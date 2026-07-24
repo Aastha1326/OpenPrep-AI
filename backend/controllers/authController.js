@@ -356,15 +356,25 @@ exports.refreshToken = async (req, res, next) => {
     const { refreshToken: rawToken } = req.body;
     const hashed = crypto.createHash('sha256').update(rawToken).digest('hex');
 
-    // Find user who has this hashed refresh token
-    const user = await User.findOne({
-      where: {
-        refreshTokens: {
-          [Op.contains]: [hashed],
+    // Find user who has this hashed refresh token (supports PostgreSQL Op.contains with DB-agnostic fallback)
+    let user;
+    try {
+      user = await User.findOne({
+        where: {
+          refreshTokens: {
+            [Op.contains]: [hashed],
+          },
+          refreshTokenExpire: { [Op.gt]: new Date() },
         },
-        refreshTokenExpire: { [Op.gt]: new Date() },
-      },
-    });
+      });
+    } catch (dbErr) {
+      const users = await User.findAll({
+        where: {
+          refreshTokenExpire: { [Op.gt]: new Date() },
+        },
+      });
+      user = users.find((u) => Array.isArray(u.refreshTokens) && u.refreshTokens.includes(hashed));
+    }
 
     if (!user) {
       return res.status(401).json({ success: false, error: 'Invalid or expired refresh token' });
