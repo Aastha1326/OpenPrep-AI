@@ -127,6 +127,11 @@ app.get('/', (req, res) => {
   res.json({ message: 'Welcome to OpenPrep AI Backend REST API API Services' });
 });
 
+// Health Check Route
+app.get('/healthz', (req, res) => {
+  res.status(200).send('OK');
+});
+
 // Error Handler Middleware
 app.use(errorHandler);
 
