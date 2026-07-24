@@ -31,6 +31,10 @@ const communityRoutes = require('./routes/communityRoutes');
 // Connect to Database
 connectDB();
 
+// Connect to Redis
+const redisService = require('./services/redisService');
+redisService.connect();
+
 const app = express();
 
 // Security Middlewares
