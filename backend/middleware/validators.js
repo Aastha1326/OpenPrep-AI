@@ -147,7 +147,7 @@ const validateSubmitQuizAttempt = [
     .isUUID(4)
     .withMessage('Each questionId must be a valid UUID'),
   body('answers.*.selectedAnswer')
-    .notEmpty()
+    .exists({ checkNull: true })
     .withMessage('Each answer must have a selectedAnswer'),
   handleValidationErrors,
 ];
