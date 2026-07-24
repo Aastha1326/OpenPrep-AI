@@ -354,6 +354,10 @@ exports.resetPassword = async (req, res, next) => {
 exports.refreshToken = async (req, res, next) => {
   try {
     const { refreshToken: rawToken } = req.body;
+    if (!rawToken || typeof rawToken !== 'string') {
+      return res.status(400).json({ success: false, error: 'Refresh token is required' });
+    }
+
     const hashed = crypto.createHash('sha256').update(rawToken).digest('hex');
 
     // Find user who has this hashed refresh token (supports PostgreSQL Op.contains with DB-agnostic fallback)
