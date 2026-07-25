@@ -32,11 +32,25 @@ exports.createExam = async (req, res, next) => {
 
 exports.getExams = async (req, res, next) => {
   try {
-    const exams = await Exam.findAll({
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const offset = (page - 1) * limit;
+
+    const { count: total, rows: exams } = await Exam.findAndCountAll({
       where: { user: req.user.id },
       order: [['date', 'ASC']],
+      limit,
+      offset,
     });
-    res.status(200).json({ success: true, count: exams.length, data: exams });
+
+    res.status(200).json({
+      success: true,
+      count: exams.length,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+      data: exams,
+    });
   } catch (error) {
     next(error);
   }
@@ -129,8 +143,24 @@ exports.getSubjects = async (req, res, next) => {
     const filter = { user: req.user.id };
     if (examId) filter.exam = examId;
 
-    const subjects = await Subject.findAll({ where: filter });
-    res.status(200).json({ success: true, count: subjects.length, data: subjects });
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const offset = (page - 1) * limit;
+
+    const { count: total, rows: subjects } = await Subject.findAndCountAll({
+      where: filter,
+      limit,
+      offset,
+    });
+
+    res.status(200).json({
+      success: true,
+      count: subjects.length,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+      data: subjects,
+    });
   } catch (error) {
     next(error);
   }
