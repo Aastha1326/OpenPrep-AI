@@ -78,21 +78,25 @@ const ResetPassword = () => {
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-sm font-semibold text-stone-700 mb-1">New Password</label>
+                <label htmlFor="reset-password" className="block text-sm font-semibold text-stone-700 mb-1">New Password</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
                   <input
+                    id="reset-password"
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     minLength={8}
+                    pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}"
+                    title="Must contain at least one uppercase letter, one lowercase letter, one number, and one special character"
                     placeholder="Min. 8 chars, upper, lower, number, special"
                     className="w-full pl-10 pr-10 py-2.5 bg-white border border-stone-300 rounded-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:border-transparent text-sm"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -101,15 +105,18 @@ const ResetPassword = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-stone-700 mb-1">Confirm Password</label>
+                <label htmlFor="reset-confirm-password" className="block text-sm font-semibold text-stone-700 mb-1">Confirm Password</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
                   <input
+                    id="reset-confirm-password"
                     type={showPassword ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
                     minLength={8}
+                    pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}"
+                    title="Must contain at least one uppercase letter, one lowercase letter, one number, and one special character"
                     placeholder="Repeat your password"
                     className="w-full pl-10 pr-4 py-2.5 bg-white border border-stone-300 rounded-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:border-transparent text-sm"
                   />
@@ -119,9 +126,11 @@ const ResetPassword = () => {
               <button
                 type="submit"
                 disabled={loading}
+                aria-busy={loading}
+                aria-label="Reset password"
                 className="w-full bg-amber-700 hover:bg-amber-800 disabled:bg-amber-400 text-amber-50 font-semibold py-2.5 rounded-sm transition-colors"
               >
-                {loading ? <Loader className="w-5 h-5 animate-spin mx-auto" /> : 'Reset Password'}
+                {loading ? <Loader className="w-5 h-5 animate-spin mx-auto" aria-hidden="true" /> : 'Reset Password'}
               </button>
             </form>
           </>

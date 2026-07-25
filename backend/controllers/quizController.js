@@ -142,17 +142,40 @@ exports.getQuizDetails = async (req, res, next) => {
 exports.submitQuizAttempt = async (req, res, next) => {
   try {
     const { answers, timeSpent } = req.body;
+    if (!Array.isArray(answers)) {
+      return res.status(400).json({ success: false, error: 'Answers must be provided as an array' });
+    }
 
     const quiz = await Quiz.findOne({ where: { id: req.params.id, createdBy: req.user.id } });
     if (!quiz) {
       return res.status(404).json({ success: false, error: 'Quiz not found' });
     }
 
+    const questionsList = quiz.questions || [];
+
+    // Validate that all questions are answered
+    if (answers.length !== questionsList.length) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Incomplete submission: expected ${questionsList.length} answers but received ${answers.length}` 
+      });
+    }
+
+    // Validate that all submitted questionIds actually belong to this quiz
+    const quizQuestionIds = questionsList.map(q => String(q._id || q.id));
+    const invalidAnswers = answers.filter(ans => !quizQuestionIds.includes(String(ans.questionId)));
+    if (invalidAnswers.length > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid questionId(s) submitted that do not belong to this quiz' 
+      });
+    }
+
     // Evaluate answers
     let correctCount = 0;
-    const evaluatedAnswers = quiz.questions.map((q) => {
+    const evaluatedAnswers = questionsList.map((q) => {
       const userAns = answers.find((ans) => ans.questionId === q._id || ans.questionId === q.id);
-      const selected = userAns ? userAns.selectedAnswer : -1;
+      const selected = userAns && userAns.selectedAnswer !== undefined ? userAns.selectedAnswer : -1;
       const isCorrect = selected === q.correctAnswer;
       if (isCorrect) correctCount++;
 
@@ -163,8 +186,8 @@ exports.submitQuizAttempt = async (req, res, next) => {
       };
     });
 
-    const totalQuestions = quiz.questions.length;
-    const score = Math.round((correctCount / totalQuestions) * 100);
+    const totalQuestions = questionsList.length;
+    const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
 
     // Determine weak vs strong areas based on score
     const weakTopics = [];
