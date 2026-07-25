@@ -149,6 +149,10 @@ const validateSubmitQuizAttempt = [
   body('answers.*.selectedAnswer')
     .exists({ checkNull: true })
     .withMessage('Each answer must have a selectedAnswer'),
+  body('timeSpent')
+    .optional()
+    .isFloat({ min: 0, max: 86400 })
+    .withMessage('timeSpent must be a non-negative number no greater than 86400 (24 hours)'),
   handleValidationErrors,
 ];
 
