@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { Op } = require('sequelize');
+const { sequelize } = require('../config/db');
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const sendEmail = require('../services/emailService');
@@ -76,18 +77,22 @@ const sendPasswordResetEmail = async (user, req) => {
 // @access  Public
 // ---------------------------------------------------------------------------
 exports.register = async (req, res, next) => {
+  const t = await sequelize.transaction();
   try {
     const { name, email, password } = req.body;
 
-    const userExists = await User.findOne({ where: { email } });
+    const userExists = await User.findOne({ where: { email }, transaction: t });
     if (userExists) {
+      await t.rollback();
       return res.status(400).json({ success: false, error: 'User already exists' });
     }
 
-    const user = await User.create({ name, email, password, role: 'student' });
+    const user = await User.create({ name, email, password, role: 'student' }, { transaction: t });
 
     // Send verification email (logs to console if SMTP not configured)
     await sendVerificationEmail(user, req);
+
+    await t.commit();
 
     res.status(201).json({
       success: true,
@@ -95,6 +100,12 @@ exports.register = async (req, res, next) => {
       isEmailVerified: false,
     });
   } catch (error) {
+    if (t && !t.finished) {
+      await t.rollback();
+    }
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      return res.status(400).json({ success: false, error: 'User already exists' });
+    }
     next(error);
   }
 };
@@ -126,14 +137,9 @@ exports.verifyEmail = async (req, res, next) => {
     user.emailVerificationExpire = null;
     await user.save();
 
-    const accessToken = generateAccessToken(user.id);
-    const refreshToken = await generateRefreshToken(user.id);
-
     res.status(200).json({
       success: true,
       message: 'Email verified successfully. You can now log in.',
-      token: accessToken,
-      refreshToken,
     });
   } catch (error) {
     next(error);
@@ -348,17 +354,31 @@ exports.resetPassword = async (req, res, next) => {
 exports.refreshToken = async (req, res, next) => {
   try {
     const { refreshToken: rawToken } = req.body;
+    if (!rawToken || typeof rawToken !== 'string') {
+      return res.status(400).json({ success: false, error: 'Refresh token is required' });
+    }
+
     const hashed = crypto.createHash('sha256').update(rawToken).digest('hex');
 
-    // Find user who has this hashed refresh token
-    const user = await User.findOne({
-      where: {
-        refreshTokens: {
-          [Op.contains]: [hashed],
+    // Find user who has this hashed refresh token (supports PostgreSQL Op.contains with DB-agnostic fallback)
+    let user;
+    try {
+      user = await User.findOne({
+        where: {
+          refreshTokens: {
+            [Op.contains]: [hashed],
+          },
+          refreshTokenExpire: { [Op.gt]: new Date() },
         },
-        refreshTokenExpire: { [Op.gt]: new Date() },
-      },
-    });
+      });
+    } catch (dbErr) {
+      const users = await User.findAll({
+        where: {
+          refreshTokenExpire: { [Op.gt]: new Date() },
+        },
+      });
+      user = users.find((u) => Array.isArray(u.refreshTokens) && u.refreshTokens.includes(hashed));
+    }
 
     if (!user) {
       return res.status(401).json({ success: false, error: 'Invalid or expired refresh token' });
