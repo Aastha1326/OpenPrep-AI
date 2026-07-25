@@ -669,9 +669,7 @@ const Dashboard = () => {
       <CreateNoteModal 
         isOpen={isNoteModalOpen} 
         onClose={() => setIsNoteModalOpen(false)} 
-        onNoteCreated={(note) => {
-          console.log('Note created', note);
-        }}
+        onNoteCreated={() => setIsNoteModalOpen(false)}
       />
 
       {/* --- STUDY PLAN MODAL --- */}
