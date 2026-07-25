@@ -17,6 +17,7 @@ const generateAccessToken = (id) => {
 };
 
 // Generate refresh token (7 day expiry) — stores hashed version in DB
+const MAX_ACTIVE_SESSIONS = 10;
 const generateRefreshToken = async (userId) => {
   const rawToken = crypto.randomBytes(40).toString('hex');
   const hashed = crypto.createHash('sha256').update(rawToken).digest('hex');
@@ -25,6 +26,12 @@ const generateRefreshToken = async (userId) => {
   if (!user) throw new Error('User not found');
 
   const tokens = [...(user.refreshTokens || [])];
+
+  // Cap active sessions: keep only the most recent tokens
+  if (tokens.length >= MAX_ACTIVE_SESSIONS) {
+    tokens.splice(0, tokens.length - MAX_ACTIVE_SESSIONS + 1);
+  }
+
   tokens.push(hashed);
   user.refreshTokens = tokens;
   user.refreshTokenExpire = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
@@ -386,6 +393,11 @@ exports.refreshToken = async (req, res, next) => {
 
     // Remove old token (rotation)
     user.refreshTokens = user.refreshTokens.filter((t) => t !== hashed);
+
+    // Prune any tokens beyond the active session limit
+    if (user.refreshTokens.length > MAX_ACTIVE_SESSIONS) {
+      user.refreshTokens = user.refreshTokens.slice(-MAX_ACTIVE_SESSIONS);
+    }
 
     // Generate new pair
     const accessToken = generateAccessToken(user.id);
