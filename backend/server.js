@@ -17,6 +17,10 @@ if (!process.env.JWT_SECRET) {
   process.exit(1);
 }
 
+if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_gemini_api_key_here') {
+  console.warn('WARNING: GEMINI_API_KEY is not set. AI endpoints will return mock data.');
+}
+
 // Import routes
 const authRoutes = require('./routes/authRoutes');
 const academicRoutes = require('./routes/academicRoutes');
