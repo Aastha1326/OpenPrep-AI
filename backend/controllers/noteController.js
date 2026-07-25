@@ -49,6 +49,10 @@ exports.uploadNote = async (req, res, next) => {
 
     res.status(201).json({ success: true, data: note });
   } catch (error) {
+    if (req.file) {
+      const filePath = path.join(__dirname, '..', 'uploads', req.file.filename);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    }
     next(error);
   }
 };

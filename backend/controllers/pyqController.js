@@ -99,6 +99,10 @@ exports.uploadAndAnalyzePYQ = async (req, res, next) => {
       data: pyq,
     });
   } catch (error) {
+    if (req.file) {
+      const filePath = path.join(__dirname, '..', 'uploads', req.file.filename);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    }
     next(error);
   }
 };
