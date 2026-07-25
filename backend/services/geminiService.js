@@ -1,5 +1,6 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const NodeCache = require('node-cache');
+const crypto = require('crypto');
 
 // Initialize Gemini API client
 const apiKey = process.env.GEMINI_API_KEY;
@@ -20,17 +21,12 @@ const responseCache = new NodeCache({
 // ==========================================
 
 /**
- * Deterministic hash for cache keys — non-crypto djb2 variant.
- * Produces a compact base-36 key from a prefix + input string.
+ * Deterministic hash for cache keys — uses cryptographically secure SHA-256.
+ * Produces a collision-resistant key from a prefix + input string.
  */
 const hashKey = (prefix, str) => {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash |= 0;
-  }
-  return `${prefix}:${Math.abs(hash).toString(36)}`;
+  const hash = crypto.createHash('sha256').update(str).digest('hex');
+  return `${prefix}:${hash}`;
 };
 
 /**
