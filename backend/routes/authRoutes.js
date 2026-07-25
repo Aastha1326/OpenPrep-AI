@@ -54,6 +54,16 @@ const forgotPasswordLimiter = rateLimit({
   legacyHeaders: true,
 });
 
+// Reset password rate limiter: 5 attempts per 15 minutes per IP
+const resetPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  skip: shouldSkip,
+  message: { success: false, error: 'Too many password reset attempts. Please try again after 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: true,
+});
+
 // Refresh token rate limiter: 10 attempts per 15 minutes per IP
 const refreshTokenLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -67,7 +77,7 @@ const refreshTokenLimiter = rateLimit({
 router.post('/register', registerLimiter, validateRegister, register);
 router.post('/login', loginLimiter, validateLogin, login);
 router.post('/forgot-password', forgotPasswordLimiter, validateForgotPassword, forgotPassword);
-router.post('/reset-password/:token', validateResetPassword, resetPassword);
+router.post('/reset-password/:token', resetPasswordLimiter, validateResetPassword, resetPassword);
 router.post('/verify-email/:token', verifyEmail);
 router.post('/refresh-token', refreshTokenLimiter, validateRefreshToken, refreshToken);
 router.post('/logout', logout);
