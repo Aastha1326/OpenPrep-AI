@@ -102,7 +102,21 @@ const forgotPasswordLimiter = rateLimit({
   legacyHeaders: true,
 });
 
+
+// Reset password rate limiter: 5 attempts per 15 minutes per IP
+const resetPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  skip: shouldSkip,
+  message: { success: false, error: 'Too many password reset attempts. Please try again after 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: true,
+});
+
+// Refresh token rate limiter: 10 attempts per 15 minutes per IP
+
 // Limit refresh token requests to 10 per 15 minutes per IP
+
 const refreshTokenLimiter = rateLimit({
   windowMs: RATE_LIMIT.WINDOWS.FIFTEEN_MINUTES,
   max: RATE_LIMIT.MAX_REQUESTS.REFRESH_TOKEN,
