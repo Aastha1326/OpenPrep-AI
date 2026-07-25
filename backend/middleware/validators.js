@@ -213,6 +213,49 @@ const validateToggleTask = [
 ];
 
 // ---------------------------------------------------------------------------
+// Progress routes
+// ---------------------------------------------------------------------------
+const validateTrackStudyTime = [
+  body('studyHours')
+    .isFloat({ min: 0.01 })
+    .withMessage('Study hours must be a positive number'),
+  body('subjectId')
+    .optional()
+    .isUUID(4)
+    .withMessage('Subject ID must be a valid UUID'),
+  body('topicId')
+    .optional()
+    .isUUID(4)
+    .withMessage('Topic ID must be a valid UUID'),
+  body('description')
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('Description must be at most 500 characters'),
+  handleValidationErrors,
+];
+
+const validateUpdateTopicProgress = [
+  body('completionPercentage')
+    .optional()
+    .isFloat({ min: 0, max: 100 })
+    .withMessage('Completion percentage must be between 0 and 100'),
+  body('studyHours')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Study hours must be a non-negative number'),
+  body('flashcardsMastered')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Flashcards mastered must be a non-negative integer'),
+  body('quizScores')
+    .optional()
+    .isArray()
+    .withMessage('Quiz scores must be an array'),
+  handleValidationErrors,
+];
+
+// ---------------------------------------------------------------------------
 // Community routes
 // ---------------------------------------------------------------------------
 const validateSubmitFeedback = [
@@ -251,6 +294,9 @@ module.exports = {
   // Study Plan
   validateGenerateAIPlan,
   validateToggleTask,
+  // Progress
+  validateTrackStudyTime,
+  validateUpdateTopicProgress,
   // Community
   validateSubmitFeedback,
 };
