@@ -203,6 +203,7 @@ router.post('/logout', logout);
 
 // Retrieve the authenticated user's profile
 // Requires authentication
+
 router.get('/me', protect, getMe);
 
 module.exports = router;
