@@ -182,8 +182,8 @@ const cleanJSON = (text) => {
  */
 exports.analyzePYQText = async (rawText, subjectName = 'the subject', forceRefresh = false) => {
   if (!genAI) {
-    console.log('Gemini API key not configured. Using Mock Data for PYQ Analysis.');
-    return getMockPYQAnalysis(subjectName);
+    console.warn('Gemini API key not configured. Using Mock Data for PYQ Analysis.');
+    return { _mock: true, ...getMockPYQAnalysis(subjectName) };
   }
 
   const cacheKey = hashKey('analyzePYQ', rawText.substring(0, 200) + subjectName);
@@ -244,8 +244,8 @@ exports.analyzePYQText = async (rawText, subjectName = 'the subject', forceRefre
  */
 exports.generateStudyPlan = async (examName, subjectsAndTopics, startDate, endDate, studyHoursPerDay = 3, forceRefresh = false) => {
   if (!genAI) {
-    console.log('Gemini API key not configured. Using Mock Data for Study Plan.');
-    return getMockStudyPlan(examName, subjectsAndTopics, startDate, endDate);
+    console.warn('Gemini API key not configured. Using Mock Data for Study Plan.');
+    return { _mock: true, days: getMockStudyPlan(examName, subjectsAndTopics, startDate, endDate) };
   }
 
   const cacheKey = hashKey('studyPlan', `${examName}:${startDate}:${endDate}:${studyHoursPerDay}`);
@@ -302,8 +302,8 @@ exports.generateStudyPlan = async (examName, subjectsAndTopics, startDate, endDa
  */
 exports.generateQuiz = async (subjectName, topicName, notesText = '', count = 5, forceRefresh = false) => {
   if (!genAI) {
-    console.log('Gemini API key not configured. Using Mock Data for Quiz.');
-    return getMockQuiz(subjectName, topicName, count);
+    console.warn('Gemini API key not configured. Using Mock Data for Quiz.');
+    return { _mock: true, ...getMockQuiz(subjectName, topicName, count) };
   }
 
   const cacheKey = hashKey('quiz', `${subjectName}:${topicName}:${count}:${notesText}`);
@@ -363,8 +363,8 @@ exports.generateQuiz = async (subjectName, topicName, notesText = '', count = 5,
  */
 exports.generateFlashcards = async (subjectName, topicName, notesText = '', count = 6, forceRefresh = false) => {
   if (!genAI) {
-    console.log('Gemini API key not configured. Using Mock Data for Flashcards.');
-    return getMockFlashcards(subjectName, topicName, count);
+    console.warn('Gemini API key not configured. Using Mock Data for Flashcards.');
+    return { _mock: true, cards: getMockFlashcards(subjectName, topicName, count) };
   }
 
   const cacheKey = hashKey('flashcards', `${subjectName}:${topicName}:${count}:${notesText}`);
@@ -412,8 +412,8 @@ exports.generateFlashcards = async (subjectName, topicName, notesText = '', coun
  */
 exports.analyzePerformanceAndRecommend = async (attemptsSummary, forceRefresh = false) => {
   if (!genAI) {
-    console.log('Gemini API key not configured. Using Mock Recommendations.');
-    return getMockRecommendations();
+    console.warn('Gemini API key not configured. Using Mock Recommendations.');
+    return { _mock: true, ...getMockRecommendations() };
   }
 
   const cacheKey = hashKey('performance', JSON.stringify(attemptsSummary));
