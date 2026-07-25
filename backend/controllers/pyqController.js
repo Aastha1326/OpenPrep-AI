@@ -27,7 +27,7 @@ exports.uploadAndAnalyzePYQ = async (req, res, next) => {
     // Read PDF and extract text
     let extractedText = '';
     try {
-      const dataBuffer = fs.readFileSync(req.file.path);
+      const dataBuffer = await fs.promises.readFile(req.file.path);
       const pdfData = await pdfParse(dataBuffer);
       extractedText = pdfData.text;
     } catch (parseError) {
@@ -200,7 +200,7 @@ exports.getPYQAnalysis = async (req, res, next) => {
       if (pyq.fileUrl) {
         const absolutePath = path.resolve(path.join(__dirname, '..', pyq.fileUrl));
         if (fs.existsSync(absolutePath)) {
-          const dataBuffer = fs.readFileSync(absolutePath);
+          const dataBuffer = await fs.promises.readFile(absolutePath);
           const pdfData = await pdfParse(dataBuffer);
           extractedText = pdfData.text;
         }
