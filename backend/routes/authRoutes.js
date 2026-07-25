@@ -1,5 +1,6 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
+const { RATE_LIMIT } = require('../config/constants');
 
 const { RATE_LIMIT } = require('../config/constants');
 
