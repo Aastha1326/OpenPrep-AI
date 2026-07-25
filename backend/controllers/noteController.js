@@ -6,6 +6,7 @@ const Subject = require('../models/Subject');
 const Topic = require('../models/Topic');
 const ActivityLog = require('../models/ActivityLog');
 const User = require('../models/User');
+const { escapeLikePattern } = require('../utils/likePattern');
 
 // @desc    Upload Note
 // @route   POST /api/notes
@@ -49,6 +50,10 @@ exports.uploadNote = async (req, res, next) => {
 
     res.status(201).json({ success: true, data: note });
   } catch (error) {
+    if (req.file) {
+      const filePath = path.join(__dirname, '..', 'uploads', req.file.filename);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    }
     next(error);
   }
 };
@@ -78,7 +83,7 @@ exports.getNotes = async (req, res, next) => {
 
     if (search) {
       const searchOp = Op.iLike || Op.like;
-      const sanitizedSearch = search.replace(/[%_]/g, '\\$&');
+      const sanitizedSearch = escapeLikePattern(search);
       const searchCondition = {
         [Op.or]: [
           { title: { [searchOp]: `%${sanitizedSearch}%` } },
