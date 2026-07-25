@@ -70,7 +70,7 @@ router.post('/forgot-password', forgotPasswordLimiter, validateForgotPassword, f
 router.post('/reset-password/:token', validateResetPassword, resetPassword);
 router.post('/verify-email/:token', verifyEmail);
 router.post('/refresh-token', refreshTokenLimiter, validateRefreshToken, refreshToken);
-router.post('/logout', logout);
+router.post('/logout', protect, logout);
 router.get('/me', protect, getMe);
 
 module.exports = router;
