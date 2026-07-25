@@ -182,15 +182,16 @@ exports.login = async (req, res, next) => {
 
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
-      // Increment failed login attempts
-      user.loginAttempts += 1;
+      // Atomically increment failed login attempts to prevent TOCTOU race condition
+      await user.increment('loginAttempts', { by: 1 });
+      await user.reload();
 
       // Lock account after 5 consecutive failures
       if (user.loginAttempts >= 5) {
         user.lockoutUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+        await user.save();
       }
 
-      await user.save();
       return res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
 
