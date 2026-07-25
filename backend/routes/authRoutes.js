@@ -1,6 +1,9 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 
+const { RATE_LIMIT } = require('../config/constants');
+
+
 const {
   register,
   login,
@@ -102,6 +105,7 @@ const forgotPasswordLimiter = rateLimit({
 const refreshTokenLimiter = rateLimit({
   windowMs: RATE_LIMIT.WINDOWS.FIFTEEN_MINUTES,
   max: RATE_LIMIT.MAX_REQUESTS.REFRESH_TOKEN,
+
   skip: shouldSkip,
 
   message: {
@@ -113,6 +117,23 @@ const refreshTokenLimiter = rateLimit({
     'Too many refresh requests. Please try again later.'
   ),
 
+  standardHeaders: true,
+  legacyHeaders: true,
+});
+
+// Email verification rate limiter: 5 attempts per 15 minutes per IP
+const verifyEmailLimiter = rateLimit({
+  windowMs: RATE_LIMIT.WINDOWS.FIFTEEN_MINUTES,
+  max: RATE_LIMIT.MAX_REQUESTS.VERIFY_EMAIL,
+  skip: shouldSkip,
+  message: createRateLimitResponse(
+    'Too many email verification attempts. Please try again after 15 minutes.'
+
+  skip: shouldSkip,
+  message: createRateLimitResponse(
+    'Too many refresh requests. Please try again later.'
+
+  ),
   standardHeaders: true,
   legacyHeaders: true,
 });
@@ -154,6 +175,10 @@ router.post('/verify-email/:token', verifyEmail);
 
 // Reset password using a valid reset token
 router.post('/reset-password/:token', validateResetPassword, resetPassword);
+
+router.post('/verify-email/:token', verifyEmailLimiter, verifyEmail);
+router.post('/refresh-token', refreshTokenLimiter, validateRefreshToken, refreshToken);
+
 
 // Verify a user's email address using the verification token
 router.post('/verify-email/:token', verifyEmailLimiter, verifyEmail);
