@@ -70,7 +70,7 @@ exports.deleteExam = async (req, res, next) => {
     }
 
     // Collect all subject IDs for this exam
-    const subjects = await Subject.findAll({ where: { exam: exam.id } });
+    const subjects = await Subject.findAll({ where: { exam: exam.id }, transaction: t });
     const subjectIds = subjects.map((sub) => sub.id);
 
     // Collect all topics for these subjects
@@ -180,28 +180,28 @@ exports.deleteSubject = async (req, res, next) => {
     }
 
     // 1. Delete QuizAttempts for quizzes under this subject
-    const quizzes = await Quiz.findAll({ where: { subject: subject.id } });
+    const quizzes = await Quiz.findAll({ where: { subject: subject.id }, transaction: t });
     const quizIds = quizzes.map((q) => q.id);
     if (quizIds.length > 0) {
-      await QuizAttempt.destroy({ where: { quiz: { [Op.in]: quizIds } } });
+      await QuizAttempt.destroy({ where: { quiz: { [Op.in]: quizIds } }, transaction: t });
     }
 
     // 2. Delete child records that reference this subject
-    await Progress.destroy({ where: { subject: subject.id } });
-    await Flashcard.destroy({ where: { subject: subject.id } });
-    await Note.destroy({ where: { subject: subject.id } });
+    await Progress.destroy({ where: { subject: subject.id }, transaction: t });
+    await Flashcard.destroy({ where: { subject: subject.id }, transaction: t });
+    await Note.destroy({ where: { subject: subject.id }, transaction: t });
 
     // 3. Delete quizzes
-    await Quiz.destroy({ where: { subject: subject.id } });
+    await Quiz.destroy({ where: { subject: subject.id }, transaction: t });
 
     // 4. Delete topics
-    await Topic.destroy({ where: { subject: subject.id } });
+    await Topic.destroy({ where: { subject: subject.id }, transaction: t });
 
     // 5. Delete PYQs for this subject
-    await PYQ.destroy({ where: { subject: subject.id } });
+    await PYQ.destroy({ where: { subject: subject.id }, transaction: t });
 
     // 6. Delete the subject itself
-    await subject.destroy();
+    await subject.destroy({ transaction: t });
 
     await t.commit();
     res.status(200).json({ success: true, data: {} });
@@ -292,16 +292,17 @@ exports.deleteTopic = async (req, res, next) => {
     }
 
     // 1. Delete child records that reference this topic
-    await Progress.destroy({ where: { topic: topic.id } });
-    await Flashcard.destroy({ where: { topic: topic.id } });
-    await Note.destroy({ where: { topic: topic.id } });
+    await Progress.destroy({ where: { topic: topic.id }, transaction: t });
+    await Flashcard.destroy({ where: { topic: topic.id }, transaction: t });
+    await Note.destroy({ where: { topic: topic.id }, transaction: t });
 
     // 2. Nullify topic reference on quizzes (quiz itself is preserved)
-    await Quiz.update({ topic: null }, { where: { topic: topic.id } });
+    await Quiz.update({ topic: null }, { where: { topic: topic.id }, transaction: t });
 
     // 3. Delete the topic itself
-    await topic.destroy();
+    await topic.destroy({ transaction: t });
 
+    await t.commit();
     res.status(200).json({ success: true, data: {} });
   } catch (error) {
     await t.rollback();
