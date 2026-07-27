@@ -251,4 +251,51 @@ describe('Dashboard', () => {
     renderDashboard();
     expect(screen.getByText('0 Day')).toBeInTheDocument();
   });
+
+  // ── Today's tasks use local date, not UTC ──
+
+  test('matches dailyGoal tasks using local date instead of UTC', () => {
+    const now = new Date();
+    const todayLocal = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const yesterdayLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    const yesterdayStr = `${yesterdayLocal.getFullYear()}-${String(yesterdayLocal.getMonth() + 1).padStart(2, '0')}-${String(yesterdayLocal.getDate()).padStart(2, '0')}`;
+
+    renderDashboard({}, {
+      activePlan: {
+        id: 'plan-1',
+        dailyGoals: [
+          {
+            date: `${yesterdayStr}T00:00:00.000Z`,
+            tasks: [{ id: 'old-task', title: 'Old day task', completed: false }],
+          },
+          {
+            date: `${todayLocal}T00:00:00.000Z`,
+            tasks: [{ id: 'today-task', title: 'Today task', completed: false }],
+          },
+        ],
+      },
+    });
+
+    expect(screen.getByText('Today task')).toBeInTheDocument();
+    expect(screen.queryByText('Old day task')).not.toBeInTheDocument();
+  });
+
+  test('falls back to first day when no dailyGoal matches today', () => {
+    const now = new Date();
+    const futureStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate() + 10).padStart(2, '0')}`;
+
+    renderDashboard({}, {
+      activePlan: {
+        id: 'plan-1',
+        dailyGoals: [
+          {
+            date: `${futureStr}T00:00:00.000Z`,
+            tasks: [{ id: 'future-task', title: 'Future task', completed: false }],
+          },
+        ],
+      },
+    });
+
+    expect(screen.getByText('Future task')).toBeInTheDocument();
+  });
 });
