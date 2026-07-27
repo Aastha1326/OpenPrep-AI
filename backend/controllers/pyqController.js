@@ -243,7 +243,7 @@ exports.deletePYQ = async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'Question paper not found' });
     }
 
-    // Delete associated file from disk
+    // Path traversal guard — the afterDestroy hook on the model handles actual file deletion
     if (pyq.fileUrl) {
       const uploadsDir = path.resolve(path.join(__dirname, '../uploads'));
       const absolutePath = path.resolve(path.join(__dirname, '..', pyq.fileUrl));
@@ -252,10 +252,6 @@ exports.deletePYQ = async (req, res, next) => {
 
       if (!isInside) {
         return res.status(400).json({ success: false, error: 'Invalid file path' });
-      }
-
-      if (fs.existsSync(absolutePath)) {
-        fs.unlinkSync(absolutePath);
       }
     }
 
