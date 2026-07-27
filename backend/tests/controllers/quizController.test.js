@@ -60,7 +60,7 @@ describe('Quiz Controller - Integration Tests', () => {
     testTopic = await Topic.create({
       name: 'Test Topic',
       description: 'A topic for testing',
-      subject: testSubject._id,
+      subject: testSubject.id,
       user: testUser.id,
     });
 
@@ -69,8 +69,8 @@ describe('Quiz Controller - Integration Tests', () => {
 
     testQuiz = await Quiz.create({
       title: 'Test Quiz',
-      subject: testSubject._id,
-      topic: testTopic._id,
+      subject: testSubject.id,
+      topic: testTopic.id,
       questions: [
         {
           _id: question1Id,
@@ -157,7 +157,7 @@ describe('Quiz Controller - Integration Tests', () => {
 
     it("should return 404 when another user tries to view someone else's quiz (IDOR protection)", async () => {
       const res = await request(app)
-        .get(`/api/quizzes/${testQuiz._id}`)
+        .get(`/api/quizzes/${testQuiz.id}`)
         .set('Authorization', `Bearer ${otherAuthToken}`);
 
       expect(res.status).toBe(404);
@@ -167,22 +167,22 @@ describe('Quiz Controller - Integration Tests', () => {
 
     it('should return quiz for the owner', async () => {
       const res = await request(app)
-        .get(`/api/quizzes/${testQuiz._id}`)
+        .get(`/api/quizzes/${testQuiz.id}`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data._id).toBe(testQuiz._id.toString());
+      expect(res.body.data.id).toBe(testQuiz.id.toString());
       expect(res.body.data.title).toBe('Test Quiz');
     });
   });
 
   describe('POST /api/quizzes/:id/submit — IDOR Protection', () => {
-    const validAnswers = [{ questionId: '000000000000000000000001', selectedAnswer: 0 }];
+    const validAnswers = [{ questionId: '00000000-0000-0000-0000-000000000001', selectedAnswer: 0 }];
 
     it("should return 404 when another user tries to submit on someone else's quiz (IDOR protection)", async () => {
       const res = await request(app)
-        .post(`/api/quizzes/${testQuiz._id}/submit`)
+        .post(`/api/quizzes/${testQuiz.id}/submit`)
         .set('Authorization', `Bearer ${otherAuthToken}`)
         .send({ answers: validAnswers, timeSpent: 60 });
 
@@ -192,13 +192,13 @@ describe('Quiz Controller - Integration Tests', () => {
     });
 
     it('should allow quiz owner to submit an attempt', async () => {
-      const realAnswers = testQuiz.questions.map((q) => ({
-        questionId: q._id.toString(),
-        selectedAnswer: q.correctAnswer,
+      const realAnswers = (testQuiz.questions || []).map((q, idx) => ({
+        questionId: String(q.id || q._id || q.questionId || `00000000-0000-0000-0000-00000000000${idx + 1}`),
+        selectedAnswer: q.correctAnswer !== undefined ? q.correctAnswer : 0,
       }));
 
       const res = await request(app)
-        .post(`/api/quizzes/${testQuiz._id}/submit`)
+        .post(`/api/quizzes/${testQuiz.id}/submit`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ answers: realAnswers, timeSpent: 120 });
 

@@ -6,6 +6,7 @@ const Subject = require('../models/Subject');
 const Topic = require('../models/Topic');
 const ActivityLog = require('../models/ActivityLog');
 const User = require('../models/User');
+const { escapeLikePattern } = require('../utils/likePattern');
 
 // @desc    Upload Note
 // @route   POST /api/notes
@@ -49,6 +50,10 @@ exports.uploadNote = async (req, res, next) => {
 
     res.status(201).json({ success: true, data: note });
   } catch (error) {
+    if (req.file) {
+      const filePath = path.join(__dirname, '..', 'uploads', req.file.filename);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    }
     next(error);
   }
 };
@@ -77,10 +82,12 @@ exports.getNotes = async (req, res, next) => {
     if (category) where.category = category;
 
     if (search) {
+      const searchOp = Op.iLike || Op.like;
+      const sanitizedSearch = escapeLikePattern(search);
       const searchCondition = {
         [Op.or]: [
-          { title: { [Op.iLike]: `%${search}%` } },
-          { content: { [Op.iLike]: `%${search}%` } },
+          { title: { [searchOp]: `%${sanitizedSearch}%` } },
+          { content: { [searchOp]: `%${sanitizedSearch}%` } },
         ],
       };
 
@@ -168,7 +175,7 @@ exports.deleteNote = async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'Note not found' });
     }
 
-    // Delete associated file from disk if it exists
+    // Path traversal guard — the afterDestroy hook on the model handles actual file deletion
     if (note.fileUrl) {
       const uploadsDir = path.resolve(path.join(__dirname, '../uploads'));
       const filePath = path.resolve(path.join(__dirname, '..', note.fileUrl));
@@ -177,10 +184,6 @@ exports.deleteNote = async (req, res, next) => {
 
       if (!isInside) {
         return res.status(400).json({ success: false, error: 'Invalid file path' });
-      }
-
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
       }
     }
 

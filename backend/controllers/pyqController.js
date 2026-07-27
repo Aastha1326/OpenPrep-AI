@@ -27,7 +27,7 @@ exports.uploadAndAnalyzePYQ = async (req, res, next) => {
     // Read PDF and extract text
     let extractedText = '';
     try {
-      const dataBuffer = fs.readFileSync(req.file.path);
+      const dataBuffer = await fs.promises.readFile(req.file.path);
       const pdfData = await pdfParse(dataBuffer);
       extractedText = pdfData.text;
     } catch (parseError) {
@@ -54,13 +54,19 @@ exports.uploadAndAnalyzePYQ = async (req, res, next) => {
     if (analysis && analysis.importantTopics) {
       for (const t of analysis.importantTopics) {
         // Look for existing topic using PostgreSQL case-insensitive iLike matching
-        let existingTopic = await Topic.findOne({
-          where: {
-            name: { [Op.iLike]: t.topicName.trim() },
-            subject: subjectId,
-            user: req.user.id,
-          },
-        });
+        let existingTopic;
+        try {
+          existingTopic = await Topic.findOne({
+            where: {
+              name: { [Op.iLike]: t.topicName.trim() },
+              subject: subjectId,
+              user: req.user.id,
+            },
+          });
+        } catch (dbErr) {
+          const userTopics = await Topic.findAll({ where: { subject: subjectId, user: req.user.id } });
+          existingTopic = userTopics.find((tp) => tp.name.trim().toLowerCase() === t.topicName.trim().toLowerCase());
+        }
 
         const calculatedStatus =
           t.importance === 'High' ? 'Medium' : t.importance === 'Medium' ? 'Medium' : 'Weak';
@@ -93,6 +99,10 @@ exports.uploadAndAnalyzePYQ = async (req, res, next) => {
       data: pyq,
     });
   } catch (error) {
+    if (req.file) {
+      const filePath = path.join(__dirname, '..', 'uploads', req.file.filename);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    }
     next(error);
   }
 };
@@ -190,7 +200,7 @@ exports.getPYQAnalysis = async (req, res, next) => {
       if (pyq.fileUrl) {
         const absolutePath = path.resolve(path.join(__dirname, '..', pyq.fileUrl));
         if (fs.existsSync(absolutePath)) {
-          const dataBuffer = fs.readFileSync(absolutePath);
+          const dataBuffer = await fs.promises.readFile(absolutePath);
           const pdfData = await pdfParse(dataBuffer);
           extractedText = pdfData.text;
         }
@@ -233,7 +243,7 @@ exports.deletePYQ = async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'Question paper not found' });
     }
 
-    // Delete associated file from disk
+    // Path traversal guard — the afterDestroy hook on the model handles actual file deletion
     if (pyq.fileUrl) {
       const uploadsDir = path.resolve(path.join(__dirname, '../uploads'));
       const absolutePath = path.resolve(path.join(__dirname, '..', pyq.fileUrl));
@@ -242,10 +252,6 @@ exports.deletePYQ = async (req, res, next) => {
 
       if (!isInside) {
         return res.status(400).json({ success: false, error: 'Invalid file path' });
-      }
-
-      if (fs.existsSync(absolutePath)) {
-        fs.unlinkSync(absolutePath);
       }
     }
 
