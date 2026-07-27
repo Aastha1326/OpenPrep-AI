@@ -49,7 +49,7 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
     testTopic = await Topic.create({
       name: 'Test Topic',
       description: 'Topic for flashcards',
-      subject: testSubject._id,
+      subject: testSubject.id,
       user: testUser.id,
     });
   });
@@ -64,8 +64,8 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
         .post('/api/flashcards')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          subjectId: testSubject._id,
-          topicId: testTopic._id,
+          subjectId: testSubject.id,
+          topicId: testTopic.id,
           front: 'What is the capital of France?',
           back: 'Paris',
         });
@@ -84,7 +84,7 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
         .post('/api/flashcards')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          subjectId: testSubject._id,
+          subjectId: testSubject.id,
           front: 'Question without topic?',
           back: 'Answer without topic',
         });
@@ -111,7 +111,7 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
     it('should return flashcards filtered by subject', async () => {
       await Flashcard.create({
         user: testUser.id,
-        subject: testSubject._id,
+        subject: testSubject.id,
         front: 'Q1',
         back: 'A1',
       });
@@ -119,7 +119,7 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
       const res = await request(app)
         .get('/api/flashcards')
         .set('Authorization', `Bearer ${authToken}`)
-        .query({ subjectId: testSubject._id.toString() });
+        .query({ subjectId: testSubject.id.toString() });
 
       expect(res.status).toBe(200);
       expect(res.body.count).toBe(1);
@@ -132,8 +132,8 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
     beforeEach(async () => {
       card = await Flashcard.create({
         user: testUser.id,
-        subject: testSubject._id,
-        topic: testTopic._id,
+        subject: testSubject.id,
+        topic: testTopic.id,
         front: 'SM-2 Test Question?',
         back: 'SM-2 Test Answer',
       });
@@ -141,7 +141,7 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
 
     it('should return 400 for invalid quality score (< 0)', async () => {
       const res = await request(app)
-        .put(`/api/flashcards/${card._id}/review`)
+        .put(`/api/flashcards/${card.id}/review`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ quality: -1 });
 
@@ -150,7 +150,7 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
 
     it('should return 400 for invalid quality score (> 5)', async () => {
       const res = await request(app)
-        .put(`/api/flashcards/${card._id}/review`)
+        .put(`/api/flashcards/${card.id}/review`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ quality: 6 });
 
@@ -159,7 +159,7 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
 
     it('should return 400 for missing quality score', async () => {
       const res = await request(app)
-        .put(`/api/flashcards/${card._id}/review`)
+        .put(`/api/flashcards/${card.id}/review`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({});
 
@@ -168,7 +168,7 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
 
     it('should set interval=1 and repetitions=0 for failed review (quality < 3)', async () => {
       const res = await request(app)
-        .put(`/api/flashcards/${card._id}/review`)
+        .put(`/api/flashcards/${card.id}/review`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ quality: 1 });
 
@@ -178,7 +178,7 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
 
     it('should increment repetitions and set interval=1 on first pass (quality >= 3, reps=0)', async () => {
       const res = await request(app)
-        .put(`/api/flashcards/${card._id}/review`)
+        .put(`/api/flashcards/${card.id}/review`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ quality: 4 });
 
@@ -193,7 +193,7 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
       await card.save();
 
       const res = await request(app)
-        .put(`/api/flashcards/${card._id}/review`)
+        .put(`/api/flashcards/${card.id}/review`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ quality: 4 });
 
@@ -209,7 +209,7 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
       await card.save();
 
       const res = await request(app)
-        .put(`/api/flashcards/${card._id}/review`)
+        .put(`/api/flashcards/${card.id}/review`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ quality: 4 });
 
@@ -219,7 +219,7 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
 
     it('should not let efactor drop below 1.3', async () => {
       const res = await request(app)
-        .put(`/api/flashcards/${card._id}/review`)
+        .put(`/api/flashcards/${card.id}/review`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ quality: 0 });
 
@@ -230,7 +230,7 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
       const before = Date.now();
 
       const res = await request(app)
-        .put(`/api/flashcards/${card._id}/review`)
+        .put(`/api/flashcards/${card.id}/review`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ quality: 5 });
 
@@ -243,13 +243,13 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
     it('should delete an existing flashcard', async () => {
       const c = await Flashcard.create({
         user: testUser.id,
-        subject: testSubject._id,
+        subject: testSubject.id,
         front: 'Delete me?',
         back: 'Deleted',
       });
 
       const res = await request(app)
-        .delete(`/api/flashcards/${c._id}`)
+        .delete(`/api/flashcards/${c.id}`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);

@@ -87,8 +87,8 @@ describe('PYQ Controller - Integration Tests', () => {
       const res = await request(app)
         .post('/api/pyqs/upload')
         .set('Authorization', `Bearer ${authToken}`)
-        .field('examId', testExam._id.toString())
-        .field('subjectId', testSubject._id.toString())
+        .field('examId', testExam.id.toString())
+        .field('subjectId', testSubject.id.toString())
         .field('year', '2024')
         .attach('file', createTestPdfBuffer(), 'pyq-2024.pdf');
 
@@ -115,8 +115,8 @@ describe('PYQ Controller - Integration Tests', () => {
       const res = await request(app)
         .post('/api/pyqs/upload')
         .set('Authorization', `Bearer ${authToken}`)
-        .field('examId', testExam._id.toString())
-        .field('subjectId', testSubject._id.toString())
+        .field('examId', testExam.id.toString())
+        .field('subjectId', testSubject.id.toString())
         .field('year', '2024');
 
       expect(res.status).toBe(400);
@@ -128,7 +128,7 @@ describe('PYQ Controller - Integration Tests', () => {
       const res = await request(app)
         .post('/api/pyqs/upload')
         .set('Authorization', `Bearer ${authToken}`)
-        .field('examId', testExam._id.toString())
+        .field('examId', testExam.id.toString())
         .field('year', '2024')
         .attach('file', createTestPdfBuffer(), 'pyq.pdf');
 
@@ -139,8 +139,8 @@ describe('PYQ Controller - Integration Tests', () => {
     it('should return 401 without authentication', async () => {
       const res = await request(app)
         .post('/api/pyqs/upload')
-        .field('examId', testExam._id.toString())
-        .field('subjectId', testSubject._id.toString())
+        .field('examId', testExam.id.toString())
+        .field('subjectId', testSubject.id.toString())
         .field('year', '2024')
         .attach('file', createTestPdfBuffer(), 'pyq.pdf');
 
@@ -158,8 +158,8 @@ describe('PYQ Controller - Integration Tests', () => {
       const res = await request(app)
         .post('/api/pyqs/upload')
         .set('Authorization', `Bearer ${authToken}`)
-        .field('examId', testExam._id.toString())
-        .field('subjectId', testSubject._id.toString())
+        .field('examId', testExam.id.toString())
+        .field('subjectId', testSubject.id.toString())
         .field('year', '2023')
         .attach('file', createTestPdfBuffer(), 'pyq-2023.pdf');
 
@@ -222,8 +222,8 @@ describe('PYQ Controller - Integration Tests', () => {
       const createRes = await request(app)
         .post('/api/pyqs/upload')
         .set('Authorization', `Bearer ${authToken}`)
-        .field('examId', testExam._id.toString())
-        .field('subjectId', testSubject._id.toString())
+        .field('examId', testExam.id.toString())
+        .field('subjectId', testSubject.id.toString())
         .field('year', '2025')
         .attach('file', createTestPdfBuffer(), 'pyq-2025.pdf');
 
@@ -279,8 +279,8 @@ describe('PYQ Controller - Integration Tests', () => {
       const createRes = await request(app)
         .post('/api/pyqs/upload')
         .set('Authorization', `Bearer ${authToken}`)
-        .field('examId', testExam._id.toString())
-        .field('subjectId', testSubject._id.toString())
+        .field('examId', testExam.id.toString())
+        .field('subjectId', testSubject.id.toString())
         .field('year', '2024')
         .attach('file', createTestPdfBuffer(), 'pyq-analyze.pdf');
 
@@ -334,7 +334,7 @@ describe('PYQ Controller - Integration Tests', () => {
       const maliciousPyq = await PYQ.create({
         title: 'Trapped PYQ',
         exam: testExam.id,
-        subject: testSubject._id.toString(),
+        subject: testSubject.id.toString(),
         year: 2024,
         fileUrl: '../../.env',
         analyzed: true,
@@ -365,8 +365,8 @@ describe('PYQ Controller - Integration Tests', () => {
       const createRes = await request(app)
         .post('/api/pyqs/upload')
         .set('Authorization', `Bearer ${authToken}`)
-        .field('examId', testExam._id.toString())
-        .field('subjectId', testSubject._id.toString())
+        .field('examId', testExam.id.toString())
+        .field('subjectId', testSubject.id.toString())
         .field('year', '2022')
         .attach('file', createTestPdfBuffer(), 'pyq-delete.pdf');
 
@@ -417,7 +417,7 @@ describe('PYQ Controller - Integration Tests', () => {
       const maliciousPyq = await PYQ.create({
         title: 'Trapped PYQ',
         exam: testExam.id,
-        subject: testSubject._id.toString(),
+        subject: testSubject.id.toString(),
         year: 2024,
         fileUrl: '../../.env',
         analyzed: true,
