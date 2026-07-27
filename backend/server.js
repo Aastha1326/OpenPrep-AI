@@ -17,6 +17,10 @@ if (!process.env.JWT_SECRET) {
   process.exit(1);
 }
 
+if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_gemini_api_key_here') {
+  console.warn('WARNING: GEMINI_API_KEY is not set. AI endpoints will return mock data.');
+}
+
 // Import routes
 const authRoutes = require('./routes/authRoutes');
 const academicRoutes = require('./routes/academicRoutes');
@@ -30,6 +34,10 @@ const communityRoutes = require('./routes/communityRoutes');
 
 // Connect to Database
 connectDB();
+
+// Connect to Redis
+const redisService = require('./services/redisService');
+redisService.connect();
 
 const app = express();
 
@@ -121,6 +129,11 @@ app.use('/api/community', communityRoutes);
 // Base Route
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to OpenPrep AI Backend REST API API Services' });
+});
+
+// Health Check Route
+app.get('/healthz', (req, res) => {
+  res.status(200).send('OK');
 });
 
 // Error Handler Middleware
