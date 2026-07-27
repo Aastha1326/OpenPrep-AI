@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
 
@@ -69,6 +71,29 @@ const Note = sequelize.define(
         fields: ['user', 'subject'],
       },
     ],
+    hooks: {
+      afterDestroy: (note) => {
+        if (!note.fileUrl) return;
+
+        const uploadsDir = path.resolve(path.join(__dirname, '../uploads'));
+        const absolutePath = path.resolve(path.join(__dirname, '..', note.fileUrl));
+        const relative = path.relative(uploadsDir, absolutePath);
+        const isInside = relative && !relative.startsWith('..') && !path.isAbsolute(relative);
+
+        if (!isInside) {
+          console.warn(`[Note Model] Path traversal blocked for fileUrl: ${note.fileUrl}`);
+          return;
+        }
+
+        try {
+          if (fs.existsSync(absolutePath)) {
+            fs.unlinkSync(absolutePath);
+          }
+        } catch (err) {
+          console.error(`[Note Model] Failed to delete file ${absolutePath}:`, err.message);
+        }
+      },
+    },
   }
 );
 

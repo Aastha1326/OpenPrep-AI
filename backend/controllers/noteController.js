@@ -175,7 +175,7 @@ exports.deleteNote = async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'Note not found' });
     }
 
-    // Delete associated file from disk if it exists
+    // Path traversal guard — the afterDestroy hook on the model handles actual file deletion
     if (note.fileUrl) {
       const uploadsDir = path.resolve(path.join(__dirname, '../uploads'));
       const filePath = path.resolve(path.join(__dirname, '..', note.fileUrl));
@@ -184,10 +184,6 @@ exports.deleteNote = async (req, res, next) => {
 
       if (!isInside) {
         return res.status(400).json({ success: false, error: 'Invalid file path' });
-      }
-
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
       }
     }
 
