@@ -94,17 +94,23 @@ exports.register = async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'User already exists' });
     }
 
-    const user = await User.create({ name, email, password, role: 'student' }, { transaction: t });
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    const isEmailVerified = isDevelopment;
+    const user = await User.create({ name, email, password, role: 'student', isEmailVerified }, { transaction: t });
 
-    // Send verification email (logs to console if SMTP not configured)
-    await sendVerificationEmail(user, req);
+    if (!isEmailVerified) {
+      // Send verification email (logs to console if SMTP not configured)
+      await sendVerificationEmail(user, req);
+    }
 
     await t.commit();
 
     res.status(201).json({
       success: true,
-      message: 'Registration successful. Please verify your email to activate your account.',
-      isEmailVerified: false,
+      message: isEmailVerified 
+        ? 'Registration successful. Account auto-verified for development.'
+        : 'Registration successful. Please verify your email to activate your account.',
+      isEmailVerified,
     });
   } catch (error) {
     if (t && !t.finished) {
