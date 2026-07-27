@@ -24,7 +24,13 @@ const generateRefreshToken = async (userId) => {
   const user = await User.findByPk(userId);
   if (!user) throw new Error('User not found');
 
-  const tokens = [...(user.refreshTokens || [])];
+  let tokens = [...(user.refreshTokens || [])];
+  
+  // Bound the array to a maximum of 5 concurrent sessions to prevent DB bloat
+  if (tokens.length >= 5) {
+    tokens = tokens.slice(-4);
+  }
+  
   tokens.push(hashed);
   user.refreshTokens = tokens;
   user.refreshTokenExpire = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
