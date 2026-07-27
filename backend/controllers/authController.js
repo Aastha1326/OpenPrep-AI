@@ -17,12 +17,9 @@ const generateAccessToken = (id) => {
 };
 
 // Generate refresh token (7 day expiry) — stores hashed version in DB
-const generateRefreshToken = async (userId) => {
+const generateRefreshToken = async (user) => {
   const rawToken = crypto.randomBytes(40).toString('hex');
   const hashed = crypto.createHash('sha256').update(rawToken).digest('hex');
-
-  const user = await User.findByPk(userId);
-  if (!user) throw new Error('User not found');
 
   const tokens = [...(user.refreshTokens || [])];
   tokens.push(hashed);
@@ -198,7 +195,6 @@ exports.login = async (req, res, next) => {
     if (user.loginAttempts !== 0 || user.lockoutUntil !== null) {
       user.loginAttempts = 0;
       user.lockoutUntil = null;
-      await user.save();
     }
 
     // Update daily streak
@@ -218,10 +214,9 @@ exports.login = async (req, res, next) => {
       user.streakCount = 1;
     }
     user.streakLastActive = new Date();
-    await user.save();
 
     const accessToken = generateAccessToken(user.id);
-    const refreshToken = await generateRefreshToken(user.id);
+    const refreshToken = await generateRefreshToken(user);
 
     res.status(200).json({
       success: true,
@@ -330,10 +325,9 @@ exports.resetPassword = async (req, res, next) => {
     user.resetPasswordExpire = null;
     // Invalidate all existing refresh tokens on password reset
     user.refreshTokens = [];
-    await user.save();
 
     const accessToken = generateAccessToken(user.id);
-    const refreshToken = await generateRefreshToken(user.id);
+    const refreshToken = await generateRefreshToken(user);
 
     res.status(200).json({
       success: true,
@@ -375,7 +369,7 @@ exports.refreshToken = async (req, res, next) => {
 
     // Generate new pair
     const accessToken = generateAccessToken(user.id);
-    const newRefreshToken = await generateRefreshToken(user.id);
+    const newRefreshToken = await generateRefreshToken(user);
 
     res.status(200).json({
       success: true,
