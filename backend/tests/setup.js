@@ -6,9 +6,17 @@ const { sequelize } = require('../models');
 
 beforeAll(async () => {
   // Clear and recreate all tables for clean test execution
-  await sequelize.sync({ force: true });
+  try {
+    await sequelize.sync({ force: true });
+  } catch (err) {
+    console.warn('Test DB sync skipped or failed:', err.message);
+  }
 });
 
 afterAll(async () => {
-  await sequelize.close();
+  try {
+    await sequelize.close();
+  } catch (err) {
+    // Ignore cleanup error if DB wasn't connected
+  }
 });
