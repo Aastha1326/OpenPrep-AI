@@ -120,45 +120,33 @@ exports.getDashboardStats = async (req, res, next) => {
 // @access  Private
 exports.getSubjectBreakdown = async (req, res, next) => {
   try {
-    const progressList = await Progress.findAll({
+    // Aggregate progress stats per subject directly in PostgreSQL
+    const breakdown = await Progress.findAll({
       where: { user: req.user.id },
-      include: [
-        { model: Subject, as: 'subjectRef' },
-        { model: Topic, as: 'topicRef' },
+      attributes: [
+        [fn('COUNT', col('topic')), 'topicsCount'],
+        [fn('SUM', col('completionPercentage')), 'totalCompletion'],
+        [fn('SUM', col('studyHours')), 'totalHours'],
+        [fn('SUM', col('flashcardsMastered')), 'flashcardsMastered'],
       ],
+      include: [{ model: Subject, as: 'subjectRef', attributes: ['name'] }],
+      group: ['subjectRef.id'],
+      raw: true,
     });
 
-    // Group progress by subject
-    const subjectStats = {};
+    const result = breakdown
+      .filter((b) => b['subjectRef.name'])
+      .map((b) => ({
+        subjectName: b['subjectRef.name'],
+        progressPercentage:
+          parseInt(b.topicsCount, 10) > 0
+            ? Math.round(parseFloat(b.totalCompletion) / parseInt(b.topicsCount, 10))
+            : 0,
+        studyHours: parseFloat(b.totalHours) || 0,
+        flashcardsMastered: parseInt(b.flashcardsMastered, 10) || 0,
+      }));
 
-    progressList.forEach((p) => {
-      const json = p.toJSON();
-      const subject = json.subjectRef;
-      if (!subject) return;
-      const subId = subject.id;
-      if (!subjectStats[subId]) {
-        subjectStats[subId] = {
-          subjectName: subject.name,
-          topicsCount: 0,
-          totalCompletion: 0,
-          totalHours: 0,
-          flashcardsMastered: 0,
-        };
-      }
-      subjectStats[subId].topicsCount += 1;
-      subjectStats[subId].totalCompletion += json.completionPercentage || 0;
-      subjectStats[subId].totalHours += json.studyHours || 0;
-      subjectStats[subId].flashcardsMastered += json.flashcardsMastered || 0;
-    });
-
-    const breakdown = Object.values(subjectStats).map((s) => ({
-      subjectName: s.subjectName,
-      progressPercentage: s.topicsCount > 0 ? Math.round(s.totalCompletion / s.topicsCount) : 0,
-      studyHours: s.totalHours,
-      flashcardsMastered: s.flashcardsMastered,
-    }));
-
-    res.status(200).json({ success: true, data: breakdown });
+    res.status(200).json({ success: true, data: result });
   } catch (error) {
     next(error);
   }

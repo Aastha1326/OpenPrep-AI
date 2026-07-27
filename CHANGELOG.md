@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
-- **Orphan files in uploads/ directory**: Added `afterDestroy` hooks on `Note` and `PYQ` Sequelize models to ensure uploaded files are cleaned up from disk whenever a database record is destroyed — including cascade deletes via parent records (User, Subject, Topic, Exam). Previously, direct file deletion in controllers was bypassed during cascade operations, leaving orphan files on disk. (#188)
+- **Unhandled Promise Rejections in Axios refresh interceptor queue**: When a silent token refresh fails, the queue of suspended requests is rejected via `processQueue`, but the queued promise lacked a `.catch()` handler, causing unhandled rejection warnings in the browser console. Added `.catch((err) => Promise.reject(err))` to properly propagate the rejection. (#182)
 - **Timer leak in Gemini service**: `callWithTimeout` in `geminiService.js` now properly clears the `setTimeout` timer handle after `Promise.race` completes. Previously, every AI call (PYQ analysis, study plan, quiz, flashcard, and performance analysis) leaked a dangling timer reference that kept the Node.js event loop active and the reject closure in memory until the timeout naturally expired. (#166)
 - **Cascade deletion**: Deleting an Exam, Subject, or Topic now properly cascade-deletes all associated child records (Progress, Flashcards, Notes, Quizzes, QuizAttempts, StudyPlans, PYQs) instead of leaving orphaned records. Previously, the controllers used bulk `Model.destroy()` which bypassed Sequelize's cascade hooks, and the `deleteExam`/`deleteSubject` controllers only manually deleted Subjects/Topics while missing all other child records. The `deleteTopic` controller now also cascade-deletes Flashcards and Notes instead of setting their FK to `NULL`.
 - **Model associations**: Changed `Topic.hasMany(Flashcard)` and `Topic.hasMany(Note)` from `onDelete: 'SET NULL'` to `onDelete: 'CASCADE'` for consistency.
@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `isEmailVerified` field on User model to gate login access.
 
 ### Changed
+- **Subject breakdown stats aggregation moved to PostgreSQL**: `getSubjectBreakdown` in `progressController.js` now uses Sequelize `GROUP BY` and aggregation functions (`COUNT`, `SUM`) to perform grouping and summing at the database level instead of loading all `Progress` rows into Node.js memory. This reduces network payload, CPU, and memory usage. (#186)
 - **JWT access token lifetime reduced from 30 days to 15 minutes** for improved security. Refresh tokens provide long-lived sessions.
 - **Registration response**: No longer returns a JWT token. Returns `{ success, message, isEmailVerified: false }` prompting email verification.
 - **Login response**: Returns 403 `Forbidden` if email is not verified. Returns `refreshToken` alongside `token` for session management.

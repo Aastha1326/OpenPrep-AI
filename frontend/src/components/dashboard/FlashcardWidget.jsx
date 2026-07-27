@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Lightbulb, AlertCircle, RefreshCw, BookOpen, ChevronRight } from 'lucide-react';
+import { Lightbulb, AlertCircle, RefreshCw, BookOpen } from 'lucide-react';
 
 const Shimmer = ({ className = '' }) => (
   <div className={`animate-pulse bg-neutral-300/60 rounded ${className}`} />
@@ -69,8 +69,22 @@ const FlashcardWidget = ({ flashcard = null, loading = false, error = null, tota
     }
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setIsFlipped(!isFlipped);
+    }
+  };
+
   return (
-    <div className="relative w-full h-56 cursor-pointer perspective-1000" onClick={() => setIsFlipped(!isFlipped)}>
+    <div
+      className="relative w-full h-56 cursor-pointer perspective-1000"
+      role="button"
+      tabIndex={0}
+      aria-label={isFlipped ? 'Flip to front' : 'Flip to back'}
+      onClick={() => setIsFlipped(!isFlipped)}
+      onKeyDown={handleKeyDown}
+    >
       <motion.div
         className="w-full h-full relative preserve-3d"
         initial={false}
