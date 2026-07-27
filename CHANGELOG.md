@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `isEmailVerified` field on User model to gate login access.
 
 ### Changed
+- **Subject breakdown stats aggregation moved to PostgreSQL**: `getSubjectBreakdown` in `progressController.js` now uses Sequelize `GROUP BY` and aggregation functions (`COUNT`, `SUM`) to perform grouping and summing at the database level instead of loading all `Progress` rows into Node.js memory. This reduces network payload, CPU, and memory usage. (#186)
 - **JWT access token lifetime reduced from 30 days to 15 minutes** for improved security. Refresh tokens provide long-lived sessions.
 - **Registration response**: No longer returns a JWT token. Returns `{ success, message, isEmailVerified: false }` prompting email verification.
 - **Login response**: Returns 403 `Forbidden` if email is not verified. Returns `refreshToken` alongside `token` for session management.
