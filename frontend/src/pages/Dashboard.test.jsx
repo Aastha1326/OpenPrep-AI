@@ -22,6 +22,7 @@ vi.mock('../store/slices/dashboardSlice', async () => {
     fetchSubjectBreakdown: () => ({ type: 'dashboard/fetchSubjects' }),
     fetchActivePlan: () => ({ type: 'dashboard/fetchActivePlan' }),
     fetchDueFlashcards: () => ({ type: 'dashboard/fetchFlashcards' }),
+    reviewFlashcard: (payload) => ({ type: 'dashboard/reviewFlashcard', payload }),
   };
 });
 
@@ -250,5 +251,23 @@ describe('Dashboard', () => {
   test('displays zero streak by default', () => {
     renderDashboard();
     expect(screen.getByText('0 Day')).toBeInTheDocument();
+  });
+
+  // ── Flashcard review integration ──
+
+  test('passes onReview handler to FlashcardWidget when flashcards are due', () => {
+    const dueFlashcards = [
+      { id: 'card-1', front: 'What is 2+2?', back: '4' },
+      { id: 'card-2', front: 'Capital of France?', back: 'Paris' },
+    ];
+    renderDashboard({}, { dueFlashcards });
+
+    const cardElement = screen.getByText('What is 2+2?');
+    expect(cardElement).toBeInTheDocument();
+  });
+
+  test('shows "All caught up" when no flashcards are due', () => {
+    renderDashboard({}, { dueFlashcards: [] });
+    expect(screen.getByText('All caught up! No cards due.')).toBeInTheDocument();
   });
 });
