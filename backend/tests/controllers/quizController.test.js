@@ -178,7 +178,7 @@ describe('Quiz Controller - Integration Tests', () => {
   });
 
   describe('POST /api/quizzes/:id/submit — IDOR Protection', () => {
-    const validAnswers = [{ questionId: '000000000000000000000001', selectedAnswer: 0 }];
+    const validAnswers = [{ questionId: '00000000-0000-0000-0000-000000000001', selectedAnswer: 0 }];
 
     it("should return 404 when another user tries to submit on someone else's quiz (IDOR protection)", async () => {
       const res = await request(app)
@@ -192,9 +192,9 @@ describe('Quiz Controller - Integration Tests', () => {
     });
 
     it('should allow quiz owner to submit an attempt', async () => {
-      const realAnswers = testQuiz.questions.map((q) => ({
-        questionId: q.id.toString(),
-        selectedAnswer: q.correctAnswer,
+      const realAnswers = (testQuiz.questions || []).map((q, idx) => ({
+        questionId: String(q.id || q._id || q.questionId || `00000000-0000-0000-0000-00000000000${idx + 1}`),
+        selectedAnswer: q.correctAnswer !== undefined ? q.correctAnswer : 0,
       }));
 
       const res = await request(app)

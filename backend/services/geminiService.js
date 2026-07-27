@@ -244,7 +244,7 @@ exports.analyzePYQText = async (rawText, subjectName = 'the subject', forceRefre
 exports.generateStudyPlan = async (examName, subjectsAndTopics, startDate, endDate, studyHoursPerDay = 3, forceRefresh = false) => {
   if (!genAI) {
     console.warn('Gemini API key not configured. Using Mock Data for Study Plan.');
-    return { _mock: true, days: getMockStudyPlan(examName, subjectsAndTopics, startDate, endDate) };
+    return getMockStudyPlan(examName, subjectsAndTopics, startDate, endDate);
   }
 
   const cacheKey = hashKey('studyPlan', `${examName}:${startDate}:${endDate}:${studyHoursPerDay}`);
@@ -366,7 +366,7 @@ exports.generateQuiz = async (subjectName, topicName, notesText = '', count = 5,
 exports.generateFlashcards = async (subjectName, topicName, notesText = '', count = 6, forceRefresh = false) => {
   if (!genAI) {
     console.warn('Gemini API key not configured. Using Mock Data for Flashcards.');
-    return { _mock: true, cards: getMockFlashcards(subjectName, topicName, count) };
+    return getMockFlashcards(subjectName, topicName, count);
   }
 
   const cacheKey = hashKey('flashcards', `${subjectName}:${topicName}:${count}:${notesText}`);
