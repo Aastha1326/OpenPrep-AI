@@ -9,6 +9,10 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 const { connectDB } = require('./config/db');
 const errorHandler = require('./middleware/error');
+const { protect } = require('./middleware/auth');
+const fs = require('fs');
+const PYQ = require('./models/PYQ');
+const Note = require('./models/Note');
 
 // Validate required environment variables at startup
 if (!process.env.JWT_SECRET) {
@@ -65,8 +69,32 @@ const apiLimiter = rateLimit({
 });
 app.use('/api/', apiLimiter);
 
-// Set Static Folder for File Uploads
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Protected Route for File Uploads (replaces insecure express.static)
+app.get('/uploads/:filename', protect, async (req, res, next) => {
+  try {
+    const filename = req.params.filename;
+    const fileUrl = `/uploads/${filename}`;
+    
+    // Verify file ownership or public access
+    const pyq = await PYQ.findOne({ where: { fileUrl, user: req.user.id } });
+    const note = await Note.findOne({ where: { fileUrl } });
+    
+    const hasNoteAccess = note && (note.user === req.user.id || note.isPublic);
+    
+    if (!pyq && !hasNoteAccess) {
+      return res.status(403).json({ success: false, error: 'Access denied. You do not have permission to view this file.' });
+    }
+    
+    const filePath = path.join(__dirname, 'uploads', filename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, error: 'File not found on server.' });
+    }
+    
+    res.sendFile(filePath);
+  } catch (error) {
+    next(error);
+  }
+});
 
 // Mount routes
 app.use('/api/auth', authRoutes);
