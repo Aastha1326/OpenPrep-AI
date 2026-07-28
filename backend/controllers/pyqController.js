@@ -83,6 +83,9 @@ exports.uploadAndAnalyzePYQ = async (req, res, next) => {
     // Automatically register/update detected topics in Database
     if (analysis && analysis.importantTopics) {
       for (const t of analysis.importantTopics) {
+        // Safety guard: skip malformed items that Gemini may have generated with missing fields
+        if (!t || !t.topicName || !t.importance) continue;
+
         // Look for existing topic using PostgreSQL case-insensitive iLike matching
         let existingTopic;
         try {

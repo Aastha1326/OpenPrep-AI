@@ -80,9 +80,9 @@ async function generateWithRetry(model, prompt, retries = 3) {
 
 const RESPONSE_SCHEMAS = {
   pyqAnalysis: {
-    chapterWeightage: 'array',
-    importantTopics: 'array',
-    repeatedQuestions: 'array',
+    chapterWeightage: { type: 'array', itemSchema: { chapterName: 'string', weightage: 'number' } },
+    importantTopics: { type: 'array', itemSchema: { topicName: 'string', importance: 'string', frequency: 'number' } },
+    repeatedQuestions: { type: 'array', itemSchema: { questionText: 'string', years: 'array' } },
     trendAnalysis: 'string'
   },
   studyPlan: {
@@ -92,39 +92,77 @@ const RESPONSE_SCHEMAS = {
   },
   quiz: {
     title: 'string',
-    questions: 'array'
+    questions: { type: 'array', itemSchema: { questionText: 'string', options: 'array', correctAnswer: 'number', explanation: 'string' } }
   },
   flashcard: {
     _type: 'array',
     _itemSchema: { front: 'string', back: 'string' }
   },
   performance: {
-    weakSubjects: 'array',
-    recommendations: 'array'
+    weakSubjects: 'array', // array of primitive strings — no itemSchema needed
+    recommendations: { type: 'array', itemSchema: { subject: 'string', topic: 'string', suggestion: 'string', priority: 'string' } }
   }
 };
 
 /**
  * Validate a parsed response against a schema definition.
  * Returns true if the data matches the expected shape, false otherwise.
+ *
+ * Supports two rule formats:
+ *   - Simple string:  `'array'` or `'string'` — checks typeof / Array.isArray
+ *   - Object rule:    `{ type: 'array', itemSchema: { key: 'string' } }`
+ *                     — also validates each item's shape recursively
  */
 function validateResponse(data, schema) {
   if (!data) return false;
+
+  // --- Top-level array schema (e.g. studyPlan, flashcard) ---
   if (schema._type === 'array') {
     if (!Array.isArray(data) || data.length === 0) return false;
     if (schema._itemSchema) {
       for (const item of data) {
-        for (const [key, type] of Object.entries(schema._itemSchema)) {
-          if (typeof item[key] !== type) return false;
-        }
+        if (!validateItemShape(item, schema._itemSchema)) return false;
       }
     }
     return true;
   }
-  for (const [key, type] of Object.entries(schema)) {
+
+  // --- Object schema (e.g. pyqAnalysis, quiz, performance) ---
+  for (const [key, rule] of Object.entries(schema)) {
     if (key.startsWith('_')) continue;
-    if (type === 'array' && (!Array.isArray(data[key]) || data[key].length === 0)) return false;
-    if (type !== 'array' && typeof data[key] !== type) return false;
+    const expectedType = typeof rule === 'string' ? rule : rule.type;
+    const itemSchema = typeof rule === 'object' ? rule.itemSchema : null;
+
+    if (expectedType === 'array') {
+      if (!Array.isArray(data[key]) || data[key].length === 0) return false;
+      if (itemSchema) {
+        for (const item of data[key]) {
+          if (!validateItemShape(item, itemSchema)) return false;
+        }
+      }
+    } else {
+      if (typeof data[key] !== expectedType) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Validate that a single item object matches the expected shape.
+ * Each entry in itemSchema is an expected typeof value.
+ * A special key `_any` means "any type is acceptable" (just checks the key exists).
+ */
+function validateItemShape(item, itemSchema) {
+  for (const [key, expectedType] of Object.entries(itemSchema)) {
+    if (expectedType === '_any') {
+      // Key must exist but can be any type
+      if (!(key in item)) return false;
+    } else if (expectedType === 'array') {
+      // typeof [] is 'object' in JS, so use Array.isArray
+      if (!Array.isArray(item[key])) return false;
+    } else if (typeof item[key] !== expectedType) {
+      return false;
+    }
   }
   return true;
 }
@@ -462,6 +500,10 @@ exports.analyzePerformanceAndRecommend = async (attemptsSummary, forceRefresh = 
     return getMockRecommendations();
   }
 };
+
+// Export validation helpers for unit testing
+exports.validateResponse = validateResponse;
+exports.RESPONSE_SCHEMAS = RESPONSE_SCHEMAS;
 
 // ==========================================
 // MOCK DATA FALLBACKS
