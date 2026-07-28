@@ -22,6 +22,7 @@ vi.mock('../store/slices/dashboardSlice', async () => {
     fetchSubjectBreakdown: () => ({ type: 'dashboard/fetchSubjects' }),
     fetchActivePlan: () => ({ type: 'dashboard/fetchActivePlan' }),
     fetchDueFlashcards: () => ({ type: 'dashboard/fetchFlashcards' }),
+    reviewFlashcard: (payload) => ({ type: 'dashboard/reviewFlashcard', payload }),
   };
 });
 

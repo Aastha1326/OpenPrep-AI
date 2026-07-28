@@ -29,6 +29,7 @@ import {
   fetchSubjectBreakdown,
   fetchActivePlan,
   fetchDueFlashcards,
+  reviewFlashcard,
 } from '../store/slices/dashboardSlice';
 import { logout } from '../store/slices/authSlice';
 
@@ -248,6 +249,15 @@ const Dashboard = () => {
   })();
 
   const firstDueCard = dueFlashcards.length > 0 ? dueFlashcards[0] : null;
+
+  const handleReviewCard = useCallback((quality) => {
+    if (!firstDueCard) return;
+    dispatch(reviewFlashcard({ cardId: firstDueCard.id, quality })).then(() => {
+      if (dueFlashcards.length <= 1) {
+        dispatch(fetchDueFlashcards());
+      }
+    });
+  }, [dispatch, firstDueCard, dueFlashcards.length]);
 
   // ── Streak display ──
   const streakDays = stats?.streak ?? 0;
@@ -483,6 +493,7 @@ const Dashboard = () => {
               error={errorFlashcards}
               totalDue={dueFlashcards.length}
               onRetry={handleRetry(fetchDueFlashcards)}
+              onReview={handleReviewCard}
             />
           </div>
           <div className="flex justify-center">

@@ -51,6 +51,18 @@ export const fetchDueFlashcards = createAsyncThunk(
   }
 );
 
+export const reviewFlashcard = createAsyncThunk(
+  'dashboard/reviewFlashcard',
+  async ({ cardId, quality }, { rejectWithValue }) => {
+    try {
+      const response = await API.put(`/flashcards/${cardId}/review`, { quality });
+      return response.data.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.error || 'Failed to review flashcard');
+    }
+  }
+);
+
 // ── Initial State ──
 const initialState = {
   stats: null,
@@ -142,6 +154,12 @@ const dashboardSlice = createSlice({
       .addCase(fetchDueFlashcards.rejected, (state, action) => {
         state.loadingFlashcards = false;
         state.errorFlashcards = action.payload;
+      })
+
+      // ── Review Flashcard ──
+      .addCase(reviewFlashcard.fulfilled, (state, action) => {
+        const reviewedId = action.meta.arg.cardId;
+        state.dueFlashcards = state.dueFlashcards.filter((c) => c.id !== reviewedId);
       });
   },
 });
