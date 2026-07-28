@@ -185,12 +185,10 @@ exports.toggleTaskCompletion = async (req, res, next) => {
 
     // Find and update task inside JSONB dailyGoals
     let taskFound = false;
-    let wasCompleted = false;
     const dailyGoals = JSON.parse(JSON.stringify(plan.dailyGoals));
     for (const goal of dailyGoals) {
       const task = goal.tasks.find((t) => t._id === taskId || t.id === taskId);
       if (task) {
-        wasCompleted = task.completed; // Capture previous state BEFORE modifying
         task.completed = completed;
         taskFound = true;
         break;
@@ -204,29 +202,14 @@ exports.toggleTaskCompletion = async (req, res, next) => {
     plan.dailyGoals = dailyGoals;
     await plan.save();
 
-    // Adjust study hours based on task state transition
-    //   false -> true : add hours (task was just completed)
-    //   true  -> false: subtract hours (task was unmarked)
-    //   same state    : no change (prevents double-counting)
-    if (studyTimeMinutes) {
+    // If task was completed, add study hours to User profile
+    if (completed && studyTimeMinutes) {
       const hours = studyTimeMinutes / 60;
-
-      if (completed && !wasCompleted) {
-        // Task transitioned from incomplete -> complete: add hours
-        const user = await User.findByPk(req.user.id);
-        if (user) {
-          user.studyHours = Number((user.studyHours + hours).toFixed(2));
-          await user.save();
-        }
-      } else if (!completed && wasCompleted) {
-        // Task transitioned from complete -> incomplete: subtract hours
-        const user = await User.findByPk(req.user.id);
-        if (user) {
-          user.studyHours = Number(Math.max(0, user.studyHours - hours).toFixed(2));
-          await user.save();
-        }
+      const user = await User.findByPk(req.user.id);
+      if (user) {
+        user.studyHours = Number((user.studyHours + hours).toFixed(2));
+        await user.save();
       }
-      // If state unchanged (completed === wasCompleted), do nothing
     }
 
     res.status(200).json({ success: true, data: plan });
