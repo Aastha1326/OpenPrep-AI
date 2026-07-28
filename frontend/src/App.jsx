@@ -17,6 +17,8 @@ const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
+const PyqDashboard = lazy(() => import('./pages/PyqDashboard'));
+
 function App() {
   const dispatch = useDispatch();
 
@@ -44,6 +46,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/pyqs"
+            element={
+              <ProtectedRoute>
+                <PyqDashboard />
               </ProtectedRoute>
             }
           />
