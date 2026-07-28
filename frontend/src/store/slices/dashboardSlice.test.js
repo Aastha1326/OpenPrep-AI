@@ -94,3 +94,35 @@ describe('dashboardSlice - reviewFlashcard', () => {
     expect(dueFlashcards).toHaveLength(0);
   });
 });
+
+describe('dashboardSlice - theme persistence', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  test('toggles theme and updates localStorage openprep_theme', () => {
+    const { toggleTheme } = require('./dashboardSlice');
+    const store = configureStore({ reducer: { dashboard: dashboardReducer } });
+
+    expect(store.getState().dashboard.theme).toBe('dark');
+    store.dispatch(toggleTheme());
+
+    expect(store.getState().dashboard.theme).toBe('light');
+    expect(localStorage.getItem('openprep_theme')).toBe('light');
+
+    store.dispatch(toggleTheme());
+    expect(store.getState().dashboard.theme).toBe('dark');
+    expect(localStorage.getItem('openprep_theme')).toBe('dark');
+  });
+
+  test('sets theme explicitly and updates localStorage', () => {
+    const { setTheme } = require('./dashboardSlice');
+    const store = configureStore({ reducer: { dashboard: dashboardReducer } });
+
+    store.dispatch(setTheme('light'));
+    expect(store.getState().dashboard.theme).toBe('light');
+    expect(localStorage.getItem('openprep_theme')).toBe('light');
+  });
+});
+
