@@ -194,7 +194,7 @@ exports.reviewFlashcard = async (req, res, next) => {
 
     // If card is mastered (quality >= 4), increment mastered count in progress
     if (quality >= 4 && card.topic) {
-      const progress = await Progress.findOne({
+      let progress = await Progress.findOne({
         where: {
           user: req.user.id,
           subject: card.subject,
@@ -204,6 +204,13 @@ exports.reviewFlashcard = async (req, res, next) => {
       if (progress) {
         progress.flashcardsMastered += 1;
         await progress.save();
+      } else {
+        await Progress.create({
+          user: req.user.id,
+          subject: card.subject,
+          topic: card.topic,
+          flashcardsMastered: 1,
+        });
       }
     }
 
