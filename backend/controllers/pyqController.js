@@ -103,6 +103,12 @@ exports.uploadAndAnalyzePYQ = async (req, res, next) => {
       const filePath = path.join(__dirname, '..', 'uploads', req.file.filename);
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     }
+    if (error.statusCode === 408 || error.message?.includes('timed out')) {
+      return res.status(408).json({
+        success: false,
+        error: error.message || 'PYQ analysis timed out. The PDF paper may be too large or complex. Please try a smaller file or retry.',
+      });
+    }
     next(error);
   }
 };
@@ -227,6 +233,12 @@ exports.getPYQAnalysis = async (req, res, next) => {
 
     res.status(200).json({ success: true, data: pyq });
   } catch (error) {
+    if (error.statusCode === 408 || error.message?.includes('timed out')) {
+      return res.status(408).json({
+        success: false,
+        error: error.message || 'PYQ analysis timed out. The PDF paper may be too large or complex. Please try a smaller file or retry.',
+      });
+    }
     next(error);
   }
 };
