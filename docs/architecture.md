@@ -9,7 +9,7 @@ This document describes the high-level system architecture of **OpenPrep AI**. I
 OpenPrep AI is structured as a decoupled, multi-tier system composed of:
 1. **Frontend (Client-Tier)**: A single-page application (SPA) built using React, Vite, and Tailwind CSS.
 2. **Backend (Server-Tier)**: A RESTful API built using Node.js and Express.js.
-3. **Database (Data-Tier)**: A document database using MongoDB for persistent storage, integrated via the Mongoose ORM.
+3. **Database (Data-Tier)**: A relational database using PostgreSQL for persistent storage, integrated via the Sequelize ORM.
 4. **AI Layer (Integration-Tier)**: The Gemini API service layer (`gemini-1.5-flash`) for heavy academic NLP analysis, planning, and content generation.
 
 ```mermaid
@@ -23,10 +23,10 @@ graph TD
     subgraph Backend [Express.js Backend]
         BE --> |Auth Middleware| JWT[JWT Validator]
         BE --> |Controllers| Ctrl[MVC Controllers]
-        BE --> |Mongoose ORM| Models[Database Models]
+        BE --> |Sequelize ORM| Models[Database Models]
         BE --> |Gemini Integration| AI[Gemini API Client]
     end
-    Models <--> |Read/Write Queries| DB[(MongoDB Database)]
+    Models <--> |Read/Write Queries| DB[(PostgreSQL Database)]
     AI <--> |NLP prompts / JSON Responses| Gemini[Google Gemini API]
 ```
 
@@ -42,7 +42,7 @@ sequenceDiagram
     actor Student
     participant React as React Frontend
     participant Express as Express Backend
-    participant DB as MongoDB
+    participant DB as PostgreSQL
     participant AI as Gemini API
     
     Student->>React: Input Exam Date & Syllabus (Subjects + Topics)
@@ -67,7 +67,7 @@ OpenPrep-AI/
 │   ├── config/                    # Configuration settings (e.g., db.js)
 │   ├── controllers/               # Route controllers (logic handler mapping)
 │   ├── middleware/                # Route filters (protect, upload, error)
-│   ├── models/                    # Mongoose database models (User, PYQ, etc.)
+│   ├── models/                    # Sequelize database models (User, PYQ, etc.)
 │   ├── routes/                    # Express API route endpoints
 │   ├── services/                  # Business logic (Gemini API interactions)
 │   ├── .env.example               # Template environment configuration file

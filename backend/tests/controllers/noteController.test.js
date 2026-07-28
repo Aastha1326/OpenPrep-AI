@@ -77,7 +77,7 @@ describe('Note Controller - Integration Tests', () => {
         .post('/api/notes')
         .set('Authorization', `Bearer ${authToken}`)
         .field('title', 'Test Note')
-        .field('subjectId', testSubject._id.toString())
+        .field('subjectId', testSubject.id.toString())
         .field('content', 'Sample note content')
         .attach('file', createTestPdfBuffer(), 'test-note.pdf');
 
@@ -101,7 +101,7 @@ describe('Note Controller - Integration Tests', () => {
         .post('/api/notes')
         .set('Authorization', `Bearer ${authToken}`)
         .field('title', 'Text Note')
-        .field('subjectId', testSubject._id.toString())
+        .field('subjectId', testSubject.id.toString())
         .field('content', 'No file attached');
 
       expect(res.status).toBe(201);
@@ -114,7 +114,7 @@ describe('Note Controller - Integration Tests', () => {
       const res = await request(app)
         .post('/api/notes')
         .set('Authorization', `Bearer ${authToken}`)
-        .field('subjectId', testSubject._id.toString());
+        .field('subjectId', testSubject.id.toString());
 
       expect(res.status).toBe(400);
       expect(res.body.success).toBe(false);
@@ -134,7 +134,7 @@ describe('Note Controller - Integration Tests', () => {
       const res = await request(app)
         .post('/api/notes')
         .field('title', 'No Auth Note')
-        .field('subjectId', testSubject._id.toString());
+        .field('subjectId', testSubject.id.toString());
 
       expect(res.status).toBe(401);
       expect(res.body.success).toBe(false);
@@ -151,7 +151,7 @@ describe('Note Controller - Integration Tests', () => {
         .post('/api/notes')
         .set('Authorization', `Bearer ${authToken}`)
         .field('title', 'Listable Note')
-        .field('subjectId', testSubject._id.toString())
+        .field('subjectId', testSubject.id.toString())
         .field('content', 'Can be listed');
     });
 
@@ -209,7 +209,7 @@ describe('Note Controller - Integration Tests', () => {
         .post('/api/notes')
         .set('Authorization', `Bearer ${authToken}`)
         .field('title', 'Delete Me')
-        .field('subjectId', testSubject._id.toString())
+        .field('subjectId', testSubject.id.toString())
         .attach('file', createTestPdfBuffer(), 'to-delete.pdf');
 
       noteToDelete = createRes.body.data;
@@ -259,7 +259,7 @@ describe('Note Controller - Integration Tests', () => {
       const maliciousNote = await Note.create({
         title: 'Trapped Note',
         content: 'Dangerous path',
-        subject: testSubject._id.toString(),
+        subject: testSubject.id.toString(),
         fileUrl: '../../.env',
         fileType: 'pdf',
         user: testUser.id,

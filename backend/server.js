@@ -21,6 +21,10 @@ if (!process.env.JWT_SECRET) {
   process.exit(1);
 }
 
+if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_gemini_api_key_here') {
+  console.warn('WARNING: GEMINI_API_KEY is not set. AI endpoints will return mock data.');
+}
+
 // Import routes
 const authRoutes = require('./routes/authRoutes');
 const academicRoutes = require('./routes/academicRoutes');
@@ -35,7 +39,15 @@ const communityRoutes = require('./routes/communityRoutes');
 // Connect to Database
 connectDB();
 
+// Connect to Redis
+const redisService = require('./services/redisService');
+redisService.connect();
+
 const app = express();
+
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
 
 // Security Middlewares
 app.use(helmet());
@@ -44,12 +56,12 @@ app.use(cors({
   credentials: true,
 }));
 
+// Cookie parser (required for csurf cookie-based tokens)
+app.use(cookieParser());
+
 // CSRF protection middleware
 const csrfProtection = csrf({ cookie: true });
 app.use(csrfProtection);
-
-// Cookie parser (required for csurf cookie-based tokens)
-app.use(cookieParser());
 
 // Response compression (skip binary uploads via default filter)
 app.use(compression());
@@ -69,28 +81,39 @@ const apiLimiter = rateLimit({
 });
 app.use('/api/', apiLimiter);
 
-// Protected Route for File Uploads (replaces insecure express.static)
+// Set Static Folder for File Uploads (Protected)
+const { protect } = require('./middleware/auth');
+const Note = require('./models/Note');
+const PYQ = require('./models/PYQ');
+
 app.get('/uploads/:filename', protect, async (req, res, next) => {
   try {
     const filename = req.params.filename;
     const fileUrl = `/uploads/${filename}`;
     
-    // Verify file ownership or public access
-    const pyq = await PYQ.findOne({ where: { fileUrl, user: req.user.id } });
-    const note = await Note.findOne({ where: { fileUrl } });
-    
-    const hasNoteAccess = note && (note.user === req.user.id || note.isPublic);
-    
-    if (!pyq && !hasNoteAccess) {
-      return res.status(403).json({ success: false, error: 'Access denied. You do not have permission to view this file.' });
+    let record = await Note.findOne({ where: { fileUrl } });
+    let isPublic = false;
+    let owner = null;
+
+    if (record) {
+      isPublic = record.isPublic;
+      owner = record.user;
+    } else {
+      record = await PYQ.findOne({ where: { fileUrl } });
+      if (record) {
+        owner = record.user;
+      }
     }
-    
-    const filePath = path.join(__dirname, 'uploads', filename);
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ success: false, error: 'File not found on server.' });
+
+    if (!record) {
+      return res.status(404).json({ success: false, error: 'File not found' });
     }
-    
-    res.sendFile(filePath);
+
+    if (owner !== req.user.id && !isPublic) {
+      return res.status(403).json({ success: false, error: 'Not authorized to access this file' });
+    }
+
+    res.sendFile(path.join(__dirname, 'uploads', filename));
   } catch (error) {
     next(error);
   }
@@ -110,6 +133,11 @@ app.use('/api/community', communityRoutes);
 // Base Route
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to OpenPrep AI Backend REST API API Services' });
+});
+
+// Health Check Route
+app.get('/healthz', (req, res) => {
+  res.status(200).send('OK');
 });
 
 // Error Handler Middleware

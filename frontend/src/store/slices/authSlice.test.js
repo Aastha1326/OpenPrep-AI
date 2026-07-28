@@ -14,7 +14,7 @@ import authReducer, {
 } from './authSlice';
 import API from '../../services/api';
 
-const mockUser = { _id: 'user123', name: 'Test User', email: 'test@example.com' };
+const mockUser = { id: 'user123', name: 'Test User', email: 'test@example.com' };
 const mockToken = 'fake-jwt-token';
 const mockRefreshToken = 'fake-refresh-token';
 
