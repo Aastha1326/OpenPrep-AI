@@ -23,6 +23,7 @@ import PinnedTasks from '../components/dashboard/PinnedTasks';
 import CreateNoteModal from '../components/dashboard/CreateNoteModal';
 import StudyPlanModal from '../components/dashboard/StudyPlanModal';
 import PyqAnalysisModal from '../components/dashboard/PyqAnalysisModal';
+import WeaknessDashboardWidget from '../components/dashboard/WeaknessDashboardWidget';
 import ThemeToggle from '../components/ThemeToggle';
 
 import {
@@ -512,6 +513,11 @@ const Dashboard = () => {
               <ErrorBanner message={toggleError} />
             </div>
           )}
+        </div>
+
+        {/* --- AI WEAKNESS DETECTION WIDGET --- */}
+        <div className="my-6">
+          <WeaknessDashboardWidget />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
