@@ -30,7 +30,7 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
       password: 'password123',
     });
 
-    authToken = jwt.sign({ id: testUser.id }, process.env.JWT_SECRET);
+    authToken = jwt.sign({ id: testUser.id, type: 'access' }, process.env.JWT_SECRET);
 
     const testExam = await Exam.create({
       name: 'Flashcard Exam',
