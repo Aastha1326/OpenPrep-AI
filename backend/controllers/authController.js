@@ -100,14 +100,37 @@ exports.register = async (req, res, next) => {
       await sendVerificationEmail(user, req);
     }
 
+    // In development, issue tokens immediately so the frontend can auto-login
+    let accessToken, refreshToken;
+    if (isEmailVerified) {
+      accessToken = generateAccessToken(user.id);
+      refreshToken = await generateRefreshToken(user);
+    }
+
     await t.commit();
 
     res.status(201).json({
       success: true,
-      message: isEmailVerified 
+      message: isEmailVerified
         ? 'Registration successful. Account auto-verified for development.'
         : 'Registration successful. Please verify your email to activate your account.',
       isEmailVerified,
+      ...(isEmailVerified && {
+        token: accessToken,
+        refreshToken,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          streak: {
+            count: user.streakCount,
+            lastActive: user.streakLastActive,
+          },
+          studyHours: user.studyHours,
+          isEmailVerified: user.isEmailVerified,
+        },
+      }),
     });
   } catch (error) {
     if (t && !t.finished) {
