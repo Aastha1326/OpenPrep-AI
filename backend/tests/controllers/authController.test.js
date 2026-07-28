@@ -532,5 +532,50 @@ describe('Auth Controller - Integration Tests', () => {
       expect(res.status).toBe(400);
       expect(res.body.success).toBe(false);
     });
+
+    it('should invalidate the old refresh token after rotation (RTR)', async () => {
+      // Verifies Refresh Token Rotation: the used token must be removed
+      // from the DB so it cannot be replayed. This is a regression test
+      // for Issue #179 — old hashed tokens were not being removed.
+      const user = await createVerifiedUser({ email: 'rtrtest@example.com' });
+
+      // Login to bootstrap the first refresh token
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'rtrtest@example.com', password: 'StrongPass1!' });
+      expect(loginRes.status).toBe(200);
+
+      const firstToken = loginRes.body.refreshToken;
+
+      // First rotation — should succeed
+      const firstRotate = await request(app)
+        .post('/api/auth/refresh-token')
+        .send({ refreshToken: firstToken });
+      expect(firstRotate.status).toBe(200);
+
+      const secondToken = firstRotate.body.refreshToken;
+      expect(secondToken).not.toBe(firstToken);
+
+      // Try using the ORIGINAL (first) token again — must be rejected
+      const replayAttempt = await request(app)
+        .post('/api/auth/refresh-token')
+        .send({ refreshToken: firstToken });
+      expect(replayAttempt.status).toBe(401);
+      expect(replayAttempt.body.success).toBe(false);
+      expect(replayAttempt.body.error).toContain('Invalid or expired');
+
+      // Second rotation with the NEW token should still work
+      const secondRotate = await request(app)
+        .post('/api/auth/refresh-token')
+        .send({ refreshToken: secondToken });
+      expect(secondRotate.status).toBe(200);
+      expect(secondRotate.body.refreshToken).not.toBe(secondToken);
+
+      // Old second token should also be invalid now
+      const secondReplay = await request(app)
+        .post('/api/auth/refresh-token')
+        .send({ refreshToken: secondToken });
+      expect(secondReplay.status).toBe(401);
+    });
   });
 });
