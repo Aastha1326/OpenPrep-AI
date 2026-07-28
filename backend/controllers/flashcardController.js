@@ -25,8 +25,15 @@ exports.generateAIFlashcards = async (req, res, next) => {
       if (topicObj) topicName = topicObj.name;
     }
 
-    // Load notes for context
-    const notes = await Note.findAll({ where: { subject: subjectId, user: req.user.id } });
+    // Load notes for context (prioritize topic-specific notes if topicId provided, fallback to subject notes)
+    const noteFilter = { subject: subjectId, user: req.user.id };
+    if (topicId) {
+      noteFilter.topic = topicId;
+    }
+    let notes = await Note.findAll({ where: noteFilter });
+    if ((!notes || notes.length === 0) && topicId) {
+      notes = await Note.findAll({ where: { subject: subjectId, user: req.user.id } });
+    }
     let notesText = '';
     if (notes && notes.length > 0) {
       notesText = notes
