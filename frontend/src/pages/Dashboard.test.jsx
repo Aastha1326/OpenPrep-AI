@@ -8,6 +8,7 @@ import dashboardReducer from '../store/slices/dashboardSlice';
 import Dashboard from './Dashboard';
 
 // window.matchMedia mock for ThemeContext
+// ThemeContext uses window.matchMedia which is not implemented in jsdom
 beforeAll(() => {
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
