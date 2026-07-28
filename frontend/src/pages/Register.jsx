@@ -1,8 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, User, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Mail, User, Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
 import { registerUser, clearError, clearRegistrationSuccess } from '../store/slices/authSlice';
+
+// Password validation criteria (synced with backend validators.js)
+const PASSWORD_CRITERIA = [
+  { label: 'At least 8 characters', test: (pw) => pw.length >= 8 },
+  { label: 'One uppercase letter (A-Z)', test: (pw) => /[A-Z]/.test(pw) },
+  { label: 'One lowercase letter (a-z)', test: (pw) => /[a-z]/.test(pw) },
+  { label: 'One number (0-9)', test: (pw) => /[0-9]/.test(pw) },
+  { label: 'One special character (!@#$%^&* etc.)', test: (pw) => /[^A-Za-z0-9]/.test(pw) },
+];
 
 const Register = () => {
   const dispatch = useDispatch();
@@ -127,8 +136,6 @@ const Register = () => {
                 onChange={handleChange}
                 required
                 minLength={8}
-                pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}"
-                title="Must contain at least one uppercase letter, one lowercase letter, one number, and one special character"
                 placeholder="Min. 8 chars, upper, lower, number, special"
                 className="w-full pl-10 pr-10 py-2.5 bg-white border border-stone-300 rounded-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:border-transparent text-sm"
               />
@@ -141,9 +148,29 @@ const Register = () => {
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
-            <p className="text-xs text-stone-500 mt-1">
-              Must contain uppercase, lowercase, number, and special character
-            </p>
+            {/* Real-time password criteria checklist */}
+            {formData.password.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {PASSWORD_CRITERIA.map((rule, idx) => {
+                  const passed = rule.test(formData.password);
+                  return (
+                    <li key={idx} className={`flex items-center gap-1.5 text-xs ${passed ? 'text-green-700' : 'text-stone-400'}`}>
+                      {passed ? (
+                        <CheckCircle className="w-3.5 h-3.5 text-green-600 shrink-0" />
+                      ) : (
+                        <span className="w-3.5 h-3.5 rounded-full border border-stone-300 shrink-0" />
+                      )}
+                      {rule.label}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {formData.password.length === 0 && (
+              <p className="text-xs text-stone-500 mt-1">
+                Must contain uppercase, lowercase, number, and special character
+              </p>
+            )}
           </div>
 
           <button
