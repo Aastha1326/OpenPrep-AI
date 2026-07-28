@@ -177,14 +177,17 @@ exports.login = async (req, res, next) => {
     }
 
     // Check if account is locked due to too many failed attempts
-    if (user.lockoutUntil && user.lockoutUntil > new Date()) {
-      const remainingMinutes = Math.ceil((user.lockoutUntil - new Date()) / (1000 * 60));
-      return res.status(423).json({
-        success: false,
-        error: `Account locked due to too many failed attempts. Try again in ${remainingMinutes} minute${
-          remainingMinutes !== 1 ? 's' : ''
-        }.`,
-      });
+    if (user.lockoutUntil) {
+      const lockoutTime = new Date(user.lockoutUntil);
+      if (!isNaN(lockoutTime.getTime()) && lockoutTime > new Date()) {
+        const remainingMinutes = Math.max(1, Math.ceil((lockoutTime - new Date()) / (1000 * 60)));
+        return res.status(423).json({
+          success: false,
+          error: `Account locked due to too many failed attempts. Try again in ${remainingMinutes} minute${
+            remainingMinutes !== 1 ? 's' : ''
+          }.`,
+        });
+      }
     }
 
     const isMatch = await user.matchPassword(password);
