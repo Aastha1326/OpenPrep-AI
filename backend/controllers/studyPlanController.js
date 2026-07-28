@@ -15,7 +15,7 @@ exports.generateAIPlan = async (req, res, next) => {
   try {
     const { examId, startDate, endDate, studyHoursPerDay } = req.body;
 
-    const exam = await Exam.findByPk(examId);
+    const exam = await Exam.findOne({ where: { id: examId, user: req.user.id } });
     if (!exam) {
       return res.status(404).json({ success: false, error: 'Exam not found' });
     }
