@@ -22,6 +22,7 @@ import FlashcardWidget from '../components/dashboard/FlashcardWidget';
 import PinnedTasks from '../components/dashboard/PinnedTasks';
 import CreateNoteModal from '../components/dashboard/CreateNoteModal';
 import StudyPlanModal from '../components/dashboard/StudyPlanModal';
+import PyqAnalysisModal from '../components/dashboard/PyqAnalysisModal';
 import ThemeToggle from '../components/ThemeToggle';
 
 import {
@@ -191,9 +192,10 @@ const Dashboard = () => {
     }
   };
 
-  // ── Note Modal State ──
+  // ── Note & PYQ Modal State ──
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isStudyPlanOpen, setIsStudyPlanOpen] = useState(false);
+  const [isPyqModalOpen, setIsPyqModalOpen] = useState(false);
   const [comingSoon, setComingSoon] = useState(null);
 
   useEffect(() => {
@@ -273,7 +275,7 @@ const Dashboard = () => {
       {/* --- QUICK ACTIONS TABS --- */}
       <div className="absolute -left-4 top-24 flex flex-col gap-4 z-30 hidden md:flex">
         <GoldTabButton icon={Play} label="Start Quiz" delay={0.1} onClick={() => setComingSoon('Quiz feature coming soon!')} />
-        <GoldTabButton icon={FileText} label="Analyze PYQ" delay={0.2} onClick={() => setComingSoon('PYQ Analysis coming soon!')} />
+        <GoldTabButton icon={FileText} label="Analyze PYQ" delay={0.2} onClick={() => setIsPyqModalOpen(true)} />
         <GoldTabButton icon={Calendar} label="Study Plan" delay={0.3} onClick={() => setIsStudyPlanOpen(true)} />
         <GoldTabButton icon={TrendingUp} label="Reports" delay={0.4} onClick={() => setComingSoon('Reports coming soon!')} />
         <button 
@@ -689,6 +691,17 @@ const Dashboard = () => {
         isOpen={isStudyPlanOpen}
         onClose={() => setIsStudyPlanOpen(false)}
         activePlan={activePlan}
+      />
+
+      {/* --- PYQ ANALYSIS MODAL --- */}
+      <PyqAnalysisModal
+        isOpen={isPyqModalOpen}
+        onClose={() => setIsPyqModalOpen(false)}
+        onAnalysisComplete={() => {
+          setIsPyqModalOpen(false);
+          dispatch(fetchDashboardStats());
+          dispatch(fetchSubjectBreakdown());
+        }}
       />
 
       {/* --- COMING SOON TOAST --- */}

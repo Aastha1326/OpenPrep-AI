@@ -48,6 +48,12 @@ const errorHandler = (err, req, res, next) => {
     error.statusCode = 400;
   }
 
+  // Timeout error handling
+  if (err.statusCode === 408 || err.message?.includes('timed out')) {
+    error.statusCode = 408;
+    error.message = err.message || 'Request processing timed out. Please try again with a smaller file.';
+  }
+
   res.status(error.statusCode || 500).json({
     success: false,
     error: error.message || 'Server Error',
