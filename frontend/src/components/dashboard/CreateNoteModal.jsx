@@ -32,7 +32,7 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
 
       const response = await API.post('/notes', formData, {
         headers: {
-          'Content-Type': 'multipart/form-data',
+          'Content-Type': undefined,
         },
       });
 
