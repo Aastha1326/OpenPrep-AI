@@ -7,14 +7,20 @@ const getInitialRefreshToken = () => localStorage.getItem('refreshToken');
 
 // ── Async Thunks ──
 
-/** Register a new user. Backend returns { success, message, isEmailVerified }
- *  (no JWT — user must verify email first). */
+/** Register a new user.
+ *  - Production: backend returns { success, message, isEmailVerified } — no JWT.
+ *  - Development: backend returns tokens immediately so the user is auto-logged in. */
 export const registerUser = createAsyncThunk(
   'auth/register',
   async (userData, { rejectWithValue }) => {
     try {
       const response = await API.post('/auth/register', userData);
-      // Do NOT store token — registration requires email verification
+      // In dev mode the backend returns token + refreshToken for immediate login
+      const { token, refreshToken } = response.data;
+      if (token) {
+        localStorage.setItem('token', token);
+        localStorage.setItem('refreshToken', refreshToken);
+      }
       return response.data;
     } catch (err) {
       return rejectWithValue(err.response?.data?.error || 'Registration failed');
@@ -169,9 +175,18 @@ const authSlice = createSlice({
       })
       .addCase(registerUser.fulfilled, (state, action) => {
         state.loading = false;
-        state.registrationSuccess = true;
         state.message = action.payload.message || 'Registration successful. Please check your email to verify your account.';
-        // NOT authenticated — email verification required
+        if (action.payload.token) {
+          // Dev mode: backend issued tokens — auto-login immediately
+          state.isAuthenticated = true;
+          state.token = action.payload.token;
+          state.refreshToken = action.payload.refreshToken;
+          state.user = action.payload.user;
+          state.registrationSuccess = false;
+        } else {
+          // Production: email verification required
+          state.registrationSuccess = true;
+        }
       })
       .addCase(registerUser.rejected, (state, action) => {
         state.loading = false;
