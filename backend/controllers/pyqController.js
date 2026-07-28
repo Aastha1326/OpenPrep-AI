@@ -8,6 +8,31 @@ const Topic = require('../models/Topic');
 const ActivityLog = require('../models/ActivityLog');
 const geminiService = require('../services/geminiService');
 
+// A simple concurrency limiter to prevent OOM on concurrent large PDF uploads
+class Semaphore {
+  constructor(max) {
+    this.max = max;
+    this.active = 0;
+    this.queue = [];
+  }
+  async acquire() {
+    if (this.active >= this.max) {
+      await new Promise((resolve) => this.queue.push(resolve));
+    }
+    this.active++;
+  }
+  release() {
+    this.active--;
+    if (this.queue.length > 0) {
+      const next = this.queue.shift();
+      next();
+    }
+  }
+}
+
+// Limit concurrent PDF parsing to 2
+const pdfParseSemaphore = new Semaphore(2);
+
 // @desc    Upload & Analyze PYQ
 // @route   POST /api/pyqs/upload
 // @access  Private
@@ -27,9 +52,14 @@ exports.uploadAndAnalyzePYQ = async (req, res, next) => {
     // Read PDF and extract text
     let extractedText = '';
     try {
-      const dataBuffer = await fs.promises.readFile(req.file.path);
-      const pdfData = await pdfParse(dataBuffer);
-      extractedText = pdfData.text;
+      await pdfParseSemaphore.acquire();
+      try {
+        const dataBuffer = await fs.promises.readFile(req.file.path);
+        const pdfData = await pdfParse(dataBuffer);
+        extractedText = pdfData.text;
+      } finally {
+        pdfParseSemaphore.release();
+      }
     } catch (parseError) {
       console.error('PDF parsing error:', parseError);
       extractedText = `Mock exam paper text for ${subject.name} - Year ${year}. Dynamic Program, caching, time complexity analysis.`;

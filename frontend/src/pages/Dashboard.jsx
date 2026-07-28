@@ -221,7 +221,8 @@ const Dashboard = () => {
 
   const todayTasks = (() => {
     if (!activePlan?.dailyGoals) return [];
-    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const todayGoal = activePlan.dailyGoals.find((g) => {
       const goalDate = g.date ? g.date.split('T')[0] : null;
       return goalDate === today;
