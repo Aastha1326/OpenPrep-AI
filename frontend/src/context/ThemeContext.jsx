@@ -26,6 +26,5 @@ export const ThemeProvider = ({ children }) => {
   );
 };
 
-// eslint-disable-next-line
 export const useTheme = () => useContext(ThemeContext);
 

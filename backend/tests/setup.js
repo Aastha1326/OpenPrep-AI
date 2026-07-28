@@ -15,8 +15,11 @@ beforeAll(async () => {
 
 afterAll(async () => {
   try {
-    await sequelize.close();
+    await Promise.race([
+      sequelize.close(),
+      new Promise((resolve) => setTimeout(resolve, 3000)),
+    ]);
   } catch (err) {
     // Ignore cleanup error if DB wasn't connected
   }
-});
+}, 60000);
