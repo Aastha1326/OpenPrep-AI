@@ -275,7 +275,7 @@ const Dashboard = () => {
       {/* --- QUICK ACTIONS TABS --- */}
       <div className="absolute -left-4 top-24 flex flex-col gap-4 z-30 hidden md:flex">
         <GoldTabButton icon={Play} label="Start Quiz" delay={0.1} onClick={() => setComingSoon('Quiz feature coming soon!')} />
-        <GoldTabButton icon={FileText} label="Analyze PYQ" delay={0.2} onClick={() => setIsPyqModalOpen(true)} />
+        <GoldTabButton icon={FileText} label="PYQ Intelligence" delay={0.2} onClick={() => navigate('/pyqs')} />
         <GoldTabButton icon={Calendar} label="Study Plan" delay={0.3} onClick={() => setIsStudyPlanOpen(true)} />
         <GoldTabButton icon={TrendingUp} label="Reports" delay={0.4} onClick={() => setComingSoon('Reports coming soon!')} />
         <button 
