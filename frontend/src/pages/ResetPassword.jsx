@@ -4,6 +4,15 @@ import { useParams, Link, Navigate } from 'react-router-dom';
 import { Lock, Eye, EyeOff, AlertCircle, CheckCircle, Loader } from 'lucide-react';
 import { resetPassword, clearError, clearMessage } from '../store/slices/authSlice';
 
+// Password validation criteria (synced with backend validators.js)
+const PASSWORD_CRITERIA = [
+  { label: 'At least 8 characters', test: (pw) => pw.length >= 8 },
+  { label: 'One uppercase letter (A-Z)', test: (pw) => /[A-Z]/.test(pw) },
+  { label: 'One lowercase letter (a-z)', test: (pw) => /[a-z]/.test(pw) },
+  { label: 'One number (0-9)', test: (pw) => /[0-9]/.test(pw) },
+  { label: 'One special character (!@#$%^&* etc.)', test: (pw) => /[^A-Za-z0-9]/.test(pw) },
+];
+
 const ResetPassword = () => {
   const { token } = useParams();
   const dispatch = useDispatch();
@@ -88,8 +97,6 @@ const ResetPassword = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     minLength={8}
-                    pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}"
-                    title="Must contain at least one uppercase letter, one lowercase letter, one number, and one special character"
                     placeholder="Min. 8 chars, upper, lower, number, special"
                     className="w-full pl-10 pr-10 py-2.5 bg-white border border-stone-300 rounded-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:border-transparent text-sm"
                   />
@@ -102,6 +109,24 @@ const ResetPassword = () => {
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+                {/* Real-time password criteria checklist */}
+                {password.length > 0 && (
+                  <ul className="mt-2 space-y-1">
+                    {PASSWORD_CRITERIA.map((rule, idx) => {
+                      const passed = rule.test(password);
+                      return (
+                        <li key={idx} className={`flex items-center gap-1.5 text-xs ${passed ? 'text-green-700' : 'text-stone-400'}`}>
+                          {passed ? (
+                            <CheckCircle className="w-3.5 h-3.5 text-green-600 shrink-0" />
+                          ) : (
+                            <span className="w-3.5 h-3.5 rounded-full border border-stone-300 shrink-0" />
+                          )}
+                          {rule.label}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </div>
 
               <div>
@@ -115,8 +140,6 @@ const ResetPassword = () => {
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
                     minLength={8}
-                    pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}"
-                    title="Must contain at least one uppercase letter, one lowercase letter, one number, and one special character"
                     placeholder="Repeat your password"
                     className="w-full pl-10 pr-4 py-2.5 bg-white border border-stone-300 rounded-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:border-transparent text-sm"
                   />
