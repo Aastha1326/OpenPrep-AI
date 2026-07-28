@@ -2,6 +2,8 @@ import { configureStore } from '@reduxjs/toolkit';
 import dashboardReducer, {
   reviewFlashcard,
   fetchDueFlashcards,
+  toggleTheme,
+  setTheme,
 } from './dashboardSlice';
 import API from '../../services/api';
 
@@ -11,6 +13,23 @@ vi.mock('../../services/api', () => ({
     put: vi.fn(),
   },
 }));
+
+// window.matchMedia mock for ThemeContext
+beforeAll(() => {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+});
 
 const createStore = (preloadedState = {}) =>
   configureStore({
@@ -102,7 +121,6 @@ describe('dashboardSlice - theme persistence', () => {
   });
 
   test('toggles theme and updates localStorage openprep_theme', () => {
-    const { toggleTheme } = require('./dashboardSlice');
     const store = configureStore({ reducer: { dashboard: dashboardReducer } });
 
     expect(store.getState().dashboard.theme).toBe('dark');
@@ -117,7 +135,6 @@ describe('dashboardSlice - theme persistence', () => {
   });
 
   test('sets theme explicitly and updates localStorage', () => {
-    const { setTheme } = require('./dashboardSlice');
     const store = configureStore({ reducer: { dashboard: dashboardReducer } });
 
     store.dispatch(setTheme('light'));

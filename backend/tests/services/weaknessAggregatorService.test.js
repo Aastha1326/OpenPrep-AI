@@ -1,18 +1,19 @@
 const weaknessAggregatorService = require('../../services/weaknessAggregatorService');
-const Topic = require('../../models/Topic');
-const Progress = require('../../models/Progress');
-const StudyPlan = require('../../models/StudyPlan');
+
+const mockTopicFindAll = vi.fn();
+const mockProgressFindAll = vi.fn();
+const mockStudyPlanFindOne = vi.fn();
 
 vi.mock('../../models/Topic', () => ({
-  findAll: vi.fn(),
+  findAll: mockTopicFindAll,
 }));
 
 vi.mock('../../models/Progress', () => ({
-  findAll: vi.fn(),
+  findAll: mockProgressFindAll,
 }));
 
 vi.mock('../../models/StudyPlan', () => ({
-  findOne: vi.fn(),
+  findOne: mockStudyPlanFindOne,
 }));
 
 vi.mock('../../services/geminiService', () => ({
@@ -35,9 +36,9 @@ describe('weaknessAggregatorService', () => {
       { id: 't1', name: 'Thermodynamics', status: 'Medium', save: mockSave },
       { id: 't2', name: 'Optics', status: 'Medium', save: mockSave }
     ];
-    Topic.findAll.mockResolvedValue(mockTopics);
+    mockTopicFindAll.mockResolvedValue(mockTopics);
 
-    Progress.findAll.mockImplementation(({ where }) => {
+    mockProgressFindAll.mockImplementation(({ where }) => {
       if (where.topic === 't1') {
         return Promise.resolve([
           { quizScores: [{ score: 40 }, { score: 30 }] } // avg 35% -> Weak
@@ -73,8 +74,8 @@ describe('weaknessAggregatorService', () => {
       save: mockSavePlan
     };
 
-    StudyPlan.findOne.mockResolvedValue(mockActivePlan);
-    Topic.findAll.mockResolvedValue([
+    mockStudyPlanFindOne.mockResolvedValue(mockActivePlan);
+    mockTopicFindAll.mockResolvedValue([
       { id: 't1', name: 'Thermodynamics', status: 'Weak' }
     ]);
 
