@@ -63,8 +63,19 @@ export const reviewFlashcard = createAsyncThunk(
   }
 );
 
+// ── Helper: Initial theme detection ──
+const getInitialTheme = () => {
+  const saved = localStorage.getItem('openprep_theme') || localStorage.getItem('theme');
+  if (saved) return saved;
+  if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    return 'dark';
+  }
+  return 'dark';
+};
+
 // ── Initial State ──
 const initialState = {
+  theme: getInitialTheme(),
   stats: null,
   weeklyChartData: [],
   recentActivity: [],
@@ -88,6 +99,17 @@ const dashboardSlice = createSlice({
   name: 'dashboard',
   initialState,
   reducers: {
+    toggleTheme: (state) => {
+      const nextTheme = state.theme === 'dark' ? 'light' : 'dark';
+      state.theme = nextTheme;
+      localStorage.setItem('openprep_theme', nextTheme);
+      localStorage.setItem('theme', nextTheme);
+    },
+    setTheme: (state, action) => {
+      state.theme = action.payload;
+      localStorage.setItem('openprep_theme', action.payload);
+      localStorage.setItem('theme', action.payload);
+    },
     clearErrors: (state) => {
       state.errorStats = null;
       state.errorSubjects = null;
@@ -164,5 +186,5 @@ const dashboardSlice = createSlice({
   },
 });
 
-export const { clearErrors } = dashboardSlice.actions;
+export const { toggleTheme, setTheme, clearErrors } = dashboardSlice.actions;
 export default dashboardSlice.reducer;
