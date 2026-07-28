@@ -1,5 +1,6 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
+const { RATE_LIMIT } = require('../config/constants');
 
 const {
   register,
@@ -24,8 +25,10 @@ const {
 
 const router = express.Router();
 
-// Skip rate limiting in the test environment
-const shouldSkip = () => process.env.NODE_ENV === 'test';
+// Skip rate limiting in ordinary tests, but allow dedicated rate-limit tests to explicitly enable it.
+const shouldSkip = () =>
+  process.env.NODE_ENV === 'test' &&
+  process.env.ENABLE_RATE_LIMIT_TESTS !== 'true';
 
 // Shared helper for consistent rate limit responses
 const createRateLimitResponse = (errorMessage) => ({
@@ -69,7 +72,7 @@ const forgotPasswordLimiter = rateLimit({
   legacyHeaders: true,
 });
 
-// Limit refresh token requests to 10 per 15 minutes per IP
+// Refresh token rate limiter: 10 attempts per 15 minutes per IP
 const refreshTokenLimiter = rateLimit({
   windowMs: RATE_LIMIT.WINDOWS.FIFTEEN_MINUTES,
   max: RATE_LIMIT.MAX_REQUESTS.REFRESH_TOKEN,
