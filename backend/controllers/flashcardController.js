@@ -188,56 +188,30 @@ exports.reviewFlashcard = async (req, res, next) => {
     card.repetitions = repetitions;
     card.efactor = efactor;
 
-    // Capture previous mastered state before updating
-    const wasMastered = card.isMastered;
-
     // Set next review date from now
     card.nextReviewDate = new Date(Date.now() + interval * 24 * 60 * 60 * 1000);
-
-    // Update mastered state based on quality (quality >= 4 = mastered)
-    card.isMastered = quality >= 4;
     await card.save();
 
-    // Adjust flashcardsMastered in progress based on state transition
-    //   false -> true : increment (card just became mastered)
-    //   true  -> false: decrement (card lost mastered status)
-    //   same state    : no change (prevents double-counting)
-    if (card.topic) {
-      if (quality >= 4 && !wasMastered) {
-        // Card transitioned from not mastered -> mastered: increment
-        let progress = await Progress.findOne({
-          where: {
-            user: req.user.id,
-            subject: card.subject,
-            topic: card.topic,
-          },
+    // If card is mastered (quality >= 4), increment mastered count in progress
+    if (quality >= 4 && card.topic) {
+      let progress = await Progress.findOne({
+        where: {
+          user: req.user.id,
+          subject: card.subject,
+          topic: card.topic,
+        },
+      });
+      if (progress) {
+        progress.flashcardsMastered += 1;
+        await progress.save();
+      } else {
+        await Progress.create({
+          user: req.user.id,
+          subject: card.subject,
+          topic: card.topic,
+          flashcardsMastered: 1,
         });
-        if (progress) {
-          progress.flashcardsMastered += 1;
-          await progress.save();
-        } else {
-          await Progress.create({
-            user: req.user.id,
-            subject: card.subject,
-            topic: card.topic,
-            flashcardsMastered: 1,
-          });
-        }
-      } else if (quality < 4 && wasMastered) {
-        // Card transitioned from mastered -> not mastered: decrement
-        let progress = await Progress.findOne({
-          where: {
-            user: req.user.id,
-            subject: card.subject,
-            topic: card.topic,
-          },
-        });
-        if (progress) {
-          progress.flashcardsMastered = Math.max(0, progress.flashcardsMastered - 1);
-          await progress.save();
-        }
       }
-      // If state unchanged, do nothing
     }
 
     res.status(200).json({ success: true, data: card });
