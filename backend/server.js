@@ -9,6 +9,10 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 const { connectDB } = require('./config/db');
 const errorHandler = require('./middleware/error');
+const { protect } = require('./middleware/auth');
+const fs = require('fs');
+const PYQ = require('./models/PYQ');
+const Note = require('./models/Note');
 
 // Validate required environment variables at startup
 if (!process.env.JWT_SECRET) {
@@ -78,9 +82,7 @@ const apiLimiter = rateLimit({
 app.use('/api/', apiLimiter);
 
 // Set Static Folder for File Uploads (Protected)
-const { protect } = require('./middleware/auth');
-const Note = require('./models/Note');
-const PYQ = require('./models/PYQ');
+// protect, Note, PYQ already imported at lines 12-15
 
 app.get('/uploads/:filename', protect, async (req, res, next) => {
   try {

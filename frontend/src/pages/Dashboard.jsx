@@ -22,6 +22,8 @@ import FlashcardWidget from '../components/dashboard/FlashcardWidget';
 import PinnedTasks from '../components/dashboard/PinnedTasks';
 import CreateNoteModal from '../components/dashboard/CreateNoteModal';
 import StudyPlanModal from '../components/dashboard/StudyPlanModal';
+import PyqAnalysisModal from '../components/dashboard/PyqAnalysisModal';
+import WeaknessDashboardWidget from '../components/dashboard/WeaknessDashboardWidget';
 import ThemeToggle from '../components/ThemeToggle';
 
 import {
@@ -29,6 +31,7 @@ import {
   fetchSubjectBreakdown,
   fetchActivePlan,
   fetchDueFlashcards,
+  reviewFlashcard,
 } from '../store/slices/dashboardSlice';
 import { logout } from '../store/slices/authSlice';
 
@@ -190,9 +193,10 @@ const Dashboard = () => {
     }
   };
 
-  // ── Note Modal State ──
+  // ── Note & PYQ Modal State ──
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isStudyPlanOpen, setIsStudyPlanOpen] = useState(false);
+  const [isPyqModalOpen, setIsPyqModalOpen] = useState(false);
   const [comingSoon, setComingSoon] = useState(null);
 
   useEffect(() => {
@@ -220,7 +224,8 @@ const Dashboard = () => {
 
   const todayTasks = (() => {
     if (!activePlan?.dailyGoals) return [];
-    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const todayGoal = activePlan.dailyGoals.find((g) => {
       const goalDate = g.date ? g.date.split('T')[0] : null;
       return goalDate === today;
@@ -248,6 +253,15 @@ const Dashboard = () => {
 
   const firstDueCard = dueFlashcards.length > 0 ? dueFlashcards[0] : null;
 
+  const handleReviewCard = useCallback((quality) => {
+    if (!firstDueCard) return;
+    dispatch(reviewFlashcard({ cardId: firstDueCard.id, quality })).then(() => {
+      if (dueFlashcards.length <= 1) {
+        dispatch(fetchDueFlashcards());
+      }
+    });
+  }, [dispatch, firstDueCard, dueFlashcards.length]);
+
   // ── Streak display ──
   const streakDays = stats?.streak ?? 0;
   const totalStudyHours = stats?.totalStudyHours ?? 0;
@@ -262,7 +276,7 @@ const Dashboard = () => {
       {/* --- QUICK ACTIONS TABS --- */}
       <div className="absolute -left-4 top-24 flex flex-col gap-4 z-30 hidden md:flex">
         <GoldTabButton icon={Play} label="Start Quiz" delay={0.1} onClick={() => setComingSoon('Quiz feature coming soon!')} />
-        <GoldTabButton icon={FileText} label="Analyze PYQ" delay={0.2} onClick={() => setComingSoon('PYQ Analysis coming soon!')} />
+        <GoldTabButton icon={FileText} label="PYQ Intelligence" delay={0.2} onClick={() => navigate('/pyqs')} />
         <GoldTabButton icon={Calendar} label="Study Plan" delay={0.3} onClick={() => setIsStudyPlanOpen(true)} />
         <GoldTabButton icon={TrendingUp} label="Reports" delay={0.4} onClick={() => setComingSoon('Reports coming soon!')} />
         <button 
@@ -482,6 +496,7 @@ const Dashboard = () => {
               error={errorFlashcards}
               totalDue={dueFlashcards.length}
               onRetry={handleRetry(fetchDueFlashcards)}
+              onReview={handleReviewCard}
             />
           </div>
           <div className="flex justify-center">
@@ -498,6 +513,11 @@ const Dashboard = () => {
               <ErrorBanner message={toggleError} />
             </div>
           )}
+        </div>
+
+        {/* --- AI WEAKNESS DETECTION WIDGET --- */}
+        <div className="my-6">
+          <WeaknessDashboardWidget />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -677,6 +697,17 @@ const Dashboard = () => {
         isOpen={isStudyPlanOpen}
         onClose={() => setIsStudyPlanOpen(false)}
         activePlan={activePlan}
+      />
+
+      {/* --- PYQ ANALYSIS MODAL --- */}
+      <PyqAnalysisModal
+        isOpen={isPyqModalOpen}
+        onClose={() => setIsPyqModalOpen(false)}
+        onAnalysisComplete={() => {
+          setIsPyqModalOpen(false);
+          dispatch(fetchDashboardStats());
+          dispatch(fetchSubjectBreakdown());
+        }}
       />
 
       {/* --- COMING SOON TOAST --- */}

@@ -172,15 +172,18 @@ describe('Quiz Controller - Integration Tests', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.id).toBe(testQuiz.id.toString());
+      expect(res.body.data.id || res.body.data._id).toBe(testQuiz.id.toString());
       expect(res.body.data.title).toBe('Test Quiz');
     });
   });
 
   describe('POST /api/quizzes/:id/submit — IDOR Protection', () => {
-    const validAnswers = [{ questionId: '00000000-0000-0000-0000-000000000001', selectedAnswer: 0 }];
-
     it("should return 404 when another user tries to submit on someone else's quiz (IDOR protection)", async () => {
+      const validAnswers = (testQuiz.questions || []).map((q) => ({
+        questionId: String(q._id || q.id || q.questionId),
+        selectedAnswer: 0,
+      }));
+
       const res = await request(app)
         .post(`/api/quizzes/${testQuiz.id}/submit`)
         .set('Authorization', `Bearer ${otherAuthToken}`)

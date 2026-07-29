@@ -3,10 +3,17 @@ import { useEffect, useRef, useState } from 'react';
 function CustomCursor() {
   const dotRef = useRef(null);
   const ringRef = useRef(null);
-  const [isTouch] = useState(() => window.matchMedia('(pointer: coarse)').matches);
+  const [isTouch] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.matchMedia('(pointer: coarse)').matches;
+    }
+    return false;
+  });
 
   useEffect(() => {
-    if (isTouch) return;
+    if (isTouch) {
+      return;
+    }
 
     const dot = dotRef.current;
     const ring = ringRef.current;

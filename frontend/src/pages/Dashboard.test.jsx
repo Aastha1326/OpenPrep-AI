@@ -7,6 +7,23 @@ import authReducer from '../store/slices/authSlice';
 import dashboardReducer from '../store/slices/dashboardSlice';
 import Dashboard from './Dashboard';
 
+// ThemeContext uses window.matchMedia which is not implemented in jsdom
+beforeAll(() => {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+});
+
 vi.mock('../services/api', () => ({
   default: {
     get: vi.fn(() => Promise.resolve({ data: { data: {} } })),
@@ -22,6 +39,7 @@ vi.mock('../store/slices/dashboardSlice', async () => {
     fetchSubjectBreakdown: () => ({ type: 'dashboard/fetchSubjects' }),
     fetchActivePlan: () => ({ type: 'dashboard/fetchActivePlan' }),
     fetchDueFlashcards: () => ({ type: 'dashboard/fetchFlashcards' }),
+    reviewFlashcard: (payload) => ({ type: 'dashboard/reviewFlashcard', payload }),
   };
 });
 
@@ -250,5 +268,52 @@ describe('Dashboard', () => {
   test('displays zero streak by default', () => {
     renderDashboard();
     expect(screen.getByText('0 Day')).toBeInTheDocument();
+  });
+
+  // ── Today's tasks use local date, not UTC ──
+
+  test('matches dailyGoal tasks using local date instead of UTC', () => {
+    const now = new Date();
+    const todayLocal = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const yesterdayLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    const yesterdayStr = `${yesterdayLocal.getFullYear()}-${String(yesterdayLocal.getMonth() + 1).padStart(2, '0')}-${String(yesterdayLocal.getDate()).padStart(2, '0')}`;
+
+    renderDashboard({}, {
+      activePlan: {
+        id: 'plan-1',
+        dailyGoals: [
+          {
+            date: `${yesterdayStr}T00:00:00.000Z`,
+            tasks: [{ id: 'old-task', title: 'Old day task', completed: false }],
+          },
+          {
+            date: `${todayLocal}T00:00:00.000Z`,
+            tasks: [{ id: 'today-task', title: 'Today task', completed: false }],
+          },
+        ],
+      },
+    });
+
+    expect(screen.getByText('Today task')).toBeInTheDocument();
+    expect(screen.queryByText('Old day task')).not.toBeInTheDocument();
+  });
+
+  test('falls back to first day when no dailyGoal matches today', () => {
+    const now = new Date();
+    const futureStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate() + 10).padStart(2, '0')}`;
+
+    renderDashboard({}, {
+      activePlan: {
+        id: 'plan-1',
+        dailyGoals: [
+          {
+            date: `${futureStr}T00:00:00.000Z`,
+            tasks: [{ id: 'future-task', title: 'Future task', completed: false }],
+          },
+        ],
+      },
+    });
+
+    expect(screen.getByText('Future task')).toBeInTheDocument();
   });
 });

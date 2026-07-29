@@ -25,8 +25,15 @@ exports.generateAIFlashcards = async (req, res, next) => {
       if (topicObj) topicName = topicObj.name;
     }
 
-    // Load notes for context
-    const notes = await Note.findAll({ where: { subject: subjectId, user: req.user.id } });
+    // Load notes for context (prioritize topic-specific notes if topicId provided, fallback to subject notes)
+    const noteFilter = { subject: subjectId, user: req.user.id };
+    if (topicId) {
+      noteFilter.topic = topicId;
+    }
+    let notes = await Note.findAll({ where: noteFilter });
+    if ((!notes || notes.length === 0) && topicId) {
+      notes = await Note.findAll({ where: { subject: subjectId, user: req.user.id } });
+    }
     let notesText = '';
     if (notes && notes.length > 0) {
       notesText = notes
@@ -187,7 +194,7 @@ exports.reviewFlashcard = async (req, res, next) => {
 
     // If card is mastered (quality >= 4), increment mastered count in progress
     if (quality >= 4 && card.topic) {
-      const progress = await Progress.findOne({
+      let progress = await Progress.findOne({
         where: {
           user: req.user.id,
           subject: card.subject,
@@ -197,6 +204,13 @@ exports.reviewFlashcard = async (req, res, next) => {
       if (progress) {
         progress.flashcardsMastered += 1;
         await progress.save();
+      } else {
+        await Progress.create({
+          user: req.user.id,
+          subject: card.subject,
+          topic: card.topic,
+          flashcardsMastered: 1,
+        });
       }
     }
 

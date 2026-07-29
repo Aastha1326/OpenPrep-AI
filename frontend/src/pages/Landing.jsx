@@ -10,7 +10,7 @@ import {
   ArrowRight, 
   Sparkles, 
   Check,
-  ChevronRight,
+  ChevronRight
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 

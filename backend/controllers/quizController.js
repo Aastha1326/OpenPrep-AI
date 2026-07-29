@@ -189,16 +189,16 @@ exports.submitQuizAttempt = async (req, res, next) => {
     const totalQuestions = questionsList.length;
     const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
 
-    // Determine weak vs strong areas based on score
+    // Determine weak vs strong areas based on score (<50% Weak, 50-80% Medium, >80% Strong)
     const weakTopics = [];
     const strongTopics = [];
     if (quiz.topic) {
       const topicObj = await Topic.findByPk(quiz.topic);
       if (topicObj) {
-        if (score < 60) {
+        if (score < 50) {
           weakTopics.push(quiz.topic);
           topicObj.status = 'Weak';
-        } else if (score >= 80) {
+        } else if (score > 80) {
           strongTopics.push(quiz.topic);
           topicObj.status = 'Strong';
         } else {
@@ -219,6 +219,12 @@ exports.submitQuizAttempt = async (req, res, next) => {
       weakTopics,
       strongTopics,
     });
+
+    // Trigger AI weakness aggregation and adaptive planner rescheduling in background
+    const weaknessAggregatorService = require('../services/weaknessAggregatorService');
+    weaknessAggregatorService.aggregateUserWeakness(req.user.id)
+      .then(() => weaknessAggregatorService.rescheduleAdaptivePlanner(req.user.id))
+      .catch((err) => console.error('Background weakness aggregation error:', err));
 
     // Update Progress
     if (quiz.topic) {
