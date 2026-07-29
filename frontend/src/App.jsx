@@ -15,6 +15,7 @@ const Login = lazy(() => import('./pages/Login'));
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const QuizSession = lazy(() => import('./pages/QuizSession'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 const PyqDashboard = lazy(() => import('./pages/PyqDashboard'));
@@ -46,6 +47,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/quiz/:id"
+            element={
+              <ProtectedRoute>
+                <QuizSession />
               </ProtectedRoute>
             }
           />
