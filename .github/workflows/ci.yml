@@ -67,6 +67,7 @@ jobs:
         working-directory: backend
         env:
           DATABASE_URL_TEST: postgres://postgres@localhost:5432/postgres
+          JWT_SECRET: "testsecret"
 
   test-frontend:
     runs-on: ubuntu-latest
