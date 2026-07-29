@@ -3,14 +3,10 @@ import { useEffect, useRef, useState } from 'react';
 function CustomCursor() {
   const dotRef = useRef(null);
   const ringRef = useRef(null);
-  const [isTouch, setIsTouch] = useState(false);
+  const [isTouch] = useState(() => window.matchMedia('(pointer: coarse)').matches);
 
   useEffect(() => {
-    const touchCheck = window.matchMedia('(pointer: coarse)').matches;
-    if (touchCheck) {
-      setIsTouch(true);
-      return;
-    }
+    if (isTouch) return;
 
     const dot = dotRef.current;
     const ring = ringRef.current;
@@ -71,7 +67,7 @@ function CustomCursor() {
       document.body.removeEventListener('mouseleave', handleBodyMouseLeave, true);
       cancelAnimationFrame(frame);
     };
-  }, []);
+  }, [isTouch]);
 
   if (isTouch) return null;
 

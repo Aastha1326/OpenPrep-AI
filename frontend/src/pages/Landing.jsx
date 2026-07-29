@@ -11,15 +11,11 @@ import {
   Sparkles, 
   Check,
   ChevronRight,
-  Sun,
-  Moon
 } from 'lucide-react';
-import { useTheme } from '../context/ThemeContext';
 import ThemeToggle from '../components/ThemeToggle';
 
 const Landing = () => {
   const navigate = useNavigate();
-  const { theme, toggleTheme } = useTheme();
   const { isAuthenticated } = useSelector((state) => state.auth);
 
   // Fade-in animation variants
