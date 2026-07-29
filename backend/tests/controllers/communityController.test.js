@@ -25,7 +25,7 @@ describe('Community Controller - Feedback List Pagination', () => {
       password: 'password123',
     });
 
-    authToken = jwt.sign({ id: testUser.id }, process.env.JWT_SECRET);
+    authToken = jwt.sign({ id: testUser.id, type: 'access' }, process.env.JWT_SECRET);
   });
 
   afterAll(() => {

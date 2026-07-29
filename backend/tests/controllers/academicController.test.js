@@ -43,7 +43,7 @@ describe('Academic Controller - Integration Tests', () => {
       password: 'password123',
     });
 
-    authToken = jwt.sign({ id: testUser.id }, process.env.JWT_SECRET);
+    authToken = jwt.sign({ id: testUser.id, type: 'access' }, process.env.JWT_SECRET);
   });
 
   afterAll(() => {
@@ -92,7 +92,7 @@ describe('Academic Controller - Integration Tests', () => {
       });
 
       it('should return empty array if no exams exist for different user', async () => {
-        const otherToken = jwt.sign({ id: otherUser.id }, process.env.JWT_SECRET);
+        const otherToken = jwt.sign({ id: otherUser.id, type: 'access' }, process.env.JWT_SECRET);
         const res = await request(app)
           .get('/api/academic/exams')
           .set('Authorization', `Bearer ${otherToken}`);

@@ -45,8 +45,8 @@ describe('Progress Controller - Integration Tests', () => {
       password: 'password123',
     });
 
-    authToken = jwt.sign({ id: testUser.id }, process.env.JWT_SECRET);
-    otherAuthToken = jwt.sign({ id: otherUser.id }, process.env.JWT_SECRET);
+    authToken = jwt.sign({ id: testUser.id, type: 'access' }, process.env.JWT_SECRET);
+    otherAuthToken = jwt.sign({ id: otherUser.id, type: 'access' }, process.env.JWT_SECRET);
 
     testExam = await Exam.create({
       name: 'Test Exam',

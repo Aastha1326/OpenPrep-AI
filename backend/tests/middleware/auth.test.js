@@ -77,7 +77,7 @@ describe('Auth Middleware - protect', () => {
   });
 
   it('should return 401 if user does not exist in database', async () => {
-    const token = jwt.sign({ id: uuidv4() }, process.env.JWT_SECRET);
+    const token = jwt.sign({ id: uuidv4(), type: 'access' }, process.env.JWT_SECRET);
     const { req, res, next } = createMockReqRes();
     req.headers.authorization = `Bearer ${token}`;
 
@@ -98,7 +98,7 @@ describe('Auth Middleware - protect', () => {
       password: 'password123',
     });
 
-    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET);
+    const token = jwt.sign({ id: user.id, type: 'access' }, process.env.JWT_SECRET);
     const { req, res, next } = createMockReqRes();
     req.headers.authorization = `Bearer ${token}`;
 
@@ -108,6 +108,28 @@ describe('Auth Middleware - protect', () => {
     expect(req.user).toBeDefined();
     expect(req.user.id.toString()).toBe(user.id.toString());
     expect(req.user.email).toBe('authtest@example.com');
+  });
+
+  it('should return 401 if token lacks type claim', async () => {
+    const token = jwt.sign({ id: uuidv4() }, process.env.JWT_SECRET);
+    const { req, res, next } = createMockReqRes();
+    req.headers.authorization = `Bearer ${token}`;
+
+    await protect(req, res, next);
+
+    expect(res.statusCode).toBe(401);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('should return 401 if token has wrong type claim', async () => {
+    const token = jwt.sign({ id: uuidv4(), type: 'refresh' }, process.env.JWT_SECRET);
+    const { req, res, next } = createMockReqRes();
+    req.headers.authorization = `Bearer ${token}`;
+
+    await protect(req, res, next);
+
+    expect(res.statusCode).toBe(401);
+    expect(next).not.toHaveBeenCalled();
   });
 
   it('should reject tokens when JWT_SECRET is not configured', async () => {
