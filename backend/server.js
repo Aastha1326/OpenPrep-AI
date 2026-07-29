@@ -63,6 +63,11 @@ app.use(cookieParser());
 const csrfProtection = csrf({ cookie: true });
 app.use(csrfProtection);
 
+// CSRF Token Endpoint for frontend clients
+app.get('/api/csrf-token', (req, res) => {
+  res.json({ csrfToken: req.csrfToken() });
+});
+
 // Response compression (skip binary uploads via default filter)
 app.use(compression());
 
