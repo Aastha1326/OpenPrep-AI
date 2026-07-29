@@ -13,6 +13,8 @@ const { protect } = require('./middleware/auth');
 const fs = require('fs');
 const PYQ = require('./models/PYQ');
 const Note = require('./models/Note');
+const http = require('http');
+const { Server } = require('socket.io');
 
 // Validate required environment variables at startup
 if (!process.env.JWT_SECRET) {
@@ -143,6 +145,19 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    methods: ['GET', 'POST'],
+    credentials: true,
+  },
+});
+
+// Initialize socket handlers
+require('./sockets/battleHandler')(io);
+
+server.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
 });
