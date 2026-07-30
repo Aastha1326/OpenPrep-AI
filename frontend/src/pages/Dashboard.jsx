@@ -194,6 +194,24 @@ const Dashboard = () => {
     }
   };
 
+  const handleBumpStudyTime = async (taskId, minutesToAdd = 30) => {
+    const planId = activePlan?.id;
+    if (!planId) return;
+    const task = todayTasks.find((t) => t.id === taskId);
+    if (!task) return;
+    const backendTaskId = task.meta?.taskId || task.id;
+    setToggleError(null);
+    try {
+      const currentDuration = task.duration || 60;
+      await API.put(`/study-plans/${planId}/tasks/${backendTaskId}`, {
+        duration: currentDuration + minutesToAdd,
+      });
+      dispatch(fetchActivePlan());
+    } catch {
+      setToggleError('Failed to bump study time. Please try again.');
+    }
+  };
+
   // ── Note & PYQ Modal State ──
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isStudyPlanOpen, setIsStudyPlanOpen] = useState(false);
@@ -262,20 +280,24 @@ const Dashboard = () => {
     });
     if (todayGoal?.tasks) {
       return todayGoal.tasks.map((t, i) => ({
-        id: t.id || `task-${i}`,
+        id: t.id || t._id || `task-${i}`,
         text: t.title || t.description || t.topic?.name || 'Untitled task',
         completed: t.completed || false,
-        meta: { taskId: t.id },
+        topic: t.topic || null,
+        duration: t.duration || 60,
+        meta: { taskId: t.id || t._id },
       }));
     }
     // Fallback: show first day's tasks
     const firstDay = activePlan.dailyGoals[0];
     if (firstDay?.tasks) {
       return firstDay.tasks.map((t, i) => ({
-        id: t.id || `task-${i}`,
+        id: t.id || t._id || `task-${i}`,
         text: t.title || t.description || t.topic?.name || 'Untitled task',
         completed: t.completed || false,
-        meta: { taskId: t.id },
+        topic: t.topic || null,
+        duration: t.duration || 60,
+        meta: { taskId: t.id || t._id },
       }));
     }
     return [];
@@ -576,6 +598,7 @@ const Dashboard = () => {
               error={errorPlan}
               onRetry={handleRetry(fetchActivePlan)}
               onToggle={handleToggleTask}
+              onBumpTime={handleBumpStudyTime}
             />
           </div>
           {toggleError && (
@@ -767,6 +790,32 @@ const Dashboard = () => {
         isOpen={isStudyPlanOpen}
         onClose={() => setIsStudyPlanOpen(false)}
         activePlan={activePlan}
+        onBumpTime={async (taskId, minutesToAdd = 30) => {
+          const planId = activePlan?.id;
+          if (!planId) return;
+          setToggleError(null);
+          try {
+            const backendTaskId = taskId;
+            let currentDuration = 60;
+            if (activePlan?.dailyGoals) {
+              outer: for (const goal of activePlan.dailyGoals) {
+                for (const t of goal.tasks || []) {
+                  const thisTaskId = t.id || t._id;
+                  if (thisTaskId === backendTaskId) {
+                    currentDuration = t.duration || 60;
+                    break outer;
+                  }
+                }
+              }
+            }
+            await API.put(`/study-plans/${planId}/tasks/${backendTaskId}`, {
+              duration: currentDuration + minutesToAdd,
+            });
+            dispatch(fetchActivePlan());
+          } catch {
+            setToggleError('Failed to bump study time. Please try again.');
+          }
+        }}
       />
 
       {/* --- PYQ ANALYSIS MODAL --- */}
