@@ -24,6 +24,7 @@ import CreateNoteModal from '../components/dashboard/CreateNoteModal';
 import StudyPlanModal from '../components/dashboard/StudyPlanModal';
 import PyqAnalysisModal from '../components/dashboard/PyqAnalysisModal';
 import WeaknessDashboardWidget from '../components/dashboard/WeaknessDashboardWidget';
+import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
 import ThemeToggle from '../components/ThemeToggle';
 
 import {
@@ -321,7 +322,7 @@ const Dashboard = () => {
 
       <div className="pl-4 md:pl-16 pr-4 lg:pr-8 py-8 space-y-12">
         {/* --- HERO SECTION --- */}
-        <div className="flex flex-col md:flex-row justify-between items-end border-b border-black/20 pb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start border-b border-black/20 pb-8 gap-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -334,13 +335,28 @@ const Dashboard = () => {
             <p className="text-amber-100/70 text-lg italic font-playfair">
               &ldquo;The roots of education are bitter, but the fruit is sweet.&rdquo; – Aristotle
             </p>
+
+            {/* --- EXAM COUNTDOWN WIDGET --- */}
+            {activePlan?.exam?.date && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.4 }}
+                className="mt-5"
+              >
+                <ExamCountdownWidget
+                  examDate={activePlan.exam.date}
+                  examName={activePlan.exam.name}
+                />
+              </motion.div>
+            )}
           </motion.div>
 
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, delay: 0.3 }}
-            className="flex items-center space-x-6 mt-6 md:mt-0"
+            className="flex items-center space-x-6 mt-2 md:mt-0 shrink-0"
           >
             <ThemeToggle className="mr-2" />
             <div className="flex flex-col items-center">
