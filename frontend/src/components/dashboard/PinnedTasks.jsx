@@ -1,10 +1,32 @@
-import { Check, AlertCircle, RefreshCw } from 'lucide-react';
+import { Check, AlertCircle, RefreshCw, AlertTriangle, ClockPlus } from 'lucide-react';
 
 const Shimmer = ({ className = '' }) => (
   <div className={`animate-pulse bg-neutral-300/60 rounded ${className}`} />
 );
 
-const PinnedTasks = ({ tasks = [], loading = false, error = null, onRetry, onToggle }) => {
+const WeakBadge = () => (
+  <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-red-100 text-red-700 border border-red-200 mt-1">
+    <AlertTriangle className="w-3 h-3" />
+    Weak Topic
+  </span>
+);
+
+const BumpTimeButton = ({ onClick, disabled = false }) => (
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
+      onClick?.();
+    }}
+    disabled={disabled}
+    className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-sm bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+    title="Add 30 minutes of recommended study time"
+  >
+    <ClockPlus className="w-3 h-3" />
+    +30 min
+  </button>
+);
+
+const PinnedTasks = ({ tasks = [], loading = false, error = null, onRetry, onToggle, onBumpTime }) => {
   if (loading) {
     return (
       <div className="relative bg-[#fdfaf3] dark:bg-slate-800 shadow-[4px_6px_15px_rgba(0,0,0,0.15)] rounded-sm p-6 max-w-sm mx-auto transform rotate-1 hover:rotate-0 transition-transform">
@@ -61,6 +83,8 @@ const PinnedTasks = ({ tasks = [], loading = false, error = null, onRetry, onTog
     );
   }
 
+  const weakCount = tasks.filter((t) => t.topic?.status === 'Weak').length;
+
   return (
     <div className="relative bg-[#fdfaf3] dark:bg-slate-800 shadow-[4px_6px_15px_rgba(0,0,0,0.15)] rounded-sm p-6 max-w-sm mx-auto transform rotate-1 hover:rotate-0 transition-transform">
       {/* Torn Top Edge Effect */}
@@ -73,23 +97,62 @@ const PinnedTasks = ({ tasks = [], loading = false, error = null, onRetry, onTog
         <div className="absolute top-4 left-1 w-0.5 h-3 bg-black/20 origin-top rotate-45 pointer-events-none" />
       </div>
 
-      <h3 className="font-playfair font-bold text-2xl text-red-800/80 dark:text-red-400 text-center mb-4 border-b border-red-800/20 dark:border-red-400/20 pb-2">To-Do List</h3>
+      <div className="flex flex-col items-center mb-4 border-b border-red-800/20 dark:border-red-400/20 pb-2">
+        <h3 className="font-playfair font-bold text-2xl text-red-800/80 dark:text-red-400 text-center">To-Do List</h3>
+        {weakCount > 0 && (
+          <span className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800/30">
+            <AlertTriangle className="w-3 h-3" />
+            {weakCount} weak task{weakCount === 1 ? '' : 's'}
+          </span>
+        )}
+      </div>
 
       <div className="space-y-3">
-        {tasks.map((task) => (
-          <div
-            key={task.id}
-            className="flex items-start cursor-pointer group"
-            onClick={() => onToggle?.(task.id)}
-          >
-            <div className={`mt-1 w-5 h-5 border-2 rounded-sm flex items-center justify-center shrink-0 transition-colors ${task.completed ? 'border-green-600 bg-green-50 dark:bg-green-900/30' : 'border-neutral-400 bg-white dark:bg-slate-700 dark:border-slate-500 group-hover:border-neutral-600 dark:group-hover:border-slate-400'}`}>
-              {task.completed && <Check className="w-3 h-3 text-green-600 dark:text-green-400 font-bold" />}
+        {tasks.map((task) => {
+          const isWeak = task.topic?.status === 'Weak';
+          return (
+            <div
+              key={task.id}
+              className={`flex items-start cursor-pointer group rounded p-1.5 -mx-1.5 transition-colors ${
+                isWeak
+                  ? 'bg-red-50/70 dark:bg-red-900/10 border border-red-100 dark:border-red-900/20'
+                  : 'hover:bg-red-900/5 dark:hover:bg-red-50/5'
+              }`}
+              onClick={() => onToggle?.(task.id)}
+            >
+              <div className={`mt-1 w-5 h-5 border-2 rounded-sm flex items-center justify-center shrink-0 transition-colors ${
+                task.completed
+                  ? 'border-green-600 bg-green-50 dark:bg-green-900/30'
+                  : isWeak
+                    ? 'border-red-400 bg-white dark:bg-slate-700 dark:border-red-500/60 group-hover:border-red-500 dark:group-hover:border-red-400'
+                    : 'border-neutral-400 bg-white dark:bg-slate-700 dark:border-slate-500 group-hover:border-neutral-600 dark:group-hover:border-slate-400'
+              }`}>
+                {task.completed && <Check className="w-3 h-3 text-green-600 dark:text-green-400 font-bold" />}
+              </div>
+              <div className="ml-3 flex-1 min-w-0">
+                <div className="flex flex-wrap items-start gap-y-1">
+                  <span className={`font-inter text-neutral-800 dark:text-neutral-200 ${
+                    task.completed ? 'line-through text-neutral-400 dark:text-neutral-500' : ''
+                  }`}>
+                    {task.text}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-3">
+                  {task.duration && (
+                    <span className="mt-1 inline-flex items-center gap-1 text-[10px] text-neutral-500 dark:text-neutral-400 font-medium">
+                      <ClockPlus className="w-3 h-3" />
+                      {task.duration} min
+                    </span>
+                  )}
+                  {isWeak && <WeakBadge />}
+                </div>
+                {isWeak && onBumpTime && (
+                  <BumpTimeButton onClick={() => onBumpTime(task.id, 30)} />
+                )}
+              </div>
             </div>
-            <span className={`ml-3 font-inter text-neutral-800 dark:text-neutral-200 ${task.completed ? 'line-through text-neutral-400 dark:text-neutral-500' : ''}`}>
-              {task.text}
-            </span>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

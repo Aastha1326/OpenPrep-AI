@@ -170,13 +170,13 @@ exports.getActivePlan = async (req, res, next) => {
   }
 };
 
-// @desc    Toggle Task Completion Status
+// @desc    Toggle Task Completion Status or Update Task Duration
 // @route   PUT /api/study-plans/:planId/tasks/:taskId
 // @access  Private
 exports.toggleTaskCompletion = async (req, res, next) => {
   try {
     const { planId, taskId } = req.params;
-    const { completed, studyTimeMinutes } = req.body;
+    const { completed, studyTimeMinutes, duration } = req.body;
 
     const plan = await StudyPlan.findOne({ where: { id: planId, user: req.user.id } });
     if (!plan) {
@@ -191,7 +191,12 @@ exports.toggleTaskCompletion = async (req, res, next) => {
       const task = goal.tasks.find((t) => t._id === taskId || t.id === taskId);
       if (task) {
         wasCompleted = task.completed; // Capture previous state BEFORE modifying
-        task.completed = completed;
+        if (completed !== undefined) {
+          task.completed = completed;
+        }
+        if (duration !== undefined && typeof duration === 'number' && duration >= 0) {
+          task.duration = duration;
+        }
         taskFound = true;
         break;
       }
