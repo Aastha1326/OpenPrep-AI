@@ -7,6 +7,7 @@ const Topic = require('../models/Topic');
 const ActivityLog = require('../models/ActivityLog');
 const User = require('../models/User');
 const { escapeLikePattern } = require('../utils/likePattern');
+const { summarizeNoteText } = require('../services/geminiService');
 
 // @desc    Upload Note
 // @route   POST /api/notes
@@ -189,6 +190,47 @@ exports.deleteNote = async (req, res, next) => {
 
     await note.destroy();
     res.status(200).json({ success: true, data: {} });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Summarize a note using AI (Gemini) and cache the result
+// @route   POST /api/notes/:id/summarize
+// @access  Private
+exports.summarizeNote = async (req, res, next) => {
+  try {
+    const note = await Note.findOne({
+      where: { id: req.params.id, user: req.user.id },
+      include: [{ model: Subject, as: 'subjectRef', attributes: ['name'] }],
+    });
+
+    if (!note) {
+      return res.status(404).json({ success: false, error: 'Note not found' });
+    }
+
+    if (!note.content || note.content.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Note has no text content to summarize',
+      });
+    }
+
+    const forceRefresh = req.body.forceRefresh === true;
+
+    // Return cached summary if available and not forcing refresh
+    if (note.aiSummary && !forceRefresh) {
+      return res.status(200).json({ success: true, data: note.aiSummary, cached: true });
+    }
+
+    const subjectName = note.subjectRef?.name || 'the subject';
+    const aiSummary = await summarizeNoteText(note.content, subjectName, forceRefresh);
+
+    // Cache AI summary on the note record
+    note.aiSummary = aiSummary;
+    await note.save();
+
+    res.status(200).json({ success: true, data: aiSummary, cached: false });
   } catch (error) {
     next(error);
   }
