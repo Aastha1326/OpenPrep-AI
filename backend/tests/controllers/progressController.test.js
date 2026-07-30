@@ -401,4 +401,40 @@ describe('Progress Controller - Integration Tests', () => {
       expect(res.status).toBe(401);
     });
   });
+
+  // =========================================================================
+  // EXPORT PROGRESS REPORTS (CSV & PDF)
+  // =========================================================================
+  describe('GET /api/progress/export/csv & /api/progress/export/pdf', () => {
+    it('should export progress report as downloadable CSV', async () => {
+      const res = await request(app)
+        .get('/api/progress/export/csv')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('text/csv');
+      expect(res.headers['content-disposition']).toContain('attachment');
+      expect(res.headers['content-disposition']).toContain('.csv');
+      expect(res.text).toContain('Exam,Subject,Topic,Status,Completion %,Study Hours,Flashcards Mastered');
+    });
+
+    it('should export progress report as downloadable PDF', async () => {
+      const res = await request(app)
+        .get('/api/progress/export/pdf')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('application/pdf');
+      expect(res.headers['content-disposition']).toContain('attachment');
+      expect(res.headers['content-disposition']).toContain('.pdf');
+    });
+
+    it('should return 401 without auth token for export endpoints', async () => {
+      const resCsv = await request(app).get('/api/progress/export/csv');
+      expect(resCsv.status).toBe(401);
+
+      const resPdf = await request(app).get('/api/progress/export/pdf');
+      expect(resPdf.status).toBe(401);
+    });
+  });
 });

@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Flame, Play, FileText, Calendar, TrendingUp, Award, BookOpen,
   Target, CheckCircle, Clock, AlertCircle, RefreshCw, Lightbulb,
-  LogOut, X,
+  LogOut, X, Download,
 } from 'lucide-react';
 import API from '../services/api';
 import {
@@ -198,6 +198,7 @@ const Dashboard = () => {
   const [isStudyPlanOpen, setIsStudyPlanOpen] = useState(false);
   const [isPyqModalOpen, setIsPyqModalOpen] = useState(false);
   const [comingSoon, setComingSoon] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     if (comingSoon) {
@@ -205,6 +206,34 @@ const Dashboard = () => {
       return () => clearTimeout(timer);
     }
   }, [comingSoon]);
+
+  const handleExportReport = async (format = 'pdf') => {
+    setIsExporting(true);
+    try {
+      const response = await API.get(`/progress/export/${format}`, {
+        responseType: 'blob',
+      });
+
+      const blob = new Blob([response.data], {
+        type: format === 'pdf' ? 'application/pdf' : 'text/csv',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute(
+        'download',
+        `progress_report_${new Date().toISOString().split('T')[0]}.${format}`
+      );
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      setComingSoon('Failed to export progress report.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // ── Derived Data ──
   const chartData = weeklyChartData.length > 0
@@ -278,7 +307,7 @@ const Dashboard = () => {
         <GoldTabButton icon={Play} label="Start Quiz" delay={0.1} onClick={() => setComingSoon('Quiz feature coming soon!')} />
         <GoldTabButton icon={FileText} label="PYQ Intelligence" delay={0.2} onClick={() => navigate('/pyqs')} />
         <GoldTabButton icon={Calendar} label="Study Plan" delay={0.3} onClick={() => setIsStudyPlanOpen(true)} />
-        <GoldTabButton icon={TrendingUp} label="Reports" delay={0.4} onClick={() => setComingSoon('Reports coming soon!')} />
+        <GoldTabButton icon={TrendingUp} label="Export Report" delay={0.4} onClick={() => handleExportReport('pdf')} />
         <button 
           onClick={() => setIsNoteModalOpen(true)}
           className="bg-neutral-800 text-yellow-500 border border-yellow-700/50 hover:bg-neutral-700 p-2 rounded-r-lg shadow-lg flex items-center justify-center relative group"
@@ -403,14 +432,39 @@ const Dashboard = () => {
         </div>
 
         {/* --- ANALYTICS SECTION (WOODEN DESK) --- */}
-        <div className="bg-wood-desk rounded-lg shadow-inner border border-black/50 p-6 relative overflow-hidden grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="absolute inset-0 shadow-[inset_0_0_50px_rgba(0,0,0,0.8)] pointer-events-none" />
-
-          {/* Line Chart — Weekly Performance */}
-          <VintagePaper animate={false} className="w-full h-full p-6 shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
-            <h2 className="text-2xl font-bold font-playfair text-neutral-900 mb-6 border-b border-neutral-400 pb-2">
-              Weekly Performance
+        <div className="space-y-4">
+          <div className="flex justify-between items-center px-1">
+            <h2 className="text-2xl font-bold font-playfair text-amber-100 flex items-center gap-2">
+              <TrendingUp className="w-6 h-6 text-yellow-500" /> Performance Analytics
             </h2>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleExportReport('csv')}
+                disabled={isExporting}
+                className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-yellow-400 border border-yellow-700/50 rounded text-xs font-semibold flex items-center gap-1.5 shadow transition-all disabled:opacity-50"
+                title="Export report as CSV"
+              >
+                <Download className="w-3.5 h-3.5" /> Export CSV
+              </button>
+              <button
+                onClick={() => handleExportReport('pdf')}
+                disabled={isExporting}
+                className="px-3 py-1.5 bg-gradient-to-r from-yellow-700 to-yellow-600 hover:from-yellow-600 hover:to-yellow-500 text-yellow-50 rounded text-xs font-semibold flex items-center gap-1.5 shadow transition-all disabled:opacity-50"
+                title="Export report as PDF"
+              >
+                <Download className="w-3.5 h-3.5" /> Export PDF
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-wood-desk rounded-lg shadow-inner border border-black/50 p-6 relative overflow-hidden grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="absolute inset-0 shadow-[inset_0_0_50px_rgba(0,0,0,0.8)] pointer-events-none" />
+
+            {/* Line Chart — Weekly Performance */}
+            <VintagePaper animate={false} className="w-full h-full p-6 shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
+              <h2 className="text-2xl font-bold font-playfair text-neutral-900 mb-6 border-b border-neutral-400 pb-2">
+                Weekly Performance
+              </h2>
             <div className="h-64 w-full" style={{ minHeight: '250px', minWidth: '100%' }}>
               {loadingStats ? (
                 <div className="flex items-center justify-center h-full">
