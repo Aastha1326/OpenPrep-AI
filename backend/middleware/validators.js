@@ -147,8 +147,8 @@ const validateSubmitQuizAttempt = [
     .isUUID(4)
     .withMessage('Each questionId must be a valid UUID'),
   body('answers.*.selectedAnswer')
-    .exists({ checkNull: true })
-    .withMessage('Each answer must have a selectedAnswer'),
+    .isInt({ min: 0, max: 3 })
+    .withMessage('Each answer must have a valid selectedAnswer option index'),
   body('timeSpent')
     .optional()
     .isFloat({ min: 0, max: 86400 })
