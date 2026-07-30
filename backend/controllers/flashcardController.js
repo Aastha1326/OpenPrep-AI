@@ -194,25 +194,29 @@ exports.reviewFlashcard = async (req, res, next) => {
     await card.save();
 
     // If card is mastered (quality >= 4), increment mastered count in progress
-    if (quality >= 4 && card.topic) {
-      let progress = await Progress.findOne({
+    // NOTE: progress entries are tracked both for topic-level flashcards (topic: id)
+    //       AND subject-level flashcards (topic: null) — we no longer skip the latter.
+    //       Progress row is atomically upserted via findOrCreate so rows are created
+    //       dynamically even if user reviews cards before ever taking a quiz.
+    if (quality >= 4) {
+      const progressTopic = card.topic || null;
+      const [progress] = await Progress.findOrCreate({
         where: {
           user: req.user.id,
           subject: card.subject,
-          topic: card.topic,
+          topic: progressTopic,
         },
-      });
-      if (progress) {
-        progress.flashcardsMastered += 1;
-        await progress.save();
-      } else {
-        await Progress.create({
+        defaults: {
           user: req.user.id,
           subject: card.subject,
-          topic: card.topic,
-          flashcardsMastered: 1,
-        });
-      }
+          topic: progressTopic,
+          flashcardsMastered: 0,
+          completionPercentage: 0,
+          studyHours: 0,
+        },
+      });
+      progress.flashcardsMastered += 1;
+      await progress.save();
     }
 
     res.status(200).json({ success: true, data: card });
