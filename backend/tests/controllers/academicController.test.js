@@ -117,6 +117,23 @@ describe('Academic Controller - Integration Tests', () => {
     });
 
     describe('DELETE /api/academic/exams/:id', () => {
+      it('should delete an exam with no subjects', async () => {
+        const emptyExam = await Exam.create({
+          name: 'Empty Exam',
+          description: 'Exam with no subjects',
+          date: '2026-06-01',
+          user: testUser.id,
+        });
+
+        const res = await request(app)
+          .delete(`/api/academic/exams/${emptyExam.id}`)
+          .set('Authorization', `Bearer ${authToken}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(true);
+        expect(await Exam.findByPk(emptyExam.id)).toBeNull();
+      });
+
       it('should delete an exam and its subjects/topics', async () => {
         const exam = await Exam.create({
           name: 'Delete Exam',
