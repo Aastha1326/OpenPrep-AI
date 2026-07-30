@@ -69,7 +69,8 @@ API.interceptors.response.use(
     const originalRequest = error.config;
 
     // Only attempt refresh on 401, and only once per request
-    if (error.response?.status !== 401 || originalRequest._retry) {
+    const isAuthEndpoint = originalRequest?.url?.includes('/auth/');
+    if (error.response?.status !== 401 || originalRequest?._retry || isAuthEndpoint) {
       return Promise.reject(error);
     }
 
