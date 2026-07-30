@@ -2,11 +2,14 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Lightbulb, AlertCircle, RefreshCw, BookOpen, Volume2, VolumeX } from 'lucide-react';
 
+import { useNavigate } from 'react-router-dom';
+
 const Shimmer = ({ className = '' }) => (
   <div className={`animate-pulse bg-neutral-300/60 rounded ${className}`} />
 );
 
 const FlashcardWidget = ({ flashcard = null, loading = false, error = null, totalDue = 0, onRetry, onReview }) => {
+  const navigate = useNavigate();
   const [isFlipped, setIsFlipped] = useState(false);
   const [prevFlashcard, setPrevFlashcard] = useState(flashcard);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -160,6 +163,13 @@ const FlashcardWidget = ({ flashcard = null, loading = false, error = null, tota
               </span>
             )}
           </div>
+          <button 
+            type="button"
+            onClick={(e) => { e.stopPropagation(); navigate('/flashcards/review'); }}
+            className="absolute bottom-4 left-4 px-3 py-1 bg-yellow-100 dark:bg-yellow-900/50 hover:bg-yellow-200 dark:hover:bg-yellow-800 text-yellow-800 dark:text-yellow-200 text-xs font-bold rounded shadow z-10"
+          >
+            Full Review &rarr;
+          </button>
 
           {/* Audio Reader Controls */}
           <div className="absolute top-2 right-2 flex items-center gap-1 z-10">

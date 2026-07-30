@@ -17,6 +17,7 @@ const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const BattleArena = lazy(() => import('./pages/BattleArena'));
 const NotFound = lazy(() => import('./pages/NotFound'));
+const FlashcardReview = lazy(() => import('./pages/FlashcardReview'));
 
 const PyqDashboard = lazy(() => import('./pages/PyqDashboard'));
 
@@ -47,6 +48,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/flashcards/review"
+            element={
+              <ProtectedRoute>
+                <FlashcardReview />
               </ProtectedRoute>
             }
           />
