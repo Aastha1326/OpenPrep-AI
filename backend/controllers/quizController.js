@@ -226,34 +226,34 @@ exports.submitQuizAttempt = async (req, res, next) => {
       .then(() => weaknessAggregatorService.rescheduleAdaptivePlanner(req.user.id))
       .catch((err) => console.error('Background weakness aggregation error:', err));
 
-    // Update Progress
+    // Update Progress (supports both topic-level and subject-level quizzes)
+    const progressWhere = {
+      user: req.user.id,
+      subject: quiz.subject,
+    };
     if (quiz.topic) {
-      let progress = await Progress.findOne({
-        where: {
-          user: req.user.id,
-          subject: quiz.subject,
-          topic: quiz.topic,
-        },
-      });
+      progressWhere.topic = quiz.topic;
+    }
 
-      if (progress) {
-        const quizScores = [...progress.quizScores];
-        quizScores.push({ attempt: attempt.id, score, date: new Date() });
-        progress.quizScores = quizScores;
+    let progress = await Progress.findOne({ where: progressWhere });
 
-        if (score > progress.completionPercentage) {
-          progress.completionPercentage = Math.min(score, 100);
-        }
-        await progress.save();
-      } else {
-        await Progress.create({
-          user: req.user.id,
-          subject: quiz.subject,
-          topic: quiz.topic,
-          completionPercentage: score,
-          quizScores: [{ attempt: attempt.id, score, date: new Date() }],
-        });
+    if (progress) {
+      const quizScores = [...progress.quizScores];
+      quizScores.push({ attempt: attempt.id, score, date: new Date() });
+      progress.quizScores = quizScores;
+
+      if (score > progress.completionPercentage) {
+        progress.completionPercentage = Math.min(score, 100);
       }
+      await progress.save();
+    } else {
+      await Progress.create({
+        user: req.user.id,
+        subject: quiz.subject,
+        topic: quiz.topic || null,
+        completionPercentage: score,
+        quizScores: [{ attempt: attempt.id, score, date: new Date() }],
+      });
     }
 
     // Log Activity
