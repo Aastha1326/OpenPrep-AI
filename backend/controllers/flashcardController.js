@@ -202,43 +202,49 @@ exports.reviewFlashcard = async (req, res, next) => {
     //   false -> true : increment (card just became mastered)
     //   true  -> false: decrement (card lost mastered status)
     //   same state    : no change (prevents double-counting)
-    if (card.topic) {
-      if (quality >= 4 && !wasMastered) {
-        // Card transitioned from not mastered -> mastered: increment
-        let progress = await Progress.findOne({
-          where: {
-            user: req.user.id,
-            subject: card.subject,
-            topic: card.topic,
-          },
-        });
-        if (progress) {
-          progress.flashcardsMastered += 1;
-          await progress.save();
-        } else {
-          await Progress.create({
-            user: req.user.id,
-            subject: card.subject,
-            topic: card.topic,
-            flashcardsMastered: 1,
-          });
-        }
-      } else if (quality < 4 && wasMastered) {
-        // Card transitioned from mastered -> not mastered: decrement
-        let progress = await Progress.findOne({
-          where: {
-            user: req.user.id,
-            subject: card.subject,
-            topic: card.topic,
-          },
-        });
-        if (progress) {
-          progress.flashcardsMastered = Math.max(0, progress.flashcardsMastered - 1);
-          await progress.save();
-        }
-      }
-      // If state unchanged, do nothing
+    // NOTE: progress entries are tracked both for topic-level flashcards (topic: id)
+    //       AND subject-level flashcards (topic: null) — we no longer skip the latter.
+    const progressTopic = card.topic || null;
+    if (quality >= 4 && !wasMastered) {
+      // Card transitioned from not mastered -> mastered: increment
+      const [progress] = await Progress.findOrCreate({
+        where: {
+          user: req.user.id,
+          subject: card.subject,
+          topic: progressTopic,
+        },
+        defaults: {
+          user: req.user.id,
+          subject: card.subject,
+          topic: progressTopic,
+          flashcardsMastered: 0,
+          completionPercentage: 0,
+          studyHours: 0,
+        },
+      });
+      progress.flashcardsMastered += 1;
+      await progress.save();
+    } else if (quality < 4 && wasMastered) {
+      // Card transitioned from mastered -> not mastered: decrement
+      const [progress] = await Progress.findOrCreate({
+        where: {
+          user: req.user.id,
+          subject: card.subject,
+          topic: progressTopic,
+        },
+        defaults: {
+          user: req.user.id,
+          subject: card.subject,
+          topic: progressTopic,
+          flashcardsMastered: 0,
+          completionPercentage: 0,
+          studyHours: 0,
+        },
+      });
+      progress.flashcardsMastered = Math.max(0, progress.flashcardsMastered - 1);
+      await progress.save();
     }
+    // If state unchanged, do nothing
 
     res.status(200).json({ success: true, data: card });
   } catch (error) {
