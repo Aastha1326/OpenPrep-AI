@@ -50,6 +50,10 @@ const Note = sequelize.define(
       type: DataTypes.UUID,
       allowNull: false,
     },
+    aiSummary: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+    },
   },
   {
     timestamps: true,
