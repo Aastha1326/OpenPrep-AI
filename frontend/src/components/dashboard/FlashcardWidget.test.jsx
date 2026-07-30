@@ -106,4 +106,77 @@ describe('FlashcardWidget', () => {
     render(<FlashcardWidget flashcard={sampleFlashcard} totalDue={1} />);
     expect(screen.queryByText('(1 due)')).not.toBeInTheDocument();
   });
+
+  // ---------------------------------------------------------------------------
+  // Audio Reader (TTS) Tests
+  // ---------------------------------------------------------------------------
+
+  describe('Audio Reader (TTS)', () => {
+    let mockSpeak;
+    let mockCancel;
+
+    beforeEach(() => {
+      mockSpeak = vi.fn();
+      mockCancel = vi.fn();
+
+      window.speechSynthesis = {
+        speak: mockSpeak,
+        cancel: mockCancel,
+      };
+
+      window.SpeechSynthesisUtterance = vi.fn().mockImplementation(function (text) {
+        this.text = text;
+        this.rate = 1;
+        this.onend = null;
+        this.onerror = null;
+      });
+    });
+
+    test('should render audio read aloud button and rate toggle button', () => {
+      render(<FlashcardWidget flashcard={sampleFlashcard} />);
+      expect(screen.getAllByLabelText('Read question aloud')[0]).toBeInTheDocument();
+      expect(screen.getAllByLabelText('Speech rate: 1x')[0]).toBeInTheDocument();
+    });
+
+    test('should trigger speech synthesis with front text when speak button is clicked', () => {
+      render(<FlashcardWidget flashcard={sampleFlashcard} />);
+      const speakBtn = screen.getAllByLabelText('Read question aloud')[0];
+
+      fireEvent.click(speakBtn);
+
+      expect(mockCancel).toHaveBeenCalled();
+      expect(window.SpeechSynthesisUtterance).toHaveBeenCalledWith('What is React?');
+      expect(mockSpeak).toHaveBeenCalledTimes(1);
+    });
+
+    test('should toggle speech rate (0.75x -> 1x -> 1.25x)', () => {
+      render(<FlashcardWidget flashcard={sampleFlashcard} />);
+      const rateBtn = screen.getAllByLabelText('Speech rate: 1x')[0];
+
+      fireEvent.click(rateBtn);
+      expect(screen.getAllByLabelText('Speech rate: 1.25x')[0]).toBeInTheDocument();
+
+      fireEvent.click(rateBtn);
+      expect(screen.getAllByLabelText('Speech rate: 0.75x')[0]).toBeInTheDocument();
+
+      fireEvent.click(rateBtn);
+      expect(screen.getAllByLabelText('Speech rate: 1x')[0]).toBeInTheDocument();
+    });
+
+    test('should cancel speech when rating buttons are clicked', () => {
+      const handleReview = vi.fn();
+      render(<FlashcardWidget flashcard={sampleFlashcard} onReview={handleReview} />);
+
+      // Flip card to back
+      const cardContainer = screen.getByText('What is React?').closest('.perspective-1000');
+      fireEvent.click(cardContainer);
+
+      // Click rating button
+      const easyBtn = screen.getByTitle('Easy');
+      fireEvent.click(easyBtn);
+
+      expect(mockCancel).toHaveBeenCalled();
+      expect(handleReview).toHaveBeenCalledWith(5);
+    });
+  });
 });

@@ -189,16 +189,16 @@ exports.submitQuizAttempt = async (req, res, next) => {
     const totalQuestions = questionsList.length;
     const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
 
-    // Determine weak vs strong areas based on score
+    // Determine weak vs strong areas based on score (<50% Weak, 50-80% Medium, >80% Strong)
     const weakTopics = [];
     const strongTopics = [];
     if (quiz.topic) {
       const topicObj = await Topic.findByPk(quiz.topic);
       if (topicObj) {
-        if (score < 60) {
+        if (score < 50) {
           weakTopics.push(quiz.topic);
           topicObj.status = 'Weak';
-        } else if (score >= 80) {
+        } else if (score > 80) {
           strongTopics.push(quiz.topic);
           topicObj.status = 'Strong';
         } else {
@@ -220,34 +220,40 @@ exports.submitQuizAttempt = async (req, res, next) => {
       strongTopics,
     });
 
-    // Update Progress
+    // Trigger AI weakness aggregation and adaptive planner rescheduling in background
+    const weaknessAggregatorService = require('../services/weaknessAggregatorService');
+    weaknessAggregatorService.aggregateUserWeakness(req.user.id)
+      .then(() => weaknessAggregatorService.rescheduleAdaptivePlanner(req.user.id))
+      .catch((err) => console.error('Background weakness aggregation error:', err));
+
+    // Update Progress (supports both topic-level and subject-level quizzes)
+    const progressWhere = {
+      user: req.user.id,
+      subject: quiz.subject,
+    };
     if (quiz.topic) {
-      let progress = await Progress.findOne({
-        where: {
-          user: req.user.id,
-          subject: quiz.subject,
-          topic: quiz.topic,
-        },
-      });
+      progressWhere.topic = quiz.topic;
+    }
 
-      if (progress) {
-        const quizScores = [...progress.quizScores];
-        quizScores.push({ attempt: attempt.id, score, date: new Date() });
-        progress.quizScores = quizScores;
+    let progress = await Progress.findOne({ where: progressWhere });
 
-        if (score > progress.completionPercentage) {
-          progress.completionPercentage = Math.min(score, 100);
-        }
-        await progress.save();
-      } else {
-        await Progress.create({
-          user: req.user.id,
-          subject: quiz.subject,
-          topic: quiz.topic,
-          completionPercentage: score,
-          quizScores: [{ attempt: attempt.id, score, date: new Date() }],
-        });
+    if (progress) {
+      const quizScores = [...progress.quizScores];
+      quizScores.push({ attempt: attempt.id, score, date: new Date() });
+      progress.quizScores = quizScores;
+
+      if (score > progress.completionPercentage) {
+        progress.completionPercentage = Math.min(score, 100);
       }
+      await progress.save();
+    } else {
+      await Progress.create({
+        user: req.user.id,
+        subject: quiz.subject,
+        topic: quiz.topic || null,
+        completionPercentage: score,
+        quizScores: [{ attempt: attempt.id, score, date: new Date() }],
+      });
     }
 
     // Log Activity

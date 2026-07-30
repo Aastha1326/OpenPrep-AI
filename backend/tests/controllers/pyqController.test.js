@@ -60,8 +60,8 @@ describe('PYQ Controller - Integration Tests', () => {
       user: testUser.id,
     });
 
-    authToken = jwt.sign({ id: testUser.id }, process.env.JWT_SECRET);
-    otherToken = jwt.sign({ id: otherUser.id }, process.env.JWT_SECRET);
+    authToken = jwt.sign({ id: testUser.id, type: 'access' }, process.env.JWT_SECRET);
+    otherToken = jwt.sign({ id: otherUser.id, type: 'access' }, process.env.JWT_SECRET);
   });
 
   afterAll(() => {

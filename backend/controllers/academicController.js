@@ -73,31 +73,56 @@ exports.deleteExam = async (req, res, next) => {
     const subjects = await Subject.findAll({ where: { exam: exam.id }, transaction: t });
     const subjectIds = subjects.map((sub) => sub.id);
 
-    // Collect all topics for these subjects
-    const topics = await Topic.findAll({ where: { subject: { [Op.in]: subjectIds } }, transaction: t });
-    const topicIds = topics.map((top) => top.id);
-
-    // 1. Delete QuizAttempts for quizzes under these subjects and topics
-    const quizzes = await Quiz.findAll({
-      where: { [Op.or]: [{ subject: { [Op.in]: subjectIds } }, { topic: { [Op.in]: topicIds } }] },
-      transaction: t,
-    });
-    const quizIds = quizzes.map((q) => q.id);
-
-    if (quizIds.length > 0) {
-      await QuizAttempt.destroy({ where: { quiz: { [Op.in]: quizIds } }, transaction: t });
+    let topicIds = [];
+    if (subjectIds.length > 0) {
+      // Collect all topics for these subjects
+      const topics = await Topic.findAll({ where: { subject: { [Op.in]: subjectIds } }, transaction: t });
+      topicIds = topics.map((top) => top.id);
     }
 
-    // 2. Delete quizzes and other related records
-    await Quiz.destroy({ where: { [Op.or]: [{ subject: { [Op.in]: subjectIds } }, { topic: { [Op.in]: topicIds } }] }, transaction: t });
+    // Build OR conditions only when IDs exist to avoid invalid Op.in: [] queries
+    const quizOrConditions = [];
+    if (subjectIds.length > 0) quizOrConditions.push({ subject: { [Op.in]: subjectIds } });
+    if (topicIds.length > 0) quizOrConditions.push({ topic: { [Op.in]: topicIds } });
+
+    if (quizOrConditions.length > 0) {
+      // 1. Delete QuizAttempts for quizzes under these subjects and topics
+      const quizzes = await Quiz.findAll({
+        where: { [Op.or]: quizOrConditions },
+        transaction: t,
+      });
+      const quizIds = quizzes.map((q) => q.id);
+
+      if (quizIds.length > 0) {
+        await QuizAttempt.destroy({ where: { quiz: { [Op.in]: quizIds } }, transaction: t });
+      }
+
+      // 2. Delete quizzes
+      await Quiz.destroy({ where: { [Op.or]: quizOrConditions }, transaction: t });
+    }
+
     await StudyPlan.destroy({ where: { exam: exam.id }, transaction: t });
-    await PYQ.destroy({ where: { [Op.or]: [{ exam: exam.id }, { subject: { [Op.in]: subjectIds } }] }, transaction: t });
-    await Note.destroy({ where: { subject: { [Op.in]: subjectIds } }, transaction: t });
-    await Flashcard.destroy({ where: { subject: { [Op.in]: subjectIds } }, transaction: t });
-    await Progress.destroy({ where: { [Op.or]: [{ subject: { [Op.in]: subjectIds } }, { topic: { [Op.in]: topicIds } }] }, transaction: t });
+
+    if (subjectIds.length > 0) {
+      await PYQ.destroy({ where: { [Op.or]: [{ exam: exam.id }, { subject: { [Op.in]: subjectIds } }] }, transaction: t });
+      await Note.destroy({ where: { subject: { [Op.in]: subjectIds } }, transaction: t });
+      await Flashcard.destroy({ where: { subject: { [Op.in]: subjectIds } }, transaction: t });
+    } else {
+      await PYQ.destroy({ where: { exam: exam.id }, transaction: t });
+    }
+
+    const progressOrConditions = [];
+    if (subjectIds.length > 0) progressOrConditions.push({ subject: { [Op.in]: subjectIds } });
+    if (topicIds.length > 0) progressOrConditions.push({ topic: { [Op.in]: topicIds } });
+
+    if (progressOrConditions.length > 0) {
+      await Progress.destroy({ where: { [Op.or]: progressOrConditions }, transaction: t });
+    }
 
     // 3. Ensure child Topic records are deleted BEFORE parent Subject records
-    await Topic.destroy({ where: { subject: { [Op.in]: subjectIds } }, transaction: t });
+    if (subjectIds.length > 0) {
+      await Topic.destroy({ where: { subject: { [Op.in]: subjectIds } }, transaction: t });
+    }
     await Subject.destroy({ where: { exam: exam.id }, transaction: t });
     
     // 4. Delete the exam itself

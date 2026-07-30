@@ -125,6 +125,25 @@ const validateReviewFlashcard = [
   handleValidationErrors,
 ];
 
+const validateExportFlashcards = [
+  query('format')
+    .optional()
+    .isIn(['json', 'csv'])
+    .withMessage('format must be "json" or "csv"'),
+  query('subjectId')
+    .optional()
+    .isUUID(4)
+    .withMessage('subjectId must be a valid UUID'),
+  handleValidationErrors,
+];
+
+const validateImportFlashcards = [
+  query('subjectId')
+    .notEmpty().withMessage('subjectId query parameter is required')
+    .isUUID(4).withMessage('subjectId must be a valid UUID'),
+  handleValidationErrors,
+];
+
 // ---------------------------------------------------------------------------
 // Quiz routes
 // ---------------------------------------------------------------------------
@@ -147,8 +166,8 @@ const validateSubmitQuizAttempt = [
     .isUUID(4)
     .withMessage('Each questionId must be a valid UUID'),
   body('answers.*.selectedAnswer')
-    .exists({ checkNull: true })
-    .withMessage('Each answer must have a selectedAnswer'),
+    .isInt({ min: 0, max: 3 })
+    .withMessage('Each answer must have a valid selectedAnswer option index'),
   body('timeSpent')
     .optional()
     .isFloat({ min: 0, max: 86400 })
@@ -288,6 +307,8 @@ module.exports = {
   validateGenerateAIFlashcards,
   validateCreateFlashcard,
   validateReviewFlashcard,
+  validateExportFlashcards,
+  validateImportFlashcards,
   // Quiz
   validateGenerateAIQuiz,
   validateSubmitQuizAttempt,

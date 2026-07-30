@@ -263,3 +263,32 @@ exports.getPlans = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Get AI Weakness Detection Analysis
+// @route   GET /api/study-plans/weakness-analysis
+// @access  Private
+exports.getWeaknessAnalysis = async (req, res, next) => {
+  try {
+    const weaknessAggregatorService = require('../services/weaknessAggregatorService');
+    const result = await weaknessAggregatorService.getLLMWeaknessAnalysis(req.user.id);
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Reschedule active study plan based on AI weakness detection
+// @route   POST /api/study-plans/reschedule-adaptive
+// @access  Private
+exports.rescheduleAdaptivePlan = async (req, res, next) => {
+  try {
+    const weaknessAggregatorService = require('../services/weaknessAggregatorService');
+    const result = await weaknessAggregatorService.rescheduleAdaptivePlanner(req.user.id);
+    if (!result) {
+      return res.status(404).json({ success: false, error: 'No active study plan found to reschedule' });
+    }
+    res.status(200).json({ success: true, data: result, message: 'Adaptive study plan rescheduled successfully' });
+  } catch (error) {
+    next(error);
+  }
+};

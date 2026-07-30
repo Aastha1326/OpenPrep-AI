@@ -18,14 +18,21 @@ const storage = multer.diskStorage({
   },
 });
 
+// Allowed MIME types mapped by extension
+const ALLOWED_MIME_TYPES = {
+  '.pdf': 'application/pdf',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.txt': 'text/plain',
+  '.jpeg': 'image/jpeg',
+  '.jpg': 'image/jpeg',
+  '.png': 'image/png',
+};
+
 // Check file type
 function checkFileType(file, cb) {
-  // Allowed ext
-  const filetypes = /pdf|docx|txt|jpeg|jpg|png/;
-  // Check ext
-  const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-  // Check mime
-  const mimetype = filetypes.test(file.mimetype);
+  const ext = path.extname(file.originalname).toLowerCase();
+  const extname = Object.prototype.hasOwnProperty.call(ALLOWED_MIME_TYPES, ext);
+  const mimetype = ALLOWED_MIME_TYPES[ext] === file.mimetype;
 
   if (mimetype && extname) {
     return cb(null, true);

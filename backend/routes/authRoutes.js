@@ -96,6 +96,18 @@ const verifyEmailLimiter = rateLimit({
   legacyHeaders: true,
 });
 
+// Limit reset password attempts to 5 requests per 15 minutes per IP
+const resetPasswordLimiter = rateLimit({
+  windowMs: RATE_LIMIT.WINDOWS.FIFTEEN_MINUTES,
+  max: 5,
+  skip: shouldSkip,
+  message: createRateLimitResponse(
+    'Too many password reset attempts. Please try again after 15 minutes.'
+  ),
+  standardHeaders: true,
+  legacyHeaders: true,
+});
+
 /* -------------------------------------------------------------------------- */
 /*                         Public Authentication Routes                       */
 /* -------------------------------------------------------------------------- */
@@ -115,7 +127,7 @@ router.post(
 );
 
 // Reset password using a valid reset token
-router.post('/reset-password/:token', validateResetPassword, resetPassword);
+router.post('/reset-password/:token', resetPasswordLimiter, validateResetPassword, resetPassword);
 
 // Verify a user's email address using the verification token
 router.post('/verify-email/:token', verifyEmailLimiter, verifyEmail);

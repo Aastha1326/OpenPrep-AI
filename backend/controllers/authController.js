@@ -11,7 +11,7 @@ const sendEmail = require('../services/emailService');
 
 // Generate access token (15 min expiry)
 const generateAccessToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
+  return jwt.sign({ id, type: 'access' }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRE || '15m',
   });
 };
@@ -100,14 +100,37 @@ exports.register = async (req, res, next) => {
       await sendVerificationEmail(user, req);
     }
 
+    // In development, issue tokens immediately so the frontend can auto-login
+    let accessToken, refreshToken;
+    if (isEmailVerified) {
+      accessToken = generateAccessToken(user.id);
+      refreshToken = await generateRefreshToken(user);
+    }
+
     await t.commit();
 
     res.status(201).json({
       success: true,
-      message: isEmailVerified 
+      message: isEmailVerified
         ? 'Registration successful. Account auto-verified for development.'
         : 'Registration successful. Please verify your email to activate your account.',
       isEmailVerified,
+      ...(isEmailVerified && {
+        token: accessToken,
+        refreshToken,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          streak: {
+            count: user.streakCount,
+            lastActive: user.streakLastActive,
+          },
+          studyHours: user.studyHours,
+          isEmailVerified: user.isEmailVerified,
+        },
+      }),
     });
   } catch (error) {
     if (t && !t.finished) {
@@ -180,14 +203,17 @@ exports.login = async (req, res, next) => {
     }
 
     // Check if account is locked due to too many failed attempts
-    if (user.lockoutUntil && user.lockoutUntil > new Date()) {
-      const remainingMinutes = Math.ceil((user.lockoutUntil - new Date()) / (1000 * 60));
-      return res.status(423).json({
-        success: false,
-        error: `Account locked due to too many failed attempts. Try again in ${remainingMinutes} minute${
-          remainingMinutes !== 1 ? 's' : ''
-        }.`,
-      });
+    if (user.lockoutUntil) {
+      const lockoutTime = new Date(user.lockoutUntil);
+      if (!isNaN(lockoutTime.getTime()) && lockoutTime > new Date()) {
+        const remainingMinutes = Math.max(1, Math.ceil((lockoutTime - new Date()) / (1000 * 60)));
+        return res.status(423).json({
+          success: false,
+          error: `Account locked due to too many failed attempts. Try again in ${remainingMinutes} minute${
+            remainingMinutes !== 1 ? 's' : ''
+          }.`,
+        });
+      }
     }
 
     const isMatch = await user.matchPassword(password);

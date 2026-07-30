@@ -7,6 +7,24 @@ import authReducer from '../store/slices/authSlice';
 import dashboardReducer from '../store/slices/dashboardSlice';
 import Dashboard from './Dashboard';
 
+// window.matchMedia mock for ThemeContext
+// ThemeContext uses window.matchMedia which is not implemented in jsdom
+beforeAll(() => {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+});
+
 vi.mock('../services/api', () => ({
   default: {
     get: vi.fn(() => Promise.resolve({ data: { data: {} } })),

@@ -40,8 +40,8 @@ describe('Quiz Controller - Integration Tests', () => {
       password: 'password123',
     });
 
-    authToken = jwt.sign({ id: testUser.id }, process.env.JWT_SECRET);
-    otherAuthToken = jwt.sign({ id: testUser2.id }, process.env.JWT_SECRET);
+    authToken = jwt.sign({ id: testUser.id, type: 'access' }, process.env.JWT_SECRET);
+    otherAuthToken = jwt.sign({ id: testUser2.id, type: 'access' }, process.env.JWT_SECRET);
 
     const examForSubject = await Exam.create({
       name: 'Quiz Test Exam',
