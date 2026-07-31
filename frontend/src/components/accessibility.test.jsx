@@ -170,20 +170,20 @@ describe('FlashcardWidget accessibility', () => {
   const sampleCard = { front: 'What is A11Y?', back: 'Accessibility' };
 
   test('flip container has role=button and tabIndex', () => {
-    render(<FlashcardWidget flashcard={sampleCard} />);
+    render(<MemoryRouter><FlashcardWidget flashcard={sampleCard} /></MemoryRouter>);
     const flipBtn = screen.getByRole('button', { name: /flip to back/i });
     expect(flipBtn).toHaveAttribute('tabindex', '0');
   });
 
   test('Enter key flips the card', () => {
-    render(<FlashcardWidget flashcard={sampleCard} />);
+    render(<MemoryRouter><FlashcardWidget flashcard={sampleCard} /></MemoryRouter>);
     const flipBtn = screen.getByRole('button', { name: /flip to back/i });
     fireEvent.keyDown(flipBtn, { key: 'Enter' });
     expect(screen.getByText('Accessibility')).toBeInTheDocument();
   });
 
   test('aria-label updates after flip', () => {
-    render(<FlashcardWidget flashcard={sampleCard} />);
+    render(<MemoryRouter><FlashcardWidget flashcard={sampleCard} /></MemoryRouter>);
     const flipBtn = screen.getByRole('button', { name: /flip to back/i });
     fireEvent.click(flipBtn);
     expect(screen.getByRole('button', { name: /flip to front/i })).toBeInTheDocument();

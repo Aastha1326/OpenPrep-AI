@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
 import { ThemeProvider } from '../context/ThemeContext';
 import authReducer from '../store/slices/authSlice';
@@ -143,14 +143,50 @@ describe('Dashboard', () => {
     });
   });
 
-  test('Analyze PYQ sidebar button shows coming soon toast', async () => {
-    renderDashboard();
-    const pyqBtn = screen.getByText('Analyze PYQ').closest('button');
-    fireEvent.click(pyqBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText('PYQ Analysis coming soon!')).toBeInTheDocument();
+  test('Analyze PYQ sidebar button navigates to the PYQ analysis page', () => {
+    const store = configureStore({
+      reducer: { auth: authReducer, dashboard: dashboardReducer },
+      preloadedState: {
+        auth: {
+          token: 'fake-token',
+          isAuthenticated: true,
+          user: { id: 'u1', name: 'Test User', email: 'test@test.com' },
+          loading: false,
+          error: null,
+        },
+        dashboard: {
+          stats: null,
+          weeklyChartData: [],
+          recentActivity: [],
+          subjectBreakdown: [],
+          activePlan: null,
+          dueFlashcards: [],
+          loadingStats: false,
+          loadingSubjects: false,
+          loadingPlan: false,
+          loadingFlashcards: false,
+          errorStats: null,
+          errorSubjects: null,
+          errorPlan: null,
+          errorFlashcards: null,
+        },
+      },
     });
+
+    render(
+      <Provider store={store}>
+        <MemoryRouter initialEntries={['/dashboard']}>
+          <Routes>
+            <Route path="/dashboard" element={<ThemeProvider><Dashboard /></ThemeProvider>} />
+            <Route path="/pyqs" element={<div>PYQ Analysis Page</div>} />
+          </Routes>
+        </MemoryRouter>
+      </Provider>
+    );
+
+    const pyqBtn = screen.getByText('PYQ Intelligence').closest('button');
+    fireEvent.click(pyqBtn);
+    expect(screen.getByText('PYQ Analysis Page')).toBeInTheDocument();
   });
 
   test('coming soon toast auto-dismisses after 3 seconds', async () => {
