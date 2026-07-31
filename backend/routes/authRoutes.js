@@ -14,6 +14,7 @@ const {
 } = require('../controllers/authController');
 
 const { protect } = require('../middleware/auth');
+const passport = require('passport');
 
 const {
   validateRegister,
@@ -525,5 +526,17 @@ router.post('/logout', logout);
 // Retrieve the authenticated user's profile
 // Requires authentication
 router.get('/me', protect, getMe);
+
+// OAuth2 Google routes
+router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+
+router.get(
+  '/google/callback',
+  passport.authenticate('google', { failureRedirect: '/login', session: false }),
+  (req, res) => {
+    // Generate token in production, but for now just redirect
+    res.redirect('/dashboard');
+  }
+);
 
 module.exports = router;

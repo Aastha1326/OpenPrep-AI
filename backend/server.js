@@ -17,6 +17,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
+const passport = require('./config/passport');
 
 // Validate required environment variables at startup
 if (!process.env.JWT_SECRET) {
@@ -59,6 +60,8 @@ app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   credentials: true,
 }));
+
+app.use(passport.initialize());
 
 // Cookie parser (required for csurf cookie-based tokens)
 app.use(cookieParser());
