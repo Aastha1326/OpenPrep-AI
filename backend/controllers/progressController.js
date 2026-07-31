@@ -507,6 +507,19 @@ exports.exportPDFData = async (req, res, next) => {
       ? Math.round((parseFloat(completionResult?.totalCompletion) || 0) / totalTopics)
       : 0;
 
+    res.status(200).json({
+      rows,
+      quizAttempts,
+      totalStudyHours,
+      streak,
+      totalTopics,
+      syllabusProgress,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Export progress report as PDF certificate/report card using pdfkit
 // @route   GET /api/progress/export/pdf
 // @access  Private
