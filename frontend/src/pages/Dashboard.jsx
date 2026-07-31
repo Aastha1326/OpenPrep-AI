@@ -791,6 +791,7 @@ const Dashboard = () => {
         isOpen={isStudyPlanOpen}
         onClose={() => setIsStudyPlanOpen(false)}
         activePlan={activePlan}
+        onPlanCreated={() => dispatch(fetchActivePlan())}
         onBumpTime={async (taskId, minutesToAdd = 30) => {
           const planId = activePlan?.id;
           if (!planId) return;
