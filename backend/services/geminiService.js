@@ -284,7 +284,7 @@ exports.analyzePYQText = async (rawText, subjectName = 'the subject', forceRefre
 /**
  * 2. Generate AI Study Plan
  */
-exports.generateStudyPlan = async (examName, subjectsAndTopics, startDate, endDate, studyHoursPerDay = 3, forceRefresh = false) => {
+exports.generateStudyPlan = async (examName, subjectsAndTopics, startDate, endDate, studyHoursPerDay = 3, forceRefresh = false, language = 'en') => {
   if (!genAI) {
     console.warn('Gemini API key not configured. Using Mock Data for Study Plan.');
     return getMockStudyPlan(examName, subjectsAndTopics, startDate, endDate);
@@ -301,7 +301,10 @@ exports.generateStudyPlan = async (examName, subjectsAndTopics, startDate, endDa
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     const prompt = `
-      You are an expert academic planner. Generate a highly personalized study plan for the exam: "${examName}".
+      You are an expert AI study planner. Create a highly optimized study plan.
+      IMPORTANT: The output must be returned entirely in language code: ${language}.
+      Input Parameters:
+      - Exam Name: ${examName}".
       The user wants to prepare starting from ${startDate} to ${endDate}.
       They have ${studyHoursPerDay} hours per day available.
       The syllabus contains the following subjects and topics:
