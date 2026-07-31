@@ -15,6 +15,8 @@ const PYQ = require('./models/PYQ');
 const Note = require('./models/Note');
 const http = require('http');
 const { Server } = require('socket.io');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./config/swagger');
 
 // Validate required environment variables at startup
 if (!process.env.JWT_SECRET) {
@@ -144,6 +146,16 @@ app.get('/', (req, res) => {
 app.get('/healthz', (req, res) => {
   res.status(200).send('OK');
 });
+
+// Swagger UI Documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'OpenPrep AI API Documentation',
+  swaggerOptions: {
+    persistAuthorization: true,
+    displayRequestDuration: true,
+  },
+}));
 
 // Error Handler Middleware
 app.use(errorHandler);
