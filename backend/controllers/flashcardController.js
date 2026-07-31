@@ -7,6 +7,7 @@ const Note = require('../models/Note');
 const ActivityLog = require('../models/ActivityLog');
 const Progress = require('../models/Progress');
 const geminiService = require('../services/geminiService');
+const { default: Exporter } = require('anki-apkg-export');
 
 // @desc    Generate AI Flashcards
 // @route   POST /api/flashcards/generate-ai
@@ -268,8 +269,8 @@ exports.exportFlashcards = async (req, res, next) => {
   try {
     const { subjectId, format = 'json' } = req.query;
 
-    if (!['json', 'csv'].includes(format)) {
-      return res.status(400).json({ success: false, error: 'format must be "json" or "csv"' });
+    if (!['json', 'csv', 'apkg'].includes(format)) {
+      return res.status(400).json({ success: false, error: 'format must be "json", "csv", or "apkg"' });
     }
 
     const filter = { user: req.user.id };
@@ -301,6 +302,28 @@ exports.exportFlashcards = async (req, res, next) => {
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', 'attachment; filename="flashcards.csv"');
       return res.status(200).send(csv);
+    }
+
+    if (format === 'apkg') {
+      const exporter = new Exporter('OpenPrep Flashcards');
+      
+      payload.forEach(c => {
+        const tags = [];
+        if (c.subject) tags.push(c.subject.replace(/\s+/g, '_'));
+        if (c.topic) tags.push(c.topic.replace(/\s+/g, '_'));
+        
+        // Add basic HTML formatting for cards
+        const frontHtml = `<div style="text-align:center;font-size:24px;">${c.front}</div>`;
+        const backHtml = `<div style="text-align:center;font-size:20px;">${c.back}</div>`;
+        
+        exporter.addCard(frontHtml, backHtml, { tags });
+      });
+
+      const zipBuffer = await exporter.save();
+      
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Content-Disposition', 'attachment; filename="flashcards.apkg"');
+      return res.status(200).send(zipBuffer);
     }
 
     // JSON

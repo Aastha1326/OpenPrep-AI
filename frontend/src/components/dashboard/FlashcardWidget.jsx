@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Lightbulb, AlertCircle, RefreshCw, BookOpen, Volume2, VolumeX } from 'lucide-react';
 
 import { useNavigate } from 'react-router-dom';
+import ExportDeckDropdown from '../flashcards/ExportDeckDropdown';
 
 const Shimmer = ({ className = '' }) => (
   <div className={`animate-pulse bg-neutral-300/60 rounded ${className}`} />
@@ -170,6 +171,10 @@ const FlashcardWidget = ({ flashcard = null, loading = false, error = null, tota
           >
             Full Review &rarr;
           </button>
+          
+          <div className="absolute bottom-4 right-4 z-10" onClick={(e) => e.stopPropagation()}>
+            <ExportDeckDropdown />
+          </div>
 
           {/* Audio Reader Controls */}
           <div className="absolute top-2 right-2 flex items-center gap-1 z-10">

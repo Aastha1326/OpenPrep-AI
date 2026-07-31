@@ -128,8 +128,8 @@ const validateReviewFlashcard = [
 const validateExportFlashcards = [
   query('format')
     .optional()
-    .isIn(['json', 'csv'])
-    .withMessage('format must be "json" or "csv"'),
+    .isIn(['json', 'csv', 'apkg'])
+    .withMessage('format must be "json", "csv", or "apkg"'),
   query('subjectId')
     .optional()
     .isUUID(4)
