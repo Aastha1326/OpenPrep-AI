@@ -25,8 +25,11 @@ import StudyPlanModal from '../components/dashboard/StudyPlanModal';
 import PyqAnalysisModal from '../components/dashboard/PyqAnalysisModal';
 import WeaknessDashboardWidget from '../components/dashboard/WeaknessDashboardWidget';
 import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
+import TargetExamOverviewWidget from '../components/dashboard/TargetExamOverviewWidget';
+import CompositeBundleModal from '../components/dashboard/CompositeBundleModal';
 import ThemeToggle from '../components/ThemeToggle';
 import BadgesList from '../components/BadgesList';
+
 
 import {
   fetchDashboardStats,
@@ -217,8 +220,10 @@ const Dashboard = () => {
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isStudyPlanOpen, setIsStudyPlanOpen] = useState(false);
   const [isPyqModalOpen, setIsPyqModalOpen] = useState(false);
+  const [isBundleModalOpen, setIsBundleModalOpen] = useState(false);
   const [comingSoon, setComingSoon] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
+
 
   useEffect(() => {
     if (comingSoon) {
@@ -402,10 +407,17 @@ const Dashboard = () => {
           </motion.div>
         </div>
 
+        {/* --- TARGET EXAM COMPOSITE BUNDLE OVERVIEW --- */}
+        <TargetExamOverviewWidget
+          onOpenBundleModal={() => setIsBundleModalOpen(true)}
+          onGenerateStudyPlan={() => setIsStudyPlanOpen(true)}
+        />
+
         {/* --- STATISTICS OVERVIEW --- */}
         {errorStats && !loadingStats ? (
           <ErrorBanner message={errorStats} onRetry={handleRetry(fetchDashboardStats)} />
         ) : null}
+
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {loadingStats ? (
@@ -836,7 +848,19 @@ const Dashboard = () => {
         }}
       />
 
+      {/* --- COMPOSITE BUNDLE MODAL --- */}
+      <CompositeBundleModal
+        isOpen={isBundleModalOpen}
+        onClose={() => setIsBundleModalOpen(false)}
+        onSuccess={() => {
+          setIsBundleModalOpen(false);
+          dispatch(fetchDashboardStats());
+          dispatch(fetchSubjectBreakdown());
+        }}
+      />
+
       {/* --- COMING SOON TOAST --- */}
+
       <AnimatePresence>
         {comingSoon && (
           <motion.div

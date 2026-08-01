@@ -307,12 +307,14 @@ exports.generateStudyPlan = async (examName, subjectsAndTopics, startDate, endDa
       - Exam Name: ${examName}".
       The user wants to prepare starting from ${startDate} to ${endDate}.
       They have ${studyHoursPerDay} hours per day available.
-      The syllabus contains the following subjects and topics:
+      The syllabus contains the following subjects and topics with percentage weightages (if composite bundle):
       ${JSON.stringify(subjectsAndTopics)}
 
       Generate a daily schedule between the start and end dates.
+      If subject weightages are provided, generate an interleaved study schedule balancing subject weightages proportionally across days.
       For each day, allocate realistic tasks with duration (in minutes) corresponding to the topics provided. Include rest/revision tasks.
       Organize the plan as daily goals.
+
 
       Return the result STRICTLY as a JSON array of daily goals:
       [
