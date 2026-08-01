@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { loadUser } from './store/slices/authSlice';
 import ProtectedRoute from './components/ProtectedRoute';
+import AdminRoute from './components/AdminRoute';
 import CustomCursor from './components/CustomCursor';
 import ScrollToTop from './components/ScrollToTop';
 import PageLoader from './components/PageLoader';
@@ -18,8 +19,8 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const BattleArena = lazy(() => import('./pages/BattleArena'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const FlashcardReview = lazy(() => import('./pages/FlashcardReview'));
-
 const PyqDashboard = lazy(() => import('./pages/PyqDashboard'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 
 function App() {
   const dispatch = useDispatch();
@@ -76,6 +77,10 @@ function App() {
               </ProtectedRoute>
             }
           />
+          
+          <Route element={<AdminRoute />}>
+            <Route path="/admin" element={<AdminDashboard />} />
+          </Route>
 
           <Route path="*" element={<NotFound />} />
         </Routes>
