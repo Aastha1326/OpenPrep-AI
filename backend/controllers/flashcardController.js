@@ -7,6 +7,7 @@ const Note = require('../models/Note');
 const ActivityLog = require('../models/ActivityLog');
 const Progress = require('../models/Progress');
 const geminiService = require('../services/geminiService');
+const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
 const { default: Exporter } = require('anki-apkg-export');
 
 // @desc    Generate AI Flashcards
@@ -70,6 +71,21 @@ exports.generateAIFlashcards = async (req, res, next) => {
 
     res.status(201).json({ success: true, count: createdCards.length, data: createdCards });
   } catch (error) {
+    // Handle Gemini API rate limit errors
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    // Handle Gemini API server errors
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({
+        success: false,
+        error: error.message,
+      });
+    }
     next(error);
   }
 };

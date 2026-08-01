@@ -8,6 +8,7 @@ const Note = require('../models/Note');
 const ActivityLog = require('../models/ActivityLog');
 const Progress = require('../models/Progress');
 const geminiService = require('../services/geminiService');
+const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
 
 // @desc    Generate AI Quiz
 // @route   POST /api/quizzes/generate-ai
@@ -61,6 +62,21 @@ exports.generateAIQuiz = async (req, res, next) => {
 
     res.status(201).json({ success: true, data: quiz });
   } catch (error) {
+    // Handle Gemini API rate limit errors
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    // Handle Gemini API server errors
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({
+        success: false,
+        error: error.message,
+      });
+    }
     next(error);
   }
 };

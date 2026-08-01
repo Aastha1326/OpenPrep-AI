@@ -8,6 +8,7 @@ const ActivityLog = require('../models/ActivityLog');
 const User = require('../models/User');
 const { escapeLikePattern } = require('../utils/likePattern');
 const { summarizeNoteText } = require('../services/geminiService');
+const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
 
 // @desc    Upload Note
 // @route   POST /api/notes
@@ -232,6 +233,21 @@ exports.summarizeNote = async (req, res, next) => {
 
     res.status(200).json({ success: true, data: aiSummary, cached: false });
   } catch (error) {
+    // Handle Gemini API rate limit errors
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    // Handle Gemini API server errors
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({
+        success: false,
+        error: error.message,
+      });
+    }
     next(error);
   }
 };

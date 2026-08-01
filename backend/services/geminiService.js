@@ -17,6 +17,34 @@ const responseCache = new NodeCache({
 });
 
 // ==========================================
+// CUSTOM ERROR CLASSES
+// ==========================================
+
+/**
+ * Custom error for Gemini API rate limit (429) errors.
+ * Includes retry-after information for client-side handling.
+ */
+class GeminiRateLimitError extends Error {
+  constructor(message, retryAfter = null) {
+    super(message);
+    this.name = 'GeminiRateLimitError';
+    this.status = 429;
+    this.retryAfter = retryAfter; // seconds until client can retry
+  }
+}
+
+/**
+ * Custom error for Gemini API server errors (5xx).
+ */
+class GeminiServerError extends Error {
+  constructor(message, status = 500) {
+    super(message);
+    this.name = 'GeminiServerError';
+    this.status = status;
+  }
+}
+
+// ==========================================
 // HELPER UTILITIES
 // ==========================================
 
@@ -53,9 +81,32 @@ async function callWithTimeout(model, prompt, timeoutMs = 30000) {
 }
 
 /**
- * Retry wrapper with exponential backoff.
- * Retries on 429 (rate limit) and 5xx (server) errors.
+ * Extracts HTTP status code from Google Generative AI SDK error.
+ * The SDK may expose status in different ways depending on version.
+ */
+function extractStatusFromError(err) {
+  // Check common error properties from Google Generative AI SDK
+  if (err?.response?.status) return err.response.status;
+  if (err?.status) return err.status;
+  if (err?.code === 'RESOURCE_EXHAUSTED') return 429; // gRPC status code
+  if (err?.message?.includes('429')) return 429;
+  if (err?.message?.includes('rate limit') || err?.message?.includes('quota')) return 429;
+  if (err?.message?.includes('500') || err?.message?.includes('502') || err?.message?.includes('503')) return 500;
+  return null;
+}
+
+/**
+ * Retry wrapper with exponential backoff and random jitter.
+ * Retries on 429 (rate limit), 5xx (server) errors, and timeouts.
  * Each attempt uses callWithTimeout for per-request timeout.
+ * 
+ * @param {Object} model - Gemini model instance
+ * @param {string} prompt - Prompt to send
+ * @param {number} retries - Maximum retry attempts (default: 3)
+ * @returns {Promise<Object>} Gemini API result
+ * @throws {GeminiRateLimitError} When rate limit is exhausted after retries
+ * @throws {GeminiServerError} When server errors persist after retries
+ * @throws {Error} For non-retryable errors
  */
 async function generateWithRetry(model, prompt, retries = 3) {
   for (let attempt = 0; attempt < retries; attempt++) {
@@ -63,13 +114,41 @@ async function generateWithRetry(model, prompt, retries = 3) {
       const result = await callWithTimeout(model, prompt);
       return result;
     } catch (err) {
-      const isRetryable = err.status === 429 || (err.status >= 500 && err.status < 600) || err.message === 'Gemini request timed out';
+      const status = extractStatusFromError(err);
+      const isRetryable = status === 429 || (status >= 500 && status < 600) || err.message === 'Gemini request timed out';
+      
       if (isRetryable && attempt < retries - 1) {
-        const delay = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s
+        // Exponential backoff with random jitter: base * 2^attempt + random(0-1000ms)
+        const baseDelay = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s
+        const jitter = Math.random() * 1000; // 0-1000ms random jitter
+        const delay = baseDelay + jitter;
+        
+        console.warn(`Gemini API attempt ${attempt + 1} failed (status: ${status || 'timeout'}), retrying in ${Math.round(delay)}ms...`);
         await new Promise(r => setTimeout(r, delay));
         continue;
       }
-      throw err; // Non-retryable or exhausted
+      
+      // Exhausted retries or non-retryable error - throw appropriate error
+      if (status === 429) {
+        // Extract retry-after from error if available, default to 60 seconds
+        const retryAfter = err?.response?.headers?.['retry-after'] 
+          ? parseInt(err.response.headers['retry-after'], 10) 
+          : 60;
+        throw new GeminiRateLimitError(
+          'Gemini API rate limit exceeded. Please try again later.',
+          retryAfter
+        );
+      }
+      
+      if (status >= 500 && status < 600) {
+        throw new GeminiServerError(
+          `Gemini API server error (${status}). Please try again later.`,
+          status
+        );
+      }
+      
+      // Non-retryable error - rethrow
+      throw err;
     }
   }
 }
@@ -276,6 +355,10 @@ exports.analyzePYQText = async (rawText, subjectName = 'the subject', forceRefre
     responseCache.set(cacheKey, parsed);
     return parsed;
   } catch (error) {
+    // Re-throw rate limit and server errors for proper HTTP handling
+    if (error instanceof GeminiRateLimitError || error instanceof GeminiServerError) {
+      throw error;
+    }
     console.error('Gemini PYQ analysis failed:', error);
     return getMockPYQAnalysis(subjectName);
   }
@@ -339,6 +422,10 @@ exports.generateStudyPlan = async (examName, subjectsAndTopics, startDate, endDa
     responseCache.set(cacheKey, parsed);
     return parsed;
   } catch (error) {
+    // Re-throw rate limit and server errors for proper HTTP handling
+    if (error instanceof GeminiRateLimitError || error instanceof GeminiServerError) {
+      throw error;
+    }
     console.error('Gemini Study Plan generation failed:', error);
     return getMockStudyPlan(examName, subjectsAndTopics, startDate, endDate);
   }
@@ -403,6 +490,10 @@ exports.generateQuiz = async (subjectName, topicName, notesText = '', count = 5,
     responseCache.set(cacheKey, parsed);
     return parsed;
   } catch (error) {
+    // Re-throw rate limit and server errors for proper HTTP handling
+    if (error instanceof GeminiRateLimitError || error instanceof GeminiServerError) {
+      throw error;
+    }
     console.error('Gemini Quiz generation failed:', error);
     return getMockQuiz(subjectName, topicName, count);
   }
@@ -455,6 +546,10 @@ exports.generateFlashcards = async (subjectName, topicName, notesText = '', coun
     responseCache.set(cacheKey, parsed);
     return parsed;
   } catch (error) {
+    // Re-throw rate limit and server errors for proper HTTP handling
+    if (error instanceof GeminiRateLimitError || error instanceof GeminiServerError) {
+      throw error;
+    }
     console.error('Gemini Flashcards generation failed:', error);
     return getMockFlashcards(subjectName, topicName, count);
   }
@@ -506,6 +601,10 @@ exports.analyzePerformanceAndRecommend = async (attemptsSummary, forceRefresh = 
     responseCache.set(cacheKey, parsed);
     return parsed;
   } catch (error) {
+    // Re-throw rate limit and server errors for proper HTTP handling
+    if (error instanceof GeminiRateLimitError || error instanceof GeminiServerError) {
+      throw error;
+    }
     console.error('Gemini performance analysis failed:', error);
     return getMockRecommendations();
   }
@@ -562,6 +661,10 @@ exports.summarizeNoteText = async (content, subjectName = 'the subject', forceRe
     responseCache.set(cacheKey, parsed);
     return parsed;
   } catch (error) {
+    // Re-throw rate limit and server errors for proper HTTP handling
+    if (error instanceof GeminiRateLimitError || error instanceof GeminiServerError) {
+      throw error;
+    }
     console.error('Gemini note summarization failed:', error);
     return getMockNoteSummary(subjectName);
   }
@@ -570,6 +673,10 @@ exports.summarizeNoteText = async (content, subjectName = 'the subject', forceRe
 // Export validation helpers for unit testing
 exports.validateResponse = validateResponse;
 exports.RESPONSE_SCHEMAS = RESPONSE_SCHEMAS;
+
+// Export custom error classes for controller error handling
+exports.GeminiRateLimitError = GeminiRateLimitError;
+exports.GeminiServerError = GeminiServerError;
 
 // ==========================================
 // MOCK DATA FALLBACKS

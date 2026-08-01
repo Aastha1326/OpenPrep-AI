@@ -7,6 +7,7 @@ const Subject = require('../models/Subject');
 const Topic = require('../models/Topic');
 const ActivityLog = require('../models/ActivityLog');
 const geminiService = require('../services/geminiService');
+const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
 
 // A simple concurrency limiter to prevent OOM on concurrent large PDF uploads
 class Semaphore {
@@ -132,6 +133,29 @@ exports.uploadAndAnalyzePYQ = async (req, res, next) => {
       data: pyq,
     });
   } catch (error) {
+    // Handle Gemini API rate limit errors
+    if (error instanceof GeminiRateLimitError) {
+      if (req.file) {
+        const filePath = path.join(__dirname, '..', 'uploads', req.file.filename);
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      }
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    // Handle Gemini API server errors
+    if (error instanceof GeminiServerError) {
+      if (req.file) {
+        const filePath = path.join(__dirname, '..', 'uploads', req.file.filename);
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      }
+      return res.status(503).json({
+        success: false,
+        error: error.message,
+      });
+    }
     if (req.file) {
       const filePath = path.join(__dirname, '..', 'uploads', req.file.filename);
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
@@ -260,6 +284,21 @@ exports.getPYQAnalysis = async (req, res, next) => {
 
     res.status(200).json({ success: true, data: pyq });
   } catch (error) {
+    // Handle Gemini API rate limit errors
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    // Handle Gemini API server errors
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({
+        success: false,
+        error: error.message,
+      });
+    }
     next(error);
   }
 };
