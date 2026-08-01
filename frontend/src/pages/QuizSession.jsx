@@ -1,7 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FaCheckCircle, FaTimesCircle, FaArrowRight, FaTrophy, FaArrowLeft } from 'react-icons/fa';
 import API from '../services/api';
+
+const SECONDS_PER_QUESTION = 60;
+
+const formatTime = (seconds) => {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+};
 
 const QuizSession = () => {
   const { id } = useParams();
@@ -15,6 +23,12 @@ const QuizSession = () => {
   const [answers, setAnswers] = useState({}); // { questionId: selectedOption }
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState(null);
+
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+  const submittingRef = useRef(false);
+  const autoSubmittedRef = useRef(false);
   
   useEffect(() => {
     fetchQuiz();
@@ -23,7 +37,9 @@ const QuizSession = () => {
   const fetchQuiz = async () => {
     try {
       const res = await API.get(`/quizzes/${id}`);
-      setQuiz(res.data.data);
+      const loadedQuiz = res.data.data;
+      setQuiz(loadedQuiz);
+      setTimeLeft((loadedQuiz?.questions?.length || 0) * SECONDS_PER_QUESTION);
       setLoading(false);
     } catch (err) {
       setError('Failed to load quiz details.');
@@ -32,7 +48,7 @@ const QuizSession = () => {
   };
 
   const handleOptionSelect = (questionId, option) => {
-    if (submitted) return;
+    if (submitted || timeElapsed) return;
     setAnswers({
       ...answers,
       [questionId]: option
@@ -40,33 +56,65 @@ const QuizSession = () => {
   };
 
   const handleNext = () => {
+    if (timeElapsed) return;
     if (currentQuestionIndex < quiz.questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     }
   };
 
   const handlePrevious = () => {
+    if (timeElapsed) return;
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(currentQuestionIndex - 1);
     }
   };
 
-  const handleSubmit = async () => {
+  const submitQuiz = useCallback(async () => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    setSubmitError(null);
     try {
       // Format answers for API
       const formattedAnswers = Object.entries(answers).map(([qId, selected]) => ({
         questionId: qId,
         selectedAnswer: selected
       }));
-      
+
       const res = await API.post(`/quizzes/${id}/submit`, { answers: formattedAnswers });
       setResult(res.data.data);
       setSubmitted(true);
     } catch (err) {
       console.error(err);
-      alert('Failed to submit quiz attempt.');
+      setSubmitError('Failed to submit quiz attempt. Check your connection and retry.');
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
     }
-  };
+  }, [answers, id]);
+
+  // Countdown: tick once per second until the time limit is reached.
+  useEffect(() => {
+    if (!quiz || submitted || timeLeft <= 0) return;
+    const interval = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [quiz, submitted, timeLeft]);
+
+  // When the countdown reaches zero, freeze input and submit automatically.
+  useEffect(() => {
+    if (!quiz || submitted || timeLeft !== 0) return;
+    if (autoSubmittedRef.current) return;
+    autoSubmittedRef.current = true;
+    submitQuiz();
+  }, [quiz, submitted, timeLeft, submitQuiz]);
 
   if (loading) {
     return (
@@ -87,17 +135,58 @@ const QuizSession = () => {
 
   const currentQuestion = quiz.questions[currentQuestionIndex];
   const isLastQuestion = currentQuestionIndex === quiz.questions.length - 1;
+  const timeElapsed = timeLeft === 0 && !submitted;
+  const lowTime = timeLeft > 0 && timeLeft <= 30;
 
   return (
     <div className="min-h-screen bg-slate-900 text-white font-sans py-10 px-4 md:px-20">
+      {timeElapsed && !submitted && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="fixed inset-0 z-50 bg-slate-900/95 flex flex-col items-center justify-center p-4 text-center"
+        >
+          {submitting ? (
+            <>
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mb-6"></div>
+              <h2 className="text-2xl font-bold text-white mb-2">Time Elapsed</h2>
+              <p className="text-slate-300">Submitting Quiz...</p>
+            </>
+          ) : (
+            <>
+              <h2 className="text-2xl font-bold text-white mb-2">Time Elapsed</h2>
+              <p className="text-slate-300 mb-6">
+                {submitError || 'Your answers were frozen when the time ran out.'}
+              </p>
+              <button
+                onClick={() => submitQuiz()}
+                className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg font-semibold transition-colors"
+              >
+                Retry Submission
+              </button>
+            </>
+          )}
+        </div>
+      )}
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8 border-b border-slate-700 pb-4">
           <h1 className="text-2xl font-bold text-slate-100">{quiz.title}</h1>
           {!submitted && (
-            <span className="text-sm font-medium bg-slate-800 px-3 py-1 rounded-full text-indigo-300">
-              Question {currentQuestionIndex + 1} of {quiz.questions.length}
-            </span>
+            <div className="flex items-center gap-3">
+              <span
+                role="timer"
+                aria-label={`Time remaining: ${formatTime(timeLeft)}`}
+                className={`text-sm font-semibold px-3 py-1 rounded-full font-mono ${
+                  lowTime ? 'bg-red-500/20 text-red-400' : 'bg-slate-800 text-indigo-300'
+                }`}
+              >
+                {formatTime(timeLeft)}
+              </span>
+              <span className="text-sm font-medium bg-slate-800 px-3 py-1 rounded-full text-indigo-300">
+                Question {currentQuestionIndex + 1} of {quiz.questions.length}
+              </span>
+            </div>
           )}
         </div>
 
@@ -115,7 +204,8 @@ const QuizSession = () => {
                   <button
                     key={index}
                     onClick={() => handleOptionSelect(currentQuestion._id, option)}
-                    className={`w-full text-left p-4 rounded-lg border transition-all duration-200 flex items-center ${
+                    disabled={submitted || timeElapsed}
+                    className={`w-full text-left p-4 rounded-lg border transition-all duration-200 flex items-center disabled:opacity-60 disabled:cursor-not-allowed ${
                       isSelected 
                         ? 'bg-indigo-600/20 border-indigo-500 text-indigo-100' 
                         : 'bg-slate-700/50 border-slate-600 hover:border-indigo-400 hover:bg-slate-700 text-slate-200'
@@ -134,7 +224,7 @@ const QuizSession = () => {
             <div className="flex justify-between items-center mt-8">
               <button
                 onClick={handlePrevious}
-                disabled={currentQuestionIndex === 0}
+                disabled={currentQuestionIndex === 0 || timeElapsed}
                 className="flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
               >
                 <FaArrowLeft className="mr-2" /> Previous
@@ -142,8 +232,8 @@ const QuizSession = () => {
               
               {isLastQuestion ? (
                 <button
-                  onClick={handleSubmit}
-                  disabled={Object.keys(answers).length < quiz.questions.length}
+                  onClick={() => submitQuiz()}
+                  disabled={timeElapsed || Object.keys(answers).length < quiz.questions.length}
                   className="flex items-center px-6 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold shadow-lg shadow-emerald-500/20 transition-all"
                 >
                   Submit Quiz <FaCheckCircle className="ml-2" />
@@ -151,7 +241,8 @@ const QuizSession = () => {
               ) : (
                 <button
                   onClick={handleNext}
-                  className="flex items-center px-6 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg font-medium transition-colors"
+                  disabled={timeElapsed}
+                  className="flex items-center px-6 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-medium transition-colors"
                 >
                   Next <FaArrowRight className="ml-2" />
                 </button>
