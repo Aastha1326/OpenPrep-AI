@@ -1,7 +1,6 @@
 const request = require('supertest');
 const express = require('express');
 const path = require('path');
-const fs = require('fs');
 const jwt = require('jsonwebtoken');
 const noteRoutes = require('../../routes/noteRoutes');
 const errorHandler = require('../../middleware/error');
@@ -108,6 +107,61 @@ describe('Note Controller - Integration Tests', () => {
       expect(res.body.success).toBe(true);
       expect(res.body.data.fileUrl).toBe('');
       expect(res.body.data.fileType).toBe('text');
+    });
+
+    it('should reject an executable renamed to .pdf (magic byte check)', async () => {
+      // Windows executable MZ header disguised as a PDF
+      const exePayload = Buffer.concat([
+        Buffer.from([0x4d, 0x5a]),
+        Buffer.alloc(64, 0),
+      ]);
+
+      const res = await request(app)
+        .post('/api/notes')
+        .set('Authorization', `Bearer ${authToken}`)
+        .field('title', 'Malicious Payload')
+        .field('subjectId', testSubject.id.toString())
+        .field('content', 'should not be stored')
+        .attach('file', exePayload, 'payload.pdf');
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toContain('Only PDFs, documents, and images are allowed');
+    });
+
+    it('should reject a text script renamed to .pdf (magic byte check)', async () => {
+      const scriptPayload = Buffer.from('#!/bin/bash\necho pwned > /tmp/owned');
+
+      const res = await request(app)
+        .post('/api/notes')
+        .set('Authorization', `Bearer ${authToken}`)
+        .field('title', 'Script Payload')
+        .field('subjectId', testSubject.id.toString())
+        .field('content', 'should not be stored')
+        .attach('file', scriptPayload, 'script.pdf');
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toContain('Only PDFs, documents, and images are allowed');
+    });
+
+    it('should reject a PNG renamed to .pdf (magic byte check)', async () => {
+      const pngPayload = Buffer.concat([
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        Buffer.alloc(32, 0),
+      ]);
+
+      const res = await request(app)
+        .post('/api/notes')
+        .set('Authorization', `Bearer ${authToken}`)
+        .field('title', 'PNG as PDF')
+        .field('subjectId', testSubject.id.toString())
+        .field('content', 'should not be stored')
+        .attach('file', pngPayload, 'image.pdf');
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toContain('Only PDFs, documents, and images are allowed');
     });
 
     it('should return 400 when title is missing', async () => {
