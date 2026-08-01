@@ -17,11 +17,17 @@ const generateAccessToken = (id) => {
   });
 };
 
-// Generate refresh token (7 day expiry) — stores hashed version in DB
+// Generate a unique token family ID for RTR
+const generateTokenFamily = () => crypto.randomBytes(16).toString('hex');
+
+// Generate refresh token (7 day expiry) — stores hashed version in DB with token family
 const MAX_ACTIVE_SESSIONS = 10;
-const generateRefreshToken = async (user) => {
+const REFRESH_TOKEN_EXPIRY_DAYS = 7;
+
+const generateRefreshToken = async (user, tokenFamily = null) => {
   const rawToken = crypto.randomBytes(40).toString('hex');
   const hashed = crypto.createHash('sha256').update(rawToken).digest('hex');
+  const family = tokenFamily || generateTokenFamily();
 
   const tokens = [...(user.refreshTokens || [])];
 
@@ -30,18 +36,24 @@ const generateRefreshToken = async (user) => {
     tokens.splice(0, tokens.length - MAX_ACTIVE_SESSIONS + 1);
   }
 
-  tokens.push(hashed);
+  tokens.push({
+    token: hashed,
+    family,
+    createdAt: new Date().toISOString(),
+  });
   user.refreshTokens = tokens;
-  user.refreshTokenExpire = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+  user.refreshTokenExpire = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000); // 7 days
   await user.save();
 
-  return rawToken;
+  return { rawToken, family };
 };
 
 // ---------------------------------------------------------------------------
 // Send verification email
 // ---------------------------------------------------------------------------
-const sendVerificationEmail = async (user, req) => {
+// Send verification email
+// ---------------------------------------------------------------------------
+const sendVerificationEmail = async (user) => {
   const verificationToken = user.generateToken('emailVerification');
   await user.save();
 
@@ -60,7 +72,7 @@ const sendVerificationEmail = async (user, req) => {
 // ---------------------------------------------------------------------------
 // Send password reset email
 // ---------------------------------------------------------------------------
-const sendPasswordResetEmail = async (user, req) => {
+const sendPasswordResetEmail = async (user) => {
   const resetToken = user.generateToken('resetPassword');
   await user.save();
 
@@ -73,6 +85,29 @@ const sendPasswordResetEmail = async (user, req) => {
     to: user.email,
     subject: 'Password Reset — OpenPrep AI',
     text: `Reset your password by clicking the link: ${resetUrl}\n\nThis link expires in 1 hour. If you did not request this, please ignore this email.`,
+  });
+};
+
+// Helper to set refresh token as HTTP-only cookie
+const setRefreshTokenCookie = (res, refreshToken) => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  res.cookie('refreshToken', refreshToken, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    maxAge: REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000, // 7 days
+    path: '/',
+  });
+};
+
+// Helper to clear refresh token cookie
+const clearRefreshTokenCookie = (res) => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  res.clearCookie('refreshToken', {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    path: '/',
   });
 };
 
@@ -105,34 +140,39 @@ exports.register = async (req, res, next) => {
     let accessToken, refreshToken;
     if (isEmailVerified) {
       accessToken = generateAccessToken(user.id);
-      refreshToken = await generateRefreshToken(user);
+      const refreshResult = await generateRefreshToken(user);
+      refreshToken = refreshResult.rawToken;
+      setRefreshTokenCookie(res, refreshToken);
     }
 
     await t.commit();
 
-    res.status(201).json({
+    const response = {
       success: true,
       message: isEmailVerified
         ? 'Registration successful. Account auto-verified for development.'
         : 'Registration successful. Please verify your email to activate your account.',
       isEmailVerified,
-      ...(isEmailVerified && {
-        token: accessToken,
-        refreshToken,
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          streak: {
-            count: user.streakCount,
-            lastActive: user.streakLastActive,
-          },
-          studyHours: user.studyHours,
-          isEmailVerified: user.isEmailVerified,
+    };
+
+    if (isEmailVerified) {
+      response.token = accessToken;
+      response.refreshToken = refreshToken; // Also return in body for backward compatibility
+      response.user = {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        streak: {
+          count: user.streakCount,
+          lastActive: user.streakLastActive,
         },
-      }),
-    });
+        studyHours: user.studyHours,
+        isEmailVerified: user.isEmailVerified,
+      };
+    }
+
+    res.status(201).json(response);
   } catch (error) {
     if (t && !t.finished) {
       await t.rollback();
@@ -256,13 +296,18 @@ exports.login = async (req, res, next) => {
     }
     user.streakLastActive = new Date();
 
+    // Generate new token family for this login session
+    const tokenFamily = generateTokenFamily();
     const accessToken = generateAccessToken(user.id);
-    const refreshToken = await generateRefreshToken(user);
+    const refreshResult = await generateRefreshToken(user, tokenFamily);
+    const refreshToken = refreshResult.rawToken;
+
+    setRefreshTokenCookie(res, refreshToken);
 
     res.status(200).json({
       success: true,
       token: accessToken,
-      refreshToken,
+      refreshToken, // Also return in body for backward compatibility
       user: {
         id: user.id,
         name: user.name,
@@ -372,14 +417,19 @@ exports.resetPassword = async (req, res, next) => {
     // Invalidate all existing refresh tokens on password reset
     user.refreshTokens = [];
 
+    // Generate new token family for fresh session after password reset
+    const tokenFamily = generateTokenFamily();
     const accessToken = generateAccessToken(user.id);
-    const refreshToken = await generateRefreshToken(user);
+    const refreshResult = await generateRefreshToken(user, tokenFamily);
+    const refreshToken = refreshResult.rawToken;
+
+    setRefreshTokenCookie(res, refreshToken);
 
     res.status(200).json({
       success: true,
       message: 'Password reset successful. You can now log in with your new password.',
       token: accessToken,
-      refreshToken,
+      refreshToken, // Also return in body for backward compatibility
     });
   } catch (error) {
     next(error);
@@ -393,7 +443,8 @@ exports.resetPassword = async (req, res, next) => {
 // ---------------------------------------------------------------------------
 exports.refreshToken = async (req, res, next) => {
   try {
-    const { refreshToken: rawToken } = req.body;
+    // Support both cookie and body for refresh token
+    const rawToken = req.cookies?.refreshToken || req.body?.refreshToken;
     if (!rawToken || typeof rawToken !== 'string') {
       return res.status(400).json({ success: false, error: 'Refresh token is required' });
     }
@@ -406,7 +457,7 @@ exports.refreshToken = async (req, res, next) => {
       user = await User.findOne({
         where: {
           refreshTokens: {
-            [Op.contains]: [hashed],
+            [Op.contains]: [{ token: hashed }],
           },
           refreshTokenExpire: { [Op.gt]: new Date() },
         },
@@ -417,29 +468,53 @@ exports.refreshToken = async (req, res, next) => {
           refreshTokenExpire: { [Op.gt]: new Date() },
         },
       });
-      user = users.find((u) => Array.isArray(u.refreshTokens) && u.refreshTokens.includes(hashed));
+      user = users.find((u) =>
+        Array.isArray(u.refreshTokens) && u.refreshTokens.some((t) => t.token === hashed)
+      );
     }
 
     if (!user) {
       return res.status(401).json({ success: false, error: 'Invalid or expired refresh token' });
     }
 
+    // Find the specific token entry to get its family
+    const tokenEntry = user.refreshTokens.find((t) => t.token === hashed);
+    if (!tokenEntry) {
+      return res.status(401).json({ success: false, error: 'Invalid or expired refresh token' });
+    }
+
+    const tokenFamily = tokenEntry.family;
+
+    // RTR: Check if this token family has been invalidated (reuse detection)
+    const familyStillValid = user.refreshTokens.some((t) => t.family === tokenFamily);
+    if (!familyStillValid) {
+      // Token family was invalidated - this is a reuse attack!
+      // Invalidate ALL tokens for this user as a security measure
+      user.refreshTokens = [];
+      await user.save();
+      clearRefreshTokenCookie(res);
+      return res.status(401).json({ success: false, error: 'Token reuse detected. All sessions invalidated.' });
+    }
+
     // Remove old token (rotation)
-    user.refreshTokens = user.refreshTokens.filter((t) => t !== hashed);
+    user.refreshTokens = user.refreshTokens.filter((t) => t.token !== hashed);
 
     // Prune any tokens beyond the active session limit
     if (user.refreshTokens.length > MAX_ACTIVE_SESSIONS) {
       user.refreshTokens = user.refreshTokens.slice(-MAX_ACTIVE_SESSIONS);
     }
 
-    // Generate new pair
+    // Generate new pair with same token family (rotation)
     const accessToken = generateAccessToken(user.id);
-    const newRefreshToken = await generateRefreshToken(user);
+    const refreshResult = await generateRefreshToken(user, tokenFamily);
+    const newRefreshToken = refreshResult.rawToken;
+
+    setRefreshTokenCookie(res, newRefreshToken);
 
     res.status(200).json({
       success: true,
       token: accessToken,
-      refreshToken: newRefreshToken,
+      refreshToken: newRefreshToken, // Also return in body for backward compatibility
     });
   } catch (error) {
     next(error);
@@ -453,7 +528,8 @@ exports.refreshToken = async (req, res, next) => {
 // ---------------------------------------------------------------------------
 exports.logout = async (req, res, next) => {
   try {
-    const { refreshToken: rawToken } = req.body;
+    // Support both cookie and body for refresh token
+    const rawToken = req.cookies?.refreshToken || req.body?.refreshToken;
     
     if (rawToken) {
       const hashed = crypto.createHash('sha256').update(rawToken).digest('hex');
@@ -462,17 +538,19 @@ exports.logout = async (req, res, next) => {
       const user = await User.findOne({
         where: {
           refreshTokens: {
-            [Op.contains]: [hashed],
+            [Op.contains]: [{ token: hashed }],
           },
         },
       });
 
       if (user) {
         // Remove the token from the user's refresh tokens array
-        user.refreshTokens = user.refreshTokens.filter((t) => t !== hashed);
+        user.refreshTokens = user.refreshTokens.filter((t) => t.token !== hashed);
         await user.save();
       }
     }
+
+    clearRefreshTokenCookie(res);
 
     res.status(200).json({
       success: true,

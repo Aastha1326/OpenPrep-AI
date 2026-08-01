@@ -73,7 +73,7 @@ const User = sequelize.define(
       type: DataTypes.DATE,
     },
     refreshTokens: {
-      type: DataTypes.ARRAY(DataTypes.STRING),
+      type: DataTypes.JSONB,
       defaultValue: [],
     },
     refreshTokenExpire: {
