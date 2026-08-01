@@ -48,7 +48,8 @@ Express middlewares intercept incoming HTTP requests to validate and format para
 
 ### 2. Upload Middleware (`middleware/upload.js`)
 * Uses `multer` to handle multi-part form data uploads for PYQ PDFs or lecture notes.
-* Validates file size constraints and file formats (restricting inputs strictly to PDFs).
+* Validates file size constraints (15MB limit) and file formats (restricting inputs strictly to PDFs, DOCX, TXT, and images).
+* Verifies binary MIME structure by inspecting magic bytes (via `file-type`) in a custom storage engine — the file is only written to disk after its content matches the claimed extension, preventing renamed executables or scripts from being stored.
 
 ### 3. Global Error Handler (`middleware/error.js`)
 * Catches unhandled promise rejections.
