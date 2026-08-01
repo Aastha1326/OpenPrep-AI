@@ -1,19 +1,65 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Brain, ArrowLeft, RotateCw, CheckCircle2, Volume2, VolumeX } from 'lucide-react';
+import { Brain, ArrowLeft, RotateCw, CheckCircle2, Volume2, VolumeX, AlertCircle } from 'lucide-react';
 import API from '../services/api';
+
+const STORAGE_KEY = 'flashcardReviewSession';
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+
+const putWithRetry = async (url, payload, attempts = 3, delayMs = 500) => {
+  try {
+    return await API.put(url, payload);
+  } catch (err) {
+    if (attempts <= 1) throw err;
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    return putWithRetry(url, payload, attempts - 1, delayMs * 2);
+  }
+};
+
+const persistSession = (session) => {
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ ...session, savedAt: Date.now() }));
+  } catch {
+    // Storage may be unavailable (private browsing / quota) - session just won't resume.
+  }
+};
+
+const restoreSession = () => {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.cards) || parsed.cards.length === 0) return null;
+    if (parsed.currentIndex >= parsed.cards.length) return null;
+    if (Date.now() - (parsed.savedAt || 0) > SESSION_TTL_MS) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const clearSession = () => {
+  try {
+    sessionStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Ignore storage errors.
+  }
+};
 
 const FlashcardReview = () => {
   const navigate = useNavigate();
-  const [cards, setCards] = useState([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const [savedSession] = useState(restoreSession);
+
+  const [cards, setCards] = useState(() => savedSession?.cards || []);
+  const [currentIndex, setCurrentIndex] = useState(() => savedSession?.currentIndex || 0);
   const [isFlipped, setIsFlipped] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !savedSession);
   const [error, setError] = useState(null);
-  
+
   // Session Stats
-  const [sessionStats, setSessionStats] = useState({
+  const [sessionStats, setSessionStats] = useState(() => savedSession?.sessionStats || {
     reviewed: 0,
     mastered: 0, // quality >= 4
     hard: 0, // quality < 3
@@ -22,21 +68,25 @@ const FlashcardReview = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speechRate, setSpeechRate] = useState(1);
 
-  useEffect(() => {
-    fetchDueCards();
-  }, []);
+  const [submitting, setSubmitting] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  const submittingRef = useRef(false);
+  const sessionStatsRef = useRef(sessionStats);
 
-  // Cancel speech synthesis on unmount or card change
-  useEffect(() => {
+  // Cancel speech synthesis and reset the speaking flag when the card or
+  // flip state changes (render-phase reset keeps the flag in sync).
+  const speechKey = `${currentIndex}:${isFlipped}`;
+  const [prevSpeechKey, setPrevSpeechKey] = useState(speechKey);
+  if (prevSpeechKey !== speechKey) {
+    setPrevSpeechKey(speechKey);
+    setIsSpeaking(false);
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
-    setIsSpeaking(false);
-  }, [currentIndex, isFlipped]);
+  }
 
   const fetchDueCards = async () => {
     try {
-      setLoading(true);
       const res = await API.get('/flashcards?dueOnly=true&limit=100'); // Fetch a batch of due cards
       setCards(res.data.data || []);
       setLoading(false);
@@ -47,36 +97,52 @@ const FlashcardReview = () => {
     }
   };
 
+  useEffect(() => {
+    if (!savedSession) {
+      fetchDueCards();
+    }
+  }, [savedSession]);
+
   const currentCard = cards[currentIndex];
   const isSessionComplete = !loading && cards.length > 0 && currentIndex >= cards.length;
   const noCardsDue = !loading && cards.length === 0;
 
-  const handleReview = async (quality) => {
-    if (!currentCard) return;
+  const handleReview = useCallback(async (quality) => {
+    if (!currentCard || submittingRef.current) return;
+
+    submittingRef.current = true;
+    setSubmitting(true);
+    setSaveError(null);
 
     try {
-      // Update session stats
-      setSessionStats(prev => ({
-        ...prev,
-        reviewed: prev.reviewed + 1,
-        mastered: prev.mastered + (quality >= 4 ? 1 : 0),
-        hard: prev.hard + (quality < 3 ? 1 : 0),
-      }));
+      // Persist the rating server-side before advancing, with retry so a
+      // transient network failure doesn't silently lose the card's progress.
+      await putWithRetry(`/flashcards/${currentCard.id}/review`, { quality });
 
-      // Fire async request to update backend
-      await API.put(`/flashcards/${currentCard.id}/review`, { quality });
-      
-      // Move to next card
+      const nextIndex = currentIndex + 1;
+      const nextStats = {
+        reviewed: sessionStatsRef.current.reviewed + 1,
+        mastered: sessionStatsRef.current.mastered + (quality >= 4 ? 1 : 0),
+        hard: sessionStatsRef.current.hard + (quality < 3 ? 1 : 0),
+      };
+      sessionStatsRef.current = nextStats;
+      setSessionStats(nextStats);
+      setCurrentIndex(nextIndex);
       setIsFlipped(false);
-      setCurrentIndex(prev => prev + 1);
+      persistSession({ cards, currentIndex: nextIndex, sessionStats: nextStats });
     } catch (err) {
       console.error("Failed to update flashcard", err);
-      // Even if it fails, maybe we still want to move on, but ideally we should show a toast.
-      // For simplicity, we just log it and move to next.
-      setIsFlipped(false);
-      setCurrentIndex(prev => prev + 1);
+      setSaveError('Could not save this rating. Check your connection and try again.');
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
     }
-  };
+  }, [cards, currentIndex, currentCard]);
+
+  const handleExit = useCallback(() => {
+    clearSession();
+    navigate('/dashboard');
+  }, [navigate]);
 
   const speakText = (text, rate) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
@@ -135,7 +201,25 @@ const FlashcardReview = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFlipped, currentIndex]);
+  }, [isFlipped, handleReview]);
+
+  // Persist the latest checkpoint when the tab is closed or refreshed.
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (cards.length > 0 && currentIndex > 0 && currentIndex < cards.length) {
+        persistSession({ cards, currentIndex, sessionStats: sessionStatsRef.current });
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [cards, currentIndex]);
+
+  // Clear the saved session once the queue is finished.
+  useEffect(() => {
+    if (isSessionComplete || noCardsDue) {
+      clearSession();
+    }
+  }, [isSessionComplete, noCardsDue]);
 
   if (loading) {
     return (
@@ -150,7 +234,7 @@ const FlashcardReview = () => {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center p-4">
         <p className="text-red-500 mb-4">{error}</p>
-        <button onClick={() => navigate('/dashboard')} className="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700">
+        <button onClick={handleExit} className="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700">
           Back to Dashboard
         </button>
       </div>
@@ -162,7 +246,7 @@ const FlashcardReview = () => {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-12 px-4 flex flex-col items-center">
         <button 
-          onClick={() => navigate('/dashboard')} 
+          onClick={handleExit} 
           className="absolute top-6 left-6 flex items-center text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-100 transition-colors"
         >
           <ArrowLeft className="w-5 h-5 mr-1" />
@@ -201,7 +285,7 @@ const FlashcardReview = () => {
 
           <div className="flex gap-4">
             <button 
-              onClick={() => navigate('/dashboard')}
+              onClick={handleExit}
               className="px-6 py-3 bg-neutral-200 dark:bg-slate-700 text-neutral-800 dark:text-neutral-200 font-semibold rounded-lg hover:bg-neutral-300 dark:hover:bg-slate-600 transition-colors"
             >
               Go to Dashboard
@@ -229,7 +313,7 @@ const FlashcardReview = () => {
       {/* Header */}
       <div className="w-full max-w-3xl flex justify-between items-center mb-8">
         <button 
-          onClick={() => navigate('/dashboard')} 
+          onClick={handleExit} 
           className="flex items-center text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-100 transition-colors"
         >
           <ArrowLeft className="w-5 h-5 mr-1" />
@@ -351,6 +435,21 @@ const FlashcardReview = () => {
 
         {/* Grading Controls (Only visible when flipped) */}
         <div className={`mt-12 w-full max-w-2xl transition-all duration-500 ${isFlipped ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
+          {saveError && (
+            <div className="mb-4 flex items-center justify-between gap-3 px-4 py-2 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-sm">
+              <span className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                {saveError}
+              </span>
+              <button
+                type="button"
+                onClick={() => setSaveError(null)}
+                className="font-semibold underline whitespace-nowrap"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
           <div className="text-center text-sm font-medium text-neutral-500 dark:text-neutral-400 mb-4">
             How well did you know this?
           </div>
@@ -365,8 +464,10 @@ const FlashcardReview = () => {
             ].map(btn => (
               <button
                 key={btn.val}
+                aria-label={btn.label}
+                disabled={submitting}
                 onClick={() => handleReview(btn.val)}
-                className={`py-3 px-2 rounded-xl border flex flex-col items-center justify-center transition-all hover:scale-105 active:scale-95 ${btn.color}`}
+                className={`py-3 px-2 rounded-xl border flex flex-col items-center justify-center transition-all hover:scale-105 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed ${btn.color}`}
               >
                 <span className="font-bold text-lg mb-1">{btn.val}</span>
                 <span className="text-[10px] uppercase tracking-wider font-semibold opacity-80">{btn.label}</span>
