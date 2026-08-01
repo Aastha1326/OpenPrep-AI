@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { Op } = require('sequelize');
 const { sequelize } = require('../config/db');
 const User = require('../models/User');
+const Achievement = require('../models/Achievement');
 const jwt = require('jsonwebtoken');
 const sendEmail = require('../services/emailService');
 
@@ -287,7 +288,11 @@ exports.login = async (req, res, next) => {
 // ---------------------------------------------------------------------------
 exports.getMe = async (req, res, next) => {
   try {
-    const user = await User.findByPk(req.user.id);
+    const user = await User.findByPk(req.user.id, {
+      include: [
+        { model: Achievement, as: 'achievements' }
+      ]
+    });
     res.status(200).json({
       success: true,
       user: {
@@ -301,6 +306,7 @@ exports.getMe = async (req, res, next) => {
         },
         studyHours: user.studyHours,
         isEmailVerified: user.isEmailVerified,
+        achievements: user.achievements || [],
       },
     });
   } catch (error) {
