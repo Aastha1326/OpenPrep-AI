@@ -36,25 +36,25 @@ const createRateLimitResponse = (errorMessage) => ({
   error: errorMessage,
 });
 
-// Login rate limiter: 5 attempts per 15 minutes per IP
+// Login rate limiter: 5 attempts per minute per IP
 const loginLimiter = rateLimit({
-  windowMs: RATE_LIMIT.WINDOWS.FIFTEEN_MINUTES,
+  windowMs: RATE_LIMIT.WINDOWS.ONE_MINUTE,
   max: RATE_LIMIT.MAX_REQUESTS.LOGIN,
   skip: shouldSkip,
   message: createRateLimitResponse(
-    'Too many login attempts. Please try again after 15 minutes.'
+    'Too many login attempts. Please try again after a minute.'
   ),
   standardHeaders: true,
   legacyHeaders: true,
 });
 
-// Limit registration attempts to 5 requests per 15 minutes per IP
+// Limit registration attempts to 5 requests per minute per IP
 const registerLimiter = rateLimit({
-  windowMs: RATE_LIMIT.WINDOWS.FIFTEEN_MINUTES,
+  windowMs: RATE_LIMIT.WINDOWS.ONE_MINUTE,
   max: RATE_LIMIT.MAX_REQUESTS.REGISTER,
   skip: shouldSkip,
   message: createRateLimitResponse(
-    'Too many registration attempts. Please try again after 15 minutes.'
+    'Too many registration attempts. Please try again after a minute.'
   ),
   standardHeaders: true,
   legacyHeaders: true,

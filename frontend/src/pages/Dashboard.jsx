@@ -26,6 +26,7 @@ import PyqAnalysisModal from '../components/dashboard/PyqAnalysisModal';
 import WeaknessDashboardWidget from '../components/dashboard/WeaknessDashboardWidget';
 import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
 import ThemeToggle from '../components/ThemeToggle';
+import BadgesList from '../components/BadgesList';
 
 import {
   fetchDashboardStats,
@@ -612,6 +613,10 @@ const Dashboard = () => {
         {/* --- AI WEAKNESS DETECTION WIDGET --- */}
         <div className="my-6">
           <WeaknessDashboardWidget />
+        </div>
+
+        <div className="my-6">
+          <BadgesList achievements={user?.achievements || []} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

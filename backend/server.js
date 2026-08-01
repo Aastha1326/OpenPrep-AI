@@ -13,6 +13,7 @@ const { protect } = require('./middleware/auth');
 const fs = require('fs');
 const PYQ = require('./models/PYQ');
 const Note = require('./models/Note');
+const Achievement = require('./models/Achievement');
 const http = require('http');
 const { Server } = require('socket.io');
 const swaggerUi = require('swagger-ui-express');
