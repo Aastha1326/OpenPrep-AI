@@ -10,6 +10,8 @@ const {
   getTopics,
   updateTopic,
   deleteTopic,
+  createCompositeBundle,
+  updateSubjectWeightages,
 } = require('../controllers/academicController');
 const { protect } = require('../middleware/auth');
 const {
@@ -30,6 +32,11 @@ const router = express.Router();
  *   name: Academic
  *   description: Exam, Subject, and Topic management
  */
+
+// Exams & Bundles
+router.post('/exams', protect, validateCreateExam, clearCache(req => `exams:${req.user.id}:*`), createExam);
+router.post('/bundles', protect, clearCache(req => `exams:${req.user.id}:*`), createCompositeBundle);
+router.put('/bundles/:examId/weightages', protect, clearCache(req => `subjects:${req.user.id}:*`), updateSubjectWeightages);
 
 /**
  * @swagger

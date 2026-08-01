@@ -2,6 +2,7 @@ const express = require('express');
 const {
   getDashboardStats,
   getSubjectBreakdown,
+  getCompositeBundleOverview,
   getStudyHours,
   trackStudyTime,
   updateTopicProgress,
@@ -16,6 +17,9 @@ const {
 } = require('../middleware/validators');
 
 const router = express.Router();
+
+router.get('/composite-overview', protect, getCompositeBundleOverview);
+
 
 /**
  * @swagger

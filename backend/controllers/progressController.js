@@ -154,6 +154,94 @@ exports.getSubjectBreakdown = async (req, res, next) => {
   }
 };
 
+// @desc    Get Target Exam Composite Bundle Overview with cumulative weighted syllabus progress
+// @route   GET /api/progress/composite-overview
+// @access  Private
+exports.getCompositeBundleOverview = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { examId } = req.query;
+
+    let exam;
+    if (examId) {
+      exam = await Exam.findOne({ where: { id: examId, user: userId } });
+    } else {
+      exam = await Exam.findOne({
+        where: { user: userId, isBundle: true },
+        order: [['createdAt', 'DESC']],
+      });
+      if (!exam) {
+        exam = await Exam.findOne({
+          where: { user: userId },
+          order: [['date', 'ASC']],
+        });
+      }
+    }
+
+    if (!exam) {
+      return res.status(200).json({
+        success: true,
+        data: null,
+      });
+    }
+
+    const subjects = await Subject.findAll({ where: { exam: exam.id, user: userId } });
+    let totalWeightedProgress = 0;
+    let totalWeightage = 0;
+    const subjectBreakdown = [];
+
+    for (const sub of subjects) {
+      const topics = await Topic.findAll({ where: { subject: sub.id, user: userId } });
+      const topicCount = topics.length;
+
+      let subProgress = 0;
+      if (topicCount > 0) {
+        const topicIds = topics.map((t) => t.id);
+        const [sumResult] = await Progress.findAll({
+          attributes: [[fn('SUM', col('completionPercentage')), 'totalCompletion']],
+          where: { user: userId, topic: { [Op.in]: topicIds } },
+          raw: true,
+        });
+        const sum = parseFloat(sumResult?.totalCompletion) || 0;
+        subProgress = Math.round(sum / topicCount);
+      }
+
+      const weightage = sub.weightage || (subjects.length > 0 ? 100 / subjects.length : 0);
+      totalWeightedProgress += subProgress * weightage;
+      totalWeightage += weightage;
+
+      subjectBreakdown.push({
+        id: sub.id,
+        name: sub.name,
+        description: sub.description,
+        weightage: Math.round(weightage * 10) / 10,
+        topicCount,
+        progressPercentage: subProgress,
+      });
+    }
+
+    const cumulativeProgress = totalWeightage > 0 ? Math.round(totalWeightedProgress / totalWeightage) : 0;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        examId: exam.id,
+        examName: exam.name,
+        description: exam.description,
+        examDate: exam.date,
+        isBundle: exam.isBundle || false,
+        targetExamType: exam.targetExamType || 'Custom',
+        cumulativeProgress,
+        totalSubjects: subjects.length,
+        subjects: subjectBreakdown,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
 // @desc    Get study hours tracking data
 // @route   GET /api/progress/study-hours
 // @access  Private

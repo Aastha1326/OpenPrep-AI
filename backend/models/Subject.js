@@ -27,7 +27,12 @@ const Subject = sequelize.define(
       type: DataTypes.UUID,
       allowNull: false,
     },
+    weightage: {
+      type: DataTypes.FLOAT,
+      defaultValue: 0,
+    },
   },
+
   {
     timestamps: true,
     indexes: [

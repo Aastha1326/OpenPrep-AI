@@ -17,11 +17,13 @@ const PYQ = require('../models/PYQ');
 
 exports.createExam = async (req, res, next) => {
   try {
-    const { name, description, date } = req.body;
+    const { name, description, date, isBundle, targetExamType } = req.body;
     const exam = await Exam.create({
       name,
       description,
       date,
+      isBundle: isBundle || false,
+      targetExamType: targetExamType || 'Custom',
       user: req.user.id,
     });
     res.status(201).json({ success: true, data: exam });
@@ -29,6 +31,7 @@ exports.createExam = async (req, res, next) => {
     next(error);
   }
 };
+
 
 exports.getExams = async (req, res, next) => {
   try {
@@ -142,7 +145,7 @@ exports.deleteExam = async (req, res, next) => {
 
 exports.createSubject = async (req, res, next) => {
   try {
-    const { name, description, examId } = req.body;
+    const { name, description, examId, weightage } = req.body;
     const examExists = await Exam.findOne({
       where: { id: examId, user: req.user.id },
     });
@@ -154,6 +157,7 @@ exports.createSubject = async (req, res, next) => {
       name,
       description,
       exam: examId,
+      weightage: weightage !== undefined ? parseFloat(weightage) : 0,
       user: req.user.id,
     });
     res.status(201).json({ success: true, data: subject });
@@ -161,6 +165,104 @@ exports.createSubject = async (req, res, next) => {
     next(error);
   }
 };
+
+// ==========================================
+// COMPOSITE EXAM BUNDLES CONTROLLER
+// ==========================================
+
+exports.createCompositeBundle = async (req, res, next) => {
+  const t = await sequelize.transaction();
+  try {
+    const { name, description, date, targetExamType, subjects } = req.body;
+
+    if (!name || !date) {
+      await t.rollback();
+      return res.status(400).json({ success: false, error: 'Please provide exam name and date' });
+    }
+
+    // Create the master composite Exam
+    const exam = await Exam.create({
+      name,
+      description,
+      date,
+      isBundle: true,
+      targetExamType: targetExamType || 'Custom',
+      user: req.user.id,
+    }, { transaction: t });
+
+    // Create subjects with percentage weightages if provided
+    const createdSubjects = [];
+    if (Array.isArray(subjects) && subjects.length > 0) {
+      for (const sub of subjects) {
+        const newSub = await Subject.create({
+          name: sub.name,
+          description: sub.description || '',
+          weightage: sub.weightage !== undefined ? parseFloat(sub.weightage) : Math.round(100 / subjects.length),
+          exam: exam.id,
+          user: req.user.id,
+        }, { transaction: t });
+        createdSubjects.push(newSub);
+      }
+    }
+
+    await t.commit();
+
+    res.status(201).json({
+      success: true,
+      data: {
+        exam,
+        subjects: createdSubjects,
+      },
+    });
+  } catch (error) {
+    await t.rollback();
+    next(error);
+  }
+};
+
+exports.updateSubjectWeightages = async (req, res, next) => {
+  const t = await sequelize.transaction();
+  try {
+    const { examId } = req.params;
+    const { subjectWeightages } = req.body; // Array of { id: subjectId, weightage: number }
+
+    const exam = await Exam.findOne({ where: { id: examId, user: req.user.id }, transaction: t });
+    if (!exam) {
+      await t.rollback();
+      return res.status(404).json({ success: false, error: 'Exam not found' });
+    }
+
+    if (!Array.isArray(subjectWeightages)) {
+      await t.rollback();
+      return res.status(400).json({ success: false, error: 'subjectWeightages must be an array' });
+    }
+
+    const updatedSubjects = [];
+    for (const item of subjectWeightages) {
+      const subject = await Subject.findOne({
+        where: { id: item.id, exam: examId, user: req.user.id },
+        transaction: t,
+      });
+
+      if (subject) {
+        subject.weightage = parseFloat(item.weightage) || 0;
+        await subject.save({ transaction: t });
+        updatedSubjects.push(subject);
+      }
+    }
+
+    await t.commit();
+
+    res.status(200).json({
+      success: true,
+      data: updatedSubjects,
+    });
+  } catch (error) {
+    await t.rollback();
+    next(error);
+  }
+};
+
 
 exports.getSubjects = async (req, res, next) => {
   try {
