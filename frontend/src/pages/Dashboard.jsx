@@ -8,6 +8,7 @@ import {
   LogOut, X, Download, Upload,
 } from 'lucide-react';
 import API from '../services/api';
+import { toDateOnlyString } from '../utils/dateUtils';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip as LineTooltip, ResponsiveContainer,
@@ -290,12 +291,8 @@ const Dashboard = () => {
 
   const todayTasks = (() => {
     if (!activePlan?.dailyGoals) return [];
-    const now = new Date();
-    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    const todayGoal = activePlan.dailyGoals.find((g) => {
-      const goalDate = g.date ? g.date.split('T')[0] : null;
-      return goalDate === today;
-    });
+    const today = toDateOnlyString(new Date());
+    const todayGoal = activePlan.dailyGoals.find((g) => g.date && toDateOnlyString(g.date) === today);
     if (todayGoal?.tasks) {
       return todayGoal.tasks.map((t, i) => ({
         id: t.id || t._id || `task-${i}`,

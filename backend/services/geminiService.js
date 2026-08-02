@@ -1,6 +1,7 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const NodeCache = require('node-cache');
 const crypto = require('crypto');
+const { toLocalDateString } = require('../utils/dateUtils');
 
 // Initialize Gemini API client
 const apiKey = process.env.GEMINI_API_KEY;
@@ -721,7 +722,9 @@ function getMockStudyPlan(examName, subjectsAndTopics, startDate, endDate) {
   let count = 0;
 
   while (current <= end && count < limitDays) {
-    const formattedDate = current.toISOString().split('T')[0];
+    // Use LOCAL date components so the mock schedule never shifts a day
+    // for users in non-UTC timezones.
+    const formattedDate = toLocalDateString(current);
     days.push({
       date: formattedDate,
       tasks: [
