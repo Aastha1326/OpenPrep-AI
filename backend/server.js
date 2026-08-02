@@ -55,10 +55,41 @@ if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
 
+// ── CORS origin resolver ──────────────────────────────────────────────────
+// Supports:
+//   CLIENT_URL  – primary production / staging frontend URL
+//   CORS_ORIGIN – legacy / alternative explicit override
+//   Fallback    – http://localhost:5173 (local dev)
+//   Pattern     – *.vercel.app and *.openprep.ai preview deployments
+const buildAllowedOrigins = () => {
+  const origins = new Set(['http://localhost:5173']);
+  if (process.env.CLIENT_URL)  origins.add(process.env.CLIENT_URL.replace(/\/$/, ''));
+  if (process.env.CORS_ORIGIN) origins.add(process.env.CORS_ORIGIN.replace(/\/$/, ''));
+  return origins;
+};
+
+const allowedOrigins = buildAllowedOrigins();
+
+const corsOriginHandler = (origin, callback) => {
+  // Allow server-to-server / curl requests with no Origin header
+  if (!origin) return callback(null, true);
+
+  // Exact match against configured origins
+  if (allowedOrigins.has(origin)) return callback(null, true);
+
+  // Pattern match: Vercel preview deployments and *.openprep.ai staging
+  const isVercelPreview = /^https:\/\/[\w-]+-[\w-]+\.vercel\.app$/.test(origin);
+  const isStagingDomain = /^https:\/\/[\w-]+\.openprep\.ai$/.test(origin);
+
+  if (isVercelPreview || isStagingDomain) return callback(null, true);
+
+  callback(new Error(`CORS: origin '${origin}' is not allowed`));
+};
+
 // Security Middlewares
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: corsOriginHandler,
   credentials: true,
 }));
 
@@ -94,8 +125,9 @@ const apiLimiter = rateLimit({
 });
 app.use('/api/', apiLimiter);
 
+
 // Set Static Folder for File Uploads (Protected)
-// protect, Note, PYQ already imported at lines 12-15
+// protect, Note, PYQ already imported at top of file
 
 app.get('/uploads/:filename', protect, async (req, res, next) => {
   try {
@@ -166,11 +198,12 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
+
 const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: corsOriginHandler,
     methods: ['GET', 'POST'],
     credentials: true,
   },
