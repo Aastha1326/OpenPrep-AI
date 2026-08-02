@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Flame, Play, FileText, Calendar, TrendingUp, Award, BookOpen,
   Target, CheckCircle, Clock, AlertCircle, RefreshCw, Lightbulb,
-  LogOut, X, Download,
+  LogOut, X, Download, Upload,
 } from 'lucide-react';
 import API from '../services/api';
 import {
@@ -27,6 +27,7 @@ import WeaknessDashboardWidget from '../components/dashboard/WeaknessDashboardWi
 import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
 import TargetExamOverviewWidget from '../components/dashboard/TargetExamOverviewWidget';
 import CompositeBundleModal from '../components/dashboard/CompositeBundleModal';
+import SyllabusImportModal from '../components/dashboard/SyllabusImportModal';
 import ThemeToggle from '../components/ThemeToggle';
 import BadgesList from '../components/BadgesList';
 
@@ -221,8 +222,19 @@ const Dashboard = () => {
   const [isStudyPlanOpen, setIsStudyPlanOpen] = useState(false);
   const [isPyqModalOpen, setIsPyqModalOpen] = useState(false);
   const [isBundleModalOpen, setIsBundleModalOpen] = useState(false);
+  const [isSyllabusImportOpen, setIsSyllabusImportOpen] = useState(false);
+  const syllabusPrefillRef = useRef(null);
   const [comingSoon, setComingSoon] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
+
+  const handleGoToStudyPlanFromImport = (prefill) => {
+    if (prefill) syllabusPrefillRef.current = prefill;
+    // Refresh dashboard caches so the new exam appears immediately in select
+    dispatch(fetchDashboardStats());
+    dispatch(fetchSubjectBreakdown());
+    dispatch(fetchActivePlan());
+    setIsStudyPlanOpen(true);
+  };
 
 
   useEffect(() => {
@@ -336,6 +348,7 @@ const Dashboard = () => {
         <GoldTabButton icon={Play} label="Start Quiz" delay={0.1} onClick={() => setComingSoon('Quiz feature coming soon!')} />
         <GoldTabButton icon={FileText} label="PYQ Intelligence" delay={0.2} onClick={() => navigate('/pyqs')} />
         <GoldTabButton icon={Calendar} label="Study Plan" delay={0.3} onClick={() => setIsStudyPlanOpen(true)} />
+        <GoldTabButton icon={Upload} label="Import Syllabus" delay={0.35} onClick={() => setIsSyllabusImportOpen(true)} />
         <GoldTabButton icon={TrendingUp} label="Export Report" delay={0.4} onClick={() => handleExportReport('pdf')} />
         <button 
           onClick={() => setIsNoteModalOpen(true)}
@@ -857,6 +870,17 @@ const Dashboard = () => {
           dispatch(fetchDashboardStats());
           dispatch(fetchSubjectBreakdown());
         }}
+      />
+
+      {/* --- SYLLABUS IMPORT MODAL --- */}
+      <SyllabusImportModal
+        isOpen={isSyllabusImportOpen}
+        onClose={() => setIsSyllabusImportOpen(false)}
+        onSuccess={() => {
+          dispatch(fetchDashboardStats());
+          dispatch(fetchSubjectBreakdown());
+        }}
+        onGoToStudyPlan={handleGoToStudyPlanFromImport}
       />
 
       {/* --- COMING SOON TOAST --- */}
