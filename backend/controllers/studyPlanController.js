@@ -7,6 +7,7 @@ const Topic = require('../models/Topic');
 const ActivityLog = require('../models/ActivityLog');
 const User = require('../models/User');
 const geminiService = require('../services/geminiService');
+const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
 
 // @desc    Generate AI Study Plan
 // @route   POST /api/study-plans/generate-ai
@@ -109,6 +110,21 @@ exports.generateAIPlan = async (req, res, next) => {
       data: studyPlan,
     });
   } catch (error) {
+    // Handle Gemini API rate limit errors
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    // Handle Gemini API server errors
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({
+        success: false,
+        error: error.message,
+      });
+    }
     next(error);
   }
 };
@@ -170,13 +186,13 @@ exports.getActivePlan = async (req, res, next) => {
   }
 };
 
-// @desc    Toggle Task Completion Status
+// @desc    Toggle Task Completion Status or Update Task Duration
 // @route   PUT /api/study-plans/:planId/tasks/:taskId
 // @access  Private
 exports.toggleTaskCompletion = async (req, res, next) => {
   try {
     const { planId, taskId } = req.params;
-    const { completed, studyTimeMinutes } = req.body;
+    const { completed, studyTimeMinutes, duration } = req.body;
 
     const plan = await StudyPlan.findOne({ where: { id: planId, user: req.user.id } });
     if (!plan) {
@@ -191,7 +207,12 @@ exports.toggleTaskCompletion = async (req, res, next) => {
       const task = goal.tasks.find((t) => t._id === taskId || t.id === taskId);
       if (task) {
         wasCompleted = task.completed; // Capture previous state BEFORE modifying
-        task.completed = completed;
+        if (completed !== undefined) {
+          task.completed = completed;
+        }
+        if (duration !== undefined && typeof duration === 'number' && duration >= 0) {
+          task.duration = duration;
+        }
         taskFound = true;
         break;
       }
@@ -471,6 +492,35 @@ exports.rescheduleOverdueTasks = async (req, res, next) => {
       data: plan,
       message: `Successfully rescheduled ${overdueTasks.length} overdue tasks`,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get AI Weakness Detection Analysis
+// @route   GET /api/study-plans/weakness-analysis
+// @access  Private
+exports.getWeaknessAnalysis = async (req, res, next) => {
+  try {
+    const weaknessAggregatorService = require('../services/weaknessAggregatorService');
+    const result = await weaknessAggregatorService.getLLMWeaknessAnalysis(req.user.id);
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Reschedule active study plan based on AI weakness detection
+// @route   POST /api/study-plans/reschedule-adaptive
+// @access  Private
+exports.rescheduleAdaptivePlan = async (req, res, next) => {
+  try {
+    const weaknessAggregatorService = require('../services/weaknessAggregatorService');
+    const result = await weaknessAggregatorService.rescheduleAdaptivePlanner(req.user.id);
+    if (!result) {
+      return res.status(404).json({ success: false, error: 'No active study plan found to reschedule' });
+    }
+    res.status(200).json({ success: true, data: result, message: 'Adaptive study plan rescheduled successfully' });
   } catch (error) {
     next(error);
   }

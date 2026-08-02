@@ -28,7 +28,7 @@ const User = sequelize.define(
     },
     password: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
       validate: {
         len: {
           args: [8],
@@ -39,6 +39,15 @@ const User = sequelize.define(
     role: {
       type: DataTypes.ENUM('student', 'contributor', 'admin'),
       defaultValue: 'student',
+    },
+    provider: {
+      type: DataTypes.STRING,
+      defaultValue: 'local',
+    },
+    socialId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      unique: true,
     },
     streakCount: {
       type: DataTypes.INTEGER,
@@ -73,7 +82,7 @@ const User = sequelize.define(
       type: DataTypes.DATE,
     },
     refreshTokens: {
-      type: DataTypes.ARRAY(DataTypes.STRING),
+      type: DataTypes.JSONB,
       defaultValue: [],
     },
     refreshTokenExpire: {

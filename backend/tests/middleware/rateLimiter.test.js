@@ -214,7 +214,7 @@ describe('Rate Limiter - Mounted on Routes', () => {
     process.env.JWT_SECRET = 'test_jwt_secret_for_rate_limiter_int';
     const jwt = require('jsonwebtoken');
     const { v4: uuidv4 } = require('uuid');
-    jwtToken = jwt.sign({ id: uuidv4() }, process.env.JWT_SECRET);
+    jwtToken = jwt.sign({ id: uuidv4(), type: 'access' }, process.env.JWT_SECRET);
   });
 
   afterAll(() => {

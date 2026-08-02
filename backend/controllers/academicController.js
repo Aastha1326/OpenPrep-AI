@@ -17,11 +17,13 @@ const PYQ = require('../models/PYQ');
 
 exports.createExam = async (req, res, next) => {
   try {
-    const { name, description, date } = req.body;
+    const { name, description, date, isBundle, targetExamType } = req.body;
     const exam = await Exam.create({
       name,
       description,
       date,
+      isBundle: isBundle || false,
+      targetExamType: targetExamType || 'Custom',
       user: req.user.id,
     });
     res.status(201).json({ success: true, data: exam });
@@ -29,6 +31,7 @@ exports.createExam = async (req, res, next) => {
     next(error);
   }
 };
+
 
 exports.getExams = async (req, res, next) => {
   try {
@@ -73,31 +76,56 @@ exports.deleteExam = async (req, res, next) => {
     const subjects = await Subject.findAll({ where: { exam: exam.id }, transaction: t });
     const subjectIds = subjects.map((sub) => sub.id);
 
-    // Collect all topics for these subjects
-    const topics = await Topic.findAll({ where: { subject: { [Op.in]: subjectIds } }, transaction: t });
-    const topicIds = topics.map((top) => top.id);
-
-    // 1. Delete QuizAttempts for quizzes under these subjects and topics
-    const quizzes = await Quiz.findAll({
-      where: { [Op.or]: [{ subject: { [Op.in]: subjectIds } }, { topic: { [Op.in]: topicIds } }] },
-      transaction: t,
-    });
-    const quizIds = quizzes.map((q) => q.id);
-
-    if (quizIds.length > 0) {
-      await QuizAttempt.destroy({ where: { quiz: { [Op.in]: quizIds } }, transaction: t });
+    let topicIds = [];
+    if (subjectIds.length > 0) {
+      // Collect all topics for these subjects
+      const topics = await Topic.findAll({ where: { subject: { [Op.in]: subjectIds } }, transaction: t });
+      topicIds = topics.map((top) => top.id);
     }
 
-    // 2. Delete quizzes and other related records
-    await Quiz.destroy({ where: { [Op.or]: [{ subject: { [Op.in]: subjectIds } }, { topic: { [Op.in]: topicIds } }] }, transaction: t });
+    // Build OR conditions only when IDs exist to avoid invalid Op.in: [] queries
+    const quizOrConditions = [];
+    if (subjectIds.length > 0) quizOrConditions.push({ subject: { [Op.in]: subjectIds } });
+    if (topicIds.length > 0) quizOrConditions.push({ topic: { [Op.in]: topicIds } });
+
+    if (quizOrConditions.length > 0) {
+      // 1. Delete QuizAttempts for quizzes under these subjects and topics
+      const quizzes = await Quiz.findAll({
+        where: { [Op.or]: quizOrConditions },
+        transaction: t,
+      });
+      const quizIds = quizzes.map((q) => q.id);
+
+      if (quizIds.length > 0) {
+        await QuizAttempt.destroy({ where: { quiz: { [Op.in]: quizIds } }, transaction: t });
+      }
+
+      // 2. Delete quizzes
+      await Quiz.destroy({ where: { [Op.or]: quizOrConditions }, transaction: t });
+    }
+
     await StudyPlan.destroy({ where: { exam: exam.id }, transaction: t });
-    await PYQ.destroy({ where: { [Op.or]: [{ exam: exam.id }, { subject: { [Op.in]: subjectIds } }] }, transaction: t });
-    await Note.destroy({ where: { subject: { [Op.in]: subjectIds } }, transaction: t });
-    await Flashcard.destroy({ where: { subject: { [Op.in]: subjectIds } }, transaction: t });
-    await Progress.destroy({ where: { [Op.or]: [{ subject: { [Op.in]: subjectIds } }, { topic: { [Op.in]: topicIds } }] }, transaction: t });
+
+    if (subjectIds.length > 0) {
+      await PYQ.destroy({ where: { [Op.or]: [{ exam: exam.id }, { subject: { [Op.in]: subjectIds } }] }, transaction: t });
+      await Note.destroy({ where: { subject: { [Op.in]: subjectIds } }, transaction: t });
+      await Flashcard.destroy({ where: { subject: { [Op.in]: subjectIds } }, transaction: t });
+    } else {
+      await PYQ.destroy({ where: { exam: exam.id }, transaction: t });
+    }
+
+    const progressOrConditions = [];
+    if (subjectIds.length > 0) progressOrConditions.push({ subject: { [Op.in]: subjectIds } });
+    if (topicIds.length > 0) progressOrConditions.push({ topic: { [Op.in]: topicIds } });
+
+    if (progressOrConditions.length > 0) {
+      await Progress.destroy({ where: { [Op.or]: progressOrConditions }, transaction: t });
+    }
 
     // 3. Ensure child Topic records are deleted BEFORE parent Subject records
-    await Topic.destroy({ where: { subject: { [Op.in]: subjectIds } }, transaction: t });
+    if (subjectIds.length > 0) {
+      await Topic.destroy({ where: { subject: { [Op.in]: subjectIds } }, transaction: t });
+    }
     await Subject.destroy({ where: { exam: exam.id }, transaction: t });
     
     // 4. Delete the exam itself
@@ -117,7 +145,7 @@ exports.deleteExam = async (req, res, next) => {
 
 exports.createSubject = async (req, res, next) => {
   try {
-    const { name, description, examId } = req.body;
+    const { name, description, examId, weightage } = req.body;
     const examExists = await Exam.findOne({
       where: { id: examId, user: req.user.id },
     });
@@ -129,6 +157,7 @@ exports.createSubject = async (req, res, next) => {
       name,
       description,
       exam: examId,
+      weightage: weightage !== undefined ? parseFloat(weightage) : 0,
       user: req.user.id,
     });
     res.status(201).json({ success: true, data: subject });
@@ -136,6 +165,104 @@ exports.createSubject = async (req, res, next) => {
     next(error);
   }
 };
+
+// ==========================================
+// COMPOSITE EXAM BUNDLES CONTROLLER
+// ==========================================
+
+exports.createCompositeBundle = async (req, res, next) => {
+  const t = await sequelize.transaction();
+  try {
+    const { name, description, date, targetExamType, subjects } = req.body;
+
+    if (!name || !date) {
+      await t.rollback();
+      return res.status(400).json({ success: false, error: 'Please provide exam name and date' });
+    }
+
+    // Create the master composite Exam
+    const exam = await Exam.create({
+      name,
+      description,
+      date,
+      isBundle: true,
+      targetExamType: targetExamType || 'Custom',
+      user: req.user.id,
+    }, { transaction: t });
+
+    // Create subjects with percentage weightages if provided
+    const createdSubjects = [];
+    if (Array.isArray(subjects) && subjects.length > 0) {
+      for (const sub of subjects) {
+        const newSub = await Subject.create({
+          name: sub.name,
+          description: sub.description || '',
+          weightage: sub.weightage !== undefined ? parseFloat(sub.weightage) : Math.round(100 / subjects.length),
+          exam: exam.id,
+          user: req.user.id,
+        }, { transaction: t });
+        createdSubjects.push(newSub);
+      }
+    }
+
+    await t.commit();
+
+    res.status(201).json({
+      success: true,
+      data: {
+        exam,
+        subjects: createdSubjects,
+      },
+    });
+  } catch (error) {
+    await t.rollback();
+    next(error);
+  }
+};
+
+exports.updateSubjectWeightages = async (req, res, next) => {
+  const t = await sequelize.transaction();
+  try {
+    const { examId } = req.params;
+    const { subjectWeightages } = req.body; // Array of { id: subjectId, weightage: number }
+
+    const exam = await Exam.findOne({ where: { id: examId, user: req.user.id }, transaction: t });
+    if (!exam) {
+      await t.rollback();
+      return res.status(404).json({ success: false, error: 'Exam not found' });
+    }
+
+    if (!Array.isArray(subjectWeightages)) {
+      await t.rollback();
+      return res.status(400).json({ success: false, error: 'subjectWeightages must be an array' });
+    }
+
+    const updatedSubjects = [];
+    for (const item of subjectWeightages) {
+      const subject = await Subject.findOne({
+        where: { id: item.id, exam: examId, user: req.user.id },
+        transaction: t,
+      });
+
+      if (subject) {
+        subject.weightage = parseFloat(item.weightage) || 0;
+        await subject.save({ transaction: t });
+        updatedSubjects.push(subject);
+      }
+    }
+
+    await t.commit();
+
+    res.status(200).json({
+      success: true,
+      data: updatedSubjects,
+    });
+  } catch (error) {
+    await t.rollback();
+    next(error);
+  }
+};
+
 
 exports.getSubjects = async (req, res, next) => {
   try {

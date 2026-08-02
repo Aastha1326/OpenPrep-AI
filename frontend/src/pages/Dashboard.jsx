@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Flame, Play, FileText, Calendar, TrendingUp, Award, BookOpen,
   Target, CheckCircle, Clock, AlertCircle, RefreshCw, Lightbulb,
-  LogOut, X,
+  LogOut, X, Download,
 } from 'lucide-react';
 import API from '../services/api';
 import {
@@ -23,7 +23,13 @@ import PinnedTasks from '../components/dashboard/PinnedTasks';
 import CreateNoteModal from '../components/dashboard/CreateNoteModal';
 import StudyPlanModal from '../components/dashboard/StudyPlanModal';
 import PyqAnalysisModal from '../components/dashboard/PyqAnalysisModal';
+import WeaknessDashboardWidget from '../components/dashboard/WeaknessDashboardWidget';
+import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
+import TargetExamOverviewWidget from '../components/dashboard/TargetExamOverviewWidget';
+import CompositeBundleModal from '../components/dashboard/CompositeBundleModal';
 import ThemeToggle from '../components/ThemeToggle';
+import BadgesList from '../components/BadgesList';
+
 
 import {
   fetchDashboardStats,
@@ -192,11 +198,32 @@ const Dashboard = () => {
     }
   };
 
+  const handleBumpStudyTime = async (taskId, minutesToAdd = 30) => {
+    const planId = activePlan?.id;
+    if (!planId) return;
+    const task = todayTasks.find((t) => t.id === taskId);
+    if (!task) return;
+    const backendTaskId = task.meta?.taskId || task.id;
+    setToggleError(null);
+    try {
+      const currentDuration = task.duration || 60;
+      await API.put(`/study-plans/${planId}/tasks/${backendTaskId}`, {
+        duration: currentDuration + minutesToAdd,
+      });
+      dispatch(fetchActivePlan());
+    } catch {
+      setToggleError('Failed to bump study time. Please try again.');
+    }
+  };
+
   // ── Note & PYQ Modal State ──
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isStudyPlanOpen, setIsStudyPlanOpen] = useState(false);
   const [isPyqModalOpen, setIsPyqModalOpen] = useState(false);
+  const [isBundleModalOpen, setIsBundleModalOpen] = useState(false);
   const [comingSoon, setComingSoon] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
+
 
   useEffect(() => {
     if (comingSoon) {
@@ -204,6 +231,34 @@ const Dashboard = () => {
       return () => clearTimeout(timer);
     }
   }, [comingSoon]);
+
+  const handleExportReport = async (format = 'pdf') => {
+    setIsExporting(true);
+    try {
+      const response = await API.get(`/progress/export/${format}`, {
+        responseType: 'blob',
+      });
+
+      const blob = new Blob([response.data], {
+        type: format === 'pdf' ? 'application/pdf' : 'text/csv',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute(
+        'download',
+        `progress_report_${new Date().toISOString().split('T')[0]}.${format}`
+      );
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      setComingSoon('Failed to export progress report.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // ── Derived Data ──
   const chartData = weeklyChartData.length > 0
@@ -231,20 +286,24 @@ const Dashboard = () => {
     });
     if (todayGoal?.tasks) {
       return todayGoal.tasks.map((t, i) => ({
-        id: t.id || `task-${i}`,
+        id: t.id || t._id || `task-${i}`,
         text: t.title || t.description || t.topic?.name || 'Untitled task',
         completed: t.completed || false,
-        meta: { taskId: t.id },
+        topic: t.topic || null,
+        duration: t.duration || 60,
+        meta: { taskId: t.id || t._id },
       }));
     }
     // Fallback: show first day's tasks
     const firstDay = activePlan.dailyGoals[0];
     if (firstDay?.tasks) {
       return firstDay.tasks.map((t, i) => ({
-        id: t.id || `task-${i}`,
+        id: t.id || t._id || `task-${i}`,
         text: t.title || t.description || t.topic?.name || 'Untitled task',
         completed: t.completed || false,
-        meta: { taskId: t.id },
+        topic: t.topic || null,
+        duration: t.duration || 60,
+        meta: { taskId: t.id || t._id },
       }));
     }
     return [];
@@ -275,9 +334,9 @@ const Dashboard = () => {
       {/* --- QUICK ACTIONS TABS --- */}
       <div className="absolute -left-4 top-24 flex flex-col gap-4 z-30 hidden md:flex">
         <GoldTabButton icon={Play} label="Start Quiz" delay={0.1} onClick={() => setComingSoon('Quiz feature coming soon!')} />
-        <GoldTabButton icon={FileText} label="Analyze PYQ" delay={0.2} onClick={() => setIsPyqModalOpen(true)} />
+        <GoldTabButton icon={FileText} label="PYQ Intelligence" delay={0.2} onClick={() => navigate('/pyqs')} />
         <GoldTabButton icon={Calendar} label="Study Plan" delay={0.3} onClick={() => setIsStudyPlanOpen(true)} />
-        <GoldTabButton icon={TrendingUp} label="Reports" delay={0.4} onClick={() => setComingSoon('Reports coming soon!')} />
+        <GoldTabButton icon={TrendingUp} label="Export Report" delay={0.4} onClick={() => handleExportReport('pdf')} />
         <button 
           onClick={() => setIsNoteModalOpen(true)}
           className="bg-neutral-800 text-yellow-500 border border-yellow-700/50 hover:bg-neutral-700 p-2 rounded-r-lg shadow-lg flex items-center justify-center relative group"
@@ -291,7 +350,7 @@ const Dashboard = () => {
 
       <div className="pl-4 md:pl-16 pr-4 lg:pr-8 py-8 space-y-12">
         {/* --- HERO SECTION --- */}
-        <div className="flex flex-col md:flex-row justify-between items-end border-b border-black/20 pb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start border-b border-black/20 pb-8 gap-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -304,13 +363,28 @@ const Dashboard = () => {
             <p className="text-amber-100/70 text-lg italic font-playfair">
               &ldquo;The roots of education are bitter, but the fruit is sweet.&rdquo; – Aristotle
             </p>
+
+            {/* --- EXAM COUNTDOWN WIDGET --- */}
+            {activePlan?.exam?.date && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.4 }}
+                className="mt-5"
+              >
+                <ExamCountdownWidget
+                  examDate={activePlan.exam.date}
+                  examName={activePlan.exam.name}
+                />
+              </motion.div>
+            )}
           </motion.div>
 
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, delay: 0.3 }}
-            className="flex items-center space-x-6 mt-6 md:mt-0"
+            className="flex items-center space-x-6 mt-2 md:mt-0 shrink-0"
           >
             <ThemeToggle className="mr-2" />
             <div className="flex flex-col items-center">
@@ -333,10 +407,17 @@ const Dashboard = () => {
           </motion.div>
         </div>
 
+        {/* --- TARGET EXAM COMPOSITE BUNDLE OVERVIEW --- */}
+        <TargetExamOverviewWidget
+          onOpenBundleModal={() => setIsBundleModalOpen(true)}
+          onGenerateStudyPlan={() => setIsStudyPlanOpen(true)}
+        />
+
         {/* --- STATISTICS OVERVIEW --- */}
         {errorStats && !loadingStats ? (
           <ErrorBanner message={errorStats} onRetry={handleRetry(fetchDashboardStats)} />
         ) : null}
+
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {loadingStats ? (
@@ -402,14 +483,39 @@ const Dashboard = () => {
         </div>
 
         {/* --- ANALYTICS SECTION (WOODEN DESK) --- */}
-        <div className="bg-wood-desk rounded-lg shadow-inner border border-black/50 p-6 relative overflow-hidden grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="absolute inset-0 shadow-[inset_0_0_50px_rgba(0,0,0,0.8)] pointer-events-none" />
-
-          {/* Line Chart — Weekly Performance */}
-          <VintagePaper animate={false} className="w-full h-full p-6 shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
-            <h2 className="text-2xl font-bold font-playfair text-neutral-900 mb-6 border-b border-neutral-400 pb-2">
-              Weekly Performance
+        <div className="space-y-4">
+          <div className="flex justify-between items-center px-1">
+            <h2 className="text-2xl font-bold font-playfair text-amber-100 flex items-center gap-2">
+              <TrendingUp className="w-6 h-6 text-yellow-500" /> Performance Analytics
             </h2>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleExportReport('csv')}
+                disabled={isExporting}
+                className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-yellow-400 border border-yellow-700/50 rounded text-xs font-semibold flex items-center gap-1.5 shadow transition-all disabled:opacity-50"
+                title="Export report as CSV"
+              >
+                <Download className="w-3.5 h-3.5" /> Export CSV
+              </button>
+              <button
+                onClick={() => handleExportReport('pdf')}
+                disabled={isExporting}
+                className="px-3 py-1.5 bg-gradient-to-r from-yellow-700 to-yellow-600 hover:from-yellow-600 hover:to-yellow-500 text-yellow-50 rounded text-xs font-semibold flex items-center gap-1.5 shadow transition-all disabled:opacity-50"
+                title="Export report as PDF"
+              >
+                <Download className="w-3.5 h-3.5" /> Export PDF
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-wood-desk rounded-lg shadow-inner border border-black/50 p-6 relative overflow-hidden grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="absolute inset-0 shadow-[inset_0_0_50px_rgba(0,0,0,0.8)] pointer-events-none" />
+
+            {/* Line Chart — Weekly Performance */}
+            <VintagePaper animate={false} className="w-full h-full p-6 shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
+              <h2 className="text-2xl font-bold font-playfair text-neutral-900 mb-6 border-b border-neutral-400 pb-2">
+                Weekly Performance
+              </h2>
             <div className="h-64 w-full" style={{ minHeight: '250px', minWidth: '100%' }}>
               {loadingStats ? (
                 <div className="flex items-center justify-center h-full">
@@ -482,6 +588,7 @@ const Dashboard = () => {
             </div>
           </VintagePaper>
         </div>
+        </div>
 
         {/* --- NEW WIDGETS ROW --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-center py-4">
@@ -505,6 +612,7 @@ const Dashboard = () => {
               error={errorPlan}
               onRetry={handleRetry(fetchActivePlan)}
               onToggle={handleToggleTask}
+              onBumpTime={handleBumpStudyTime}
             />
           </div>
           {toggleError && (
@@ -512,6 +620,15 @@ const Dashboard = () => {
               <ErrorBanner message={toggleError} />
             </div>
           )}
+        </div>
+
+        {/* --- AI WEAKNESS DETECTION WIDGET --- */}
+        <div className="my-6">
+          <WeaknessDashboardWidget />
+        </div>
+
+        <div className="my-6">
+          <BadgesList achievements={user?.achievements || []} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -692,6 +809,8 @@ const Dashboard = () => {
         onClose={() => setIsStudyPlanOpen(false)}
         activePlan={activePlan}
         onPlanUpdate={() => dispatch(fetchActivePlan())}
+        onPlanCreated={() => dispatch(fetchActivePlan())}
+        onBumpTime={handleBumpStudyTime}
       />
 
       {/* --- PYQ ANALYSIS MODAL --- */}
@@ -705,7 +824,19 @@ const Dashboard = () => {
         }}
       />
 
+      {/* --- COMPOSITE BUNDLE MODAL --- */}
+      <CompositeBundleModal
+        isOpen={isBundleModalOpen}
+        onClose={() => setIsBundleModalOpen(false)}
+        onSuccess={() => {
+          setIsBundleModalOpen(false);
+          dispatch(fetchDashboardStats());
+          dispatch(fetchSubjectBreakdown());
+        }}
+      />
+
       {/* --- COMING SOON TOAST --- */}
+
       <AnimatePresence>
         {comingSoon && (
           <motion.div

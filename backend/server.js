@@ -13,6 +13,12 @@ const { protect } = require('./middleware/auth');
 const fs = require('fs');
 const PYQ = require('./models/PYQ');
 const Note = require('./models/Note');
+const Achievement = require('./models/Achievement');
+const http = require('http');
+const { Server } = require('socket.io');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./config/swagger');
+const passport = require('./config/passport');
 
 // Validate required environment variables at startup
 if (!process.env.JWT_SECRET) {
@@ -56,12 +62,19 @@ app.use(cors({
   credentials: true,
 }));
 
+app.use(passport.initialize());
+
 // Cookie parser (required for csurf cookie-based tokens)
 app.use(cookieParser());
 
 // CSRF protection middleware
 const csrfProtection = csrf({ cookie: true });
 app.use(csrfProtection);
+
+// CSRF Token Endpoint for frontend clients
+app.get('/api/csrf-token', (req, res) => {
+  res.json({ csrfToken: req.csrfToken() });
+});
 
 // Response compression (skip binary uploads via default filter)
 app.use(compression());
@@ -82,9 +95,7 @@ const apiLimiter = rateLimit({
 app.use('/api/', apiLimiter);
 
 // Set Static Folder for File Uploads (Protected)
-const { protect } = require('./middleware/auth');
-const Note = require('./models/Note');
-const PYQ = require('./models/PYQ');
+// protect, Note, PYQ already imported at lines 12-15
 
 app.get('/uploads/:filename', protect, async (req, res, next) => {
   try {
@@ -140,11 +151,34 @@ app.get('/healthz', (req, res) => {
   res.status(200).send('OK');
 });
 
+// Swagger UI Documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'OpenPrep AI API Documentation',
+  swaggerOptions: {
+    persistAuthorization: true,
+    displayRequestDuration: true,
+  },
+}));
+
 // Error Handler Middleware
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    methods: ['GET', 'POST'],
+    credentials: true,
+  },
+});
+
+// Initialize socket handlers
+require('./sockets/battleHandler')(io);
+
+server.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
 });

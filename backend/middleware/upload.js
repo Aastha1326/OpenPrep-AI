@@ -1,6 +1,7 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { fromBuffer } = require('file-type');
 
 // Ensure upload directory exists
 const uploadDir = path.join(__dirname, '../uploads');
@@ -8,41 +9,132 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Set storage engine
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    cb(null, `${file.fieldname}-${Date.now()}${path.extname(file.originalname)}`);
-  },
-});
+// Allowed MIME types mapped by extension
+const ALLOWED_MIME_TYPES = {
+  '.pdf': 'application/pdf',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.txt': 'text/plain',
+  '.jpeg': 'image/jpeg',
+  '.jpg': 'image/jpeg',
+  '.png': 'image/png',
+};
 
-// Check file type
-function checkFileType(file, cb) {
-  // Allowed ext
-  const filetypes = /pdf|docx|txt|jpeg|jpg|png/;
-  // Check ext
-  const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-  // Check mime
-  const mimetype = filetypes.test(file.mimetype);
+// Expected binary magic-byte signature (file-type ext) per allowed extension.
+// `.txt` is intentionally absent — plain-text files have no magic bytes and
+// are validated by extension + MIME type only.
+const MAGIC_BYTE_TYPES = {
+  '.pdf': 'pdf',
+  '.docx': 'docx',
+  '.jpeg': 'jpg',
+  '.jpg': 'jpg',
+  '.png': 'png',
+};
 
-  if (mimetype && extname) {
-    return cb(null, true);
-  } else {
-    const error = new Error('Only PDFs, documents, and images are allowed!');
-    error.name = 'FileValidationError';
-    cb(error);
+function createFileValidationError() {
+  const error = new Error('Only PDFs, documents, and images are allowed!');
+  error.name = 'FileValidationError';
+  return error;
+}
+
+/**
+ * Verify that the uploaded buffer's binary structure (magic bytes) matches the
+ * claimed file extension. Prevents attackers from renaming executables or
+ * scripts to `payload.pdf` to bypass extension-only checks.
+ *
+ * @param {string} ext Lowercased file extension (with leading dot)
+ * @param {Buffer} buffer Full uploaded file content
+ */
+async function verifyMagicBytes(ext, buffer) {
+  const expected = MAGIC_BYTE_TYPES[ext];
+
+  // Empty uploads carry no magic bytes — only meaningful for plain text
+  if (buffer.length === 0) {
+    if (expected === undefined) return;
+    throw createFileValidationError();
+  }
+
+  let detected;
+  try {
+    detected = await fromBuffer(buffer);
+  } catch {
+    // Truncated or unparseable binary — treat as no signature found
+    detected = undefined;
+  }
+
+  if (expected === undefined) {
+    // .txt must not contain a known binary signature (e.g. an .exe renamed)
+    if (detected) {
+      throw createFileValidationError();
+    }
+    return;
+  }
+
+  if (!detected || detected.ext !== expected) {
+    throw createFileValidationError();
   }
 }
 
+// Check file type (extension + declared MIME pre-check, fast reject)
+function checkFileType(file, cb) {
+  const ext = path.extname(file.originalname).toLowerCase();
+  const extname = Object.prototype.hasOwnProperty.call(ALLOWED_MIME_TYPES, ext);
+  const mimetype = ALLOWED_MIME_TYPES[ext] === file.mimetype;
+
+  if (mimetype && extname) {
+    return cb(null, true);
+  }
+  return cb(createFileValidationError());
+}
+
+// Custom storage engine: buffer the stream, verify magic bytes against the
+// claimed extension, and only write to disk when the content is genuine.
+const storage = {
+  _handleFile(req, file, cb) {
+    (async () => {
+      const chunks = [];
+      for await (const chunk of file.stream) {
+        chunks.push(chunk);
+      }
+      const buffer = Buffer.concat(chunks);
+
+      const ext = path.extname(file.originalname).toLowerCase();
+      await verifyMagicBytes(ext, buffer);
+
+      const filename = `${file.fieldname}-${Date.now()}${path.extname(file.originalname)}`;
+      const filePath = path.join(uploadDir, filename);
+      await fs.promises.writeFile(filePath, buffer);
+
+      const info = {
+        destination: uploadDir,
+        filename,
+        path: filePath,
+        size: buffer.length,
+      };
+      Object.assign(file, info);
+      return info;
+    })()
+      .then((info) => cb(null, info))
+      .catch((err) => cb(err));
+  },
+
+  _removeFile(req, file, cb) {
+    if (file.path) {
+      fs.unlink(file.path, () => cb(null));
+    } else {
+      cb(null);
+    }
+  },
+};
+
 // Init upload
 const upload = multer({
-  storage: storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  storage,
+  limits: { fileSize: 15 * 1024 * 1024 }, // 15MB limit
   fileFilter: function (req, file, cb) {
     checkFileType(file, cb);
   },
 });
 
+// Expose helper for unit testing while keeping the multer instance as default
 module.exports = upload;
+module.exports.verifyMagicBytes = verifyMagicBytes;

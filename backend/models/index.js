@@ -15,6 +15,7 @@ const Progress = require('./Progress');
 const Feedback = require('./Feedback');
 const ActivityLog = require('./ActivityLog');
 const UsageQuota = require('./UsageQuota');
+const Achievement = require('./Achievement');
 
 // Define Associations
 
@@ -31,6 +32,7 @@ User.hasMany(Flashcard, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Progress, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Feedback, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(ActivityLog, { foreignKey: 'user', onDelete: 'CASCADE' });
+User.hasMany(Achievement, { foreignKey: 'userId', as: 'achievements', onDelete: 'CASCADE' });
 
 // Exam associations
 Exam.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
@@ -96,6 +98,9 @@ Feedback.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 // ActivityLog associations
 ActivityLog.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 
+// Achievement associations
+Achievement.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
 module.exports = {
   sequelize,
   User,
@@ -112,4 +117,5 @@ module.exports = {
   Feedback,
   ActivityLog,
   UsageQuota,
+  Achievement,
 };

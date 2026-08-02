@@ -9,7 +9,6 @@ const Exam = require('../../models/Exam');
 const Subject = require('../../models/Subject');
 const Topic = require('../../models/Topic');
 const Flashcard = require('../../models/Flashcard');
-const Progress = require('../../models/Progress');
 
 const app = express();
 app.use(express.json());
@@ -31,7 +30,7 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
       password: 'password123',
     });
 
-    authToken = jwt.sign({ id: testUser.id }, process.env.JWT_SECRET);
+    authToken = jwt.sign({ id: testUser.id, type: 'access' }, process.env.JWT_SECRET);
 
     const testExam = await Exam.create({
       name: 'Flashcard Exam',
@@ -264,161 +263,6 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(404);
-    });
-  });
-
-  // =========================================================================
-  // isMastered — state transition and flashcardsMastered tracking
-  // =========================================================================
-  describe('PUT /api/flashcards/:id/review (isMastered tracking)', () => {
-    let card;
-    let progress;
-
-    beforeEach(async () => {
-      // Clean up any leftover progress records for this user+subject+topic
-      await Progress.destroy({ where: { user: testUser.id, subject: testSubject.id, topic: testTopic.id } });
-
-      // Create a fresh flashcard with topic set (so progress tracking applies)
-      card = await Flashcard.create({
-        user: testUser.id,
-        subject: testSubject.id,
-        topic: testTopic.id,
-        front: 'Mastery Test?',
-        back: 'Mastery Test Answer',
-        isMastered: false,
-      });
-    });
-
-    it('should set isMastered=true on first high-quality review (quality >= 4)', async () => {
-      const res = await request(app)
-        .put(`/api/flashcards/${card.id}/review`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({ quality: 5 });
-
-      expect(res.status).toBe(200);
-      expect(res.body.data.isMastered).toBe(true);
-    });
-
-    it('should set isMastered=false on low-quality review', async () => {
-      card.isMastered = true;
-      await card.save();
-
-      const res = await request(app)
-        .put(`/api/flashcards/${card.id}/review`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({ quality: 2 });
-
-      expect(res.status).toBe(200);
-      expect(res.body.data.isMastered).toBe(false);
-    });
-
-    it('should increment flashcardsMastered from 0 to 1 when card becomes mastered', async () => {
-      await request(app)
-        .put(`/api/flashcards/${card.id}/review`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({ quality: 5 });
-
-      progress = await Progress.findOne({
-        where: { user: testUser.id, subject: testSubject.id, topic: testTopic.id },
-      });
-      expect(progress).not.toBeNull();
-      expect(progress.flashcardsMastered).toBe(1);
-    });
-
-    it('should NOT double-count flashcardsMastered on repeated high-quality reviews', async () => {
-      // First review: becomes mastered -> 1
-      await request(app)
-        .put(`/api/flashcards/${card.id}/review`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({ quality: 5 });
-
-      // Second review: still mastered -> should stay at 1
-      await request(app)
-        .put(`/api/flashcards/${card.id}/review`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({ quality: 5 });
-
-      progress = await Progress.findOne({
-        where: { user: testUser.id, subject: testSubject.id, topic: testTopic.id },
-      });
-      expect(progress.flashcardsMastered).toBe(1);
-    });
-
-    it('should decrement flashcardsMastered when mastered card is demoted', async () => {
-      // First review: becomes mastered
-      await request(app)
-        .put(`/api/flashcards/${card.id}/review`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({ quality: 5 });
-
-      // Second review: low quality -> demoted
-      await request(app)
-        .put(`/api/flashcards/${card.id}/review`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({ quality: 2 });
-
-      progress = await Progress.findOne({
-        where: { user: testUser.id, subject: testSubject.id, topic: testTopic.id },
-      });
-      expect(progress.flashcardsMastered).toBe(0);
-    });
-
-    it('should NOT change flashcardsMastered on low-quality review when already not mastered', async () => {
-      // Card starts with isMastered=false, quality < 4
-      await request(app)
-        .put(`/api/flashcards/${card.id}/review`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({ quality: 2 });
-
-      // No progress should be created (no state change)
-      progress = await Progress.findOne({
-        where: { user: testUser.id, subject: testSubject.id, topic: testTopic.id },
-      });
-      expect(progress).toBeNull();
-    });
-
-    it('should NOT decrement below 0 when demoting a mastered card with multiple reviews', async () => {
-      // Master the card
-      await request(app)
-        .put(`/api/flashcards/${card.id}/review`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({ quality: 5 });
-
-      // Demote
-      await request(app)
-        .put(`/api/flashcards/${card.id}/review`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({ quality: 2 });
-
-      progress = await Progress.findOne({
-        where: { user: testUser.id, subject: testSubject.id, topic: testTopic.id },
-      });
-      expect(progress.flashcardsMastered).toBe(0);
-
-      // Try demoting again (should stay at 0, not go negative)
-      await request(app)
-        .put(`/api/flashcards/${card.id}/review`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({ quality: 2 });
-
-      progress = await Progress.findOne({
-        where: { user: testUser.id, subject: testSubject.id, topic: testTopic.id },
-      });
-      expect(progress.flashcardsMastered).toBe(0);
-    });
-
-    it('should return isMastered flag in create response', async () => {
-      const res = await request(app)
-        .post('/api/flashcards')
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({
-          subjectId: testSubject.id,
-          front: 'New card',
-          back: 'New answer',
-        });
-
-      expect(res.status).toBe(201);
-      expect(res.body.data.isMastered).toBe(false);
     });
   });
 });

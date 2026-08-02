@@ -5,22 +5,439 @@ const {
   getFlashcards,
   reviewFlashcard,
   deleteFlashcard,
+  exportFlashcards,
+  importFlashcards,
 } = require('../controllers/flashcardController');
 const { protect } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
 const { checkQuota } = require('../middleware/quotaMiddleware');
+const flashcardUpload = require('../middleware/flashcardUpload');
 const {
   validateGenerateAIFlashcards,
   validateCreateFlashcard,
   validateReviewFlashcard,
+  validateExportFlashcards,
+  validateImportFlashcards,
 } = require('../middleware/validators');
 
 const router = express.Router();
 
+/**
+ * @swagger
+ * tags:
+ *   name: Flashcards
+ *   description: Flashcard generation, CRUD, and review
+ */
+
+/**
+ * @swagger
+ * /api/flashcards/generate-ai:
+ *   post:
+ *     summary: Generate AI-powered flashcards
+ *     tags: [Flashcards]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - subjectId
+ *             properties:
+ *               subjectId:
+ *                 type: string
+ *                 format: uuid
+ *                 example: "123e4567-e89b-12d3-a456-426614174000"
+ *               topicId:
+ *                 type: string
+ *                 format: uuid
+ *                 example: "123e4567-e89b-12d3-a456-426614174001"
+ *               count:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 50
+ *                 default: 10
+ *                 example: 20
+ *     responses:
+ *       201:
+ *         description: Flashcards generated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Flashcard'
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Subject or topic not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       429:
+ *         description: Rate limit exceeded
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+
+// Static routes first (must come before /:id to avoid route shadowing)
 router.post('/generate-ai', protect, aiLimiter, checkQuota, validateGenerateAIFlashcards, generateAIFlashcards);
+
+/**
+ * @swagger
+ * /api/flashcards/export:
+ *   get:
+ *     summary: Export flashcards as JSON
+ *     tags: [Flashcards]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: subjectId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Filter by subject
+ *       - in: query
+ *         name: topicId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Filter by topic
+ *     responses:
+ *       200:
+ *         description: Flashcards exported successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Flashcard'
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+
+router.get('/export', protect, validateExportFlashcards, exportFlashcards);
+
+/**
+ * @swagger
+ * /api/flashcards/import:
+ *   post:
+ *     summary: Import flashcards from JSON file
+ *     tags: [Flashcards]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - file
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       201:
+ *         description: Flashcards imported successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     imported:
+ *                       type: integer
+ *                       example: 25
+ *       400:
+ *         description: Validation error or invalid file format
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+
+router.post('/import', protect, flashcardUpload.single('file'), validateImportFlashcards, importFlashcards);
+
+/**
+ * @swagger
+ * /api/flashcards:
+ *   post:
+ *     summary: Create a new flashcard
+ *     tags: [Flashcards]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - front
+ *               - back
+ *               - subject
+ *             properties:
+ *               front:
+ *                 type: string
+ *                 example: "What is the capital of France?"
+ *               back:
+ *                 type: string
+ *                 example: "Paris"
+ *               subject:
+ *                 type: string
+ *                 format: uuid
+ *                 example: "123e4567-e89b-12d3-a456-426614174000"
+ *               topic:
+ *                 type: string
+ *                 format: uuid
+ *                 example: "123e4567-e89b-12d3-a456-426614174001"
+ *     responses:
+ *       201:
+ *         description: Flashcard created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/Flashcard'
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Subject or topic not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+
+// Collection routes
 router.post('/', protect, validateCreateFlashcard, createFlashcard);
+
+/**
+ * @swagger
+ * /api/flashcards:
+ *   get:
+ *     summary: Get all flashcards for the authenticated user
+ *     tags: [Flashcards]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: subjectId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Filter by subject
+ *       - in: query
+ *         name: topicId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Filter by topic
+ *     responses:
+ *       200:
+ *         description: List of flashcards
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Flashcard'
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+
 router.get('/', protect, getFlashcards);
+
+/**
+ * @swagger
+ * /api/flashcards/{id}/review:
+ *   put:
+ *     summary: Review a flashcard (update spaced repetition data)
+ *     tags: [Flashcards]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Flashcard ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - quality
+ *             properties:
+ *               quality:
+ *                 type: integer
+ *                 minimum: 0
+ *                 maximum: 5
+ *                 example: 4
+ *                 description: "Recall quality (0-5): 0=complete blackout, 5=perfect recall"
+ *     responses:
+ *       200:
+ *         description: Flashcard reviewed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/Flashcard'
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Flashcard not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+
+// Parameterised routes
 router.put('/:id/review', protect, validateReviewFlashcard, reviewFlashcard);
+
+/**
+ * @swagger
+ * /api/flashcards/{id}:
+ *   delete:
+ *     summary: Delete a flashcard
+ *     tags: [Flashcards]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Flashcard ID
+ *     responses:
+ *       200:
+ *         description: Flashcard deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     message:
+ *                       type: string
+ *                       example: "Flashcard deleted successfully"
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Flashcard not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+
 router.delete('/:id', protect, deleteFlashcard);
 
 module.exports = router;
