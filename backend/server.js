@@ -41,6 +41,7 @@ const flashcardRoutes = require('./routes/flashcardRoutes');
 const noteRoutes = require('./routes/noteRoutes');
 const progressRoutes = require('./routes/progressRoutes');
 const communityRoutes = require('./routes/communityRoutes');
+const userRoutes = require('./routes/userRoutes');
 
 // Connect to Database
 connectDB();
@@ -125,6 +126,9 @@ const apiLimiter = rateLimit({
 });
 app.use('/api/', apiLimiter);
 
+// Serve avatar images publicly — profile pictures are displayed to other
+// users (e.g. in community features) and aren't sensitive like notes/PYQs.
+app.use('/uploads/avatars', express.static(path.join(__dirname, 'uploads/avatars')));
 
 // Set Static Folder for File Uploads (Protected)
 // protect, Note, PYQ already imported at top of file
@@ -172,6 +176,7 @@ app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/progress', progressRoutes);
 app.use('/api/community', communityRoutes);
+app.use('/api/users', userRoutes);
 
 // Base Route
 app.get('/', (req, res) => {
