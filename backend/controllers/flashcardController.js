@@ -41,8 +41,7 @@ exports.generateAIFlashcards = async (req, res, next) => {
     if (notes && notes.length > 0) {
       notesText = notes
         .map((n) => n.content || '')
-        .join('\n')
-        .substring(0, 5000);
+        .join('\n');
     }
 
     // Call Gemini
