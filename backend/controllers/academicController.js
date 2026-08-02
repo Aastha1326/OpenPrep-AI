@@ -10,6 +10,17 @@ const Note = require('../models/Note');
 const Progress = require('../models/Progress');
 const StudyPlan = require('../models/StudyPlan');
 const PYQ = require('../models/PYQ');
+const ActivityLog = require('../models/ActivityLog');
+const {
+  validateSyllabusPayload,
+  readFile,
+  cleanupUploadedFile,
+  readJSONSync,
+  extractPdfText,
+  parseSyllabusPdfWithAI,
+  normalizeSyllabusPayload,
+} = require('../services/syllabusParserService');
+
 
 // ==========================================
 // EXAMS CONTROLLER
@@ -433,6 +444,171 @@ exports.deleteTopic = async (req, res, next) => {
     res.status(200).json({ success: true, data: {} });
   } catch (error) {
     await t.rollback();
+    next(error);
+  }
+};
+
+// ==========================================
+// SYLLABUS FILE IMPORTER
+// ==========================================
+
+exports.importSyllabus = async (req, res, next) => {
+  let cleanup = true;
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'No file uploaded. Please attach a syllabus file (.pdf or .json).',
+      });
+    }
+
+    const originalName = (req.file.originalname || '').toLowerCase();
+    const isJSON = originalName.endsWith('.json') || req.file.mimetype === 'application/json';
+    const isPDF = originalName.endsWith('.pdf') || req.file.mimetype === 'application/pdf';
+
+    if (!isJSON && !isPDF) {
+      cleanupUploadedFile(req.file);
+      cleanup = false;
+      return res.status(400).json({
+        success: false,
+        error: 'Unsupported file type. Please upload either a .pdf syllabus or a .json file matching the bulk import schema.',
+      });
+    }
+
+    const buffer = await readFile(req.file);
+    let parsedPayload;
+    let importSource = 'upload';
+    let extractedText = null;
+
+    if (isJSON) {
+      parsedPayload = readJSONSync(buffer, req.file.originalname);
+      importSource = 'json';
+    } else {
+      extractedText = await extractPdfText(buffer);
+      parsedPayload = await parseSyllabusPdfWithAI(extractedText, true);
+      importSource = parsedPayload?._mock ? 'pdf_mock' : 'pdf_ai';
+    }
+
+    const { valid, errors } = validateSyllabusPayload(parsedPayload);
+    if (!valid) {
+      cleanupUploadedFile(req.file);
+      cleanup = false;
+      return res.status(400).json({
+        success: false,
+        error: 'Syllabus validation failed',
+        details: errors,
+      });
+    }
+
+    parsedPayload.importSource = importSource;
+    const normalized = normalizeSyllabusPayload(parsedPayload);
+
+    // Run the whole creation inside a transaction so partial failures roll back
+    const t = await sequelize.transaction();
+    try {
+      const exam = await Exam.create(
+        {
+          name: normalized.examName,
+          description: normalized.description,
+          date: normalized.examDate,
+          isBundle: true,
+          targetExamType: 'University Syllabus Import',
+          user: req.user.id,
+        },
+        { transaction: t }
+      );
+
+      const createdSubjects = [];
+      let totalTopics = 0;
+      const subjectWeightage = normalized.subjects.length > 0 ? Math.max(1, Math.round(100 / normalized.subjects.length)) : 0;
+
+      for (const sub of normalized.subjects) {
+        const subWeightage = Number(sub.weightage) || subjectWeightage;
+        const subject = await Subject.create(
+          {
+            name: sub.name,
+            description: sub.description,
+            exam: exam.id,
+            weightage: subWeightage,
+            user: req.user.id,
+          },
+          { transaction: t }
+        );
+
+        const createdTopics = [];
+        const topicWeightage = sub.topics.length > 0 ? Math.max(1, Math.round(100 / sub.topics.length)) : 0;
+        for (const topicName of sub.topics) {
+          const topic = await Topic.create(
+            {
+              name: topicName,
+              description: '',
+              subject: subject.id,
+              status: 'Medium',
+              weightage: topicWeightage,
+              user: req.user.id,
+            },
+            { transaction: t }
+          );
+          createdTopics.push(topic);
+          totalTopics += 1;
+        }
+
+        createdSubjects.push({
+          id: subject.id,
+          name: subject.name,
+          description: subject.description,
+          weightage: subject.weightage,
+          topicsCount: createdTopics.length,
+          topics: createdTopics.map((tp) => ({ id: tp.id, name: tp.name })),
+        });
+      }
+
+      await ActivityLog.create(
+        {
+          user: req.user.id,
+          activityType: 'syllabus_import',
+          description: `Imported syllabus ${normalized.examName} (${importSource}) — ${createdSubjects.length} subjects, ${totalTopics} topics`,
+        },
+        { transaction: t }
+      );
+
+      await t.commit();
+
+      if (cleanup) cleanupUploadedFile(req.file);
+
+      const prefill = {
+        examId: exam.id,
+        examName: exam.name,
+        examDate: exam.date ? new Date(exam.date).toISOString().split('T')[0] : null,
+        subjects: createdSubjects.map((s) => ({
+          id: s.id,
+          name: s.name,
+          topics: s.topics.map((tp) => tp.name),
+        })),
+      };
+
+      return res.status(201).json({
+        success: true,
+        message: `Syllabus imported successfully: ${createdSubjects.length} subjects, ${totalTopics} topics.`,
+        importSource,
+        summary: {
+          subjects: createdSubjects.length,
+          topics: totalTopics,
+          exams: 1,
+        },
+        prefill,
+        data: {
+          exam: { id: exam.id, name: exam.name, description: exam.description, date: exam.date, isBundle: exam.isBundle, targetExamType: exam.targetExamType },
+          subjects: createdSubjects,
+        },
+      });
+    } catch (innerErr) {
+      await t.rollback();
+      if (cleanup) cleanupUploadedFile(req.file);
+      throw innerErr;
+    }
+  } catch (error) {
+    if (cleanup && req?.file) cleanupUploadedFile(req.file);
     next(error);
   }
 };

@@ -12,8 +12,10 @@ const {
   deleteTopic,
   createCompositeBundle,
   updateSubjectWeightages,
+  importSyllabus,
 } = require('../controllers/academicController');
 const { protect } = require('../middleware/auth');
+const { checkQuota } = require('../middleware/quotaMiddleware');
 const {
   validateCreateExam,
   validateCreateSubject,
@@ -23,6 +25,9 @@ const {
 
 const cacheMiddleware = require('../middleware/cache');
 const clearCache = require('../middleware/clearCache');
+const upload = require('../middleware/upload');
+
+const aiLimiter = require('../middleware/rateLimiter').aiLimiter || require('../middleware/rateLimiter');
 
 const router = express.Router();
 
@@ -37,6 +42,19 @@ const router = express.Router();
 router.post('/exams', protect, validateCreateExam, clearCache(req => `exams:${req.user.id}:*`), createExam);
 router.post('/bundles', protect, clearCache(req => `exams:${req.user.id}:*`), createCompositeBundle);
 router.put('/bundles/:examId/weightages', protect, clearCache(req => `subjects:${req.user.id}:*`), updateSubjectWeightages);
+
+// Syllabus File Importer
+// Uses multer single file upload (field: 'syllabusFile'), AI quota middleware + rate limiter
+// because PDF imports call Gemini for parsing. Clears the full exams cache after import.
+router.post(
+  '/import-syllabus',
+  protect,
+  upload.single('syllabusFile'),
+  aiLimiter,
+  checkQuota,
+  clearCache((req) => `exams:${req.user.id}:*`),
+  importSyllabus
+);
 
 /**
  * @swagger
