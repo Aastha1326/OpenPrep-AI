@@ -20,6 +20,7 @@ const BattleArena = lazy(() => import('./pages/BattleArena'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const FlashcardReview = lazy(() => import('./pages/FlashcardReview'));
 const PyqDashboard = lazy(() => import('./pages/PyqDashboard'));
+const Settings = lazy(() => import('./pages/Settings'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 
 function App() {
@@ -74,6 +75,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <PyqDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <Settings />
               </ProtectedRoute>
             }
           />

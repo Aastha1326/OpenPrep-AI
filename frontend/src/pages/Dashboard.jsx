@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Flame, Play, FileText, Calendar, TrendingUp, Award, BookOpen,
   Target, CheckCircle, Clock, AlertCircle, RefreshCw, Lightbulb,
-  LogOut, X, Download, Upload,
+  LogOut, X, Download, Upload, Settings,
 } from 'lucide-react';
 import API from '../services/api';
 import {
@@ -24,6 +24,7 @@ import CreateNoteModal from '../components/dashboard/CreateNoteModal';
 import StudyPlanModal from '../components/dashboard/StudyPlanModal';
 import PyqAnalysisModal from '../components/dashboard/PyqAnalysisModal';
 import WeaknessDashboardWidget from '../components/dashboard/WeaknessDashboardWidget';
+import LeaderboardWidget from '../components/dashboard/LeaderboardWidget';
 import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
 import TargetExamOverviewWidget from '../components/dashboard/TargetExamOverviewWidget';
 import CompositeBundleModal from '../components/dashboard/CompositeBundleModal';
@@ -410,6 +411,15 @@ const Dashboard = () => {
             </div>
 
             <button
+              onClick={() => navigate('/settings')}
+              className="bg-neutral-800 text-amber-100/80 px-4 py-3 rounded-sm border border-amber-700/40 shadow-[0_4px_15px_rgba(0,0,0,0.5)] hover:bg-neutral-700 hover:text-yellow-400 transition-all flex items-center gap-2 group"
+              aria-label="Settings"
+            >
+              <Settings className="w-5 h-5" />
+              <span className="font-playfair font-bold text-sm tracking-wide hidden sm:inline">Settings</span>
+            </button>
+
+            <button
               onClick={handleLogout}
               className="bg-gradient-to-br from-red-700 to-red-900 text-red-50 px-4 py-3 rounded-sm border border-red-500/50 shadow-[0_4px_15px_rgba(0,0,0,0.5)] hover:shadow-[0_6px_20px_rgba(220,50,50,0.3)] transition-all flex items-center gap-2 group"
               aria-label="Log out"
@@ -635,8 +645,9 @@ const Dashboard = () => {
           )}
         </div>
 
-        {/* --- AI WEAKNESS DETECTION WIDGET --- */}
-        <div className="my-6">
+        {/* --- LEADERBOARD & AI WEAKNESS DETECTION WIDGETS --- */}
+        <div className="my-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <LeaderboardWidget />
           <WeaknessDashboardWidget />
         </div>
 

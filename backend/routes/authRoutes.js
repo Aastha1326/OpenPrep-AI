@@ -6,6 +6,7 @@ const {
   register,
   login,
   getMe,
+  updateSettings,
   forgotPassword,
   verifyEmail,
   resetPassword,
@@ -22,6 +23,7 @@ const {
   validateForgotPassword,
   validateResetPassword,
   validateRefreshToken,
+  validateUpdateSettings,
 } = require('../middleware/validators');
 
 const router = express.Router();
@@ -526,6 +528,57 @@ router.post('/logout', logout);
 // Retrieve the authenticated user's profile
 // Requires authentication
 router.get('/me', protect, getMe);
+
+/**
+ * @swagger
+ * /api/auth/settings:
+ *   patch:
+ *     summary: Update the authenticated user's settings (leaderboard name visibility)
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - leaderboardVisible
+ *             properties:
+ *               leaderboardVisible:
+ *                 type: boolean
+ *                 description: When false, the user appears as an anonymous handle on the weekly leaderboard
+ *                 example: false
+ *     responses:
+ *       200:
+ *         description: Settings updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+
+// Update authenticated user settings
+router.patch('/settings', protect, validateUpdateSettings, updateSettings);
 
 // OAuth2 Google routes
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));

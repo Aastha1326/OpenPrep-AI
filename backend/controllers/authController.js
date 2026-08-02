@@ -169,6 +169,7 @@ exports.register = async (req, res, next) => {
         },
         studyHours: user.studyHours,
         isEmailVerified: user.isEmailVerified,
+        leaderboardVisible: user.leaderboardVisible,
       };
     }
 
@@ -319,6 +320,7 @@ exports.login = async (req, res, next) => {
         },
         studyHours: user.studyHours,
         isEmailVerified: user.isEmailVerified,
+        leaderboardVisible: user.leaderboardVisible,
       },
     });
   } catch (error) {
@@ -352,6 +354,40 @@ exports.getMe = async (req, res, next) => {
         studyHours: user.studyHours,
         isEmailVerified: user.isEmailVerified,
         achievements: user.achievements || [],
+        leaderboardVisible: user.leaderboardVisible,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// @desc    Update current user settings (e.g. leaderboard name visibility)
+// @route   PATCH /api/auth/settings
+// @access  Private
+// ---------------------------------------------------------------------------
+exports.updateSettings = async (req, res, next) => {
+  try {
+    const { leaderboardVisible } = req.body;
+
+    req.user.leaderboardVisible = leaderboardVisible;
+    await req.user.save();
+
+    res.status(200).json({
+      success: true,
+      user: {
+        id: req.user.id,
+        name: req.user.name,
+        email: req.user.email,
+        role: req.user.role,
+        streak: {
+          count: req.user.streakCount,
+          lastActive: req.user.streakLastActive,
+        },
+        studyHours: req.user.studyHours,
+        isEmailVerified: req.user.isEmailVerified,
+        leaderboardVisible: req.user.leaderboardVisible,
       },
     });
   } catch (error) {
