@@ -691,6 +691,7 @@ const Dashboard = () => {
         isOpen={isStudyPlanOpen}
         onClose={() => setIsStudyPlanOpen(false)}
         activePlan={activePlan}
+        onPlanUpdate={() => dispatch(fetchActivePlan())}
       />
 
       {/* --- PYQ ANALYSIS MODAL --- */}

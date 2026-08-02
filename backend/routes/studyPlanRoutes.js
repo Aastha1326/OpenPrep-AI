@@ -1,5 +1,5 @@
 const express = require('express');
-const { generateAIPlan, getActivePlan, toggleTaskCompletion, getPlans } = require('../controllers/studyPlanController');
+const { generateAIPlan, getActivePlan, toggleTaskCompletion, getPlans, rescheduleOverdueTasks } = require('../controllers/studyPlanController');
 const { protect } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
 const { checkQuota } = require('../middleware/quotaMiddleware');
@@ -14,5 +14,6 @@ router.post('/generate-ai', protect, aiLimiter, checkQuota, validateGenerateAIPl
 router.get('/active', protect, getActivePlan);
 router.get('/plans', protect, getPlans);
 router.put('/:planId/tasks/:taskId', protect, validateToggleTask, toggleTaskCompletion);
+router.post('/:id/reschedule', protect, aiLimiter, checkQuota, rescheduleOverdueTasks);
 
 module.exports = router;
