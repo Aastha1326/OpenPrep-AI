@@ -18,8 +18,11 @@ const expectDateHeading = (day) => {
     .getAllByRole('heading', { level: 3 })
     .find((h) => h.textContent.includes('2026'));
   expect(heading).toBeTruthy();
-  expect(heading.textContent).toContain(`${day} October`);
-  expect(heading.textContent).not.toContain(`${day - 1} October`);
+  const text = heading.textContent;
+  const dayFirst = text.match(/(^|[^0-9])(\d{1,2})\s+October/);
+  const monthFirst = text.match(/October\s+(\d{1,2})\b/);
+  const renderedDay = dayFirst ? dayFirst[2] : monthFirst?.[1];
+  expect(renderedDay).toBe(String(day));
 };
 
 describe('StudyPlanModal date rendering (issue #461)', () => {
