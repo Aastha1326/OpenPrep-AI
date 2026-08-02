@@ -145,9 +145,11 @@ const BumpTimeButton = ({ onClick, disabled = false }) => (
   </button>
 );
 
-const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated }) => {
+const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated, onPlanUpdate }) => {
   const contentRef = useRef(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isRescheduling, setIsRescheduling] = useState(false);
+  const [rescheduleMessage, setRescheduleMessage] = useState(null);
   const [showWeakOnly, setShowWeakOnly] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -235,6 +237,40 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
         console.error('PDF export failed:', err);
         setIsExporting(false);
       });
+  };
+
+  const handleReschedule = async () => {
+    if (!activePlan?.id) return;
+
+    setIsRescheduling(true);
+    setRescheduleMessage(null);
+
+    try {
+      const response = await API.post(`/study-plans/${activePlan.id}/reschedule`, {
+        useAIRebalance: false
+      });
+
+      setRescheduleMessage({
+        type: 'success',
+        text: response.data.message || 'Study plan rescheduled successfully'
+      });
+
+      // Notify parent component to refresh the plan
+      if (onPlanUpdate) {
+        onPlanUpdate();
+      }
+
+      setTimeout(() => setRescheduleMessage(null), 4000);
+    } catch (error) {
+      console.error('Reschedule failed:', error);
+      setRescheduleMessage({
+        type: 'error',
+        text: error.response?.data?.error || 'Failed to reschedule study plan'
+      });
+      setTimeout(() => setRescheduleMessage(null), 4000);
+    } finally {
+      setIsRescheduling(false);
+    }
   };
 
   const handleInputChange = (field, value) => {
@@ -331,6 +367,15 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
                 {!showForm && (
                   <>
                     <button
+                      onClick={handleReschedule}
+                      disabled={isRescheduling}
+                      className="flex items-center space-x-2 bg-gradient-to-r from-blue-700 to-blue-900 text-white px-4 py-2 rounded-sm hover:from-blue-600 hover:to-blue-800 transition-colors disabled:opacity-50 cursor-pointer"
+                      title="Reschedule overdue tasks"
+                    >
+                      <RefreshCw className={`w-5 h-5 ${isRescheduling ? 'animate-spin' : ''}`} />
+                      <span className="font-semibold">{isRescheduling ? 'Rescheduling...' : 'Reschedule Tasks'}</span>
+                    </button>
+                    <button
                       onClick={() => setShowCreateForm(true)}
                       className="flex items-center gap-1.5 px-3 py-2 rounded-sm text-sm font-semibold transition-colors cursor-pointer border bg-white/70 text-[#8B4513] border-[#8B4513]/30 hover:bg-white"
                     >
@@ -366,6 +411,24 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
                 </button>
               </div>
             </div>
+
+            {/* Reschedule Message Toast */}
+            <AnimatePresence>
+              {rescheduleMessage && (
+                <motion.div
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className={`absolute top-20 left-1/2 -translate-x-1/2 px-6 py-3 rounded-sm border shadow-lg z-10 ${
+                    rescheduleMessage.type === 'success'
+                      ? 'bg-green-900 text-green-50 border-green-700/50'
+                      : 'bg-red-900 text-red-50 border-red-700/50'
+                  }`}
+                >
+                  <span className="font-medium text-sm">{rescheduleMessage.text}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Scrollable Content (PDF Target) */}
             <div className="overflow-y-auto p-8 flex-1 bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')]">

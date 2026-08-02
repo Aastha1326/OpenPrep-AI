@@ -821,33 +821,9 @@ const Dashboard = () => {
         isOpen={isStudyPlanOpen}
         onClose={() => setIsStudyPlanOpen(false)}
         activePlan={activePlan}
+        onPlanUpdate={() => dispatch(fetchActivePlan())}
         onPlanCreated={() => dispatch(fetchActivePlan())}
-        onBumpTime={async (taskId, minutesToAdd = 30) => {
-          const planId = activePlan?.id;
-          if (!planId) return;
-          setToggleError(null);
-          try {
-            const backendTaskId = taskId;
-            let currentDuration = 60;
-            if (activePlan?.dailyGoals) {
-              outer: for (const goal of activePlan.dailyGoals) {
-                for (const t of goal.tasks || []) {
-                  const thisTaskId = t.id || t._id;
-                  if (thisTaskId === backendTaskId) {
-                    currentDuration = t.duration || 60;
-                    break outer;
-                  }
-                }
-              }
-            }
-            await API.put(`/study-plans/${planId}/tasks/${backendTaskId}`, {
-              duration: currentDuration + minutesToAdd,
-            });
-            dispatch(fetchActivePlan());
-          } catch {
-            setToggleError('Failed to bump study time. Please try again.');
-          }
-        }}
+        onBumpTime={handleBumpStudyTime}
       />
 
       {/* --- PYQ ANALYSIS MODAL --- */}
