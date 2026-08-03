@@ -14,6 +14,7 @@ const {
   logout,
   updateSM2Settings,
   resetSM2Settings,
+  resendVerification,
 } = require('../controllers/authController');
 
 const { protect } = require('../middleware/auth');
@@ -25,6 +26,7 @@ const {
   validateForgotPassword,
   validateResetPassword,
   validateRefreshToken,
+  validateResendVerification,
   validateUpdateSettings,
 } = require('../middleware/validators');
 
@@ -76,6 +78,8 @@ const forgotPasswordLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: true,
 });
+
+const { authEmailLimiter } = require('../middleware/rateLimiter');
 
 // Refresh token rate limiter: 10 attempts per 15 minutes per IP
 const refreshTokenLimiter = rateLimit({
@@ -292,9 +296,17 @@ router.post('/login', loginLimiter, validateLogin, login);
 // Request a password reset email
 router.post(
   '/forgot-password',
-  forgotPasswordLimiter,
+  authEmailLimiter,
   validateForgotPassword,
   forgotPassword
+);
+
+// Resend email verification link
+router.post(
+  '/resend-verification',
+  authEmailLimiter,
+  validateResendVerification,
+  resendVerification
 );
 
 /**

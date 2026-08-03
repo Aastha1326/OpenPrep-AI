@@ -66,6 +66,11 @@ const validateRefreshToken = [
   handleValidationErrors,
 ];
 
+const validateResendVerification = [
+  body('email').trim().isEmail().withMessage('Please provide a valid email').normalizeEmail(),
+  handleValidationErrors,
+];
+
 const validateUpdateSettings = [
   body('leaderboardVisible')
     .isBoolean()
@@ -332,4 +337,5 @@ module.exports = {
   validateUpdateTopicProgress,
   // Community
   validateSubmitFeedback,
+  validateResendVerification,
 };

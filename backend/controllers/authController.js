@@ -677,3 +677,39 @@ exports.resetSM2Settings = async (req, res, next) => {
   }
 };
 
+// ---------------------------------------------------------------------------
+// @desc    Resend email verification link
+// @route   POST /api/auth/resend-verification
+// @access  Public
+// ---------------------------------------------------------------------------
+exports.resendVerification = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'Please provide an email' });
+    }
+
+    const user = await User.findOne({ where: { email } });
+    if (!user) {
+      // Security best practice: prevent user enumeration by returning success message
+      return res.status(200).json({
+        success: true,
+        message: 'If a matching user account exists, a new verification link has been sent.',
+      });
+    }
+
+    if (user.isEmailVerified) {
+      return res.status(400).json({ success: false, error: 'Email is already verified' });
+    }
+
+    await sendVerificationEmail(user);
+
+    res.status(200).json({
+      success: true,
+      message: 'If a matching user account exists, a new verification link has been sent.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
