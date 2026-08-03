@@ -579,6 +579,76 @@ describe('Auth Controller - Integration Tests', () => {
       expect(secondReplay.status).toBe(401);
     });
   });
+
+  // =========================================================================
+  // POST /api/auth/logout
+  // =========================================================================
+  describe('POST /api/auth/logout', () => {
+    it('should clear the refreshToken httpOnly cookie on logout', async () => {
+      await createVerifiedUser({ email: 'logout@example.com' });
+
+      // Login to bootstrap a refresh token (also sets the httpOnly cookie)
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'logout@example.com', password: 'StrongPass1!' });
+      expect(loginRes.status).toBe(200);
+
+      const refreshToken = loginRes.body.refreshToken;
+      expect(refreshToken).toBeDefined();
+
+      const res = await request(app)
+        .post('/api/auth/logout')
+        .send({ refreshToken });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.message).toBe('Logged out successfully');
+
+      // Response must include a Set-Cookie header that expires the cookie
+      const setCookie = res.headers['set-cookie'];
+      expect(Array.isArray(setCookie)).toBe(true);
+      const clearCookieHeader = setCookie.find((c) => c.startsWith('refreshToken='));
+      expect(clearCookieHeader).toBeDefined();
+      expect(clearCookieHeader).toContain('Expires=Thu, 01 Jan 1970');
+      expect(clearCookieHeader).toContain('Path=/');
+      expect(clearCookieHeader).toContain('HttpOnly');
+    });
+
+    it('should invalidate the refresh token in the database after logout', async () => {
+      await createVerifiedUser({ email: 'logout-invalid@example.com' });
+
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'logout-invalid@example.com', password: 'StrongPass1!' });
+      expect(loginRes.status).toBe(200);
+
+      const refreshToken = loginRes.body.refreshToken;
+
+      const logoutRes = await request(app)
+        .post('/api/auth/logout')
+        .send({ refreshToken });
+      expect(logoutRes.status).toBe(200);
+
+      // Logged-out token must no longer be accepted for rotation
+      const refreshRes = await request(app)
+        .post('/api/auth/refresh-token')
+        .send({ refreshToken });
+      expect(refreshRes.status).toBe(401);
+      expect(refreshRes.body.success).toBe(false);
+      expect(refreshRes.body.error).toContain('Invalid or expired');
+    });
+
+    it('should return 200 and clear the cookie even without a refresh token', async () => {
+      const res = await request(app).post('/api/auth/logout').send({});
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+
+      const setCookie = res.headers['set-cookie'];
+      expect(Array.isArray(setCookie)).toBe(true);
+      expect(setCookie.some((c) => c.startsWith('refreshToken='))).toBe(true);
+    });
+  });
 });
 
 describe('Auth Settings - Integration Tests', () => {
