@@ -1,7 +1,6 @@
 const request = require('supertest');
 const express = require('express');
 const path = require('path');
-const fs = require('fs');
 const jwt = require('jsonwebtoken');
 const noteRoutes = require('../../routes/noteRoutes');
 const errorHandler = require('../../middleware/error');
@@ -60,8 +59,8 @@ describe('Note Controller - Integration Tests', () => {
       user: testUser.id,
     });
 
-    authToken = jwt.sign({ id: testUser.id }, process.env.JWT_SECRET);
-    otherToken = jwt.sign({ id: otherUser.id }, process.env.JWT_SECRET);
+    authToken = jwt.sign({ id: testUser.id, type: 'access' }, process.env.JWT_SECRET);
+    otherToken = jwt.sign({ id: otherUser.id, type: 'access' }, process.env.JWT_SECRET);
   });
 
   afterAll(() => {
@@ -77,7 +76,7 @@ describe('Note Controller - Integration Tests', () => {
         .post('/api/notes')
         .set('Authorization', `Bearer ${authToken}`)
         .field('title', 'Test Note')
-        .field('subjectId', testSubject._id.toString())
+        .field('subjectId', testSubject.id.toString())
         .field('content', 'Sample note content')
         .attach('file', createTestPdfBuffer(), 'test-note.pdf');
 
@@ -101,7 +100,7 @@ describe('Note Controller - Integration Tests', () => {
         .post('/api/notes')
         .set('Authorization', `Bearer ${authToken}`)
         .field('title', 'Text Note')
-        .field('subjectId', testSubject._id.toString())
+        .field('subjectId', testSubject.id.toString())
         .field('content', 'No file attached');
 
       expect(res.status).toBe(201);
@@ -110,11 +109,66 @@ describe('Note Controller - Integration Tests', () => {
       expect(res.body.data.fileType).toBe('text');
     });
 
+    it('should reject an executable renamed to .pdf (magic byte check)', async () => {
+      // Windows executable MZ header disguised as a PDF
+      const exePayload = Buffer.concat([
+        Buffer.from([0x4d, 0x5a]),
+        Buffer.alloc(64, 0),
+      ]);
+
+      const res = await request(app)
+        .post('/api/notes')
+        .set('Authorization', `Bearer ${authToken}`)
+        .field('title', 'Malicious Payload')
+        .field('subjectId', testSubject.id.toString())
+        .field('content', 'should not be stored')
+        .attach('file', exePayload, 'payload.pdf');
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toContain('Only PDFs, documents, and images are allowed');
+    });
+
+    it('should reject a text script renamed to .pdf (magic byte check)', async () => {
+      const scriptPayload = Buffer.from('#!/bin/bash\necho pwned > /tmp/owned');
+
+      const res = await request(app)
+        .post('/api/notes')
+        .set('Authorization', `Bearer ${authToken}`)
+        .field('title', 'Script Payload')
+        .field('subjectId', testSubject.id.toString())
+        .field('content', 'should not be stored')
+        .attach('file', scriptPayload, 'script.pdf');
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toContain('Only PDFs, documents, and images are allowed');
+    });
+
+    it('should reject a PNG renamed to .pdf (magic byte check)', async () => {
+      const pngPayload = Buffer.concat([
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        Buffer.alloc(32, 0),
+      ]);
+
+      const res = await request(app)
+        .post('/api/notes')
+        .set('Authorization', `Bearer ${authToken}`)
+        .field('title', 'PNG as PDF')
+        .field('subjectId', testSubject.id.toString())
+        .field('content', 'should not be stored')
+        .attach('file', pngPayload, 'image.pdf');
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toContain('Only PDFs, documents, and images are allowed');
+    });
+
     it('should return 400 when title is missing', async () => {
       const res = await request(app)
         .post('/api/notes')
         .set('Authorization', `Bearer ${authToken}`)
-        .field('subjectId', testSubject._id.toString());
+        .field('subjectId', testSubject.id.toString());
 
       expect(res.status).toBe(400);
       expect(res.body.success).toBe(false);
@@ -134,7 +188,7 @@ describe('Note Controller - Integration Tests', () => {
       const res = await request(app)
         .post('/api/notes')
         .field('title', 'No Auth Note')
-        .field('subjectId', testSubject._id.toString());
+        .field('subjectId', testSubject.id.toString());
 
       expect(res.status).toBe(401);
       expect(res.body.success).toBe(false);
@@ -151,7 +205,7 @@ describe('Note Controller - Integration Tests', () => {
         .post('/api/notes')
         .set('Authorization', `Bearer ${authToken}`)
         .field('title', 'Listable Note')
-        .field('subjectId', testSubject._id.toString())
+        .field('subjectId', testSubject.id.toString())
         .field('content', 'Can be listed');
     });
 
@@ -209,7 +263,7 @@ describe('Note Controller - Integration Tests', () => {
         .post('/api/notes')
         .set('Authorization', `Bearer ${authToken}`)
         .field('title', 'Delete Me')
-        .field('subjectId', testSubject._id.toString())
+        .field('subjectId', testSubject.id.toString())
         .attach('file', createTestPdfBuffer(), 'to-delete.pdf');
 
       noteToDelete = createRes.body.data;
@@ -259,7 +313,7 @@ describe('Note Controller - Integration Tests', () => {
       const maliciousNote = await Note.create({
         title: 'Trapped Note',
         content: 'Dangerous path',
-        subject: testSubject._id.toString(),
+        subject: testSubject.id.toString(),
         fileUrl: '../../.env',
         fileType: 'pdf',
         user: testUser.id,
@@ -275,6 +329,116 @@ describe('Note Controller - Integration Tests', () => {
 
       // Cleanup note
       await maliciousNote.destroy();
+    });
+  });
+
+  // =========================================================================
+  // POST /api/notes/:id/summarize — AI Note Summarization
+  // =========================================================================
+  describe('POST /api/notes/:id/summarize', () => {
+    let noteWithContent;
+
+    beforeAll(async () => {
+      noteWithContent = await Note.create({
+        title: 'Summarize Test Note',
+        content: 'Data structures are ways of organizing data. Arrays store elements in contiguous memory. Linked lists use pointers to connect nodes. Trees are hierarchical structures with a root node. Graphs represent networks of connected nodes.',
+        subject: testSubject.id,
+        user: testUser.id,
+      });
+    });
+
+    it('should return AI summary with expected structure', async () => {
+      const res = await request(app)
+        .post(`/api/notes/${noteWithContent.id}/summarize`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({});
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveProperty('summary');
+      expect(res.body.data).toHaveProperty('keyConcepts');
+      expect(res.body.data).toHaveProperty('examTips');
+      expect(typeof res.body.data.summary).toBe('string');
+      expect(Array.isArray(res.body.data.keyConcepts)).toBe(true);
+      expect(Array.isArray(res.body.data.examTips)).toBe(true);
+    });
+
+    it('should return cached summary on second call', async () => {
+      // First call to ensure cache is populated
+      await request(app)
+        .post(`/api/notes/${noteWithContent.id}/summarize`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({});
+
+      // Second call should return cached result
+      const res = await request(app)
+        .post(`/api/notes/${noteWithContent.id}/summarize`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({});
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.cached).toBe(true);
+      expect(res.body.data).toHaveProperty('summary');
+    });
+
+    it('should regenerate summary when forceRefresh is true', async () => {
+      const res = await request(app)
+        .post(`/api/notes/${noteWithContent.id}/summarize`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ forceRefresh: true });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.cached).toBe(false);
+      expect(res.body.data).toHaveProperty('summary');
+    });
+
+    it('should return 400 for note with no content', async () => {
+      const emptyNote = await Note.create({
+        title: 'Empty Note',
+        content: '',
+        subject: testSubject.id,
+        user: testUser.id,
+      });
+
+      const res = await request(app)
+        .post(`/api/notes/${emptyNote.id}/summarize`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({});
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toContain('no text content');
+    });
+
+    it('should return 404 for non-existent note', async () => {
+      const fakeId = '00000000-0000-0000-0000-000000000000';
+      const res = await request(app)
+        .post(`/api/notes/${fakeId}/summarize`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({});
+
+      expect(res.status).toBe(404);
+      expect(res.body.success).toBe(false);
+    });
+
+    it('should return 404 when another user tries to summarize', async () => {
+      const res = await request(app)
+        .post(`/api/notes/${noteWithContent.id}/summarize`)
+        .set('Authorization', `Bearer ${otherToken}`)
+        .send({});
+
+      expect(res.status).toBe(404);
+      expect(res.body.success).toBe(false);
+    });
+
+    it('should return 401 without auth token', async () => {
+      const res = await request(app)
+        .post(`/api/notes/${noteWithContent.id}/summarize`)
+        .send({});
+
+      expect(res.status).toBe(401);
     });
   });
 });

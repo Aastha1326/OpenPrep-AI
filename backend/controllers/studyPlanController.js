@@ -7,6 +7,8 @@ const Topic = require('../models/Topic');
 const ActivityLog = require('../models/ActivityLog');
 const User = require('../models/User');
 const geminiService = require('../services/geminiService');
+const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
+const { toDateOnlyString, toLocalDateString } = require('../utils/dateUtils');
 
 // @desc    Generate AI Study Plan
 // @route   POST /api/study-plans/generate-ai
@@ -15,7 +17,7 @@ exports.generateAIPlan = async (req, res, next) => {
   try {
     const { examId, startDate, endDate, studyHoursPerDay } = req.body;
 
-    const exam = await Exam.findByPk(examId);
+    const exam = await Exam.findOne({ where: { id: examId, user: req.user.id } });
     if (!exam) {
       return res.status(404).json({ success: false, error: 'Exam not found' });
     }
@@ -77,7 +79,9 @@ exports.generateAIPlan = async (req, res, next) => {
         });
       }
       formattedGoals.push({
-        date: new Date(day.date),
+        // Store plain YYYY-MM-DD date strings (local day) instead of UTC
+        // timestamps so schedule items never shift by a day across timezones.
+        date: toDateOnlyString(day.date),
         tasks,
       });
     }
@@ -109,6 +113,21 @@ exports.generateAIPlan = async (req, res, next) => {
       data: studyPlan,
     });
   } catch (error) {
+    // Handle Gemini API rate limit errors
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    // Handle Gemini API server errors
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({
+        success: false,
+        error: error.message,
+      });
+    }
     next(error);
   }
 };
@@ -170,13 +189,13 @@ exports.getActivePlan = async (req, res, next) => {
   }
 };
 
-// @desc    Toggle Task Completion Status
+// @desc    Toggle Task Completion Status or Update Task Duration
 // @route   PUT /api/study-plans/:planId/tasks/:taskId
 // @access  Private
 exports.toggleTaskCompletion = async (req, res, next) => {
   try {
     const { planId, taskId } = req.params;
-    const { completed, studyTimeMinutes } = req.body;
+    const { completed, studyTimeMinutes, duration } = req.body;
 
     const plan = await StudyPlan.findOne({ where: { id: planId, user: req.user.id } });
     if (!plan) {
@@ -185,11 +204,18 @@ exports.toggleTaskCompletion = async (req, res, next) => {
 
     // Find and update task inside JSONB dailyGoals
     let taskFound = false;
+    let wasCompleted = false;
     const dailyGoals = JSON.parse(JSON.stringify(plan.dailyGoals));
     for (const goal of dailyGoals) {
       const task = goal.tasks.find((t) => t._id === taskId || t.id === taskId);
       if (task) {
-        task.completed = completed;
+        wasCompleted = task.completed; // Capture previous state BEFORE modifying
+        if (completed !== undefined) {
+          task.completed = completed;
+        }
+        if (duration !== undefined && typeof duration === 'number' && duration >= 0) {
+          task.duration = duration;
+        }
         taskFound = true;
         break;
       }
@@ -202,14 +228,29 @@ exports.toggleTaskCompletion = async (req, res, next) => {
     plan.dailyGoals = dailyGoals;
     await plan.save();
 
-    // If task was completed, add study hours to User profile
-    if (completed && studyTimeMinutes) {
+    // Adjust study hours based on task state transition
+    //   false -> true : add hours (task was just completed)
+    //   true  -> false: subtract hours (task was unmarked)
+    //   same state    : no change (prevents double-counting)
+    if (studyTimeMinutes) {
       const hours = studyTimeMinutes / 60;
-      const user = await User.findByPk(req.user.id);
-      if (user) {
-        user.studyHours = Number((user.studyHours + hours).toFixed(2));
-        await user.save();
+
+      if (completed && !wasCompleted) {
+        // Task transitioned from incomplete -> complete: add hours
+        const user = await User.findByPk(req.user.id);
+        if (user) {
+          user.studyHours = Number((user.studyHours + hours).toFixed(2));
+          await user.save();
+        }
+      } else if (!completed && wasCompleted) {
+        // Task transitioned from complete -> incomplete: subtract hours
+        const user = await User.findByPk(req.user.id);
+        if (user) {
+          user.studyHours = Number(Math.max(0, user.studyHours - hours).toFixed(2));
+          await user.save();
+        }
       }
+      // If state unchanged (completed === wasCompleted), do nothing
     }
 
     res.status(200).json({ success: true, data: plan });
@@ -242,6 +283,246 @@ exports.getPlans = async (req, res, next) => {
       currentPage: page,
       data: plans,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Reschedule Overdue Tasks
+// @route   POST /api/study-plans/:id/reschedule
+// @access  Private
+exports.rescheduleOverdueTasks = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { useAIRebalance } = req.body;
+
+    const plan = await StudyPlan.findOne({ 
+      where: { id, user: req.user.id },
+      include: [{ model: Exam, as: 'examRef' }]
+    });
+    
+    if (!plan) {
+      return res.status(404).json({ success: false, error: 'Study plan not found' });
+    }
+
+    const exam = plan.examRef;
+    if (!exam) {
+      return res.status(404).json({ success: false, error: 'Associated exam not found' });
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    // Plain local-date string (YYYY-MM-DD) immune to timezone drift
+    const todayStr = toLocalDateString(new Date());
+    const examDate = new Date(exam.date);
+    const daysUntilExam = Math.ceil((examDate - today) / (1000 * 60 * 60 * 24));
+
+    // Check if AI re-balance should be used (exam < 7 days away)
+    const shouldUseAI = useAIRebalance || daysUntilExam < 7;
+
+    if (shouldUseAI) {
+      // Use AI to re-balance the entire plan
+      const subjects = await Subject.findAll({ where: { exam: plan.exam, user: req.user.id } });
+      const syllabus = [];
+
+      for (const sub of subjects) {
+        const topics = await Topic.findAll({ where: { subject: sub.id, user: req.user.id } });
+        syllabus.push({
+          subjectName: sub.name,
+          topics: topics.map((t) => t.name),
+        });
+      }
+
+      if (syllabus.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'No subjects and topics found for AI re-balancing',
+        });
+      }
+
+      // Generate new plan with AI
+      const generatedGoals = await geminiService.generateStudyPlan(
+        exam.name,
+        syllabus,
+        todayStr,
+        toDateOnlyString(exam.date),
+        3, // Default 3 hours per day
+        true // Force refresh
+      );
+
+      // Format goals for database
+      const formattedGoals = [];
+      for (const day of generatedGoals) {
+        const tasks = [];
+        for (const t of day.tasks) {
+          let matchedTopic;
+          try {
+            matchedTopic = await Topic.findOne({
+              where: {
+                name: { [Op.iLike]: t.topicName.trim() },
+                user: req.user.id,
+              },
+            });
+          } catch (dbErr) {
+            const userTopics = await Topic.findAll({ where: { user: req.user.id } });
+            matchedTopic = userTopics.find((tp) => tp.name.trim().toLowerCase() === t.topicName.trim().toLowerCase());
+          }
+
+          tasks.push({
+            _id: uuidv4(),
+            title: t.title,
+            duration: t.duration || 60,
+            completed: false,
+            topic: matchedTopic ? matchedTopic.id : null,
+          });
+        }
+        formattedGoals.push({
+          date: toDateOnlyString(day.date),
+          tasks,
+        });
+      }
+
+      plan.dailyGoals = formattedGoals;
+      await plan.save();
+
+      await ActivityLog.create({
+        user: req.user.id,
+        activityType: 'study_plan_reschedule',
+        description: `AI Re-balanced study plan for exam: ${exam.name}`,
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: plan,
+        message: 'Study plan re-balanced using AI',
+      });
+    }
+
+    // Manual rescheduling logic for overdue tasks
+    const dailyGoals = JSON.parse(JSON.stringify(plan.dailyGoals));
+    const overdueTasks = [];
+    const futureGoals = [];
+
+    // Separate overdue incomplete tasks from future goals.
+    // Compare plain YYYY-MM-DD strings so the reschedule never drifts a day
+    // based on the server/client timezone.
+    for (const goal of dailyGoals) {
+      const goalDateStr = toDateOnlyString(goal.date);
+
+      if (goalDateStr < todayStr) {
+        // This is a past date - collect incomplete tasks
+        for (const task of goal.tasks) {
+          if (!task.completed) {
+            overdueTasks.push(task);
+          }
+        }
+      } else {
+        // This is a future date - keep as is
+        futureGoals.push(goal);
+      }
+    }
+
+    if (overdueTasks.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: plan,
+        message: 'No overdue tasks to reschedule',
+      });
+    }
+
+    // Calculate daily capacity (assuming 3 hours = 180 minutes per day)
+    const dailyCapacityMinutes = 180;
+    const rescheduledGoals = [];
+
+    // Distribute overdue tasks across future days with capacity
+    let taskIndex = 0;
+    for (const goal of futureGoals) {
+      const currentTotalDuration = goal.tasks.reduce((sum, t) => sum + (t.duration || 60), 0);
+      const remainingCapacity = dailyCapacityMinutes - currentTotalDuration;
+
+      if (remainingCapacity > 0 && taskIndex < overdueTasks.length) {
+        const tasksToAdd = [];
+        let usedCapacity = 0;
+
+        while (taskIndex < overdueTasks.length && usedCapacity < remainingCapacity) {
+          const task = overdueTasks[taskIndex];
+          const taskDuration = task.duration || 60;
+
+          if (usedCapacity + taskDuration <= remainingCapacity) {
+            tasksToAdd.push({ ...task, _id: uuidv4() });
+            usedCapacity += taskDuration;
+            taskIndex++;
+          } else {
+            break;
+          }
+        }
+
+        if (tasksToAdd.length > 0) {
+          goal.tasks = [...goal.tasks, ...tasksToAdd];
+        }
+      }
+
+      rescheduledGoals.push(goal);
+    }
+
+    // If there are still tasks left, add them to the last available day
+    if (taskIndex < overdueTasks.length) {
+      const lastGoal = rescheduledGoals[rescheduledGoals.length - 1];
+      if (lastGoal) {
+        const remainingTasks = overdueTasks.slice(taskIndex);
+        lastGoal.tasks = [
+          ...lastGoal.tasks,
+          ...remainingTasks.map(t => ({ ...t, _id: uuidv4() }))
+        ];
+      }
+    }
+
+    // Rebuild dailyGoals with today's date onwards
+    const todayGoals = dailyGoals.filter((g) => toDateOnlyString(g.date) >= todayStr);
+
+    plan.dailyGoals = [...todayGoals, ...rescheduledGoals];
+    await plan.save();
+
+    await ActivityLog.create({
+      user: req.user.id,
+      activityType: 'study_plan_reschedule',
+      description: `Rescheduled ${overdueTasks.length} overdue tasks for exam: ${exam.name}`,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: plan,
+      message: `Successfully rescheduled ${overdueTasks.length} overdue tasks`,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get AI Weakness Detection Analysis
+// @route   GET /api/study-plans/weakness-analysis
+// @access  Private
+exports.getWeaknessAnalysis = async (req, res, next) => {
+  try {
+    const weaknessAggregatorService = require('../services/weaknessAggregatorService');
+    const result = await weaknessAggregatorService.getLLMWeaknessAnalysis(req.user.id);
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Reschedule active study plan based on AI weakness detection
+// @route   POST /api/study-plans/reschedule-adaptive
+// @access  Private
+exports.rescheduleAdaptivePlan = async (req, res, next) => {
+  try {
+    const weaknessAggregatorService = require('../services/weaknessAggregatorService');
+    const result = await weaknessAggregatorService.rescheduleAdaptivePlanner(req.user.id);
+    if (!result) {
+      return res.status(404).json({ success: false, error: 'No active study plan found to reschedule' });
+    }
+    res.status(200).json({ success: true, data: result, message: 'Adaptive study plan rescheduled successfully' });
   } catch (error) {
     next(error);
   }

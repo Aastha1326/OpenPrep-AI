@@ -3,9 +3,10 @@ import { Routes, Route } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { loadUser } from './store/slices/authSlice';
 import ProtectedRoute from './components/ProtectedRoute';
+import AdminRoute from './components/AdminRoute';
 import CustomCursor from './components/CustomCursor';
 import ScrollToTop from './components/ScrollToTop';
-import PageLoader from './components/PageLoader';
+import MobileNavDrawer from './components/MobileNavDrawer';import PageLoader from './components/PageLoader';
 import './App.css';
 
 const Landing = lazy(() => import('./pages/Landing'));
@@ -15,7 +16,13 @@ const Login = lazy(() => import('./pages/Login'));
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const BattleArena = lazy(() => import('./pages/BattleArena'));
 const NotFound = lazy(() => import('./pages/NotFound'));
+const FlashcardReview = lazy(() => import('./pages/FlashcardReview'));
+const PyqDashboard = lazy(() => import('./pages/PyqDashboard'));
+const Settings = lazy(() => import('./pages/Settings'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const StudyGroupChat = lazy(() => import('./pages/StudyGroupChat'));
 
 function App() {
   const dispatch = useDispatch();
@@ -28,9 +35,9 @@ function App() {
 
   return (
     <>
-      <CustomCursor />
+<CustomCursor />
       <ScrollToTop />
-      <Suspense fallback={<PageLoader />}>
+      <MobileNavDrawer />      <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/register" element={<Register />} />
@@ -47,6 +54,52 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/flashcards/review"
+            element={
+              <ProtectedRoute>
+                <FlashcardReview />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/battle"
+            element={
+              <ProtectedRoute>
+                <BattleArena />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/study-group"
+            element={
+              <ProtectedRoute>
+                <StudyGroupChat />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/pyqs"
+            element={
+              <ProtectedRoute>
+                <PyqDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <Settings />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route element={<AdminRoute />}>
+            <Route path="/admin" element={<AdminDashboard />} />
+          </Route>
 
           <Route path="*" element={<NotFound />} />
         </Routes>

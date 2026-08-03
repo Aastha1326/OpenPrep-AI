@@ -7,14 +7,20 @@ const getInitialRefreshToken = () => localStorage.getItem('refreshToken');
 
 // ── Async Thunks ──
 
-/** Register a new user. Backend returns { success, message, isEmailVerified }
- *  (no JWT — user must verify email first). */
+/** Register a new user.
+ *  - Production: backend returns { success, message, isEmailVerified } — no JWT.
+ *  - Development: backend returns tokens immediately so the user is auto-logged in. */
 export const registerUser = createAsyncThunk(
   'auth/register',
   async (userData, { rejectWithValue }) => {
     try {
       const response = await API.post('/auth/register', userData);
-      // Do NOT store token — registration requires email verification
+      // In dev mode the backend returns token + refreshToken for immediate login
+      const { token, refreshToken } = response.data;
+      if (token) {
+        localStorage.setItem('token', token);
+        localStorage.setItem('refreshToken', refreshToken);
+      }
       return response.data;
     } catch (err) {
       return rejectWithValue(err.response?.data?.error || 'Registration failed');
@@ -121,6 +127,45 @@ export const refreshTokenThunk = createAsyncThunk(
   }
 );
 
+/** Update custom SM-2 algorithm preferences */
+export const updateSM2Settings = createAsyncThunk(
+  'auth/updateSM2Settings',
+  async (settingsData, { rejectWithValue }) => {
+    try {
+      const response = await API.put('/auth/sm2-settings', settingsData);
+      return response.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.error || 'Failed to update SM-2 settings');
+    }
+  }
+);
+
+/** Update general user settings (e.g. leaderboard, weekly email digest) */
+export const updateSettings = createAsyncThunk(
+  'auth/updateSettings',
+  async (settingsData, { rejectWithValue }) => {
+    try {
+      const response = await API.patch('/auth/settings', settingsData);
+      return response.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.error || 'Failed to update settings');
+    }
+  }
+);
+
+/** Reset custom SM-2 algorithm preferences to default values */
+export const resetSM2Settings = createAsyncThunk(
+  'auth/resetSM2Settings',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await API.post('/auth/sm2-settings/reset');
+      return response.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.error || 'Failed to reset SM-2 settings');
+    }
+  }
+);
+
 // ── Initial State ──
 const initialState = {
   get token() { return getInitialToken(); },
@@ -169,9 +214,18 @@ const authSlice = createSlice({
       })
       .addCase(registerUser.fulfilled, (state, action) => {
         state.loading = false;
-        state.registrationSuccess = true;
         state.message = action.payload.message || 'Registration successful. Please check your email to verify your account.';
-        // NOT authenticated — email verification required
+        if (action.payload.token) {
+          // Dev mode: backend issued tokens — auto-login immediately
+          state.isAuthenticated = true;
+          state.token = action.payload.token;
+          state.refreshToken = action.payload.refreshToken;
+          state.user = action.payload.user;
+          state.registrationSuccess = false;
+        } else {
+          // Production: email verification required
+          state.registrationSuccess = true;
+        }
       })
       .addCase(registerUser.rejected, (state, action) => {
         state.loading = false;
@@ -289,6 +343,45 @@ const authSlice = createSlice({
         state.token = null;
         state.refreshToken = null;
         state.error = 'Session expired. Please log in again.';
+      })
+      // ── Update SM-2 Settings ──
+      .addCase(updateSM2Settings.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateSM2Settings.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload.user;
+      })
+      .addCase(updateSM2Settings.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // ── Reset SM-2 Settings ──
+      .addCase(resetSM2Settings.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(resetSM2Settings.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload.user;
+      })
+      .addCase(resetSM2Settings.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // ── Update General Settings ──
+      .addCase(updateSettings.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateSettings.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload.user;
+      })
+      .addCase(updateSettings.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
       });
   },
 });

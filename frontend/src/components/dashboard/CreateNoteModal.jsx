@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Save, AlertCircle } from 'lucide-react';
 import 'react-quill/dist/quill.snow.css';
@@ -33,7 +33,7 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
 
       const response = await API.post('/notes', formData, {
         headers: {
-          'Content-Type': 'multipart/form-data',
+          'Content-Type': undefined,
         },
       });
 

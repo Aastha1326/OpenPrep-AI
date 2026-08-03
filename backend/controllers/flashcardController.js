@@ -1,4 +1,5 @@
 const { Op } = require('sequelize');
+const fs = require('fs');
 const Flashcard = require('../models/Flashcard');
 const Subject = require('../models/Subject');
 const Topic = require('../models/Topic');
@@ -6,6 +7,9 @@ const Note = require('../models/Note');
 const ActivityLog = require('../models/ActivityLog');
 const Progress = require('../models/Progress');
 const geminiService = require('../services/geminiService');
+const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
+const { default: Exporter } = require('anki-apkg-export');
+const { calculateSM2 } = require('../utils/sm2');
 
 // @desc    Generate AI Flashcards
 // @route   POST /api/flashcards/generate-ai
@@ -25,14 +29,20 @@ exports.generateAIFlashcards = async (req, res, next) => {
       if (topicObj) topicName = topicObj.name;
     }
 
-    // Load notes for context
-    const notes = await Note.findAll({ where: { subject: subjectId, user: req.user.id } });
+    // Load notes for context (prioritize topic-specific notes if topicId provided, fallback to subject notes)
+    const noteFilter = { subject: subjectId, user: req.user.id };
+    if (topicId) {
+      noteFilter.topic = topicId;
+    }
+    let notes = await Note.findAll({ where: noteFilter });
+    if ((!notes || notes.length === 0) && topicId) {
+      notes = await Note.findAll({ where: { subject: subjectId, user: req.user.id } });
+    }
     let notesText = '';
     if (notes && notes.length > 0) {
       notesText = notes
         .map((n) => n.content || '')
-        .join('\n')
-        .substring(0, 5000);
+        .join('\n');
     }
 
     // Call Gemini
@@ -61,6 +71,78 @@ exports.generateAIFlashcards = async (req, res, next) => {
 
     res.status(201).json({ success: true, count: createdCards.length, data: createdCards });
   } catch (error) {
+    // Handle Gemini API rate limit errors
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    // Handle Gemini API server errors
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({
+        success: false,
+        error: error.message,
+      });
+    }
+    next(error);
+  }
+};
+
+// @desc    Preview AI-generated flashcards from a note's content (not saved)
+// @route   POST /api/flashcards/generate-from-note
+// @access  Private
+exports.generateFlashcardsFromNote = async (req, res, next) => {
+  try {
+    const { noteId, count } = req.body;
+
+    const note = await Note.findOne({
+      where: { id: noteId, user: req.user.id },
+      include: [
+        { model: Subject, as: 'subjectRef', attributes: ['id', 'name'] },
+        { model: Topic, as: 'topicRef', attributes: ['id', 'name'] },
+      ],
+    });
+
+    if (!note) {
+      return res.status(404).json({ success: false, error: 'Note not found' });
+    }
+
+    if (!note.content || note.content.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Note has no text content to generate flashcards from',
+      });
+    }
+
+    const subjectName = note.subjectRef ? note.subjectRef.name : 'General';
+    const topicName = note.topicRef ? note.topicRef.name : 'General overview';
+
+    const cardsList = await geminiService.generateFlashcards(
+      subjectName,
+      topicName,
+      note.content,
+      count || 6
+    );
+
+    res.status(200).json({
+      success: true,
+      count: cardsList.length,
+      subjectId: note.subjectRef ? note.subjectRef.id : note.subject,
+      data: cardsList,
+    });
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({ success: false, error: error.message });
+    }
     next(error);
   }
 };
@@ -68,8 +150,7 @@ exports.generateAIFlashcards = async (req, res, next) => {
 // @desc    Create manual Flashcard
 // @route   POST /api/flashcards
 // @access  Private
-exports.createFlashcard = async (req, res, next) => {
-  try {
+exports.createFlashcard = async (req, res, next) => {  try {
     const { subjectId, topicId, front, back } = req.body;
     const card = await Flashcard.create({
       user: req.user.id,
@@ -156,48 +237,50 @@ exports.reviewFlashcard = async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'Flashcard not found' });
     }
 
-    // SuperMemo SM-2 Algorithm
-    let { interval, repetitions, efactor } = card;
+    // SuperMemo SM-2 Algorithm using custom settings
+    const result = calculateSM2({
+      interval: card.interval,
+      repetitions: card.repetitions,
+      efactor: card.efactor,
+      quality,
+      easyFactorModifier: req.user.sm2EasyFactorModifier,
+      intervalModifier: req.user.sm2IntervalModifier,
+      step1Interval: req.user.sm2Step1Interval,
+      step2Interval: req.user.sm2Step2Interval,
+    });
 
-    if (quality >= 3) {
-      if (repetitions === 0) {
-        interval = 1;
-      } else if (repetitions === 1) {
-        interval = 6;
-      } else {
-        interval = Math.round(interval * efactor);
-      }
-      repetitions += 1;
-    } else {
-      repetitions = 0;
-      interval = 1;
-    }
-
-    // Adjust E-Factor
-    efactor = efactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
-    if (efactor < 1.3) efactor = 1.3;
-
-    card.interval = interval;
-    card.repetitions = repetitions;
-    card.efactor = efactor;
+    card.interval = result.interval;
+    card.repetitions = result.repetitions;
+    card.efactor = result.efactor;
 
     // Set next review date from now
-    card.nextReviewDate = new Date(Date.now() + interval * 24 * 60 * 60 * 1000);
+    card.nextReviewDate = new Date(Date.now() + card.interval * 24 * 60 * 60 * 1000);
     await card.save();
 
     // If card is mastered (quality >= 4), increment mastered count in progress
-    if (quality >= 4 && card.topic) {
-      const progress = await Progress.findOne({
+    // NOTE: progress entries are tracked both for topic-level flashcards (topic: id)
+    //       AND subject-level flashcards (topic: null) — we no longer skip the latter.
+    //       Progress row is atomically upserted via findOrCreate so rows are created
+    //       dynamically even if user reviews cards before ever taking a quiz.
+    if (quality >= 4) {
+      const progressTopic = card.topic || null;
+      const [progress] = await Progress.findOrCreate({
         where: {
           user: req.user.id,
           subject: card.subject,
-          topic: card.topic,
+          topic: progressTopic,
+        },
+        defaults: {
+          user: req.user.id,
+          subject: card.subject,
+          topic: progressTopic,
+          flashcardsMastered: 0,
+          completionPercentage: 0,
+          studyHours: 0,
         },
       });
-      if (progress) {
-        progress.flashcardsMastered += 1;
-        await progress.save();
-      }
+      progress.flashcardsMastered += 1;
+      await progress.save();
     }
 
     res.status(200).json({ success: true, data: card });
@@ -218,6 +301,265 @@ exports.deleteFlashcard = async (req, res, next) => {
     await card.destroy();
     res.status(200).json({ success: true, data: {} });
   } catch (error) {
+    next(error);
+  }
+};
+// ---------------------------------------------------------------------------
+// Export helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Escape a CSV field value: wrap in quotes if it contains comma, quote, or newline.
+ * @param {string|null|undefined} val
+ * @returns {string}
+ */
+function csvField(val) {
+  const str = val == null ? '' : String(val);
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return '"' + str.replace(/"/g, '""') + '"';
+  }
+  return str;
+}
+
+// ---------------------------------------------------------------------------
+// Export
+// ---------------------------------------------------------------------------
+
+// @desc    Export flashcards as JSON or CSV
+// @route   GET /api/flashcards/export?subjectId=...&format=json|csv
+// @access  Private
+exports.exportFlashcards = async (req, res, next) => {
+  try {
+    const { subjectId, format = 'json' } = req.query;
+
+    if (!['json', 'csv', 'apkg'].includes(format)) {
+      return res.status(400).json({ success: false, error: 'format must be "json", "csv", or "apkg"' });
+    }
+
+    const filter = { user: req.user.id };
+    if (subjectId) filter.subject = subjectId;
+
+    const cards = await Flashcard.findAll({
+      where: filter,
+      include: [
+        { model: Subject, as: 'subjectRef', attributes: ['name'] },
+        { model: Topic, as: 'topicRef', attributes: ['name'] },
+      ],
+      order: [['createdAt', 'ASC']],
+    });
+
+    const payload = cards.map((c) => ({
+      front: c.front,
+      back: c.back,
+      subject: c.subjectRef ? c.subjectRef.name : null,
+      topic: c.topicRef ? c.topicRef.name : null,
+    }));
+
+    if (format === 'csv') {
+      const header = 'front,back,subject,topic';
+      const rows = payload.map(
+        (p) => `${csvField(p.front)},${csvField(p.back)},${csvField(p.subject)},${csvField(p.topic)}`
+      );
+      const csv = [header, ...rows].join('\r\n');
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="flashcards.csv"');
+      return res.status(200).send(csv);
+    }
+
+    if (format === 'apkg') {
+      const exporter = new Exporter('OpenPrep Flashcards');
+      
+      payload.forEach(c => {
+        const tags = [];
+        if (c.subject) tags.push(c.subject.replace(/\s+/g, '_'));
+        if (c.topic) tags.push(c.topic.replace(/\s+/g, '_'));
+        
+        // Add basic HTML formatting for cards
+        const frontHtml = `<div style="text-align:center;font-size:24px;">${c.front}</div>`;
+        const backHtml = `<div style="text-align:center;font-size:20px;">${c.back}</div>`;
+        
+        exporter.addCard(frontHtml, backHtml, { tags });
+      });
+
+      const zipBuffer = await exporter.save();
+      
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Content-Disposition', 'attachment; filename="flashcards.apkg"');
+      return res.status(200).send(zipBuffer);
+    }
+
+    // JSON
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', 'attachment; filename="flashcards.json"');
+    return res.status(200).json({ success: true, count: payload.length, data: payload });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Import
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse a minimal RFC 4180 CSV into an array of objects with keys from the
+ * header row.  Handles quoted fields and escaped double-quotes.
+ */
+function parseCSV(text) {
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  if (lines.length < 2) return [];
+
+  function splitLine(line) {
+    const fields = [];
+    let cur = '';
+    let inQuote = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (inQuote) {
+        if (ch === '"' && line[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else if (ch === '"') {
+          inQuote = false;
+        } else {
+          cur += ch;
+        }
+      } else {
+        if (ch === '"') {
+          inQuote = true;
+        } else if (ch === ',') {
+          fields.push(cur);
+          cur = '';
+        } else {
+          cur += ch;
+        }
+      }
+    }
+    fields.push(cur);
+    return fields;
+  }
+
+  const headers = splitLine(lines[0]).map((h) => h.trim().toLowerCase());
+  const records = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const values = splitLine(line);
+    const obj = {};
+    headers.forEach((h, idx) => {
+      obj[h] = values[idx] !== undefined ? values[idx].trim() : '';
+    });
+    records.push(obj);
+  }
+
+  return records;
+}
+
+// @desc    Import flashcards from CSV/JSON file or raw JSON body
+// @route   POST /api/flashcards/import
+// @access  Private
+exports.importFlashcards = async (req, res, next) => {
+  try {
+    const { subjectId } = req.query;
+
+    if (!subjectId) {
+      if (req.file) fs.unlinkSync(req.file.path);
+      return res.status(400).json({ success: false, error: 'subjectId query parameter is required' });
+    }
+
+    const subject = await Subject.findOne({
+      where: { id: subjectId, user: req.user.id },
+    });
+    if (!subject) {
+      if (req.file) fs.unlinkSync(req.file.path);
+      return res.status(404).json({ success: false, error: 'Subject not found' });
+    }
+
+    let records = [];
+
+    if (req.file) {
+      // File upload path
+      const raw = fs.readFileSync(req.file.path, 'utf8');
+      fs.unlinkSync(req.file.path); // clean up immediately
+
+      if (req.file.mimetype === 'application/json' || req.file.originalname.endsWith('.json')) {
+        let parsed;
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          return res.status(400).json({ success: false, error: 'Invalid JSON file' });
+        }
+        records = Array.isArray(parsed) ? parsed : parsed.data || [];
+      } else {
+        // CSV
+        records = parseCSV(raw);
+      }
+    } else if (req.body && Array.isArray(req.body.cards)) {
+      // Raw JSON body fallback
+      records = req.body.cards;
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: 'Provide a CSV/JSON file via multipart upload or a JSON body with a "cards" array',
+      });
+    }
+
+    // Validate and normalise records
+    const valid = [];
+    const invalid = [];
+
+    for (let i = 0; i < records.length; i++) {
+      const r = records[i];
+      const front = typeof r.front === 'string' ? r.front.trim() : '';
+      const back = typeof r.back === 'string' ? r.back.trim() : '';
+
+      if (!front || !back) {
+        invalid.push({ index: i, reason: 'front and back are required' });
+        continue;
+      }
+      if (front.length > 5000 || back.length > 5000) {
+        invalid.push({ index: i, reason: 'front/back must be at most 5000 characters' });
+        continue;
+      }
+
+      valid.push({
+        user: req.user.id,
+        subject: subject.id,
+        topic: null,
+        front,
+        back,
+      });
+    }
+
+    if (valid.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No valid flashcard records found in the provided data',
+        invalid,
+      });
+    }
+
+    const created = await Flashcard.bulkCreate(valid);
+
+    await ActivityLog.create({
+      user: req.user.id,
+      activityType: 'flashcard_review',
+      description: `Imported ${created.length} flashcard(s) into subject "${subject.name}"`,
+    });
+
+    return res.status(201).json({
+      success: true,
+      imported: created.length,
+      skipped: invalid.length,
+      invalid,
+      data: created,
+    });
+  } catch (error) {
+    if (req.file) {
+      try { fs.unlinkSync(req.file.path); } catch { /* ignore */ }
+    }
     next(error);
   }
 };

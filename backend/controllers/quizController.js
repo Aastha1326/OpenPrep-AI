@@ -1,5 +1,6 @@
 const { Op } = require('sequelize');
 const { v4: uuidv4 } = require('uuid');
+const { sequelize } = require('../config/db');
 const Quiz = require('../models/Quiz');
 const QuizAttempt = require('../models/QuizAttempt');
 const Subject = require('../models/Subject');
@@ -8,6 +9,11 @@ const Note = require('../models/Note');
 const ActivityLog = require('../models/ActivityLog');
 const Progress = require('../models/Progress');
 const geminiService = require('../services/geminiService');
+const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
+
+// Window (ms) during which duplicate quiz submissions for the same quiz are ignored.
+// Prevents double-click on "Submit Quiz" from creating duplicate attempt records.
+const DUPLICATE_SUBMIT_WINDOW_MS = 5000;
 
 // @desc    Generate AI Quiz
 // @route   POST /api/quizzes/generate-ai
@@ -34,8 +40,7 @@ exports.generateAIQuiz = async (req, res, next) => {
     if (notes && notes.length > 0) {
       notesText = notes
         .map((n) => n.content || '')
-        .join('\n')
-        .substring(0, 5000);
+        .join('\n');
     }
 
     // Call Gemini Service
@@ -61,6 +66,21 @@ exports.generateAIQuiz = async (req, res, next) => {
 
     res.status(201).json({ success: true, data: quiz });
   } catch (error) {
+    // Handle Gemini API rate limit errors
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    // Handle Gemini API server errors
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({
+        success: false,
+        error: error.message,
+      });
+    }
     next(error);
   }
 };
@@ -171,83 +191,136 @@ exports.submitQuizAttempt = async (req, res, next) => {
       });
     }
 
-    // Evaluate answers
-    let correctCount = 0;
-    const evaluatedAnswers = questionsList.map((q) => {
-      const userAns = answers.find((ans) => ans.questionId === q._id || ans.questionId === q.id);
-      const selected = userAns && userAns.selectedAnswer !== undefined ? userAns.selectedAnswer : -1;
-      const isCorrect = selected === q.correctAnswer;
-      if (isCorrect) correctCount++;
-
-      return {
-        questionId: q._id || q.id,
-        selectedAnswer: selected,
-        isCorrect,
-      };
-    });
-
-    const totalQuestions = questionsList.length;
-    const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
-
-    // Determine weak vs strong areas based on score
-    const weakTopics = [];
-    const strongTopics = [];
-    if (quiz.topic) {
-      const topicObj = await Topic.findByPk(quiz.topic);
-      if (topicObj) {
-        if (score < 60) {
-          weakTopics.push(quiz.topic);
-          topicObj.status = 'Weak';
-        } else if (score >= 80) {
-          strongTopics.push(quiz.topic);
-          topicObj.status = 'Strong';
-        } else {
-          topicObj.status = 'Medium';
-        }
-        await topicObj.save();
+    // Atomically check for duplicate submissions and persist the attempt.
+    // READ COMMITTED is required so that, after waiting for the row lock, the
+    // duplicate check sees the committed attempt of a concurrent request.
+    const result = await sequelize.transaction(
+      { isolationLevel: 'READ COMMITTED' },
+      async (transaction) => {
+      const lockedQuiz = await Quiz.findOne({
+        where: { id: quiz.id },
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
+      if (!lockedQuiz) {
+        return { error: 'Quiz not found' };
       }
-    }
 
-    // Save Attempt
-    const attempt = await QuizAttempt.create({
-      user: req.user.id,
-      quiz: quiz.id,
-      score,
-      totalQuestions,
-      answers: evaluatedAnswers,
-      timeSpent: timeSpent || 0,
-      weakTopics,
-      strongTopics,
-    });
-
-    // Update Progress
-    if (quiz.topic) {
-      let progress = await Progress.findOne({
+      // Ignore duplicate submissions for the same quiz within the 5-second window
+      const existingAttempt = await QuizAttempt.findOne({
         where: {
           user: req.user.id,
-          subject: quiz.subject,
-          topic: quiz.topic,
+          quiz: quiz.id,
+          createdAt: { [Op.gte]: new Date(Date.now() - DUPLICATE_SUBMIT_WINDOW_MS) },
         },
+        transaction,
+      });
+      if (existingAttempt) {
+        return { attempt: existingAttempt, duplicate: true };
+      }
+
+      // Evaluate answers
+      let correctCount = 0;
+      const evaluatedAnswers = questionsList.map((q) => {
+        const userAns = answers.find((ans) => String(ans.questionId) === String(q._id || q.id));
+        const selected = userAns && userAns.selectedAnswer !== undefined ? userAns.selectedAnswer : -1;
+        const isCorrect = selected === q.correctAnswer;
+        if (isCorrect) correctCount++;
+
+        return {
+          questionId: q._id || q.id,
+          selectedAnswer: selected,
+          isCorrect,
+        };
       });
 
-      if (progress) {
-        const quizScores = [...progress.quizScores];
-        quizScores.push({ attempt: attempt.id, score, date: new Date() });
-        progress.quizScores = quizScores;
+      const totalQuestions = questionsList.length;
+      const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
 
-        if (score > progress.completionPercentage) {
-          progress.completionPercentage = Math.min(score, 100);
+      // Determine weak vs strong areas based on score (<50% Weak, 50-80% Medium, >80% Strong)
+      const weakTopics = [];
+      const strongTopics = [];
+      if (quiz.topic) {
+        const topicObj = await Topic.findByPk(quiz.topic, { transaction });
+        if (topicObj) {
+          if (score < 50) {
+            weakTopics.push(quiz.topic);
+            topicObj.status = 'Weak';
+          } else if (score > 80) {
+            strongTopics.push(quiz.topic);
+            topicObj.status = 'Strong';
+          } else {
+            topicObj.status = 'Medium';
+          }
+          await topicObj.save({ transaction });
         }
-        await progress.save();
-      } else {
-        await Progress.create({
-          user: req.user.id,
-          subject: quiz.subject,
-          topic: quiz.topic,
-          completionPercentage: score,
-          quizScores: [{ attempt: attempt.id, score, date: new Date() }],
-        });
       }
+
+      // Save Attempt
+      const attempt = await QuizAttempt.create(
+        {
+          user: req.user.id,
+          quiz: quiz.id,
+          score,
+          totalQuestions,
+          answers: evaluatedAnswers,
+          timeSpent: timeSpent || 0,
+          weakTopics,
+          strongTopics,
+        },
+        { transaction }
+      );
+
+      return { attempt, duplicate: false, score };
+      }
+    );
+
+    if (result.error) {
+      return res.status(404).json({ success: false, error: result.error });
+    }
+
+    const { attempt, duplicate, score } = result;
+
+    // Duplicate submission detected — return the original attempt without
+    // re-running side effects (progress, activity log, weakness aggregation).
+    if (duplicate) {
+      return res.status(200).json({ success: true, data: attempt, duplicate: true });
+    }
+
+    // Trigger AI weakness aggregation and adaptive planner rescheduling in background
+    const weaknessAggregatorService = require('../services/weaknessAggregatorService');
+    weaknessAggregatorService.aggregateUserWeakness(req.user.id)
+      .then(() => weaknessAggregatorService.rescheduleAdaptivePlanner(req.user.id))
+      .catch((err) => console.error('Background weakness aggregation error:', err));
+
+    // Update Progress (supports both topic-level and subject-level quizzes)
+    const progressWhere = {
+      user: req.user.id,
+      subject: quiz.subject,
+    };
+    if (quiz.topic) {
+      progressWhere.topic = quiz.topic;
+    }
+
+    let progress = await Progress.findOne({ where: progressWhere });
+
+    if (progress) {
+      const quizScores = [...progress.quizScores];
+      quizScores.push({ attempt: attempt.id, score, date: new Date() });
+      progress.quizScores = quizScores;
+
+      if (score > progress.completionPercentage) {
+        progress.completionPercentage = Math.min(score, 100);
+      }
+      await progress.save();
+    } else {
+      await Progress.create({
+        user: req.user.id,
+        subject: quiz.subject,
+        topic: quiz.topic || null,
+        completionPercentage: score,
+        quizScores: [{ attempt: attempt.id, score, date: new Date() }],
+      });
     }
 
     // Log Activity

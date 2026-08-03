@@ -43,7 +43,7 @@ describe('Academic Controller - Integration Tests', () => {
       password: 'password123',
     });
 
-    authToken = jwt.sign({ id: testUser.id }, process.env.JWT_SECRET);
+    authToken = jwt.sign({ id: testUser.id, type: 'access' }, process.env.JWT_SECRET);
   });
 
   afterAll(() => {
@@ -92,7 +92,7 @@ describe('Academic Controller - Integration Tests', () => {
       });
 
       it('should return empty array if no exams exist for different user', async () => {
-        const otherToken = jwt.sign({ id: otherUser.id }, process.env.JWT_SECRET);
+        const otherToken = jwt.sign({ id: otherUser.id, type: 'access' }, process.env.JWT_SECRET);
         const res = await request(app)
           .get('/api/academic/exams')
           .set('Authorization', `Bearer ${otherToken}`);
@@ -117,6 +117,23 @@ describe('Academic Controller - Integration Tests', () => {
     });
 
     describe('DELETE /api/academic/exams/:id', () => {
+      it('should delete an exam with no subjects', async () => {
+        const emptyExam = await Exam.create({
+          name: 'Empty Exam',
+          description: 'Exam with no subjects',
+          date: '2026-06-01',
+          user: testUser.id,
+        });
+
+        const res = await request(app)
+          .delete(`/api/academic/exams/${emptyExam.id}`)
+          .set('Authorization', `Bearer ${authToken}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(true);
+        expect(await Exam.findByPk(emptyExam.id)).toBeNull();
+      });
+
       it('should delete an exam and its subjects/topics', async () => {
         const exam = await Exam.create({
           name: 'Delete Exam',
@@ -128,19 +145,19 @@ describe('Academic Controller - Integration Tests', () => {
         const subject = await Subject.create({
           name: 'Delete Subject',
           description: 'To be deleted',
-          exam: exam._id,
+          exam: exam.id,
           user: testUser.id,
         });
 
         await Topic.create({
           name: 'Delete Topic',
           description: 'To be deleted',
-          subject: subject._id,
+          subject: subject.id,
           user: testUser.id,
         });
 
         const res = await request(app)
-          .delete(`/api/academic/exams/${exam._id}`)
+          .delete(`/api/academic/exams/${exam.id}`)
           .set('Authorization', `Bearer ${authToken}`);
 
         expect(res.status).toBe(200);
@@ -183,7 +200,7 @@ describe('Academic Controller - Integration Tests', () => {
           .send({
             name: 'Mathematics',
             description: 'Math subject',
-            examId: examForSubject._id,
+            examId: examForSubject.id,
           });
 
         expect(res.status).toBe(201);
@@ -212,7 +229,7 @@ describe('Academic Controller - Integration Tests', () => {
         const res = await request(app)
           .get('/api/academic/subjects')
           .set('Authorization', `Bearer ${authToken}`)
-          .query({ examId: examForSubject._id.toString() });
+          .query({ examId: examForSubject.id.toString() });
 
         expect(res.status).toBe(200);
         expect(res.body.success).toBe(true);
@@ -225,19 +242,19 @@ describe('Academic Controller - Integration Tests', () => {
         const subject = await Subject.create({
           name: 'Delete Subject',
           description: 'To delete',
-          exam: examForSubject._id,
+          exam: examForSubject.id,
           user: testUser.id,
         });
 
         await Topic.create({
           name: 'Topic to Delete',
           description: 'Cascade delete',
-          subject: subject._id,
+          subject: subject.id,
           user: testUser.id,
         });
 
         const res = await request(app)
-          .delete(`/api/academic/subjects/${subject._id}`)
+          .delete(`/api/academic/subjects/${subject.id}`)
           .set('Authorization', `Bearer ${authToken}`);
 
         expect(res.status).toBe(200);
@@ -264,7 +281,7 @@ describe('Academic Controller - Integration Tests', () => {
       subjectForTopic = await Subject.create({
         name: 'Topic Subject',
         description: 'Subject for topic tests',
-        exam: examForTopic._id,
+        exam: examForTopic.id,
         user: testUser.id,
       });
     });
@@ -277,7 +294,7 @@ describe('Academic Controller - Integration Tests', () => {
           .send({
             name: 'Algebra',
             description: 'Algebraic equations',
-            subjectId: subjectForTopic._id,
+            subjectId: subjectForTopic.id,
             status: 'Medium',
             weightage: 30,
           });
@@ -294,7 +311,7 @@ describe('Academic Controller - Integration Tests', () => {
           .set('Authorization', `Bearer ${authToken}`)
           .send({
             name: 'Default Topic',
-            subjectId: subjectForTopic._id,
+            subjectId: subjectForTopic.id,
           });
 
         expect(res.body.data.status).toBe('Medium');
@@ -320,7 +337,7 @@ describe('Academic Controller - Integration Tests', () => {
         const res = await request(app)
           .get('/api/academic/topics')
           .set('Authorization', `Bearer ${authToken}`)
-          .query({ subjectId: subjectForTopic._id.toString() });
+          .query({ subjectId: subjectForTopic.id.toString() });
 
         expect(res.status).toBe(200);
 
@@ -339,12 +356,12 @@ describe('Academic Controller - Integration Tests', () => {
         const topic = await Topic.create({
           name: 'Update Topic',
           description: 'Original',
-          subject: subjectForTopic._id,
+          subject: subjectForTopic.id,
           user: testUser.id,
         });
 
         const res = await request(app)
-          .put(`/api/academic/topics/${topic._id}`)
+          .put(`/api/academic/topics/${topic.id}`)
           .set('Authorization', `Bearer ${authToken}`)
           .send({
             name: 'Updated Topic',
@@ -373,12 +390,12 @@ describe('Academic Controller - Integration Tests', () => {
       it('should delete a topic', async () => {
         const topic = await Topic.create({
           name: 'Delete Topic',
-          subject: subjectForTopic._id,
+          subject: subjectForTopic.id,
           user: testUser.id,
         });
 
         const res = await request(app)
-          .delete(`/api/academic/topics/${topic._id}`)
+          .delete(`/api/academic/topics/${topic.id}`)
           .set('Authorization', `Bearer ${authToken}`);
 
         expect(res.status).toBe(200);
@@ -418,35 +435,35 @@ describe('Academic Controller - Integration Tests', () => {
       subject = await Subject.create({
         name: 'Cascade Test Subject',
         description: 'Subject for cascade tests',
-        exam: exam._id,
+        exam: exam.id,
         user: testUser.id,
       });
 
       topic = await Topic.create({
         name: 'Cascade Test Topic',
         description: 'Topic for cascade tests',
-        subject: subject._id,
+        subject: subject.id,
         user: testUser.id,
       });
 
       quiz = await Quiz.create({
         title: 'Cascade Test Quiz',
-        subject: subject._id,
-        topic: topic._id,
+        subject: subject.id,
+        topic: topic.id,
         createdBy: testUser.id,
       });
 
       quizAttempt = await QuizAttempt.create({
         user: testUser.id,
-        quiz: quiz._id,
+        quiz: quiz.id,
         score: 8,
         totalQuestions: 10,
       });
 
       flashcard = await Flashcard.create({
         user: testUser.id,
-        subject: subject._id,
-        topic: topic._id,
+        subject: subject.id,
+        topic: topic.id,
         front: 'Cascade test front',
         back: 'Cascade test back',
       });
@@ -454,20 +471,20 @@ describe('Academic Controller - Integration Tests', () => {
       note = await Note.create({
         title: 'Cascade Test Note',
         content: 'Note for cascade tests',
-        subject: subject._id,
-        topic: topic._id,
+        subject: subject.id,
+        topic: topic.id,
         user: testUser.id,
       });
 
       progress = await Progress.create({
         user: testUser.id,
-        subject: subject._id,
-        topic: topic._id,
+        subject: subject.id,
+        topic: topic.id,
         completionPercentage: 50,
       });
 
       studyPlan = await StudyPlan.create({
-        exam: exam._id,
+        exam: exam.id,
         user: testUser.id,
         startDate: '2026-11-01',
         endDate: '2026-12-31',
@@ -481,7 +498,7 @@ describe('Academic Controller - Integration Tests', () => {
 
       it('should cascade-delete all child records when deleting an exam', async () => {
         const res = await request(app)
-          .delete(`/api/academic/exams/${exam._id}`)
+          .delete(`/api/academic/exams/${exam.id}`)
           .set('Authorization', `Bearer ${authToken}`);
 
         expect(res.status).toBe(200);
@@ -503,33 +520,33 @@ describe('Academic Controller - Integration Tests', () => {
         const subject2 = await Subject.create({
           name: 'Cascade Subject 2',
           description: 'Second subject',
-          exam: exam._id,
+          exam: exam.id,
           user: testUser.id,
         });
 
         const topic2 = await Topic.create({
           name: 'Cascade Topic 2',
-          subject: subject2._id,
+          subject: subject2.id,
           user: testUser.id,
         });
 
         const quiz2 = await Quiz.create({
           title: 'Cascade Quiz 2',
-          subject: subject2._id,
-          topic: topic2._id,
+          subject: subject2.id,
+          topic: topic2.id,
           createdBy: testUser.id,
         });
 
         await QuizAttempt.create({
           user: testUser.id,
-          quiz: quiz2._id,
+          quiz: quiz2.id,
           score: 9,
           totalQuestions: 10,
         });
 
         // Delete the exam
         const res = await request(app)
-          .delete(`/api/academic/exams/${exam._id}`)
+          .delete(`/api/academic/exams/${exam.id}`)
           .set('Authorization', `Bearer ${authToken}`);
 
         expect(res.status).toBe(200);
@@ -548,7 +565,7 @@ describe('Academic Controller - Integration Tests', () => {
 
       it('should cascade-delete all child records when deleting a subject', async () => {
         const res = await request(app)
-          .delete(`/api/academic/subjects/${subject._id}`)
+          .delete(`/api/academic/subjects/${subject.id}`)
           .set('Authorization', `Bearer ${authToken}`);
 
         expect(res.status).toBe(200);
@@ -574,7 +591,7 @@ describe('Academic Controller - Integration Tests', () => {
 
       it('should cascade-delete flashcards, notes, and progress when deleting a topic', async () => {
         const res = await request(app)
-          .delete(`/api/academic/topics/${topic._id}`)
+          .delete(`/api/academic/topics/${topic.id}`)
           .set('Authorization', `Bearer ${authToken}`);
 
         expect(res.status).toBe(200);
@@ -599,7 +616,7 @@ describe('Academic Controller - Integration Tests', () => {
 
       it('should preserve quiz attempts when deleting a topic', async () => {
         const res = await request(app)
-          .delete(`/api/academic/topics/${topic._id}`)
+          .delete(`/api/academic/topics/${topic.id}`)
           .set('Authorization', `Bearer ${authToken}`);
 
         expect(res.status).toBe(200);
