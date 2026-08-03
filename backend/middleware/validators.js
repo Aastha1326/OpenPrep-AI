@@ -128,6 +128,14 @@ const validateGenerateAIFlashcards = [
   handleValidationErrors,
 ];
 
+const validateGenerateFlashcardsFromNote = [
+  body('noteId').isUUID(4).withMessage('Valid note ID is required'),
+  body('count')
+    .optional()
+    .isInt({ min: 1, max: 50 })
+    .withMessage('Count must be between 1 and 50'),
+  handleValidationErrors,
+];
 const validateCreateFlashcard = [
   body('front').trim().notEmpty().withMessage('Please provide the front text'),
   body('back').trim().notEmpty().withMessage('Please provide the back text'),
@@ -321,10 +329,10 @@ module.exports = {
   validateCreateSubject,
   validateCreateTopic,
   validateUpdateTopic,
-  // Flashcard
+// Flashcard
   validateGenerateAIFlashcards,
-  validateCreateFlashcard,
-  validateReviewFlashcard,
+  validateGenerateFlashcardsFromNote,
+  validateCreateFlashcard,  validateReviewFlashcard,
   validateExportFlashcards,
   validateImportFlashcards,
   // Quiz

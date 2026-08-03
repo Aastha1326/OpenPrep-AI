@@ -90,11 +90,67 @@ exports.generateAIFlashcards = async (req, res, next) => {
   }
 };
 
+// @desc    Preview AI-generated flashcards from a note's content (not saved)
+// @route   POST /api/flashcards/generate-from-note
+// @access  Private
+exports.generateFlashcardsFromNote = async (req, res, next) => {
+  try {
+    const { noteId, count } = req.body;
+
+    const note = await Note.findOne({
+      where: { id: noteId, user: req.user.id },
+      include: [
+        { model: Subject, as: 'subjectRef', attributes: ['id', 'name'] },
+        { model: Topic, as: 'topicRef', attributes: ['id', 'name'] },
+      ],
+    });
+
+    if (!note) {
+      return res.status(404).json({ success: false, error: 'Note not found' });
+    }
+
+    if (!note.content || note.content.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Note has no text content to generate flashcards from',
+      });
+    }
+
+    const subjectName = note.subjectRef ? note.subjectRef.name : 'General';
+    const topicName = note.topicRef ? note.topicRef.name : 'General overview';
+
+    const cardsList = await geminiService.generateFlashcards(
+      subjectName,
+      topicName,
+      note.content,
+      count || 6
+    );
+
+    res.status(200).json({
+      success: true,
+      count: cardsList.length,
+      subjectId: note.subjectRef ? note.subjectRef.id : note.subject,
+      data: cardsList,
+    });
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({ success: false, error: error.message });
+    }
+    next(error);
+  }
+};
+
 // @desc    Create manual Flashcard
 // @route   POST /api/flashcards
 // @access  Private
-exports.createFlashcard = async (req, res, next) => {
-  try {
+exports.createFlashcard = async (req, res, next) => {  try {
     const { subjectId, topicId, front, back } = req.body;
     const card = await Flashcard.create({
       user: req.user.id,

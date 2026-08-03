@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FileText, Volume2, Loader, AlertCircle, RefreshCw, Sparkles, CheckCircle } from 'lucide-react';
+import { FileText, Volume2, Loader, AlertCircle, RefreshCw, Sparkles, CheckCircle, Layers } from 'lucide-react';
 import API from '../../services/api';
 import VintagePaper from './VintagePaper';
 import AudioReader from '../AudioReader';
 import HighlightedText from '../HighlightedText';
-
+import GenerateFlashcardsFromNoteModal from './GenerateFlashcardsFromNoteModal';
 const Shimmer = ({ className = '' }) => (
   <div className={`animate-pulse bg-neutral-300/60 rounded ${className}`} />
 );
@@ -13,9 +13,9 @@ const NotesWidget = ({ limit = 5 }) => {
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [summaries, setSummaries] = useState({});
+const [summaries, setSummaries] = useState({});
   const [activeSentenceByNote, setActiveSentenceByNote] = useState({});
-
+  const [flashcardNote, setFlashcardNote] = useState(null);
   const loadNotes = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -110,16 +110,24 @@ const NotesWidget = ({ limit = 5 }) => {
                       </p>
                     )}
                   </div>
-                  {!summary && (
+<div className="flex shrink-0 items-center gap-2">
+                    {!summary && (
+                      <button
+                        type="button"
+                        onClick={() => generateSummary(note.id)}
+                        className="flex items-center gap-1 px-2.5 py-1 bg-yellow-100 hover:bg-yellow-200 text-yellow-800 text-xs font-bold rounded"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" /> Summarize
+                      </button>
+                    )}
                     <button
                       type="button"
-                      onClick={() => generateSummary(note.id)}
-                      className="flex shrink-0 items-center gap-1 px-2.5 py-1 bg-yellow-100 hover:bg-yellow-200 text-yellow-800 text-xs font-bold rounded"
+                      onClick={() => setFlashcardNote(note)}
+                      className="flex items-center gap-1 px-2.5 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-800 text-xs font-bold rounded"
                     >
-                      <Sparkles className="w-3.5 h-3.5" /> Summarize
+                      <Layers className="w-3.5 h-3.5" /> Generate AI Flashcards
                     </button>
-                  )}
-                </div>
+                  </div>                </div>
 
                 {summary?.loading && (
                   <div className="mt-3 flex items-center gap-2 text-xs text-neutral-500">
@@ -177,6 +185,14 @@ const NotesWidget = ({ limit = 5 }) => {
             );
           })}
         </div>
+)}
+
+      {flashcardNote && (
+        <GenerateFlashcardsFromNoteModal
+          note={flashcardNote}
+          onClose={() => setFlashcardNote(null)}
+          onImported={loadNotes}
+        />
       )}
     </VintagePaper>
   );
