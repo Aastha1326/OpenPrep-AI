@@ -140,6 +140,19 @@ export const updateSM2Settings = createAsyncThunk(
   }
 );
 
+/** Update general user settings (e.g. leaderboard, weekly email digest) */
+export const updateSettings = createAsyncThunk(
+  'auth/updateSettings',
+  async (settingsData, { rejectWithValue }) => {
+    try {
+      const response = await API.patch('/auth/settings', settingsData);
+      return response.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.error || 'Failed to update settings');
+    }
+  }
+);
+
 /** Reset custom SM-2 algorithm preferences to default values */
 export const resetSM2Settings = createAsyncThunk(
   'auth/resetSM2Settings',
@@ -354,6 +367,19 @@ const authSlice = createSlice({
         state.user = action.payload.user;
       })
       .addCase(resetSM2Settings.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // ── Update General Settings ──
+      .addCase(updateSettings.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateSettings.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload.user;
+      })
+      .addCase(updateSettings.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });

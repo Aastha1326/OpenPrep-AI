@@ -69,6 +69,11 @@ const User = sequelize.define(
       type: DataTypes.BOOLEAN,
       defaultValue: true,
     },
+    receiveWeeklyDigest: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+      allowNull: false,
+    },
     isEmailVerified: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
