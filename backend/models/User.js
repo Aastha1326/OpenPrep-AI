@@ -65,6 +65,10 @@ const User = sequelize.define(
       type: DataTypes.STRING,
       defaultValue: '',
     },
+    leaderboardVisible: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+    },
     isEmailVerified: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,

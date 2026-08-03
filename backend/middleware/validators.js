@@ -66,6 +66,13 @@ const validateRefreshToken = [
   handleValidationErrors,
 ];
 
+const validateUpdateSettings = [
+  body('leaderboardVisible')
+    .isBoolean()
+    .withMessage('leaderboardVisible must be a boolean'),
+  handleValidationErrors,
+];
+
 // ---------------------------------------------------------------------------
 // Academic routes
 // ---------------------------------------------------------------------------
@@ -298,6 +305,7 @@ module.exports = {
   validateForgotPassword,
   validateResetPassword,
   validateRefreshToken,
+  validateUpdateSettings,
   // Academic
   validateCreateExam,
   validateCreateSubject,

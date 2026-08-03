@@ -169,6 +169,7 @@ exports.register = async (req, res, next) => {
         },
         studyHours: user.studyHours,
         isEmailVerified: user.isEmailVerified,
+        leaderboardVisible: user.leaderboardVisible,
       };
     }
 
