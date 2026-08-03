@@ -8,6 +8,7 @@ const ActivityLog = require('../models/ActivityLog');
 const User = require('../models/User');
 const geminiService = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
+const { toDateOnlyString, toLocalDateString } = require('../utils/dateUtils');
 
 // @desc    Generate AI Study Plan
 // @route   POST /api/study-plans/generate-ai
@@ -78,7 +79,9 @@ exports.generateAIPlan = async (req, res, next) => {
         });
       }
       formattedGoals.push({
-        date: new Date(day.date),
+        // Store plain YYYY-MM-DD date strings (local day) instead of UTC
+        // timestamps so schedule items never shift by a day across timezones.
+        date: toDateOnlyString(day.date),
         tasks,
       });
     }
@@ -309,6 +312,8 @@ exports.rescheduleOverdueTasks = async (req, res, next) => {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    // Plain local-date string (YYYY-MM-DD) immune to timezone drift
+    const todayStr = toLocalDateString(new Date());
     const examDate = new Date(exam.date);
     const daysUntilExam = Math.ceil((examDate - today) / (1000 * 60 * 60 * 24));
 
@@ -339,8 +344,8 @@ exports.rescheduleOverdueTasks = async (req, res, next) => {
       const generatedGoals = await geminiService.generateStudyPlan(
         exam.name,
         syllabus,
-        today.toISOString().split('T')[0],
-        examDate.toISOString().split('T')[0],
+        todayStr,
+        toDateOnlyString(exam.date),
         3, // Default 3 hours per day
         true // Force refresh
       );
@@ -372,7 +377,7 @@ exports.rescheduleOverdueTasks = async (req, res, next) => {
           });
         }
         formattedGoals.push({
-          date: new Date(day.date),
+          date: toDateOnlyString(day.date),
           tasks,
         });
       }
@@ -398,12 +403,13 @@ exports.rescheduleOverdueTasks = async (req, res, next) => {
     const overdueTasks = [];
     const futureGoals = [];
 
-    // Separate overdue incomplete tasks from future goals
+    // Separate overdue incomplete tasks from future goals.
+    // Compare plain YYYY-MM-DD strings so the reschedule never drifts a day
+    // based on the server/client timezone.
     for (const goal of dailyGoals) {
-      const goalDate = new Date(goal.date);
-      goalDate.setHours(0, 0, 0, 0);
+      const goalDateStr = toDateOnlyString(goal.date);
 
-      if (goalDate < today) {
+      if (goalDateStr < todayStr) {
         // This is a past date - collect incomplete tasks
         for (const task of goal.tasks) {
           if (!task.completed) {
@@ -472,11 +478,7 @@ exports.rescheduleOverdueTasks = async (req, res, next) => {
     }
 
     // Rebuild dailyGoals with today's date onwards
-    const todayGoals = dailyGoals.filter(g => {
-      const goalDate = new Date(g.date);
-      goalDate.setHours(0, 0, 0, 0);
-      return goalDate >= today;
-    });
+    const todayGoals = dailyGoals.filter((g) => toDateOnlyString(g.date) >= todayStr);
 
     plan.dailyGoals = [...todayGoals, ...rescheduledGoals];
     await plan.save();

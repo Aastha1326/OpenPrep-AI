@@ -853,7 +853,9 @@ function getMockStudyPlan(examName, subjectsAndTopics, startDate, endDate) {
   let count = 0;
 
   while (current <= end && count < limitDays) {
-    const formattedDate = current.toISOString().split('T')[0];
+    // Use LOCAL date components so the mock schedule never shifts a day
+    // for users in non-UTC timezones.
+    const formattedDate = toLocalDateString(current);
     days.push({
       date: formattedDate,
       tasks: [
