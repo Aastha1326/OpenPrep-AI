@@ -220,9 +220,12 @@ const validateUploadPYQ = [
     .optional()
     .isInt({ min: 1900, max: 2100 })
     .withMessage('Year must be a valid year'),
+  body('difficulty')
+    .optional()
+    .isIn(['Easy', 'Medium', 'Hard'])
+    .withMessage('Difficulty must be "Easy", "Medium", or "Hard"'),
   handleValidationErrors,
 ];
-
 // ---------------------------------------------------------------------------
 // Study Plan routes
 // ---------------------------------------------------------------------------
