@@ -66,6 +66,11 @@ const validateRefreshToken = [
   handleValidationErrors,
 ];
 
+const validateResendVerification = [
+  body('email').trim().isEmail().withMessage('Please provide a valid email').normalizeEmail(),
+  handleValidationErrors,
+];
+
 // ---------------------------------------------------------------------------
 // Academic routes
 // ---------------------------------------------------------------------------
@@ -324,4 +329,5 @@ module.exports = {
   validateUpdateTopicProgress,
   // Community
   validateSubmitFeedback,
+  validateResendVerification,
 };
