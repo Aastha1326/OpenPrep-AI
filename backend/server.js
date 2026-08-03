@@ -19,6 +19,7 @@ const { Server } = require('socket.io');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
 const passport = require('./config/passport');
+const { getCorsMiddleware } = require('./middleware/corsHandler');
 
 // Validate required environment variables at startup
 if (!process.env.JWT_SECRET) {
@@ -56,43 +57,9 @@ if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
 
-// ── CORS origin resolver ──────────────────────────────────────────────────
-// Supports:
-//   CLIENT_URL  – primary production / staging frontend URL
-//   CORS_ORIGIN – legacy / alternative explicit override
-//   Fallback    – http://localhost:5173 (local dev)
-//   Pattern     – *.vercel.app and *.openprep.ai preview deployments
-const buildAllowedOrigins = () => {
-  const origins = new Set(['http://localhost:5173']);
-  if (process.env.CLIENT_URL)  origins.add(process.env.CLIENT_URL.replace(/\/$/, ''));
-  if (process.env.CORS_ORIGIN) origins.add(process.env.CORS_ORIGIN.replace(/\/$/, ''));
-  return origins;
-};
-
-const allowedOrigins = buildAllowedOrigins();
-
-const corsOriginHandler = (origin, callback) => {
-  // Allow server-to-server / curl requests with no Origin header
-  if (!origin) return callback(null, true);
-
-  // Exact match against configured origins
-  if (allowedOrigins.has(origin)) return callback(null, true);
-
-  // Pattern match: Vercel preview deployments and *.openprep.ai staging
-  const isVercelPreview = /^https:\/\/[\w-]+-[\w-]+\.vercel\.app$/.test(origin);
-  const isStagingDomain = /^https:\/\/[\w-]+\.openprep\.ai$/.test(origin);
-
-  if (isVercelPreview || isStagingDomain) return callback(null, true);
-
-  callback(new Error(`CORS: origin '${origin}' is not allowed`));
-};
-
 // Security Middlewares
 app.use(helmet());
-app.use(cors({
-  origin: corsOriginHandler,
-  credentials: true,
-}));
+app.use(getCorsMiddleware());
 
 app.use(passport.initialize());
 
