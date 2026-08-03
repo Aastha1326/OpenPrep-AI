@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Save, RefreshCw, HelpCircle, Info, Check } from 'lucide-react';
-import { updateSM2Settings, resetSM2Settings } from '../../store/slices/authSlice';
+import { updateSM2Settings, resetSM2Settings, updateSettings } from '../../store/slices/authSlice';
 
 const SM2SettingsModal = ({ isOpen, onClose }) => {
   const dispatch = useDispatch();
@@ -13,6 +13,10 @@ const SM2SettingsModal = ({ isOpen, onClose }) => {
   const [intervalMod, setIntervalMod] = useState('1.0');
   const [step1, setStep1] = useState('1');
   const [step2, setStep2] = useState('6');
+  
+  // General settings state
+  const [leaderboardVisible, setLeaderboardVisible] = useState(true);
+  const [receiveWeeklyDigest, setReceiveWeeklyDigest] = useState(true);
 
   const [localError, setLocalError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
@@ -25,6 +29,8 @@ const SM2SettingsModal = ({ isOpen, onClose }) => {
       setIntervalMod((user.sm2IntervalModifier ?? 1.0).toString());
       setStep1((user.sm2Step1Interval ?? 1).toString());
       setStep2((user.sm2Step2Interval ?? 6).toString());
+      setLeaderboardVisible(user.leaderboardVisible ?? true);
+      setReceiveWeeklyDigest(user.receiveWeeklyDigest ?? true);
     }
   }, [user, isOpen]);
 
@@ -81,7 +87,16 @@ const SM2SettingsModal = ({ isOpen, onClose }) => {
 
     setSaving(true);
     try {
-      const result = await dispatch(
+      // 1. Save general settings
+      await dispatch(
+        updateSettings({
+          leaderboardVisible,
+          receiveWeeklyDigest,
+        })
+      ).unwrap();
+
+      // 2. Save SM-2 settings
+      await dispatch(
         updateSM2Settings({
           sm2EasyFactorModifier: parsedEasyMod,
           sm2IntervalModifier: parsedIntervalMod,
@@ -90,7 +105,7 @@ const SM2SettingsModal = ({ isOpen, onClose }) => {
         })
       ).unwrap();
       
-      setSuccessMsg(result.message || 'SM-2 settings updated successfully!');
+      setSuccessMsg('Settings updated successfully!');
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err) {
       setLocalError(err || 'Failed to update settings');
@@ -114,8 +129,8 @@ const SM2SettingsModal = ({ isOpen, onClose }) => {
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-neutral-300">
               <div>
-                <h2 className="text-2xl font-playfair font-bold text-neutral-800">SM-2 Spaced Repetition Settings</h2>
-                <p className="text-xs text-neutral-500 mt-1 font-serif">Tailor review intervals and learning pace to your study speed.</p>
+                <h2 className="text-2xl font-playfair font-bold text-neutral-800">Application Settings</h2>
+                <p className="text-xs text-neutral-500 mt-1 font-serif">Configure email notifications, leaderboard privacy, and spaced repetition pace.</p>
               </div>
               <button
                 onClick={onClose}
@@ -143,6 +158,51 @@ const SM2SettingsModal = ({ isOpen, onClose }) => {
               )}
 
               <form onSubmit={handleSave} className="space-y-4">
+                {/* --- Section: General Preferences --- */}
+                <div className="border-b border-neutral-200 pb-4 mb-4">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-3 font-serif">General Preferences</h3>
+                  
+                  {/* Weekly Digest Checkbox/Toggle */}
+                  <div className="flex items-center justify-between p-3 bg-neutral-50 border border-neutral-200 rounded-sm mb-3">
+                    <div className="pr-4">
+                      <span className="text-sm font-semibold text-neutral-800 block">Weekly Study Summary Email</span>
+                      <span className="text-[11px] text-neutral-500 leading-normal block">Receive weekly performance study summary digests with Mastery PDF reports.</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={receiveWeeklyDigest}
+                        onChange={(e) => setReceiveWeeklyDigest(e.target.checked)}
+                        className="sr-only peer"
+                        disabled={saving}
+                      />
+                      <div className="w-9 h-5 bg-neutral-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-yellow-600"></div>
+                    </label>
+                  </div>
+
+                  {/* Leaderboard Checkbox/Toggle */}
+                  <div className="flex items-center justify-between p-3 bg-neutral-50 border border-neutral-200 rounded-sm">
+                    <div className="pr-4">
+                      <span className="text-sm font-semibold text-neutral-800 block">Leaderboard Visibility</span>
+                      <span className="text-[11px] text-neutral-500 leading-normal block">Show your study performance statistics on the global leaderboard.</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={leaderboardVisible}
+                        onChange={(e) => setLeaderboardVisible(e.target.checked)}
+                        className="sr-only peer"
+                        disabled={saving}
+                      />
+                      <div className="w-9 h-5 bg-neutral-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-yellow-600"></div>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="border-b border-neutral-200 pb-2 mb-2">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500 font-serif">Spaced Repetition (SM-2) Parameters</h3>
+                </div>
+
                 {/* Easiness Factor Modifier */}
                 <div className="p-4 bg-neutral-50 border border-neutral-200 rounded-sm">
                   <div className="flex items-center justify-between mb-1">

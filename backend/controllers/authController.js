@@ -321,6 +321,7 @@ exports.login = async (req, res, next) => {
         studyHours: user.studyHours,
         isEmailVerified: user.isEmailVerified,
         leaderboardVisible: user.leaderboardVisible,
+        receiveWeeklyDigest: user.receiveWeeklyDigest,
         sm2EasyFactorModifier: user.sm2EasyFactorModifier,
         sm2IntervalModifier: user.sm2IntervalModifier,
         sm2Step1Interval: user.sm2Step1Interval,
@@ -357,6 +358,8 @@ exports.getMe = async (req, res, next) => {
         },
         studyHours: user.studyHours,
         isEmailVerified: user.isEmailVerified,
+        leaderboardVisible: user.leaderboardVisible,
+        receiveWeeklyDigest: user.receiveWeeklyDigest,
         achievements: user.achievements || [],
         leaderboardVisible: user.leaderboardVisible,
         sm2EasyFactorModifier: user.sm2EasyFactorModifier,
@@ -658,6 +661,8 @@ exports.updateSM2Settings = async (req, res, next) => {
         },
         studyHours: user.studyHours,
         isEmailVerified: user.isEmailVerified,
+        leaderboardVisible: user.leaderboardVisible,
+        receiveWeeklyDigest: user.receiveWeeklyDigest,
         sm2EasyFactorModifier: user.sm2EasyFactorModifier,
         sm2IntervalModifier: user.sm2IntervalModifier,
         sm2Step1Interval: user.sm2Step1Interval,
@@ -701,6 +706,8 @@ exports.resetSM2Settings = async (req, res, next) => {
         },
         studyHours: user.studyHours,
         isEmailVerified: user.isEmailVerified,
+        leaderboardVisible: user.leaderboardVisible,
+        receiveWeeklyDigest: user.receiveWeeklyDigest,
         sm2EasyFactorModifier: user.sm2EasyFactorModifier,
         sm2IntervalModifier: user.sm2IntervalModifier,
         sm2Step1Interval: user.sm2Step1Interval,
@@ -742,6 +749,55 @@ exports.resendVerification = async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: 'If a matching user account exists, a new verification link has been sent.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// @desc    Update general user settings
+// @route   PATCH /api/auth/settings
+// @access  Private
+// ---------------------------------------------------------------------------
+exports.updateSettings = async (req, res, next) => {
+  try {
+    const { leaderboardVisible, receiveWeeklyDigest } = req.body;
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    if (leaderboardVisible !== undefined) {
+      user.leaderboardVisible = leaderboardVisible;
+    }
+    if (receiveWeeklyDigest !== undefined) {
+      user.receiveWeeklyDigest = receiveWeeklyDigest;
+    }
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Settings updated successfully',
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        streak: {
+          count: user.streakCount,
+          lastActive: user.streakLastActive,
+        },
+        studyHours: user.studyHours,
+        isEmailVerified: user.isEmailVerified,
+        leaderboardVisible: user.leaderboardVisible,
+        receiveWeeklyDigest: user.receiveWeeklyDigest,
+        sm2EasyFactorModifier: user.sm2EasyFactorModifier,
+        sm2IntervalModifier: user.sm2IntervalModifier,
+        sm2Step1Interval: user.sm2Step1Interval,
+        sm2Step2Interval: user.sm2Step2Interval,
+      },
     });
   } catch (error) {
     next(error);

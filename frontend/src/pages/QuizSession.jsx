@@ -233,7 +233,7 @@ const QuizSession = () => {
               {isLastQuestion ? (
                 <button
                   onClick={() => submitQuiz()}
-                  disabled={timeElapsed || Object.keys(answers).length < quiz.questions.length}
+                  disabled={submitting || timeElapsed || Object.keys(answers).length < quiz.questions.length}
                   className="flex items-center px-6 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold shadow-lg shadow-emerald-500/20 transition-all"
                 >
                   Submit Quiz <FaCheckCircle className="ml-2" />

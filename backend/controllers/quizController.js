@@ -1,5 +1,6 @@
 const { Op } = require('sequelize');
 const { v4: uuidv4 } = require('uuid');
+const { sequelize } = require('../config/db');
 const Quiz = require('../models/Quiz');
 const QuizAttempt = require('../models/QuizAttempt');
 const Subject = require('../models/Subject');
@@ -9,6 +10,10 @@ const ActivityLog = require('../models/ActivityLog');
 const Progress = require('../models/Progress');
 const geminiService = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
+
+// Window (ms) during which duplicate quiz submissions for the same quiz are ignored.
+// Prevents double-click on "Submit Quiz" from creating duplicate attempt records.
+const DUPLICATE_SUBMIT_WINDOW_MS = 5000;
 
 // @desc    Generate AI Quiz
 // @route   POST /api/quizzes/generate-ai
@@ -186,54 +191,101 @@ exports.submitQuizAttempt = async (req, res, next) => {
       });
     }
 
-    // Evaluate answers
-    let correctCount = 0;
-    const evaluatedAnswers = questionsList.map((q) => {
-      const userAns = answers.find((ans) => String(ans.questionId) === String(q._id || q.id));
-      const selected = userAns && userAns.selectedAnswer !== undefined ? userAns.selectedAnswer : -1;
-      const isCorrect = selected === q.correctAnswer;
-      if (isCorrect) correctCount++;
-
-      return {
-        questionId: q._id || q.id,
-        selectedAnswer: selected,
-        isCorrect,
-      };
-    });
-
-    const totalQuestions = questionsList.length;
-    const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
-
-    // Determine weak vs strong areas based on score (<50% Weak, 50-80% Medium, >80% Strong)
-    const weakTopics = [];
-    const strongTopics = [];
-    if (quiz.topic) {
-      const topicObj = await Topic.findByPk(quiz.topic);
-      if (topicObj) {
-        if (score < 50) {
-          weakTopics.push(quiz.topic);
-          topicObj.status = 'Weak';
-        } else if (score > 80) {
-          strongTopics.push(quiz.topic);
-          topicObj.status = 'Strong';
-        } else {
-          topicObj.status = 'Medium';
-        }
-        await topicObj.save();
+    // Atomically check for duplicate submissions and persist the attempt.
+    // READ COMMITTED is required so that, after waiting for the row lock, the
+    // duplicate check sees the committed attempt of a concurrent request.
+    const result = await sequelize.transaction(
+      { isolationLevel: 'READ COMMITTED' },
+      async (transaction) => {
+      const lockedQuiz = await Quiz.findOne({
+        where: { id: quiz.id },
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
+      if (!lockedQuiz) {
+        return { error: 'Quiz not found' };
       }
+
+      // Ignore duplicate submissions for the same quiz within the 5-second window
+      const existingAttempt = await QuizAttempt.findOne({
+        where: {
+          user: req.user.id,
+          quiz: quiz.id,
+          createdAt: { [Op.gte]: new Date(Date.now() - DUPLICATE_SUBMIT_WINDOW_MS) },
+        },
+        transaction,
+      });
+      if (existingAttempt) {
+        return { attempt: existingAttempt, duplicate: true };
+      }
+
+      // Evaluate answers
+      let correctCount = 0;
+      const evaluatedAnswers = questionsList.map((q) => {
+        const userAns = answers.find((ans) => String(ans.questionId) === String(q._id || q.id));
+        const selected = userAns && userAns.selectedAnswer !== undefined ? userAns.selectedAnswer : -1;
+        const isCorrect = selected === q.correctAnswer;
+        if (isCorrect) correctCount++;
+
+        return {
+          questionId: q._id || q.id,
+          selectedAnswer: selected,
+          isCorrect,
+        };
+      });
+
+      const totalQuestions = questionsList.length;
+      const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
+
+      // Determine weak vs strong areas based on score (<50% Weak, 50-80% Medium, >80% Strong)
+      const weakTopics = [];
+      const strongTopics = [];
+      if (quiz.topic) {
+        const topicObj = await Topic.findByPk(quiz.topic, { transaction });
+        if (topicObj) {
+          if (score < 50) {
+            weakTopics.push(quiz.topic);
+            topicObj.status = 'Weak';
+          } else if (score > 80) {
+            strongTopics.push(quiz.topic);
+            topicObj.status = 'Strong';
+          } else {
+            topicObj.status = 'Medium';
+          }
+          await topicObj.save({ transaction });
+        }
+      }
+
+      // Save Attempt
+      const attempt = await QuizAttempt.create(
+        {
+          user: req.user.id,
+          quiz: quiz.id,
+          score,
+          totalQuestions,
+          answers: evaluatedAnswers,
+          timeSpent: timeSpent || 0,
+          weakTopics,
+          strongTopics,
+        },
+        { transaction }
+      );
+
+      return { attempt, duplicate: false, score };
+      }
+    );
+
+    if (result.error) {
+      return res.status(404).json({ success: false, error: result.error });
     }
 
-    // Save Attempt
-    const attempt = await QuizAttempt.create({
-      user: req.user.id,
-      quiz: quiz.id,
-      score,
-      totalQuestions,
-      answers: evaluatedAnswers,
-      timeSpent: timeSpent || 0,
-      weakTopics,
-      strongTopics,
-    });
+    const { attempt, duplicate, score } = result;
+
+    // Duplicate submission detected — return the original attempt without
+    // re-running side effects (progress, activity log, weakness aggregation).
+    if (duplicate) {
+      return res.status(200).json({ success: true, data: attempt, duplicate: true });
+    }
 
     // Trigger AI weakness aggregation and adaptive planner rescheduling in background
     const weaknessAggregatorService = require('../services/weaknessAggregatorService');
