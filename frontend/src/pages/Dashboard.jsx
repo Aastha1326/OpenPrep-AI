@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,11 +8,6 @@ import {
   LogOut, X,
 } from 'lucide-react';
 import API from '../services/api';
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip as LineTooltip, ResponsiveContainer,
-  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-} from 'recharts';
 
 import LeatherBoard from '../components/dashboard/LeatherBoard';
 import VintagePaper from '../components/dashboard/VintagePaper';
@@ -20,9 +15,12 @@ import GoldTabButton from '../components/dashboard/GoldTabButton';
 import PomodoroTimer from '../components/dashboard/PomodoroTimer';
 import FlashcardWidget from '../components/dashboard/FlashcardWidget';
 import PinnedTasks from '../components/dashboard/PinnedTasks';
-import CreateNoteModal from '../components/dashboard/CreateNoteModal';
-import StudyPlanModal from '../components/dashboard/StudyPlanModal';
 import ThemeToggle from '../components/ThemeToggle';
+import PageLoader from '../components/PageLoader';
+
+const AnalyticsCharts = lazy(() => import('../components/dashboard/AnalyticsCharts'));
+const CreateNoteModal = lazy(() => import('../components/dashboard/CreateNoteModal'));
+const StudyPlanModal = lazy(() => import('../components/dashboard/StudyPlanModal'));
 
 import {
   fetchDashboardStats,
@@ -135,6 +133,19 @@ const EmptyState = ({ icon: Icon = Lightbulb, message = 'No data yet' }) => (
   </div>
 );
 
+// ── Analytics Charts Skeleton (shown while recharts chunk loads) ──
+const AnalyticsChartsFallback = () => (
+  <div className="bg-wood-desk rounded-lg shadow-inner border border-black/50 p-6 relative overflow-hidden grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <div className="absolute inset-0 shadow-[inset_0_0_50px_rgba(0,0,0,0.8)] pointer-events-none" />
+    {[0, 1].map((i) => (
+      <VintagePaper key={i} animate={false} className="w-full h-full p-6 shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
+        <Shimmer className="h-7 w-48 mb-6" />
+        <Shimmer className="h-64 w-full" />
+      </VintagePaper>
+    ))}
+  </div>
+);
+
 // ── Main Component ──
 const Dashboard = () => {
   const dispatch = useDispatch();
@@ -193,6 +204,8 @@ const Dashboard = () => {
   // ── Note Modal State ──
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isStudyPlanOpen, setIsStudyPlanOpen] = useState(false);
+  const [hasOpenedNoteModal, setHasOpenedNoteModal] = useState(false);
+  const [hasOpenedStudyPlan, setHasOpenedStudyPlan] = useState(false);
   const [comingSoon, setComingSoon] = useState(null);
 
   useEffect(() => {
@@ -263,10 +276,10 @@ const Dashboard = () => {
       <div className="absolute -left-4 top-24 flex flex-col gap-4 z-30 hidden md:flex">
         <GoldTabButton icon={Play} label="Start Quiz" delay={0.1} onClick={() => setComingSoon('Quiz feature coming soon!')} />
         <GoldTabButton icon={FileText} label="Analyze PYQ" delay={0.2} onClick={() => setComingSoon('PYQ Analysis coming soon!')} />
-        <GoldTabButton icon={Calendar} label="Study Plan" delay={0.3} onClick={() => setIsStudyPlanOpen(true)} />
+        <GoldTabButton icon={Calendar} label="Study Plan" delay={0.3} onClick={() => { setHasOpenedStudyPlan(true); setIsStudyPlanOpen(true); }} />
         <GoldTabButton icon={TrendingUp} label="Reports" delay={0.4} onClick={() => setComingSoon('Reports coming soon!')} />
         <button 
-          onClick={() => setIsNoteModalOpen(true)}
+          onClick={() => { setHasOpenedNoteModal(true); setIsNoteModalOpen(true); }}
           className="bg-neutral-800 text-yellow-500 border border-yellow-700/50 hover:bg-neutral-700 p-2 rounded-r-lg shadow-lg flex items-center justify-center relative group"
         >
           <FileText className="w-5 h-5" />
@@ -389,86 +402,16 @@ const Dashboard = () => {
         </div>
 
         {/* --- ANALYTICS SECTION (WOODEN DESK) --- */}
-        <div className="bg-wood-desk rounded-lg shadow-inner border border-black/50 p-6 relative overflow-hidden grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="absolute inset-0 shadow-[inset_0_0_50px_rgba(0,0,0,0.8)] pointer-events-none" />
-
-          {/* Line Chart — Weekly Performance */}
-          <VintagePaper animate={false} className="w-full h-full p-6 shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
-            <h2 className="text-2xl font-bold font-playfair text-neutral-900 mb-6 border-b border-neutral-400 pb-2">
-              Weekly Performance
-            </h2>
-            <div className="h-64 w-full" style={{ minHeight: '250px', minWidth: '100%' }}>
-              {loadingStats ? (
-                <div className="flex items-center justify-center h-full">
-                  <Shimmer className="w-full h-48" />
-                </div>
-              ) : errorStats ? (
-                <div className="flex flex-col items-center justify-center h-full text-neutral-500">
-                  <AlertCircle className="w-8 h-8 mb-2" />
-                  <p className="text-sm">Could not load chart</p>
-                </div>
-              ) : chartData.length === 0 ? (
-                <EmptyState message="No weekly data yet — start studying to see your progress!" />
-              ) : (
-                <ResponsiveContainer width="99%" height="100%" minHeight={250}>
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#d4d4d4" />
-                    <XAxis dataKey="name" stroke="#525252" tick={{ fontFamily: 'Inter' }} />
-                    <YAxis stroke="#525252" tick={{ fontFamily: 'Inter' }} domain={[0, 100]} />
-                    <LineTooltip
-                      contentStyle={{ backgroundColor: '#F5E6CA', border: '1px solid #8B4513', borderRadius: '4px' }}
-                      itemStyle={{ color: '#3E2723', fontWeight: 'bold' }}
-                    />
-                    <Line
-                      type="monotone" dataKey="score" stroke="#8B4513" strokeWidth={3}
-                      dot={{ fill: '#8B4513', r: 5 }} activeDot={{ r: 8, fill: '#D4AF37' }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </VintagePaper>
-
-          {/* Radar Chart — Subject Mastery */}
-          <VintagePaper animate={false} className="w-full h-full p-6 shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
-            <h2 className="text-2xl font-bold font-playfair text-neutral-900 mb-6 border-b border-neutral-400 pb-2">
-              Subject Mastery
-            </h2>
-            <div className="h-64 w-full" style={{ minHeight: '250px', minWidth: '100%' }}>
-              {loadingSubjects ? (
-                <div className="flex items-center justify-center h-full">
-                  <Shimmer className="w-full h-48" />
-                </div>
-              ) : errorSubjects ? (
-                <div className="flex flex-col items-center justify-center h-full text-neutral-500">
-                  <AlertCircle className="w-8 h-8 mb-2" />
-                  <p className="text-sm">Could not load subjects</p>
-                </div>
-              ) : radarData.length === 0 ? (
-                <EmptyState message="Add subjects to see your mastery breakdown" />
-              ) : (
-                <ResponsiveContainer width="99%" height="100%" minHeight={250}>
-                  <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
-                    <PolarGrid stroke="#d4d4d4" />
-                    <PolarAngleAxis
-                      dataKey="subject"
-                      tick={{ fontFamily: 'Inter', fill: '#525252', fontSize: 12, fontWeight: 'bold' }}
-                    />
-                    <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                    <Radar
-                      name="Mastery" dataKey="A" stroke="#8B4513" strokeWidth={2}
-                      fill="#D4AF37" fillOpacity={0.6}
-                    />
-                    <LineTooltip
-                      contentStyle={{ backgroundColor: '#F5E6CA', border: '1px solid #8B4513', borderRadius: '4px' }}
-                      itemStyle={{ color: '#3E2723', fontWeight: 'bold' }}
-                    />
-                  </RadarChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </VintagePaper>
-        </div>
+        <Suspense fallback={<AnalyticsChartsFallback />}>
+          <AnalyticsCharts
+            chartData={chartData}
+            radarData={radarData}
+            loadingStats={loadingStats}
+            errorStats={errorStats}
+            loadingSubjects={loadingSubjects}
+            errorSubjects={errorSubjects}
+          />
+        </Suspense>
 
         {/* --- NEW WIDGETS ROW --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-center py-4">
@@ -665,19 +608,27 @@ const Dashboard = () => {
           </VintagePaper>
         </div>
       </div>
-      {/* --- CREATE NOTE MODAL --- */}
-      <CreateNoteModal 
-        isOpen={isNoteModalOpen} 
-        onClose={() => setIsNoteModalOpen(false)} 
-        onNoteCreated={() => setIsNoteModalOpen(false)}
-      />
+      {/* --- CREATE NOTE MODAL (lazy: react-quill chunk loads on first open) --- */}
+      {hasOpenedNoteModal && (
+        <Suspense fallback={<PageLoader />}>
+          <CreateNoteModal
+            isOpen={isNoteModalOpen}
+            onClose={() => setIsNoteModalOpen(false)}
+            onNoteCreated={() => setIsNoteModalOpen(false)}
+          />
+        </Suspense>
+      )}
 
-      {/* --- STUDY PLAN MODAL --- */}
-      <StudyPlanModal
-        isOpen={isStudyPlanOpen}
-        onClose={() => setIsStudyPlanOpen(false)}
-        activePlan={activePlan}
-      />
+      {/* --- STUDY PLAN MODAL (lazy: html2pdf.js chunk loads on first open) --- */}
+      {hasOpenedStudyPlan && (
+        <Suspense fallback={<PageLoader />}>
+          <StudyPlanModal
+            isOpen={isStudyPlanOpen}
+            onClose={() => setIsStudyPlanOpen(false)}
+            activePlan={activePlan}
+          />
+        </Suspense>
+      )}
 
       {/* --- COMING SOON TOAST --- */}
       <AnimatePresence>
