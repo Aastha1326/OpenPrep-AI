@@ -213,31 +213,32 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
     }
   }
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (!contentRef.current) return;
     setIsExporting(true);
 
-    const element = contentRef.current;
-    
-    const opt = {
-      margin: 10,
-      filename: 'My_Study_Plan.pdf',
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
+    try {
+      const { default: html2pdf } = await import('html2pdf.js');
 
-    html2pdf()
-      .set(opt)
-      .from(element)
-      .save()
-      .then(() => {
-        setIsExporting(false);
-      })
-      .catch(err => {
-        console.error('PDF export failed:', err);
-        setIsExporting(false);
-      });
+      const element = contentRef.current;
+
+      const opt = {
+        margin: 10,
+        filename: 'My_Study_Plan.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      await html2pdf()
+        .set(opt)
+        .from(element)
+        .save();
+    } catch (err) {
+      console.error('PDF export failed:', err);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleReschedule = async () => {

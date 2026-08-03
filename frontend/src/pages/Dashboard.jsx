@@ -148,6 +148,19 @@ const EmptyState = ({ icon: Icon = Lightbulb, message = 'No data yet' }) => (
   </div>
 );
 
+// ── Analytics Charts Skeleton (shown while recharts chunk loads) ──
+const AnalyticsChartsFallback = () => (
+  <div className="bg-wood-desk rounded-lg shadow-inner border border-black/50 p-6 relative overflow-hidden grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <div className="absolute inset-0 shadow-[inset_0_0_50px_rgba(0,0,0,0.8)] pointer-events-none" />
+    {[0, 1].map((i) => (
+      <VintagePaper key={i} animate={false} className="w-full h-full p-6 shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
+        <Shimmer className="h-7 w-48 mb-6" />
+        <Shimmer className="h-64 w-full" />
+      </VintagePaper>
+    ))}
+  </div>
+);
+
 // ── Main Component ──
 const Dashboard = () => {
   const dispatch = useDispatch();
@@ -353,7 +366,7 @@ const Dashboard = () => {
         <GoldTabButton icon={TrendingUp} label="Export Report" delay={0.4} onClick={() => handleExportReport('pdf')} />
         <GoldTabButton icon={MessageSquare} label="Study Room" delay={0.45} onClick={() => navigate('/study-group')} />
         <button 
-          onClick={() => setIsNoteModalOpen(true)}
+          onClick={() => { setHasOpenedNoteModal(true); setIsNoteModalOpen(true); }}
           className="bg-neutral-800 text-yellow-500 border border-yellow-700/50 hover:bg-neutral-700 p-2 rounded-r-lg shadow-lg flex items-center justify-center relative group"
         >
           <FileText className="w-5 h-5" />
