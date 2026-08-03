@@ -26,15 +26,22 @@ const PYQ = sequelize.define(
       type: DataTypes.UUID,
       allowNull: false,
     },
-    year: {
+year: {
       type: DataTypes.INTEGER,
       allowNull: false,
+    },
+    difficulty: {
+      type: DataTypes.ENUM('Easy', 'Medium', 'Hard'),
+      defaultValue: 'Medium',
+    },
+    chapters: {
+      type: DataTypes.ARRAY(DataTypes.STRING),
+      defaultValue: [],
     },
     fileUrl: {
       type: DataTypes.STRING,
       allowNull: false,
-    },
-    analyzed: {
+    },    analyzed: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
     },

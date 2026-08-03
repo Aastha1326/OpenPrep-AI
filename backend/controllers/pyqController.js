@@ -39,8 +39,7 @@ const pdfParseSemaphore = new Semaphore(2);
 // @access  Private
 exports.uploadAndAnalyzePYQ = async (req, res, next) => {
   try {
-    const { examId, subjectId, year, title } = req.body;
-
+const { examId, subjectId, year, title, difficulty } = req.body;
     if (!req.file) {
       return res.status(400).json({ success: false, error: 'Please upload a question paper PDF' });
     }
@@ -69,18 +68,23 @@ exports.uploadAndAnalyzePYQ = async (req, res, next) => {
     // Call Gemini API for structure analysis
     const analysis = await geminiService.analyzePYQText(extractedText, subject.name, req.query.refresh === 'true');
 
-    // Save to Database
+// Save to Database
+    const chapters = Array.isArray(analysis?.chapterWeightage)
+      ? analysis.chapterWeightage.map((ch) => ch.chapterName).filter(Boolean)
+      : [];
+
     const pyq = await PYQ.create({
       title: title || `${subject.name} Question Paper - ${year}`,
       exam: examId,
       subject: subjectId,
       year: parseInt(year),
+      difficulty: ['Easy', 'Medium', 'Hard'].includes(difficulty) ? difficulty : 'Medium',
+      chapters,
       fileUrl: `/uploads/${req.file.filename}`,
       analyzed: true,
       analysisResults: analysis,
       user: req.user.id,
     });
-
     // Automatically register/update detected topics in Database
     if (analysis && analysis.importantTopics) {
       for (const t of analysis.importantTopics) {
@@ -169,9 +173,8 @@ exports.uploadAndAnalyzePYQ = async (req, res, next) => {
 // @access  Private
 exports.getPYQs = async (req, res, next) => {
   try {
-    const { subjectId, courseId } = req.query;
+    const { subjectId, courseId, year, difficulty, chapter } = req.query;
     const targetId = subjectId || courseId;
-
     if (targetId) {
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
       if (!uuidRegex.test(targetId)) {
@@ -188,9 +191,14 @@ exports.getPYQs = async (req, res, next) => {
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const offset = (page - 1) * limit;
 
-    const filter = { user: req.user.id };
+const filter = { user: req.user.id };
     if (targetId) filter.subject = targetId;
-
+    if (year) filter.year = parseInt(year, 10);
+    if (difficulty) {
+      const difficultyList = difficulty.split(',').filter((d) => ['Easy', 'Medium', 'Hard'].includes(d));
+      if (difficultyList.length > 0) filter.difficulty = { [Op.in]: difficultyList };
+    }
+    if (chapter) filter.chapters = { [Op.contains]: [chapter] };
     const { count: total, rows: pyqs } = await PYQ.findAndCountAll({
       where: filter,
       order: [['year', 'DESC']],

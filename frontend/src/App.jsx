@@ -6,7 +6,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
 import CustomCursor from './components/CustomCursor';
 import ScrollToTop from './components/ScrollToTop';
-import PageLoader from './components/PageLoader';
+import MobileNavDrawer from './components/MobileNavDrawer';import PageLoader from './components/PageLoader';
 import './App.css';
 
 const Landing = lazy(() => import('./pages/Landing'));
@@ -35,9 +35,9 @@ function App() {
 
   return (
     <>
-      <CustomCursor />
+<CustomCursor />
       <ScrollToTop />
-      <Suspense fallback={<PageLoader />}>
+      <MobileNavDrawer />      <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/register" element={<Register />} />
