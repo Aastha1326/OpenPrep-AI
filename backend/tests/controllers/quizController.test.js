@@ -212,6 +212,99 @@ describe('Quiz Controller - Integration Tests', () => {
       expect(res.body.data.user).toBe(testUser.id.toString());
     });
 
+    it('should return the existing attempt when the same quiz is resubmitted within the 5-second window (double-click prevention)', async () => {
+      const realAnswers = (testQuiz.questions || []).map((q, idx) => ({
+        questionId: String(q.id || q._id || q.questionId || `00000000-0000-0000-0000-00000000000${idx + 1}`),
+        selectedAnswer: q.correctAnswer !== undefined ? q.correctAnswer : 0,
+      }));
+
+      // First submission creates the attempt
+      const firstRes = await request(app)
+        .post(`/api/quizzes/${testQuiz.id}/submit`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ answers: realAnswers, timeSpent: 30 });
+      expect(firstRes.status).toBe(201);
+
+      // Immediate second submission must NOT create a duplicate
+      const secondRes = await request(app)
+        .post(`/api/quizzes/${testQuiz.id}/submit`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ answers: realAnswers, timeSpent: 30 });
+
+      expect(secondRes.status).toBe(200);
+      expect(secondRes.body.success).toBe(true);
+      expect(secondRes.body.duplicate).toBe(true);
+      expect(secondRes.body.data.id).toBe(firstRes.body.data.id);
+
+      const attemptCount = await QuizAttempt.count({
+        where: { user: testUser.id, quiz: testQuiz.id },
+      });
+      expect(attemptCount).toBe(1);
+    });
+
+    it('should not create duplicate attempts when the same quiz is submitted concurrently (rapid double-click)', async () => {
+      const realAnswers = (testQuiz.questions || []).map((q, idx) => ({
+        questionId: String(q.id || q._id || q.questionId || `00000000-0000-0000-0000-00000000000${idx + 1}`),
+        selectedAnswer: q.correctAnswer !== undefined ? q.correctAnswer : 0,
+      }));
+
+      const [res1, res2] = await Promise.all([
+        request(app)
+          .post(`/api/quizzes/${testQuiz.id}/submit`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({ answers: realAnswers, timeSpent: 30 }),
+        request(app)
+          .post(`/api/quizzes/${testQuiz.id}/submit`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({ answers: realAnswers, timeSpent: 30 }),
+      ]);
+
+      // Exactly one attempt must be persisted
+      const attemptCount = await QuizAttempt.count({
+        where: { user: testUser.id, quiz: testQuiz.id },
+      });
+      expect(attemptCount).toBe(1);
+
+      // One request creates (201), the other is deduplicated (200 + duplicate flag)
+      const statuses = [res1.status, res2.status].sort();
+      expect(statuses).toEqual([200, 201]);
+      const dupRes = res1.status === 200 ? res1 : res2;
+      expect(dupRes.body.duplicate).toBe(true);
+    });
+
+    it('should allow a new attempt after the 5-second dedup window has passed', async () => {
+      const realAnswers = (testQuiz.questions || []).map((q, idx) => ({
+        questionId: String(q.id || q._id || q.questionId || `00000000-0000-0000-0000-00000000000${idx + 1}`),
+        selectedAnswer: q.correctAnswer !== undefined ? q.correctAnswer : 0,
+      }));
+
+      const firstRes = await request(app)
+        .post(`/api/quizzes/${testQuiz.id}/submit`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ answers: realAnswers, timeSpent: 30 });
+      expect(firstRes.status).toBe(201);
+
+      // Simulate the previous attempt being older than the dedup window
+      await QuizAttempt.update(
+        { createdAt: new Date(Date.now() - 10000) },
+        { where: { id: firstRes.body.data.id } }
+      );
+
+      const secondRes = await request(app)
+        .post(`/api/quizzes/${testQuiz.id}/submit`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ answers: realAnswers, timeSpent: 30 });
+
+      expect(secondRes.status).toBe(201);
+      expect(secondRes.body.success).toBe(true);
+      expect(secondRes.body.data.id).not.toBe(firstRes.body.data.id);
+
+      const attemptCount = await QuizAttempt.count({
+        where: { user: testUser.id, quiz: testQuiz.id },
+      });
+      expect(attemptCount).toBe(2);
+    });
+
     afterEach(async () => {
       // Clean up attempts created during these tests
       await QuizAttempt.destroy({ where: {} });
