@@ -216,6 +216,7 @@ const io = new Server(server, {
 
 // Initialize socket handlers
 require('./sockets/battleHandler')(io);
+require('./sockets/chatHandler')(io);
 
 server.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
