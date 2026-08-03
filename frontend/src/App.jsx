@@ -22,6 +22,7 @@ const FlashcardReview = lazy(() => import('./pages/FlashcardReview'));
 const PyqDashboard = lazy(() => import('./pages/PyqDashboard'));
 const Settings = lazy(() => import('./pages/Settings'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const StudyGroupChat = lazy(() => import('./pages/StudyGroupChat'));
 
 function App() {
   const dispatch = useDispatch();
@@ -66,6 +67,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <BattleArena />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/study-group"
+            element={
+              <ProtectedRoute>
+                <StudyGroupChat />
               </ProtectedRoute>
             }
           />
