@@ -73,8 +73,13 @@ const validateResendVerification = [
 
 const validateUpdateSettings = [
   body('leaderboardVisible')
+    .optional()
     .isBoolean()
     .withMessage('leaderboardVisible must be a boolean'),
+  body('receiveWeeklyDigest')
+    .optional()
+    .isBoolean()
+    .withMessage('receiveWeeklyDigest must be a boolean'),
   handleValidationErrors,
 ];
 

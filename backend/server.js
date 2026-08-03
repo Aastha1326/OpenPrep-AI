@@ -185,6 +185,10 @@ const io = new Server(server, {
 require('./sockets/battleHandler')(io);
 require('./sockets/chatHandler')(io);
 
+// Start weekly digest background scheduler
+const { startScheduler } = require('./services/weeklyDigestService');
+startScheduler();
+
 server.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
 });
