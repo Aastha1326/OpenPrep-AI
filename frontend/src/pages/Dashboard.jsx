@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Flame, Play, FileText, Calendar, TrendingUp, Award, BookOpen,
   Target, CheckCircle, Clock, AlertCircle, RefreshCw, Lightbulb,
-  LogOut, X, Download, Upload,
+  LogOut, X, Download, Upload, Settings,
 } from 'lucide-react';
 import API from '../services/api';
 import { toDateOnlyString } from '../utils/dateUtils';
@@ -29,8 +29,10 @@ import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
 import TargetExamOverviewWidget from '../components/dashboard/TargetExamOverviewWidget';
 import CompositeBundleModal from '../components/dashboard/CompositeBundleModal';
 import SyllabusImportModal from '../components/dashboard/SyllabusImportModal';
+import NotesWidget from '../components/dashboard/NotesWidget';
 import ThemeToggle from '../components/ThemeToggle';
 import BadgesList from '../components/BadgesList';
+import SM2SettingsModal from '../components/dashboard/SM2SettingsModal';
 
 
 import {
@@ -224,6 +226,7 @@ const Dashboard = () => {
   const [isPyqModalOpen, setIsPyqModalOpen] = useState(false);
   const [isBundleModalOpen, setIsBundleModalOpen] = useState(false);
   const [isSyllabusImportOpen, setIsSyllabusImportOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const syllabusPrefillRef = useRef(null);
   const [comingSoon, setComingSoon] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -397,6 +400,16 @@ const Dashboard = () => {
             className="flex items-center space-x-6 mt-2 md:mt-0 shrink-0"
           >
             <ThemeToggle className="mr-2" />
+            <button
+              onClick={() => setIsSettingsModalOpen(true)}
+              className="bg-neutral-800 text-yellow-500 border border-yellow-700/50 hover:bg-neutral-700 p-2.5 rounded-sm shadow-[0_4px_10px_rgba(0,0,0,0.4)] flex items-center justify-center relative group"
+              aria-label="Settings"
+            >
+              <Settings className="w-5 h-5 transition-transform duration-300 group-hover:rotate-45" />
+              <div className="absolute top-full mt-2 px-2 py-1 bg-neutral-800 text-yellow-500 text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                SM-2 Settings
+              </div>
+            </button>
             <div className="flex flex-col items-center">
               <div className="relative">
                 <Flame className="w-12 h-12 text-orange-500 animate-pulse-glow" fill="currentColor" />
@@ -641,6 +654,11 @@ const Dashboard = () => {
           <BadgesList achievements={user?.achievements || []} />
         </div>
 
+        {/* --- AI REVISION SUMMARIES + AUDIO READER --- */}
+        <div className="my-6">
+          <NotesWidget limit={5} />
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* --- SUBJECT PROGRESS --- */}
           <VintagePaper delay={0.6} className="lg:col-span-1 shadow-[0_10px_20px_rgba(0,0,0,0.4)]">
@@ -854,6 +872,12 @@ const Dashboard = () => {
           dispatch(fetchSubjectBreakdown());
         }}
         onGoToStudyPlan={handleGoToStudyPlanFromImport}
+      />
+
+      {/* --- SM-2 SETTINGS MODAL --- */}
+      <SM2SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
       />
 
       {/* --- COMING SOON TOAST --- */}

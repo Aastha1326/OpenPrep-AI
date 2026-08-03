@@ -11,9 +11,48 @@ import {
 import API from '../services/api';
 import LeatherBoard from '../components/dashboard/LeatherBoard';
 import VintagePaper from '../components/dashboard/VintagePaper';
+import AudioReader from '../components/AudioReader';
+import HighlightedText from '../components/HighlightedText';
 import ThemeToggle from '../components/ThemeToggle';
 
 const COLORS = ['#8B4513', '#D4AF37', '#2563EB', '#059669', '#7C3AED', '#DB2777', '#D97706', '#4B5563'];
+
+const RepeatedQuestionCard = ({ rq }) => {
+  const [activeIndex, setActiveIndex] = useState(-1);
+
+  return (
+    <div className="p-3 bg-white border border-neutral-300 rounded text-xs text-neutral-800">
+      <div className="flex items-start justify-between gap-2">
+        <HighlightedText
+          text={rq.questionText}
+          activeIndex={activeIndex}
+          className="font-semibold text-neutral-900"
+        />
+        <AudioReader
+          text={rq.questionText}
+          className="shrink-0"
+          onSentenceChange={setActiveIndex}
+        />
+      </div>
+      {rq.years && (
+        <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+          <span className="text-[10px] font-bold text-neutral-500 uppercase">Appeared in:</span>
+          {Array.isArray(rq.years) ? (
+            rq.years.map((y, yi) => (
+              <span key={yi} className="bg-amber-100 text-amber-900 text-[10px] px-1.5 py-0.5 rounded font-bold">
+                {y}
+              </span>
+            ))
+          ) : (
+            <span className="bg-amber-100 text-amber-900 text-[10px] px-1.5 py-0.5 rounded font-bold">
+              {rq.years}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const PyqDashboard = () => {
   const navigate = useNavigate();
@@ -32,6 +71,7 @@ const PyqDashboard = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
   const [isTimeout, setIsTimeout] = useState(false);
+  const [trendActiveIndex, setTrendActiveIndex] = useState(-1);
 
   // Fetch subjects on mount
   useEffect(() => {
@@ -447,10 +487,21 @@ const PyqDashboard = () => {
                   <TrendingUp className="w-5 h-5 text-indigo-700" /> AI Exam Trend Summary
                 </h3>
                 <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-sm flex-1 font-inter text-neutral-800 text-sm leading-relaxed space-y-3">
-                  <p className="font-medium text-amber-900 italic">
-                    Analysis for: <span className="font-bold font-playfair underline">{selectedPyq.title}</span> ({selectedPyq.year})
-                  </p>
-                  <p className="whitespace-pre-line text-neutral-700">{trendAnalysis}</p>
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="font-medium text-amber-900 italic">
+                      Analysis for: <span className="font-bold font-playfair underline">{selectedPyq.title}</span> ({selectedPyq.year})
+                    </p>
+                    <AudioReader
+                      text={trendAnalysis}
+                      className="shrink-0"
+                      onSentenceChange={setTrendActiveIndex}
+                    />
+                  </div>
+                  <HighlightedText
+                    text={trendAnalysis}
+                    activeIndex={trendActiveIndex}
+                    className="whitespace-pre-line text-neutral-700"
+                  />
                 </div>
               </VintagePaper>
             </div>
@@ -513,25 +564,7 @@ const PyqDashboard = () => {
                 ) : (
                   <div className="space-y-3 max-h-72 overflow-y-auto">
                     {repeatedQuestions.map((rq, idx) => (
-                      <div key={idx} className="p-3 bg-white border border-neutral-300 rounded text-xs text-neutral-800">
-                        <p className="font-semibold text-neutral-900">{rq.questionText}</p>
-                        {rq.years && (
-                          <div className="mt-2 flex items-center gap-1.5 flex-wrap">
-                            <span className="text-[10px] font-bold text-neutral-500 uppercase">Appeared in:</span>
-                            {Array.isArray(rq.years) ? (
-                              rq.years.map((y, yi) => (
-                                <span key={yi} className="bg-amber-100 text-amber-900 text-[10px] px-1.5 py-0.5 rounded font-bold">
-                                  {y}
-                                </span>
-                              ))
-                            ) : (
-                              <span className="bg-amber-100 text-amber-900 text-[10px] px-1.5 py-0.5 rounded font-bold">
-                                {rq.years}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                      <RepeatedQuestionCard key={idx} rq={rq} />
                     ))}
                   </div>
                 )}
