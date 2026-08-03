@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Flame, Play, FileText, Calendar, TrendingUp, Award, BookOpen,
   Target, CheckCircle, Clock, AlertCircle, RefreshCw, Lightbulb,
-  LogOut, X, Download, Upload, Settings,
+  LogOut, X, Download, Upload, Settings, MessageSquare,
 } from 'lucide-react';
 import API from '../services/api';
 import {
@@ -352,6 +352,7 @@ const Dashboard = () => {
         <GoldTabButton icon={Calendar} label="Study Plan" delay={0.3} onClick={() => setIsStudyPlanOpen(true)} />
         <GoldTabButton icon={Upload} label="Import Syllabus" delay={0.35} onClick={() => setIsSyllabusImportOpen(true)} />
         <GoldTabButton icon={TrendingUp} label="Export Report" delay={0.4} onClick={() => handleExportReport('pdf')} />
+        <GoldTabButton icon={MessageSquare} label="Study Room" delay={0.45} onClick={() => navigate('/study-group')} />
         <button 
           onClick={() => setIsNoteModalOpen(true)}
           className="bg-neutral-800 text-yellow-500 border border-yellow-700/50 hover:bg-neutral-700 p-2 rounded-r-lg shadow-lg flex items-center justify-center relative group"
