@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Download, Calendar as CalendarIcon, CheckCircle, Circle, AlertTriangle, ClockPlus, Filter, Plus, RefreshCw, AlertCircle } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 import API from '../../services/api';
+import { toLocalDateString, formatDateOnly } from '../../utils/dateUtils';
 
 // Create Study Plan Form Component
 const CreateStudyPlanForm = ({ onClose, onSubmit, loading, error, formData, handleInputChange, minStartDate, minEndDate, exams }) => (
@@ -40,7 +41,7 @@ const CreateStudyPlanForm = ({ onClose, onSubmit, loading, error, formData, hand
           ) : (
             exams.map((exam) => (
               <option key={exam.id} value={exam.id}>
-                {exam.name} ({exam.date ? new Date(exam.date).toLocaleDateString() : 'No date'})
+                {exam.name} ({exam.date ? formatDateOnly(exam.date) : 'No date'})
               </option>
             ))
           )}
@@ -320,7 +321,7 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
     }
   };
 
-  const minStartDate = new Date().toISOString().split('T')[0];
+  const minStartDate = toLocalDateString(new Date());
   const minEndDate = formData.startDate || minStartDate;
 
   const showForm = showCreateForm || !activePlan;
@@ -464,7 +465,7 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
                 <div className="space-y-8">
                   {filteredDailyGoals && filteredDailyGoals.length > 0 ? (
                     filteredDailyGoals.map((day, idx) => {
-                      const dateStr = day.date ? new Date(day.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : `Day ${idx + 1}`;
+                      const dateStr = day.date ? formatDateOnly(day.date, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : `Day ${idx + 1}`;
                       const hasTasks = day.tasks && day.tasks.length > 0;
                       const weakDayCount = (day.tasks || []).filter((t) => t.topic?.status === 'Weak').length;
                       return (

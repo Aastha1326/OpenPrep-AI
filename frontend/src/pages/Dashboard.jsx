@@ -8,6 +8,7 @@ import {
   LogOut, X, Download, Upload, Settings, MessageSquare,
 } from 'lucide-react';
 import API from '../services/api';
+import { toDateOnlyString } from '../utils/dateUtils';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip as LineTooltip, ResponsiveContainer,
@@ -24,10 +25,12 @@ import CreateNoteModal from '../components/dashboard/CreateNoteModal';
 import StudyPlanModal from '../components/dashboard/StudyPlanModal';
 import PyqAnalysisModal from '../components/dashboard/PyqAnalysisModal';
 import WeaknessDashboardWidget from '../components/dashboard/WeaknessDashboardWidget';
+import LeaderboardWidget from '../components/dashboard/LeaderboardWidget';
 import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
 import TargetExamOverviewWidget from '../components/dashboard/TargetExamOverviewWidget';
 import CompositeBundleModal from '../components/dashboard/CompositeBundleModal';
 import SyllabusImportModal from '../components/dashboard/SyllabusImportModal';
+import NotesWidget from '../components/dashboard/NotesWidget';
 import ThemeToggle from '../components/ThemeToggle';
 import BadgesList from '../components/BadgesList';
 import SM2SettingsModal from '../components/dashboard/SM2SettingsModal';
@@ -292,12 +295,8 @@ const Dashboard = () => {
 
   const todayTasks = (() => {
     if (!activePlan?.dailyGoals) return [];
-    const now = new Date();
-    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    const todayGoal = activePlan.dailyGoals.find((g) => {
-      const goalDate = g.date ? g.date.split('T')[0] : null;
-      return goalDate === today;
-    });
+    const today = toDateOnlyString(new Date());
+    const todayGoal = activePlan.dailyGoals.find((g) => g.date && toDateOnlyString(g.date) === today);
     if (todayGoal?.tasks) {
       return todayGoal.tasks.map((t, i) => ({
         id: t.id || t._id || `task-${i}`,
@@ -421,6 +420,15 @@ const Dashboard = () => {
               <span className="text-gold-foil font-bold text-2xl">{streakDays} Day</span>
               <span className="text-amber-200/50 text-xs uppercase tracking-widest">Streak</span>
             </div>
+
+            <button
+              onClick={() => navigate('/settings')}
+              className="bg-neutral-800 text-amber-100/80 px-4 py-3 rounded-sm border border-amber-700/40 shadow-[0_4px_15px_rgba(0,0,0,0.5)] hover:bg-neutral-700 hover:text-yellow-400 transition-all flex items-center gap-2 group"
+              aria-label="Settings"
+            >
+              <Settings className="w-5 h-5" />
+              <span className="font-playfair font-bold text-sm tracking-wide hidden sm:inline">Settings</span>
+            </button>
 
             <button
               onClick={handleLogout}
@@ -648,13 +656,19 @@ const Dashboard = () => {
           )}
         </div>
 
-        {/* --- AI WEAKNESS DETECTION WIDGET --- */}
-        <div className="my-6">
+        {/* --- LEADERBOARD & AI WEAKNESS DETECTION WIDGETS --- */}
+        <div className="my-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <LeaderboardWidget />
           <WeaknessDashboardWidget />
         </div>
 
         <div className="my-6">
           <BadgesList achievements={user?.achievements || []} />
+        </div>
+
+        {/* --- AI REVISION SUMMARIES + AUDIO READER --- */}
+        <div className="my-6">
+          <NotesWidget limit={5} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

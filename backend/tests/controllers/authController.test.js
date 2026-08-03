@@ -1,6 +1,7 @@
 const request = require('supertest');
 const express = require('express');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const authRoutes = require('../../routes/authRoutes');
 const errorHandler = require('../../middleware/error');
 const User = require('../../models/User');
@@ -576,6 +577,81 @@ describe('Auth Controller - Integration Tests', () => {
         .post('/api/auth/refresh-token')
         .send({ refreshToken: secondToken });
       expect(secondReplay.status).toBe(401);
+    });
+  });
+});
+
+describe('Auth Settings - Integration Tests', () => {
+  let settingsUser;
+  let settingsToken;
+
+  beforeAll(async () => {
+    settingsUser = await createVerifiedUser({
+      email: 'settings@example.com',
+      name: 'Settings User',
+    });
+    settingsToken = jwt.sign({ id: settingsUser.id, type: 'access' }, process.env.JWT_SECRET);
+  });
+
+  // =========================================================================
+  // GET /api/auth/me — should surface leaderboardVisible
+  // =========================================================================
+  describe('GET /api/auth/me', () => {
+    it('should include leaderboardVisible in the returned user', async () => {
+      const res = await request(app)
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${settingsToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.user).toHaveProperty('leaderboardVisible', true);
+    });
+  });
+
+  // =========================================================================
+  // PATCH /api/auth/settings
+  // =========================================================================
+  describe('PATCH /api/auth/settings', () => {
+    it('should update leaderboardVisible to false (anonymous mode)', async () => {
+      const res = await request(app)
+        .patch('/api/auth/settings')
+        .set('Authorization', `Bearer ${settingsToken}`)
+        .send({ leaderboardVisible: false });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.user).toHaveProperty('leaderboardVisible', false);
+
+      const reloaded = await User.findByPk(settingsUser.id);
+      expect(reloaded.leaderboardVisible).toBe(false);
+    });
+
+    it('should update leaderboardVisible back to true', async () => {
+      const res = await request(app)
+        .patch('/api/auth/settings')
+        .set('Authorization', `Bearer ${settingsToken}`)
+        .send({ leaderboardVisible: true });
+
+      expect(res.status).toBe(200);
+      expect(res.body.user).toHaveProperty('leaderboardVisible', true);
+    });
+
+    it('should return 401 without a token', async () => {
+      const res = await request(app)
+        .patch('/api/auth/settings')
+        .send({ leaderboardVisible: false });
+
+      expect(res.status).toBe(401);
+    });
+
+    it('should return 400 when leaderboardVisible is not a boolean', async () => {
+      const res = await request(app)
+        .patch('/api/auth/settings')
+        .set('Authorization', `Bearer ${settingsToken}`)
+        .send({ leaderboardVisible: 'no' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
     });
   });
 });
