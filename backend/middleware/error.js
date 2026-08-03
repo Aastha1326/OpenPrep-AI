@@ -54,6 +54,22 @@ const errorHandler = (err, req, res, next) => {
     error.statusCode = 400;
   }
 
+  // JWT Errors
+  if (err.name === 'TokenExpiredError') {
+    return res.status(401).json({
+      success: false,
+      message: 'Token expired',
+      error: 'Token expired',
+    });
+  }
+  if (err.name === 'JsonWebTokenError') {
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid token',
+      error: 'Not authorized to access this route',
+    });
+  }
+
   // Timeout error handling
   if (err.statusCode === 408 || err.message?.includes('timed out')) {
     error.statusCode = 408;
