@@ -28,6 +28,7 @@ import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
 import TargetExamOverviewWidget from '../components/dashboard/TargetExamOverviewWidget';
 import CompositeBundleModal from '../components/dashboard/CompositeBundleModal';
 import SyllabusImportModal from '../components/dashboard/SyllabusImportModal';
+import NotesWidget from '../components/dashboard/NotesWidget';
 import ThemeToggle from '../components/ThemeToggle';
 import BadgesList from '../components/BadgesList';
 import SM2SettingsModal from '../components/dashboard/SM2SettingsModal';
@@ -654,6 +655,11 @@ const Dashboard = () => {
 
         <div className="my-6">
           <BadgesList achievements={user?.achievements || []} />
+        </div>
+
+        {/* --- AI REVISION SUMMARIES + AUDIO READER --- */}
+        <div className="my-6">
+          <NotesWidget limit={5} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
