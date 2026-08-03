@@ -9,6 +9,7 @@ const Progress = require('../models/Progress');
 const geminiService = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
 const { default: Exporter } = require('anki-apkg-export');
+const { calculateSM2 } = require('../utils/sm2');
 
 // @desc    Generate AI Flashcards
 // @route   POST /api/flashcards/generate-ai
@@ -181,33 +182,24 @@ exports.reviewFlashcard = async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'Flashcard not found' });
     }
 
-    // SuperMemo SM-2 Algorithm
-    let { interval, repetitions, efactor } = card;
+    // SuperMemo SM-2 Algorithm using custom settings
+    const result = calculateSM2({
+      interval: card.interval,
+      repetitions: card.repetitions,
+      efactor: card.efactor,
+      quality,
+      easyFactorModifier: req.user.sm2EasyFactorModifier,
+      intervalModifier: req.user.sm2IntervalModifier,
+      step1Interval: req.user.sm2Step1Interval,
+      step2Interval: req.user.sm2Step2Interval,
+    });
 
-    if (quality >= 3) {
-      if (repetitions === 0) {
-        interval = 1;
-      } else if (repetitions === 1) {
-        interval = 6;
-      } else {
-        interval = Math.round(interval * efactor);
-      }
-      repetitions += 1;
-    } else {
-      repetitions = 0;
-      interval = 1;
-    }
-
-    // Adjust E-Factor
-    efactor = efactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
-    if (efactor < 1.3) efactor = 1.3;
-
-    card.interval = interval;
-    card.repetitions = repetitions;
-    card.efactor = efactor;
+    card.interval = result.interval;
+    card.repetitions = result.repetitions;
+    card.efactor = result.efactor;
 
     // Set next review date from now
-    card.nextReviewDate = new Date(Date.now() + interval * 24 * 60 * 60 * 1000);
+    card.nextReviewDate = new Date(Date.now() + card.interval * 24 * 60 * 60 * 1000);
     await card.save();
 
     // If card is mastered (quality >= 4), increment mastered count in progress
