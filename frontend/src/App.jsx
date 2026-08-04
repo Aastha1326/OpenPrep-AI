@@ -1,12 +1,14 @@
 import { useEffect, lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
-import { loadUser } from './store/slices/authSlice';
+import { useDispatch, useSelector } from 'react-redux';
+import { loadUser, checkTokenFreshness } from './store/slices/authSlice';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
 import CustomCursor from './components/CustomCursor';
 import ScrollToTop from './components/ScrollToTop';
-import MobileNavDrawer from './components/MobileNavDrawer';import PageLoader from './components/PageLoader';
+import MobileNavDrawer from './components/MobileNavDrawer';
+import PageLoader from './components/PageLoader';
+import SessionTimeoutModal from './components/dashboard/SessionTimeoutModal';
 import './App.css';
 
 const Landing = lazy(() => import('./pages/Landing'));
@@ -26,6 +28,7 @@ const StudyGroupChat = lazy(() => import('./pages/StudyGroupChat'));
 
 function App() {
   const dispatch = useDispatch();
+  const { sessionExpired } = useSelector((state) => state.auth);
 
   useEffect(() => {
     if (localStorage.getItem('token')) {
@@ -33,11 +36,32 @@ function App() {
     }
   }, [dispatch]);
 
+  // Check token freshness when the user returns to a background tab
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        dispatch(checkTokenFreshness());
+      }
+    };
+    const handleFocus = () => {
+      dispatch(checkTokenFreshness());
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [dispatch]);
+
   return (
     <>
-<CustomCursor />
+      <CustomCursor />
       <ScrollToTop />
-      <MobileNavDrawer />      <Suspense fallback={<PageLoader />}>
+      <MobileNavDrawer />
+      <SessionTimeoutModal isOpen={sessionExpired} />
+      <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/register" element={<Register />} />
@@ -96,7 +120,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-          
+
           <Route element={<AdminRoute />}>
             <Route path="/admin" element={<AdminDashboard />} />
           </Route>
