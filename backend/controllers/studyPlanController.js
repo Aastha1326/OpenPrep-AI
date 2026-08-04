@@ -527,3 +527,91 @@ exports.rescheduleAdaptivePlan = async (req, res, next) => {
     next(error);
   }
 };
+// @desc    Export Study Plan as RFC 5545 .ics calendar file
+// @route   GET /api/study-plans/:id/export-ics
+// @access  Private
+exports.exportStudyPlanIcs = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const plan = await StudyPlan.findOne({
+      where: { id, user: req.user.id },
+      include: [{ model: Exam, as: 'examRef' }],
+    });
+
+    if (!plan) {
+      return res.status(404).json({ success: false, error: 'Study plan not found' });
+    }
+
+    const examName = plan.examRef ? plan.examRef.name : 'Exam Study Plan';
+    
+    // Helper to format JS date to RFC 5545 UTC timestamp format (YYYYMMDDTHHmmssZ)
+    const formatIcsDate = (date) => {
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+      return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    };
+
+    const nowTimestamp = formatIcsDate(new Date());
+
+    let icsLines = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//OpenPrep-AI//Study Plan Calendar//EN',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      `X-WR-CALNAME:${examName} - Study Plan`,
+    ];
+
+    if (Array.isArray(plan.dailyGoals)) {
+      for (const goal of plan.dailyGoals) {
+        const goalDateStr = goal.date; // YYYY-MM-DD format
+        if (!goalDateStr || !Array.isArray(goal.tasks)) continue;
+
+        // Base start time for tasks on this day (e.g., 09:00:00 UTC)
+        let baseHour = 9;
+        for (const task of goal.tasks) {
+          const startDateObj = new Date(`${goalDateStr}T${String(baseHour).padStart(2, '0')}:00:00Z`);
+          const durationMinutes = task.duration || 60;
+          const endDateObj = new Date(startDateObj.getTime() + durationMinutes * 60000);
+
+          const dtStart = formatIcsDate(startDateObj);
+          const dtEnd = formatIcsDate(endDateObj);
+          const uid = `${task._id || uuidv4()}@openprep.ai`;
+          const summary = `Study: ${task.title} (${examName})`;
+          const description = `Scheduled study session for exam: ${examName}. Duration: ${durationMinutes} minutes.`;
+
+          icsLines.push(
+            'BEGIN:VEVENT',
+            `UID:${uid}`,
+            `DTSTAMP:${nowTimestamp}`,
+            `DTSTART:${dtStart}`,
+            `DTEND:${dtEnd}`,
+            `SUMMARY:${summary}`,
+            `DESCRIPTION:${description}`,
+            // Add reminder notification metadata (VALARM - 15 minutes prior)
+            'BEGIN:VALARM',
+            'TRIGGER:-PT15M',
+            'ACTION:DISPLAY',
+            `DESCRIPTION:Reminder: ${task.title} starts in 15 minutes`,
+            'END:VALARM',
+            'END:VEVENT'
+          );
+
+          // Increment start hour for subsequent tasks on the same day
+          baseHour += Math.ceil(durationMinutes / 60);
+          if (baseHour > 20) baseHour = 9; // wrap around if too late
+        }
+      }
+    }
+
+    icsLines.push('END:VCALENDAR');
+
+    const icsContent = icsLines.join('\r\n');
+
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="study-plan-${id}.ics"`);
+    return res.status(200).send(icsContent);
+  } catch (error) {
+    next(error);
+  }
+};

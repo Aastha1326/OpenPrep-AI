@@ -95,6 +95,7 @@ const router = express.Router();
  */
 
 router.post('/generate-ai', protect, aiLimiter, checkQuota, validateGenerateAIPlan, generateAIPlan);
+router.get('/:id/export-ics', protect, studyPlanController.exportStudyPlanIcs);
 
 /**
  * @swagger
