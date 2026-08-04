@@ -670,6 +670,57 @@ exports.summarizeNoteText = async (content, subjectName = 'the subject', forceRe
   }
 };
 
+/**
+ * 7. Generate AI Revision Sheet for Weak Topics & Incorrect Questions
+ */
+exports.generateRevisionSheet = async (mistookQuestions = [], subjectName = 'General Subject', topicName = 'Weak Concepts', forceRefresh = false) => {
+  if (!genAI) {
+    console.warn('Gemini API key not configured. Using Mock Data for Revision Sheet.');
+    return { _mock: true, ...getMockRevisionSheet(subjectName, topicName, mistookQuestions) };
+  }
+
+  const cacheKey = hashKey('revisionSheet', `${subjectName}:${topicName}:${JSON.stringify(mistookQuestions)}`);
+
+  if (!forceRefresh) {
+    const cached = responseCache.get(cacheKey);
+    if (cached) return cached;
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const prompt = `
+      You are an expert academic tutor and AI revision assistant.
+      The student recently attempted a practice quiz on "${subjectName} - ${topicName}" and made mistakes on the following question(s):
+      ${JSON.stringify(mistookQuestions, null, 2)}
+
+      Analyze these incorrect questions to extract the key underlying weak concepts, core formulas, critical facts, and common pitfalls.
+      Create a comprehensive, well-structured Markdown revision sheet for the student.
+
+      Your response MUST be a JSON object with this exact structure:
+      {
+        "title": "string (e.g. AI Concept Revision Sheet: Topic Name)",
+        "summaryMarkdown": "string (A rich GitHub-Flavored Markdown text containing # Title, ## Core Concepts & Formulas, ## Key Takeaways, ## Pitfalls to Avoid, and ## Quick Practice Hints)"
+      }
+    `;
+
+    const result = await generateWithRetry(model, prompt);
+    const parsed = cleanJSON(result.response.text());
+
+    if (!parsed || !parsed.summaryMarkdown) {
+      return getMockRevisionSheet(subjectName, topicName, mistookQuestions);
+    }
+
+    responseCache.set(cacheKey, parsed);
+    return parsed;
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError || error instanceof GeminiServerError) {
+      throw error;
+    }
+    console.error('Gemini revision sheet generation failed:', error);
+    return getMockRevisionSheet(subjectName, topicName, mistookQuestions);
+  }
+};
+
 // Export validation helpers for unit testing
 exports.validateResponse = validateResponse;
 exports.RESPONSE_SCHEMAS = RESPONSE_SCHEMAS;
@@ -803,5 +854,39 @@ function getMockNoteSummary(subjectName) {
       'Practice applying concepts to novel scenarios, as exams frequently test transfer of knowledge',
       'Create summary flashcards for key terms and review them using spaced repetition',
     ],
+  };
+}
+
+function getMockRevisionSheet(subjectName, topicName, mistookQuestions) {
+  const missedCount = Array.isArray(mistookQuestions) ? mistookQuestions.length : 0;
+  const questionsListMarkdown = Array.isArray(mistookQuestions) && mistookQuestions.length > 0
+    ? mistookQuestions.map((q, idx) => `* **Question ${idx + 1}**: ${q.questionText || q.question || 'Concept question'} (Selected option: ${q.userSelectedAnswer !== undefined ? q.userSelectedAnswer : 'Incorrect'})`).join('\n')
+    : '* Review general missed questions from quiz history.';
+
+  return {
+    title: `AI Revision Summary: ${topicName || subjectName}`,
+    summaryMarkdown: `# AI Concept Revision Sheet: ${topicName || subjectName}
+
+## Executive Summary
+This revision sheet analyzes your recent quiz attempt on **${subjectName} - ${topicName}**, where **${missedCount} question(s)** were identified as weak areas.
+
+## Missed Questions & Target Weaknesses
+${questionsListMarkdown}
+
+## Core Concepts & Key Formulas
+1. **Fundamental Principle**: Ensure clear separation of core parameters and boundary conditions.
+2. **Formula / Rule**: $E = mc^2$ or $O(N \\log N)$ complexity bounds depending on algorithmic context.
+3. **Primary Definition**: Re-verify definition constraints before committing choices.
+
+## Key Takeaways
+- Read options carefully to eliminate distractor answers.
+- Pay attention to specific phrasing such as "NOT", "ALWAYS", or "EXCEPT".
+- Always calculate time and space constraints upfront.
+
+## Action Steps
+- [ ] Review lecture notes on ${topicName}.
+- [ ] Practice flashcards associated with ${subjectName}.
+- [ ] Attempt a refresher quiz on weak topics.
+`
   };
 }

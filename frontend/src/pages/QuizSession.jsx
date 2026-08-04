@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FaCheckCircle, FaTimesCircle, FaArrowRight, FaTrophy, FaArrowLeft } from 'react-icons/fa';
+import { FaCheckCircle, FaTimesCircle, FaArrowRight, FaTrophy, FaArrowLeft, FaBrain } from 'react-icons/fa';
 import API from '../services/api';
+import RevisionSheetModal from '../components/dashboard/RevisionSheetModal';
 
 const SECONDS_PER_QUESTION = 60;
 
@@ -23,6 +24,7 @@ const QuizSession = () => {
   const [answers, setAnswers] = useState({}); // { questionId: selectedOption }
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState(null);
+  const [isRevisionModalOpen, setIsRevisionModalOpen] = useState(false);
 
   const [timeLeft, setTimeLeft] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -304,14 +306,30 @@ const QuizSession = () => {
               })}
             </div>
             
-            <div className="mt-8 text-center">
+            <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+              <button
+                onClick={() => setIsRevisionModalOpen(true)}
+                className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-lg font-semibold shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2 transition-all"
+              >
+                <FaBrain className="text-yellow-300" /> Generate AI Concept Revision Sheet
+              </button>
+
               <button
                 onClick={() => navigate('/dashboard')}
-                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 rounded-lg font-medium transition-colors"
+                className="w-full sm:w-auto px-6 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition-colors"
               >
                 Back to Dashboard
               </button>
             </div>
+
+            <RevisionSheetModal
+              isOpen={isRevisionModalOpen}
+              onClose={() => setIsRevisionModalOpen(false)}
+              quizAttemptId={result?.id || result?._id}
+              subjectId={quiz.subject?.id || quiz.subject}
+              topicId={quiz.topic?.id || quiz.topic}
+              topicName={quiz.topic?.name}
+            />
           </div>
         )}
       </div>
