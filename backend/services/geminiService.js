@@ -2,6 +2,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const NodeCache = require('node-cache');
 const crypto = require('crypto');
 const { splitIntoChunks } = require('../utils/textChunking');
+const { toLocalDateString } = require('../utils/dateUtils');
 
 // Notes larger than this are split into semantic chunks and summarized
 // across multiple Gemini passes so no content is silently dropped.
