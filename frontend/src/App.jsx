@@ -6,7 +6,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
 import CustomCursor from './components/CustomCursor';
 import ScrollToTop from './components/ScrollToTop';
-import MobileNavDrawer from './components/MobileNavDrawer';import PageLoader from './components/PageLoader';
+import MobileNavDrawer from './components/MobileNavDrawer';
+import PageLoader from './components/PageLoader';
 import './App.css';
 
 const Landing = lazy(() => import('./pages/Landing'));
@@ -35,9 +36,10 @@ function App() {
 
   return (
     <>
-<CustomCursor />
+      <CustomCursor />
       <ScrollToTop />
-      <MobileNavDrawer />      <Suspense fallback={<PageLoader />}>
+      <MobileNavDrawer />
+      <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/register" element={<Register />} />
@@ -71,6 +73,14 @@ function App() {
             }
           />
           <Route
+            path="/battle/join/:roomId"
+            element={
+              <ProtectedRoute>
+                <BattleArena />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/study-group"
             element={
               <ProtectedRoute>
@@ -96,7 +106,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-          
+
           <Route element={<AdminRoute />}>
             <Route path="/admin" element={<AdminDashboard />} />
           </Route>

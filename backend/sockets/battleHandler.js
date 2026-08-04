@@ -1,3 +1,5 @@
+const { createRoomState, roomRequiresPassword, isPasswordValid } = require('./battleRoomAccess');
+
 const rooms = {};
 
 const isAllReady = (room) => {
@@ -19,53 +21,116 @@ const tryStartBattle = (io, roomId) => {
   });
 };
 
+const addPlayerToRoom = ({ io, socket, roomId, username, roomName, password }) => {
+  if (!rooms[roomId]) {
+    rooms[roomId] = createRoomState({ roomId, roomName, password });
+  }
+
+  if (password) {
+    rooms[roomId].password = password;
+  }
+
+  if (roomName) {
+    rooms[roomId].name = roomName;
+  }
+
+  rooms[roomId].players[socket.id] = {
+    username: username || 'Anonymous',
+    score: 0,
+    isReady: false,
+    online: true,
+  };
+
+  io.to(roomId).emit('room_update', {
+    players: rooms[roomId].players,
+    status: rooms[roomId].status,
+  });
+
+  io.to(roomId).emit('presence_update', {
+    socketId: socket.id,
+    username: username || 'Anonymous',
+    online: true,
+  });
+
+  return rooms[roomId];
+};
+
 module.exports = (io) => {
   io.on('connection', (socket) => {
     console.log(`Socket connected: ${socket.id}`);
 
-    // Join a battle room
-    socket.on('join_room', ({ roomId, username }) => {
-      socket.join(roomId);
+    const handleJoinAttempt = (payload, callback) => {
+      const roomId = (payload?.roomId || '').toUpperCase();
+      const username = payload?.username || 'Anonymous';
+      const roomName = payload?.roomName || 'Battle Room';
+      const enteredPassword = payload?.password || '';
 
-      if (!rooms[roomId]) {
-        rooms[roomId] = {
-          players: {},
-          status: 'waiting',
-          questions: [],
-        };
+      if (!roomId) {
+        if (callback) {
+          callback({ success: false, message: 'A room code is required.' });
+        }
+        return;
       }
 
-      rooms[roomId].players[socket.id] = {
-        username: username || 'Anonymous',
-        score: 0,
-        isReady: false,
-        online: true,
-      };
+      const existingRoom = rooms[roomId];
+      if (existingRoom && roomRequiresPassword(existingRoom) && !isPasswordValid(existingRoom, enteredPassword)) {
+        if (callback) {
+          callback({
+            success: false,
+            requiresPassword: true,
+            message: 'Incorrect password',
+          });
+        }
+        return;
+      }
 
-      // Notify everyone in the room about the updated players list
-      io.to(roomId).emit('room_update', {
-        players: rooms[roomId].players,
-        status: rooms[roomId].status,
+      socket.join(roomId);
+      const room = addPlayerToRoom({
+        io,
+        socket,
+        roomId,
+        username,
+        roomName,
+        password: enteredPassword,
       });
 
-      // Broadcast presence so clients can track who is online
-      io.to(roomId).emit('presence_update', {
-        socketId: socket.id,
-        username: username || 'Anonymous',
-        online: true,
-      });
+      if (callback) {
+        callback({
+          success: true,
+          roomId,
+          room: {
+            id: room.id,
+            name: room.name,
+            password: room.password,
+          },
+          isPrivate: roomRequiresPassword(room),
+        });
+      }
 
       console.log(`User ${username} joined room ${roomId}`);
+    };
+
+    socket.on('create-room', (payload, callback) => {
+      handleJoinAttempt({ ...payload, password: payload?.password || '' }, callback);
     });
 
-    // Player toggles ready status
+    socket.on('join-room', (payload, callback) => {
+      handleJoinAttempt(payload, callback);
+    });
+
+    socket.on('join_room', (payload, callback) => {
+      const normalizedPayload = typeof payload === 'string'
+        ? { roomId: payload, username: 'Anonymous' }
+        : payload;
+      handleJoinAttempt(normalizedPayload, callback);
+    });
+
     socket.on('toggle_ready', ({ roomId }) => {
       const player = rooms[roomId] && rooms[roomId].players[socket.id];
       if (!player) return;
 
       player.isReady = !player.isReady;
 
-      // Live readiness broadcast
       io.to(roomId).emit('user:ready', {
         socketId: socket.id,
         username: player.username,
@@ -80,7 +145,6 @@ module.exports = (io) => {
       tryStartBattle(io, roomId);
     });
 
-    // Explicit ready-state update (live presence in lobby)
     socket.on('user:ready', ({ roomId, isReady }) => {
       const player = rooms[roomId] && rooms[roomId].players[socket.id];
       if (!player) return;
@@ -101,12 +165,10 @@ module.exports = (io) => {
       tryStartBattle(io, roomId);
     });
 
-    // Live typing / answering indicator
     socket.on('user:typing', ({ roomId, isTyping }) => {
       const player = rooms[roomId] && rooms[roomId].players[socket.id];
       if (!player) return;
 
-      // socket.to excludes the sender
       socket.to(roomId).emit('user:typing', {
         socketId: socket.id,
         username: player.username,
@@ -114,7 +176,6 @@ module.exports = (io) => {
       });
     });
 
-    // Submit answer and update score
     socket.on('submit_answer', ({ roomId, isCorrect, points = 10 }) => {
       const player = rooms[roomId] && rooms[roomId].players[socket.id];
       if (player && rooms[roomId].status === 'playing') {
@@ -128,27 +189,22 @@ module.exports = (io) => {
       }
     });
 
-    // Handle disconnect
     socket.on('disconnect', () => {
       console.log(`Socket disconnected: ${socket.id}`);
-      // Find and remove user from any rooms
       for (const roomId in rooms) {
         if (rooms[roomId].players[socket.id]) {
           const username = rooms[roomId].players[socket.id].username;
           delete rooms[roomId].players[socket.id];
 
-          // Broadcast presence so clients can clear offline users
           io.to(roomId).emit('presence_update', {
             socketId: socket.id,
             username,
             online: false,
           });
 
-          // If room is empty, delete it
           if (Object.keys(rooms[roomId].players).length === 0) {
             delete rooms[roomId];
           } else {
-            // Notify remaining players
             io.to(roomId).emit('player_left', { username });
             io.to(roomId).emit('room_update', {
               players: rooms[roomId].players,
