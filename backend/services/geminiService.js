@@ -193,6 +193,12 @@ const RESPONSE_SCHEMAS = {
     summary: 'string',
     keyConcepts: 'array',
     examTips: 'array'
+  },
+  audioSummary: {
+    transcription: 'string',
+    summary: 'string',
+    keyConcepts: 'array',
+    examTips: 'array'
   }
 };
 
@@ -940,3 +946,60 @@ function getMockNoteSummary(subjectName) {
     ],
   };
 }
+
+/**
+ * 6. Transcribe & Summarize Audio
+ */
+exports.transcribeAndSummarizeAudio = async (fileBuffer, mimeType, subjectName) => {
+  if (!genAI) {
+    console.warn('Gemini API key not configured. Using Mock Audio transcription and summary.');
+    return {
+      transcription: `Mock transcription: Today we are discussing key topics in ${subjectName || 'this subject'}. In standard lectures, we cover core definitions and formulas.`,
+      summary: `This lecture introduces core definitions and principles relevant to ${subjectName || 'the subject'}.`,
+      keyConcepts: ['Introductory concepts', 'Core principles'],
+      examTips: ['Review basic formulas', 'Focus on terminology'],
+    };
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const prompt = `
+      You are an expert academic tutor. You are given an audio recording from a study session or class for the subject "${subjectName || 'General Study'}".
+      Please perform two tasks:
+      1. Transcribe the audio content as accurately and completely as possible.
+      2. Generate a structured study summary based on the transcription.
+
+      Return the result STRICTLY as a JSON object with this exact structure:
+      {
+        "transcription": "string",
+        "summary": "string",
+        "keyConcepts": ["string"],
+        "examTips": ["string"]
+      }
+    `;
+
+    const result = await generateWithRetry(model, [
+      {
+        inlineData: {
+          data: Buffer.from(fileBuffer).toString('base64'),
+          mimeType: mimeType || 'audio/mp3',
+        },
+      },
+      prompt,
+    ]);
+
+    const parsed = cleanJSON(result.response.text());
+    return parsed;
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError || error instanceof GeminiServerError) {
+      throw error;
+    }
+    console.error('Gemini audio transcription and summarization failed:', error);
+    return {
+      transcription: `Unable to transcribe audio due to error: ${error.message}`,
+      summary: 'Failed to generate study summary from the audio.',
+      keyConcepts: [],
+      examTips: [],
+    };
+  }
+};

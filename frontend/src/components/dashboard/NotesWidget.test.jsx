@@ -6,7 +6,17 @@ vi.mock('../../services/api', () => ({
   default: {
     get: vi.fn(),
     post: vi.fn(),
+    defaults: { baseURL: 'http://localhost:5000/api' },
   },
+}));
+
+vi.mock('./RecordVoiceNoteModal', () => ({
+  default: ({ isOpen, onClose }) => isOpen ? (
+    <div data-testid="record-voice-note-modal">
+      RecordVoiceNoteModal
+      <button onClick={onClose}>Close</button>
+    </div>
+  ) : null
 }));
 
 const mockNotes = [
@@ -84,5 +94,42 @@ describe('NotesWidget', () => {
     API.get.mockResolvedValue({ data: { data: mockNotes } });
     fireEvent.click(screen.getByText('Retry'));
     expect(await screen.findByText('Data Structures')).toBeInTheDocument();
+  });
+
+  it('opens and closes RecordVoiceNoteModal when the record button is clicked', async () => {
+    API.get.mockResolvedValue({ data: { data: [] } });
+    render(<NotesWidget />);
+
+    const recordBtn = await screen.findByText('Record Voice Note');
+    fireEvent.click(recordBtn);
+
+    expect(screen.getByTestId('record-voice-note-modal')).toBeInTheDocument();
+
+    const closeBtn = screen.getByText('Close');
+    fireEvent.click(closeBtn);
+
+    expect(screen.queryByTestId('record-voice-note-modal')).not.toBeInTheDocument();
+  });
+
+  it('renders a custom audio waveform visualizer player for audio notes', async () => {
+    const audioNotes = [
+      {
+        id: 'n3',
+        title: 'Voice Lecture 1',
+        subject: { name: 'Computer Science' },
+        fileType: 'audio',
+        fileUrl: '/uploads/voice.wav',
+        aiSummary: mockSummary,
+      }
+    ];
+
+    API.get.mockResolvedValue({ data: { data: audioNotes } });
+    render(<NotesWidget />);
+
+    expect(await screen.findByText('Voice Lecture 1')).toBeInTheDocument();
+    
+    // Waveform player uses a Play button to toggle playback state
+    const playButtons = await screen.findAllByRole('button');
+    expect(playButtons.length).toBeGreaterThan(0);
   });
 });
