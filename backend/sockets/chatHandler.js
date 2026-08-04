@@ -45,6 +45,19 @@ module.exports = (io) => {
       io.to(roomId).emit('new_chat_message', messagePayload);
     });
 
+    // Live typing indicator
+    socket.on('user:typing', ({ roomId, isTyping }) => {
+      if (!roomId) return;
+
+      const sender = (rooms[roomId] && rooms[roomId].users[socket.id]) || 'Anonymous';
+
+      // socket.to excludes the sender
+      socket.to(roomId).emit('user:typing', {
+        username: sender,
+        isTyping: !!isTyping,
+      });
+    });
+
     // Explicitly leave chat room
     socket.on('leave_chat_room', ({ roomId }) => {
       if (!roomId) return;
@@ -58,6 +71,12 @@ module.exports = (io) => {
         // Notify remaining users of updated list
         io.to(roomId).emit('chat_room_update', {
           users: Object.values(rooms[roomId].users),
+        });
+
+        // Clear any lingering typing indicator from this user
+        socket.to(roomId).emit('user:typing', {
+          username,
+          isTyping: false,
         });
 
         // Clean up empty rooms
@@ -82,6 +101,12 @@ module.exports = (io) => {
           // Notify remaining users of updated list
           io.to(roomId).emit('chat_room_update', {
             users: Object.values(rooms[roomId].users),
+          });
+
+          // Clear any lingering typing indicator from this user
+          socket.to(roomId).emit('user:typing', {
+            username,
+            isTyping: false,
           });
 
           // Clean up empty rooms

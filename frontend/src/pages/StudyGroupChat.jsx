@@ -26,7 +26,10 @@ const StudyGroupChat = () => {
   
   // UI States
   const [copied, setCopied] = useState(false);
+  const [typingUsers, setTypingUsers] = useState({});
   const messagesEndRef = useRef(null);
+  const stopTypingTimerRef = useRef(null);
+  const typingClearTimersRef = useRef({});
 
   useEffect(() => {
     // Connect socket on mount
@@ -41,10 +44,33 @@ const StudyGroupChat = () => {
       setMessages((prev) => [...prev, message]);
     });
 
+    socket.on('user:typing', ({ username, isTyping }) => {
+      clearTimeout(typingClearTimersRef.current[username]);
+      setTypingUsers((prev) => {
+        const next = { ...prev };
+        if (isTyping) next[username] = true;
+        else delete next[username];
+        return next;
+      });
+
+      if (isTyping) {
+        typingClearTimersRef.current[username] = setTimeout(() => {
+          setTypingUsers((prev) => {
+            const next = { ...prev };
+            delete next[username];
+            return next;
+          });
+        }, 3000);
+      }
+    });
+
     return () => {
       // Cleanup on unmount
       socket.off('chat_room_update');
       socket.off('new_chat_message');
+      socket.off('user:typing');
+      clearTimeout(stopTypingTimerRef.current);
+      socket.emit('user:typing', { roomId, isTyping: false });
       socket.disconnect();
     };
   }, []);
@@ -72,20 +98,40 @@ const StudyGroupChat = () => {
   };
 
   const handleLeave = () => {
+    clearTimeout(stopTypingTimerRef.current);
+    socket.emit('user:typing', { roomId, isTyping: false });
     socket.emit('leave_chat_room', { roomId });
     setJoined(false);
     setRoomId('');
     setRoomIdInput('');
     setMessages([]);
     setParticipants([]);
+    setTypingUsers({});
   };
 
   const handleSendMessage = (e) => {
     e?.preventDefault();
     if (inputText.trim()) {
       socket.emit('send_chat_message', { roomId, messageText: inputText });
+      socket.emit('user:typing', { roomId, isTyping: false });
       setInputText('');
     }
+  };
+
+  const handleInputChange = (e) => {
+    const value = e.target.value;
+    setInputText(value);
+
+    if (value.trim()) {
+      socket.emit('user:typing', { roomId, isTyping: true });
+    } else {
+      socket.emit('user:typing', { roomId, isTyping: false });
+    }
+
+    clearTimeout(stopTypingTimerRef.current);
+    stopTypingTimerRef.current = setTimeout(() => {
+      socket.emit('user:typing', { roomId, isTyping: false });
+    }, 2000);
   };
 
   const handleKeyDown = (e) => {
@@ -332,13 +378,31 @@ const StudyGroupChat = () => {
                       </div>
                     </div>
 
+                    {/* Live typing indicator */}
+                    {Object.keys(typingUsers).filter((name) => name !== user?.name).length > 0 && (
+                      <div className="px-6 pt-3 text-xs text-yellow-700 font-serif italic flex items-center gap-1.5">
+                        <span>
+                          {Object.keys(typingUsers).filter((name) => name !== user?.name).join(', ')} is typing
+                        </span>
+                        <span className="inline-flex items-center">
+                          {[0, 1, 2].map((dot) => (
+                            <span
+                              key={dot}
+                              className="w-1 h-1 bg-yellow-600 rounded-full animate-bounce mr-0.5"
+                              style={{ animationDelay: `${dot * 150}ms` }}
+                            />
+                          ))}
+                        </span>
+                      </div>
+                    )}
+
                     {/* Input Area */}
                     <form onSubmit={handleSendMessage} className="p-4 bg-white flex gap-3 items-end">
                       <div className="flex-1">
                         <textarea
                           placeholder="Type your markdown study notes, formulas, or code snippet here..."
                           value={inputText}
-                          onChange={(e) => setInputText(e.target.value)}
+                          onChange={handleInputChange}
                           onKeyDown={handleKeyDown}
                           rows={2}
                           className="w-full p-3 bg-white border border-neutral-300 rounded focus:outline-none focus:ring-2 focus:ring-yellow-600 text-sm font-sans resize-none text-neutral-800"
