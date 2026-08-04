@@ -11,6 +11,12 @@ const WeakBadge = () => (
   </span>
 );
 
+const BonusBadge = () => (
+  <span className="inline-flex items-center px-1.5 py-0.5 text-[9px] font-bold rounded bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-900/40 mt-0.5 ml-2">
+    Bonus
+  </span>
+);
+
 const BumpTimeButton = ({ onClick, disabled = false }) => (
   <button
     onClick={(e) => {
@@ -26,7 +32,16 @@ const BumpTimeButton = ({ onClick, disabled = false }) => (
   </button>
 );
 
-const PinnedTasks = ({ tasks = [], loading = false, error = null, onRetry, onToggle, onBumpTime }) => {
+const PinnedTasks = ({
+  tasks = [],
+  progress = 0,
+  completedBonus = 0,
+  loading = false,
+  error = null,
+  onRetry,
+  onToggle,
+  onBumpTime
+}) => {
   if (loading) {
     return (
       <div className="relative bg-[#fdfaf3] dark:bg-slate-800 shadow-[4px_6px_15px_rgba(0,0,0,0.15)] rounded-sm p-6 max-w-sm mx-auto transform rotate-1 hover:rotate-0 transition-transform">
@@ -86,7 +101,7 @@ const PinnedTasks = ({ tasks = [], loading = false, error = null, onRetry, onTog
   const weakCount = tasks.filter((t) => t.topic?.status === 'Weak').length;
 
   return (
-    <div className="relative bg-[#fdfaf3] dark:bg-slate-800 shadow-[4px_6px_15px_rgba(0,0,0,0.15)] rounded-sm p-6 max-w-sm mx-auto transform rotate-1 hover:rotate-0 transition-transform">
+    <div className="relative bg-[#fdfaf3] dark:bg-slate-800 shadow-[4px_6px_15px_rgba(0,0,0,0.15)] rounded-sm p-6 w-full max-w-sm mx-auto transform rotate-1 hover:rotate-0 transition-transform">
       {/* Torn Top Edge Effect */}
       <div className="absolute top-0 left-0 right-0 h-3 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAiIHByZXNlcnZlQXNwZWN0UmF0aW89Im5vbmUiPjxwYXRoIGQ9Ik0wIDEwTDIwIDBMNDAgMTBMNjAgMEw4MCAxMEwxMDAgMFYxMEgwWiIgZmlsbD0iI2ZkZmFmMyIvPjwvc3ZnPg==')] dark:bg-none -translate-y-full" />
 
@@ -105,6 +120,28 @@ const PinnedTasks = ({ tasks = [], loading = false, error = null, onRetry, onTog
             {weakCount} weak task{weakCount === 1 ? '' : 's'}
           </span>
         )}
+      </div>
+
+      {/* Daily Progress Bar */}
+      <div className="w-full mb-4 px-1">
+        <div className="flex justify-between items-center text-[10px] font-bold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
+          <span className="flex items-center gap-1.5 flex-wrap">
+            Daily Progress
+            {completedBonus > 0 && (
+              <span className="inline-flex items-center px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-900/40 shadow-sm">
+                ★ {completedBonus} Bonus Done
+              </span>
+            )}
+          </span>
+          <span className="font-mono text-neutral-900 dark:text-neutral-100">{progress}%</span>
+        </div>
+        <div className="w-full h-3 bg-neutral-200 dark:bg-slate-700 rounded-full overflow-hidden border border-neutral-300 dark:border-slate-600 relative p-0.5">
+          <div
+            data-testid="daily-progress-fill"
+            className="h-full bg-gradient-to-r from-yellow-600 via-amber-500 to-yellow-600 rounded-full transition-all duration-500"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -130,12 +167,13 @@ const PinnedTasks = ({ tasks = [], loading = false, error = null, onRetry, onTog
                 {task.completed && <Check className="w-3 h-3 text-green-600 dark:text-green-400 font-bold" />}
               </div>
               <div className="ml-3 flex-1 min-w-0">
-                <div className="flex flex-wrap items-start gap-y-1">
+                <div className="flex flex-wrap items-center gap-y-1">
                   <span className={`font-inter text-neutral-800 dark:text-neutral-200 ${
                     task.completed ? 'line-through text-neutral-400 dark:text-neutral-500' : ''
                   }`}>
                     {task.text}
                   </span>
+                  {task.isBonus && <BonusBadge />}
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3">
                   {task.duration && (
