@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { socket } from '../services/socket';
-import { FaPlay, FaCheck, FaUsers, FaCopy, FaCrown } from 'react-icons/fa';
+import { FaPlay, FaCheck, FaUsers, FaCopy, FaCrown, FaWifi } from 'react-icons/fa';
 
 const MOCK_QUESTIONS = [
   { id: 'q1', text: 'What is the powerhouse of the cell?', options: ['Nucleus', 'Mitochondria', 'Ribosome', 'Endoplasmic Reticulum'], correct: 'Mitochondria' },
@@ -11,6 +11,29 @@ const MOCK_QUESTIONS = [
   { id: 'q5', text: 'Which planet is known as the Red Planet?', options: ['Venus', 'Jupiter', 'Saturn', 'Mars'], correct: 'Mars' },
 ];
 
+const TypingDots = ({ delay = 0 }) => (
+  <span className="inline-flex items-center">
+    {[0, 1, 2].map((dot) => (
+      <span
+        key={dot}
+        className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce mr-1"
+        style={{ animationDelay: `${delay + dot * 150}ms` }}
+      />
+    ))}
+  </span>
+);
+
+const ReconnectBanner = ({ connected }) => {
+  if (connected) return null;
+
+  return (
+    <div className="fixed top-0 inset-x-0 z-50 bg-amber-500/95 backdrop-blur text-slate-900 text-center py-2.5 px-4 text-sm font-semibold flex items-center justify-center gap-2 shadow-lg">
+      <FaWifi className="animate-pulse" />
+      Connection lost. Reconnecting to the arena...
+    </div>
+  );
+};
+
 const BattleArena = () => {
   const { user } = useSelector((state) => state.auth);
   
@@ -18,12 +41,29 @@ const BattleArena = () => {
   const [joined, setJoined] = useState(false);
   const [players, setPlayers] = useState({});
   const [status, setStatus] = useState('waiting');
+  const [isConnected, setIsConnected] = useState(socket.connected);
+  const [typingPlayers, setTypingPlayers] = useState({});
   
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
 
+  const joinedRef = useRef(false);
+  const roomIdRef = useRef('');
+  const typingTimers = useRef({});
+
   useEffect(() => {
     socket.connect();
+
+    socket.on('connect', () => {
+      setIsConnected(true);
+      // Gracefully rejoin after an unexpected disconnect
+      if (joinedRef.current) {
+        socket.emit('join_room', { roomId: roomIdRef.current, username: user?.name || 'Anonymous' });
+      }
+    });
+
+    socket.on('disconnect', () => setIsConnected(false));
+    socket.on('connect_error', () => setIsConnected(false));
 
     socket.on('room_update', (data) => {
       setPlayers(data.players);
@@ -40,15 +80,59 @@ const BattleArena = () => {
       setPlayers(data.players);
     });
 
-    socket.on('player_left', (data) => {
-      // Optional: show toast notification
+    socket.on('presence_update', ({ socketId, online }) => {
+      setPlayers((prev) => {
+        if (!prev[socketId]) return prev;
+        return { ...prev, [socketId]: { ...prev[socketId], online } };
+      });
+
+      if (!online) {
+        clearTimeout(typingTimers.current[socketId]);
+        setTypingPlayers((prev) => {
+          const next = { ...prev };
+          delete next[socketId];
+          return next;
+        });
+      }
+    });
+
+    socket.on('user:typing', ({ socketId, username, isTyping }) => {
+      setTypingPlayers((prev) => {
+        const next = { ...prev };
+        if (isTyping) next[socketId] = { username };
+        else delete next[socketId];
+        return next;
+      });
+
+      clearTimeout(typingTimers.current[socketId]);
+      if (isTyping) {
+        typingTimers.current[socketId] = setTimeout(() => {
+          setTypingPlayers((prev) => {
+            const next = { ...prev };
+            delete next[socketId];
+            return next;
+          });
+        }, 3000);
+      }
+    });
+
+    socket.on('user:ready', ({ socketId, username, isReady }) => {
+      setPlayers((prev) => ({
+        ...prev,
+        [socketId]: { ...prev[socketId], username, isReady },
+      }));
     });
 
     return () => {
+      socket.off('connect');
+      socket.off('disconnect');
+      socket.off('connect_error');
       socket.off('room_update');
       socket.off('battle_start');
       socket.off('score_update');
-      socket.off('player_left');
+      socket.off('presence_update');
+      socket.off('user:typing');
+      socket.off('user:ready');
       socket.disconnect();
     };
   }, []);
@@ -56,7 +140,9 @@ const BattleArena = () => {
   const handleJoin = (e) => {
     e.preventDefault();
     if (roomId.trim()) {
-      socket.emit('join_room', { roomId, username: user?.name || 'Anonymous' });
+      roomIdRef.current = roomId.trim();
+      joinedRef.current = true;
+      socket.emit('join_room', { roomId: roomIdRef.current, username: user?.name || 'Anonymous' });
       setJoined(true);
     }
   };
@@ -64,19 +150,26 @@ const BattleArena = () => {
   const handleCreateRoom = () => {
     const newRoomId = Math.random().toString(36).substring(2, 8).toUpperCase();
     setRoomId(newRoomId);
+    roomIdRef.current = newRoomId;
+    joinedRef.current = true;
     socket.emit('join_room', { roomId: newRoomId, username: user?.name || 'Anonymous' });
     setJoined(true);
   };
 
   const handleToggleReady = () => {
+    const isReady = !players[socket.id]?.isReady;
     socket.emit('toggle_ready', { roomId });
+    socket.emit('user:ready', { roomId, isReady });
   };
 
   const handleAnswerSelect = (option) => {
     if (selectedAnswer) return; // Prevent multiple selections
 
     setSelectedAnswer(option);
-    
+
+    // Broadcast live "answering" activity to opponents
+    socket.emit('user:typing', { roomId, isTyping: true });
+
     const currentQuestion = MOCK_QUESTIONS[currentQuestionIndex];
     const isCorrect = option === currentQuestion.correct;
     
@@ -84,6 +177,7 @@ const BattleArena = () => {
     
     // Move to next question after short delay
     setTimeout(() => {
+      socket.emit('user:typing', { roomId, isTyping: false });
       if (currentQuestionIndex < MOCK_QUESTIONS.length - 1) {
         setCurrentQuestionIndex(prev => prev + 1);
         setSelectedAnswer(null);
@@ -96,6 +190,7 @@ const BattleArena = () => {
   if (!joined) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <ReconnectBanner connected={isConnected} />
         <div className="bg-slate-800 p-8 rounded-xl border border-slate-700 shadow-2xl w-full max-w-md">
           <div className="text-center mb-8">
             <FaUsers className="text-5xl text-indigo-500 mx-auto mb-4" />
@@ -142,14 +237,19 @@ const BattleArena = () => {
 
   if (status === 'waiting') {
     const isReady = players[socket.id]?.isReady;
+    const onlineCount = Object.values(players).filter((p) => p.online !== false).length;
     
     return (
       <div className="min-h-screen bg-slate-900 text-white p-6 md:p-12">
+        <ReconnectBanner connected={isConnected} />
         <div className="max-w-4xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-center bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg mb-8">
             <div>
               <h1 className="text-2xl font-bold mb-1">Lobby: <span className="text-indigo-400 font-mono tracking-wider">{roomId}</span></h1>
-              <p className="text-slate-400 text-sm">Waiting for players to get ready...</p>
+              <p className="text-slate-400 text-sm flex items-center flex-wrap gap-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block" />
+                Waiting for players to get ready... <span className="text-emerald-400 font-medium">{onlineCount} online</span>
+              </p>
             </div>
             <button
               onClick={() => navigator.clipboard.writeText(roomId)}
@@ -168,13 +268,19 @@ const BattleArena = () => {
                 {Object.entries(players).map(([id, player]) => (
                   <div key={id} className="flex justify-between items-center p-3 bg-slate-900/50 rounded-lg border border-slate-700/50">
                     <span className="font-medium flex items-center">
+                      <span className={`w-2.5 h-2.5 rounded-full mr-2 animate-pulse ${player.online === false ? 'bg-slate-500' : 'bg-emerald-400'}`} />
                       {player.username} {id === socket.id && <span className="ml-2 text-xs bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full">You</span>}
                     </span>
-                    {player.isReady ? (
-                      <span className="text-emerald-400 text-sm font-medium flex items-center"><FaCheck className="mr-1" /> Ready</span>
-                    ) : (
-                      <span className="text-slate-400 text-sm">Not Ready</span>
-                    )}
+                    <span className="flex items-center gap-3">
+                      <span className={`text-xs font-medium ${player.online === false ? 'text-slate-500' : 'text-emerald-400'}`}>
+                        {player.online === false ? 'Offline' : 'Online'}
+                      </span>
+                      {player.isReady ? (
+                        <span className="text-emerald-400 text-sm font-medium flex items-center"><FaCheck className="mr-1" /> Ready</span>
+                      ) : (
+                        <span className="text-slate-400 text-sm">Not Ready</span>
+                      )}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -215,6 +321,7 @@ const BattleArena = () => {
     const winner = leaderboard[0];
     return (
       <div className="min-h-screen bg-slate-900 text-white p-6 md:p-12 flex flex-col items-center justify-center">
+        <ReconnectBanner connected={isConnected} />
         <div className="bg-slate-800 p-10 rounded-2xl border border-slate-700 shadow-2xl w-full max-w-2xl text-center">
           <div className="inline-flex items-center justify-center w-24 h-24 bg-yellow-500/20 rounded-full mb-6">
             <FaCrown className="text-5xl text-yellow-400" />
@@ -247,9 +354,11 @@ const BattleArena = () => {
 
   // PLAYING STATUS
   const currentQuestion = MOCK_QUESTIONS[currentQuestionIndex];
+  const activeTypers = Object.entries(typingPlayers).filter(([id]) => id !== socket.id);
 
   return (
     <div className="min-h-screen bg-slate-900 text-white flex flex-col">
+      <ReconnectBanner connected={isConnected} />
       {/* Top Bar / Leaderboard */}
       <div className="bg-slate-800 border-b border-slate-700 p-4 sticky top-0 z-10 flex overflow-x-auto gap-4 scrollbar-hide items-center px-6">
         <span className="text-slate-400 font-medium mr-4 flex-shrink-0">Live Scores:</span>
@@ -260,6 +369,20 @@ const BattleArena = () => {
           </div>
         ))}
       </div>
+
+      {/* Live typing / answering indicator */}
+      {activeTypers.length > 0 && (
+        <div className="bg-slate-800/80 border-b border-slate-700 px-6 py-2 text-center">
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1">
+            {activeTypers.map(([id, { username }], idx) => (
+              <div key={id} className="text-indigo-300 text-sm font-medium flex items-center">
+                <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse mr-2" />
+                {username} is typing <TypingDots delay={idx * 200} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Battle Area */}
       <div className="flex-1 p-6 md:p-12 flex flex-col items-center justify-center">

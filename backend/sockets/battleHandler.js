@@ -1,5 +1,24 @@
 const rooms = {};
 
+const isAllReady = (room) => {
+  const playerKeys = Object.keys(room.players);
+  return playerKeys.length > 1 && playerKeys.every((id) => room.players[id].isReady);
+};
+
+const tryStartBattle = (io, roomId) => {
+  const room = rooms[roomId];
+  if (!room || room.status !== 'waiting' || !isAllReady(room)) return;
+
+  room.status = 'playing';
+  io.to(roomId).emit('battle_start', {
+    message: 'All players ready! Battle starts now!',
+  });
+  io.to(roomId).emit('room_update', {
+    players: room.players,
+    status: room.status,
+  });
+};
+
 module.exports = (io) => {
   io.on('connection', (socket) => {
     console.log(`Socket connected: ${socket.id}`);
@@ -20,6 +39,7 @@ module.exports = (io) => {
         username: username || 'Anonymous',
         score: 0,
         isReady: false,
+        online: true,
       };
 
       // Notify everyone in the room about the updated players list
@@ -27,42 +47,79 @@ module.exports = (io) => {
         players: rooms[roomId].players,
         status: rooms[roomId].status,
       });
-      
+
+      // Broadcast presence so clients can track who is online
+      io.to(roomId).emit('presence_update', {
+        socketId: socket.id,
+        username: username || 'Anonymous',
+        online: true,
+      });
+
       console.log(`User ${username} joined room ${roomId}`);
     });
 
     // Player toggles ready status
     socket.on('toggle_ready', ({ roomId }) => {
-      if (rooms[roomId] && rooms[roomId].players[socket.id]) {
-        rooms[roomId].players[socket.id].isReady = !rooms[roomId].players[socket.id].isReady;
-        
-        io.to(roomId).emit('room_update', {
-          players: rooms[roomId].players,
-          status: rooms[roomId].status,
-        });
+      const player = rooms[roomId] && rooms[roomId].players[socket.id];
+      if (!player) return;
 
-        // Check if all players are ready to start
-        const playerKeys = Object.keys(rooms[roomId].players);
-        const allReady = playerKeys.length > 1 && playerKeys.every(id => rooms[roomId].players[id].isReady);
-        
-        if (allReady && rooms[roomId].status === 'waiting') {
-          rooms[roomId].status = 'playing';
-          io.to(roomId).emit('battle_start', {
-            message: 'All players ready! Battle starts now!',
-          });
-          io.to(roomId).emit('room_update', {
-            players: rooms[roomId].players,
-            status: rooms[roomId].status,
-          });
-        }
-      }
+      player.isReady = !player.isReady;
+
+      // Live readiness broadcast
+      io.to(roomId).emit('user:ready', {
+        socketId: socket.id,
+        username: player.username,
+        isReady: player.isReady,
+      });
+
+      io.to(roomId).emit('room_update', {
+        players: rooms[roomId].players,
+        status: rooms[roomId].status,
+      });
+
+      tryStartBattle(io, roomId);
+    });
+
+    // Explicit ready-state update (live presence in lobby)
+    socket.on('user:ready', ({ roomId, isReady }) => {
+      const player = rooms[roomId] && rooms[roomId].players[socket.id];
+      if (!player) return;
+
+      player.isReady = !!isReady;
+
+      io.to(roomId).emit('user:ready', {
+        socketId: socket.id,
+        username: player.username,
+        isReady: player.isReady,
+      });
+
+      io.to(roomId).emit('room_update', {
+        players: rooms[roomId].players,
+        status: rooms[roomId].status,
+      });
+
+      tryStartBattle(io, roomId);
+    });
+
+    // Live typing / answering indicator
+    socket.on('user:typing', ({ roomId, isTyping }) => {
+      const player = rooms[roomId] && rooms[roomId].players[socket.id];
+      if (!player) return;
+
+      // socket.to excludes the sender
+      socket.to(roomId).emit('user:typing', {
+        socketId: socket.id,
+        username: player.username,
+        isTyping: !!isTyping,
+      });
     });
 
     // Submit answer and update score
     socket.on('submit_answer', ({ roomId, isCorrect, points = 10 }) => {
-      if (rooms[roomId] && rooms[roomId].players[socket.id] && rooms[roomId].status === 'playing') {
+      const player = rooms[roomId] && rooms[roomId].players[socket.id];
+      if (player && rooms[roomId].status === 'playing') {
         if (isCorrect) {
-          rooms[roomId].players[socket.id].score += points;
+          player.score += points;
         }
 
         io.to(roomId).emit('score_update', {
@@ -79,6 +136,13 @@ module.exports = (io) => {
         if (rooms[roomId].players[socket.id]) {
           const username = rooms[roomId].players[socket.id].username;
           delete rooms[roomId].players[socket.id];
+
+          // Broadcast presence so clients can clear offline users
+          io.to(roomId).emit('presence_update', {
+            socketId: socket.id,
+            username,
+            online: false,
+          });
 
           // If room is empty, delete it
           if (Object.keys(rooms[roomId].players).length === 0) {
