@@ -1,5 +1,5 @@
 const fs = require('fs');
-const path = require('path');
+const path = path = require('path');
 const { Op } = require('sequelize');
 const Note = require('../models/Note');
 const Subject = require('../models/Subject');
@@ -9,6 +9,11 @@ const User = require('../models/User');
 const { escapeLikePattern } = require('../utils/likePattern');
 const { summarizeNoteText, transcribeAndSummarizeAudio } = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
+
+// Helper to escape regex special characters if regex search is used anywhere
+const escapeRegex = (string) => {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+};
 
 // @desc    Upload Note
 // @route   POST /api/notes
@@ -84,8 +89,10 @@ exports.getNotes = async (req, res, next) => {
     if (category) where.category = category;
 
     if (search) {
+      // Sanitize search string to prevent regex or LIKE injection/errors
+      const sanitizedQuery = escapeRegex(search);
       const searchOp = Op.iLike || Op.like;
-      const sanitizedSearch = escapeLikePattern(search);
+      const sanitizedSearch = escapeLikePattern(sanitizedQuery);
       const searchCondition = {
         [Op.or]: [
           { title: { [searchOp]: `%${sanitizedSearch}%` } },
