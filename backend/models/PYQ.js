@@ -26,7 +26,7 @@ const PYQ = sequelize.define(
       type: DataTypes.UUID,
       allowNull: false,
     },
-year: {
+    year: {
       type: DataTypes.INTEGER,
       allowNull: false,
     },
@@ -41,7 +41,8 @@ year: {
     fileUrl: {
       type: DataTypes.STRING,
       allowNull: false,
-    },    analyzed: {
+    },
+    analyzed: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
@@ -61,6 +62,7 @@ year: {
   },
   {
     timestamps: true,
+    indexes: [
       {
         name: 'pyq_user_id_idx',
         unique: false,
