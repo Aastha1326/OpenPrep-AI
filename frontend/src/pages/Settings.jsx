@@ -2,11 +2,12 @@ import { useState, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, Loader2, ShieldCheck, UserCircle, Upload, Save, Trash, AlertCircle, CheckCircle } from 'lucide-react';
 import LeatherBoard from '../components/dashboard/LeatherBoard';
 import VintagePaper from '../components/dashboard/VintagePaper';
 import API from '../services/api';
 import { loadUser } from '../store/slices/authSlice';
+import { validateAvatarFile } from '../utils/fileValidation';
 
 const Settings = () => {
   const dispatch = useDispatch();
@@ -19,6 +20,79 @@ const Settings = () => {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
+
+  // Avatar Upload States
+  const [file, setFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files[0];
+    if (!selectedFile) return;
+
+    const validation = validateAvatarFile(selectedFile);
+    if (!validation.isValid) {
+      setUploadError(validation.error);
+      setFile(null);
+      setPreviewUrl(null);
+      return;
+    }
+
+    setUploadError(null);
+    setUploadSuccess(false);
+    setFile(selectedFile);
+    setPreviewUrl(URL.createObjectURL(selectedFile));
+  };
+
+  const handleSaveAvatar = async () => {
+    if (!file) return;
+
+    setUploading(true);
+    setUploadError(null);
+    setUploadSuccess(false);
+
+    try {
+      const formData = new FormData();
+      formData.append('avatar', file);
+
+      await API.put('/users/avatar', formData, {
+        headers: {
+          'Content-Type': undefined,
+        },
+      });
+
+      setUploadSuccess(true);
+      setFile(null);
+      setPreviewUrl(null);
+      await dispatch(loadUser());
+    } catch (err) {
+      setUploadError(err.response?.data?.error || 'Failed to save avatar photo.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    if (!window.confirm('Are you sure you want to remove your profile picture?')) return;
+
+    setUploading(true);
+    setUploadError(null);
+    setUploadSuccess(false);
+
+    try {
+      await API.delete('/users/avatar');
+      setUploadSuccess(true);
+      setFile(null);
+      setPreviewUrl(null);
+      await dispatch(loadUser());
+    } catch (err) {
+      setUploadError(err.response?.data?.error || 'Failed to remove avatar photo.');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleToggle = useCallback(async () => {
     const next = !leaderboardVisible;
@@ -37,6 +111,12 @@ const Settings = () => {
       setSaving(false);
     }
   }, [leaderboardVisible, dispatch]);
+
+  const baseURL = API.defaults.baseURL || '';
+  const cleanBaseURL = baseURL.replace(/\/api\/?$/, '');
+  const avatarUrl = user?.avatar
+    ? (user.avatar.startsWith('http') ? user.avatar : `${cleanBaseURL}${user.avatar}`)
+    : null;
 
   return (
     <LeatherBoard>
@@ -64,6 +144,103 @@ const Settings = () => {
             Back to Dashboard
           </button>
         </div>
+
+        {/* --- USER AVATAR PROFILE --- */}
+        <VintagePaper className="border-t-4 border-t-amber-700">
+          <div className="flex items-center gap-3 mb-4">
+            <UserCircle className="w-7 h-7 text-amber-700" />
+            <h2 className="text-2xl font-bold font-playfair text-neutral-800 dark:text-neutral-100">
+              Profile Picture
+            </h2>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-6">
+            {/* Avatar Preview */}
+            <div className="relative shrink-0">
+              {previewUrl || avatarUrl ? (
+                <img
+                  src={previewUrl || avatarUrl}
+                  alt="Profile Avatar"
+                  className={`w-24 h-24 rounded-full border-2 border-amber-600 shadow-[0_4px_10px_rgba(0,0,0,0.2)] object-cover bg-white ${
+                    (previewUrl || avatarUrl).endsWith('.svg') || (previewUrl || avatarUrl).includes('image/svg+xml') ? 'p-2 object-contain' : ''
+                  }`}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = 'https://www.transparenttextures.com/patterns/cream-paper.png';
+                  }}
+                />
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-amber-600 to-amber-700 text-white font-playfair font-bold text-4xl flex items-center justify-center border-2 border-amber-500 shadow-md">
+                  {user?.name ? user.name[0].toUpperCase() : 'S'}
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 space-y-3">
+              <p className="text-sm text-neutral-600 dark:text-neutral-300">
+                Upload a JPEG, PNG, WEBP, or SVG image (max 5MB).
+              </p>
+              
+              <div className="flex flex-wrap gap-2.5">
+                <input
+                  type="file"
+                  id="avatar-upload"
+                  accept="image/png, image/jpeg, image/jpg, image/webp, image/svg+xml"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => document.getElementById('avatar-upload').click()}
+                  className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-yellow-400 border border-yellow-700/50 rounded-sm text-xs font-semibold shadow transition-all flex items-center gap-1.5"
+                >
+                  <Upload className="w-3.5 h-3.5" /> Select Image
+                </button>
+
+                {file && (
+                  <button
+                    type="button"
+                    onClick={handleSaveAvatar}
+                    disabled={uploading}
+                    className="px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white rounded-sm text-xs font-semibold shadow transition-all flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {uploading ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-3.5 h-3.5" /> Save Photo
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {user?.avatar && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveAvatar}
+                    disabled={uploading}
+                    className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-800 border border-red-200 rounded-sm text-xs font-semibold shadow transition-all flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    <Trash className="w-3.5 h-3.5" /> Remove
+                  </button>
+                )}
+              </div>
+
+              {uploadError && (
+                <p className="text-xs text-red-600 dark:text-red-400 font-serif flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5" /> {uploadError}
+                </p>
+              )}
+              {uploadSuccess && (
+                <p className="text-xs text-green-600 dark:text-green-400 font-serif flex items-center gap-1.5">
+                  <CheckCircle className="w-3.5 h-3.5" /> Avatar updated successfully!
+                </p>
+              )}
+            </div>
+          </div>
+        </VintagePaper>
 
         {/* --- LEADERBOARD PRIVACY --- */}
         <VintagePaper className="border-t-4 border-t-amber-700">

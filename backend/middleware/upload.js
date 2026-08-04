@@ -23,6 +23,8 @@ const ALLOWED_MIME_TYPES = {
   '.webm': 'audio/webm',
   '.ogg': 'audio/ogg',
   '.m4a': 'audio/mp4',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml',
 };
 
 // Expected binary magic-byte signature (file-type ext) per allowed extension.
@@ -39,6 +41,7 @@ const MAGIC_BYTE_TYPES = {
   '.webm': 'webm',
   '.ogg': 'ogg',
   '.m4a': ['m4a', 'mp4'],
+  '.webp': 'webp',
 };
 
 function createFileValidationError() {

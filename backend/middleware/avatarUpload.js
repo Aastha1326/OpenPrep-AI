@@ -21,10 +21,12 @@ const ALLOWED_AVATAR_MIME = {
   '.jpeg': 'image/jpeg',
   '.jpg': 'image/jpeg',
   '.png': 'image/png',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml',
 };
 
 function createFileValidationError() {
-  const error = new Error('Only JPEG and PNG images are allowed for avatars');
+  const error = new Error('Only JPEG, PNG, WEBP, and SVG images are allowed for avatars');
   error.name = 'FileValidationError';
   return error;
 }
