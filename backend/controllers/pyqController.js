@@ -341,3 +341,80 @@ exports.deletePYQ = async (req, res, next) => {
     next(error);
   }
 };
+// @desc    Get PYQ Frequency and Difficulty Trend Analysis
+// @route   GET /api/pyqs/trends
+// @access  Private
+exports.getPYQTrends = async (req, res, next) => {
+  try {
+    const { subjectId, startYear, endYear } = req.query;
+    const filter = { user: req.user.id };
+
+    if (subjectId) {
+      filter.subject = subjectId;
+    }
+
+    if (startYear || endYear) {
+      filter.year = {};
+      if (startYear) filter.year[Op.gte] = parseInt(startYear, 10);
+      if (endYear) filter.year[Op.lte] = parseInt(endYear, 10);
+    }
+
+    const pyqs = await PYQ.findAll({
+      where: filter,
+      order: [['year', 'ASC']],
+    });
+
+    // Aggregate topic weightages and difficulty trends year-over-year
+    const yearlyTrends = {};
+    const topicAggregates = {};
+    const difficultyCounts = { Easy: 0, Medium: 0, Hard: 0 };
+
+    pyqs.forEach((pyq) => {
+      const year = pyq.year;
+      if (!yearlyTrends[year]) {
+        yearlyTrends[year] = { year, totalPapers: 0, topics: {}, difficulties: { Easy: 0, Medium: 0, Hard: 0 } };
+      }
+
+      yearlyTrends[year].totalPapers += 1;
+      if (pyq.difficulty && difficultyCounts[pyq.difficulty] !== undefined) {
+        difficultyCounts[pyq.difficulty] += 1;
+        yearlyTrends[year].difficulties[pyq.difficulty] += 1;
+      }
+
+      // Extract important topics from analysisResults JSONB
+      const analysis = pyq.analysisResults;
+      const importantTopics = analysis?.importantTopics || [];
+
+      importantTopics.forEach((t) => {
+        if (!t || !t.topicName) return;
+        const topicName = t.topicName.trim();
+        const frequency = t.frequency || t.weightage || 1;
+
+        if (!yearlyTrends[year].topics[topicName]) {
+          yearlyTrends[year].topics[topicName] = 0;
+        }
+        yearlyTrends[year].topics[topicName] += frequency;
+
+        if (!topicAggregates[topicName]) {
+          topicAggregates[topicName] = { topicName, totalFrequency: 0, appearances: 0 };
+        }
+        topicAggregates[topicName].totalFrequency += frequency;
+        topicAggregates[topicName].appearances += 1;
+      });
+    });
+
+    const formattedTrends = Object.values(yearlyTrends).sort((a, b) => a.year - b.year);
+    const topTopics = Object.values(topicAggregates).sort((a, b) => b.totalFrequency - a.totalFrequency);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        trends: formattedTrends,
+        topTopics,
+        difficultySummary: difficultyCounts,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
