@@ -18,6 +18,11 @@ const ALLOWED_MIME_TYPES = {
   '.jpeg': 'image/jpeg',
   '.jpg': 'image/jpeg',
   '.png': 'image/png',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.webm': 'audio/webm',
+  '.ogg': 'audio/ogg',
+  '.m4a': 'audio/mp4',
 };
 
 // Expected binary magic-byte signature (file-type ext) per allowed extension.
@@ -29,10 +34,15 @@ const MAGIC_BYTE_TYPES = {
   '.jpeg': 'jpg',
   '.jpg': 'jpg',
   '.png': 'png',
+  '.mp3': 'mp3',
+  '.wav': 'wav',
+  '.webm': 'webm',
+  '.ogg': 'ogg',
+  '.m4a': ['m4a', 'mp4'],
 };
 
 function createFileValidationError() {
-  const error = new Error('Only PDFs, documents, and images are allowed!');
+  const error = new Error('Only PDFs, documents, images, and audio files are allowed!');
   error.name = 'FileValidationError';
   return error;
 }
@@ -70,8 +80,18 @@ async function verifyMagicBytes(ext, buffer) {
     return;
   }
 
-  if (!detected || detected.ext !== expected) {
+  if (!detected) {
     throw createFileValidationError();
+  }
+
+  if (Array.isArray(expected)) {
+    if (!expected.includes(detected.ext)) {
+      throw createFileValidationError();
+    }
+  } else {
+    if (detected.ext !== expected) {
+      throw createFileValidationError();
+    }
   }
 }
 
@@ -79,7 +99,11 @@ async function verifyMagicBytes(ext, buffer) {
 function checkFileType(file, cb) {
   const ext = path.extname(file.originalname).toLowerCase();
   const extname = Object.prototype.hasOwnProperty.call(ALLOWED_MIME_TYPES, ext);
-  const mimetype = ALLOWED_MIME_TYPES[ext] === file.mimetype;
+
+  const isAudioExt = ['.mp3', '.wav', '.webm', '.ogg', '.m4a'].includes(ext);
+  const mimetype = isAudioExt
+    ? file.mimetype.startsWith('audio/')
+    : ALLOWED_MIME_TYPES[ext] === file.mimetype;
 
   if (mimetype && extname) {
     return cb(null, true);

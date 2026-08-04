@@ -7,7 +7,7 @@ const Topic = require('../models/Topic');
 const ActivityLog = require('../models/ActivityLog');
 const User = require('../models/User');
 const { escapeLikePattern } = require('../utils/likePattern');
-const { summarizeNoteText } = require('../services/geminiService');
+const { summarizeNoteText, transcribeAndSummarizeAudio } = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
 
 // @desc    Upload Note
@@ -248,6 +248,81 @@ exports.summarizeNote = async (req, res, next) => {
         error: error.message,
       });
     }
+    next(error);
+  }
+};
+
+// @desc    Upload & Process Voice Note
+// @route   POST /api/notes/voice
+// @access  Private
+exports.uploadVoiceNote = async (req, res, next) => {
+  try {
+    const { title, subjectId, topicId, isPublic } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'Please upload an audio file' });
+    }
+
+    const subject = await Subject.findByPk(subjectId);
+    if (!subject) {
+      const filePath = path.join(__dirname, '..', 'uploads', req.file.filename);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      return res.status(404).json({ success: false, error: 'Subject not found' });
+    }
+
+    const fileUrl = `/uploads/${req.file.filename}`;
+    const filePath = path.join(__dirname, '..', 'uploads', req.file.filename);
+    const fileBuffer = fs.readFileSync(filePath);
+    const mimeType = req.file.mimetype;
+
+    // Transcribe and summarize voice note via Gemini API
+    const audioResult = await transcribeAndSummarizeAudio(fileBuffer, mimeType, subject.name);
+
+    const note = await Note.create({
+      title,
+      content: audioResult.transcription || 'No transcription generated',
+      subject: subjectId,
+      topic: topicId || null,
+      fileUrl,
+      fileType: 'audio',
+      isPublic: isPublic === 'true' || isPublic === true,
+      category: 'Summary',
+      aiSummary: {
+        summary: audioResult.summary || '',
+        keyConcepts: audioResult.keyConcepts || [],
+        examTips: audioResult.examTips || [],
+      },
+      user: req.user.id,
+    });
+
+    // Log activity
+    await ActivityLog.create({
+      user: req.user.id,
+      activityType: 'note_upload',
+      description: `Uploaded and summarized voice note: "${note.title}"`,
+    });
+
+    res.status(201).json({ success: true, data: note });
+  } catch (error) {
+    if (req.file) {
+      const filePath = path.join(__dirname, '..', 'uploads', req.file.filename);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    }
+
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({
+        success: false,
+        error: error.message,
+      });
+    }
+
     next(error);
   }
 };

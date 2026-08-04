@@ -2,6 +2,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const NodeCache = require('node-cache');
 const crypto = require('crypto');
 const { splitIntoChunks } = require('../utils/textChunking');
+const { toLocalDateString } = require('../utils/dateUtils');
 
 // Notes larger than this are split into semantic chunks and summarized
 // across multiple Gemini passes so no content is silently dropped.
@@ -189,6 +190,12 @@ const RESPONSE_SCHEMAS = {
     recommendations: { type: 'array', itemSchema: { subject: 'string', topic: 'string', suggestion: 'string', priority: 'string' } }
   },
   noteSummary: {
+    summary: 'string',
+    keyConcepts: 'array',
+    examTips: 'array'
+  },
+  audioSummary: {
+    transcription: 'string',
     summary: 'string',
     keyConcepts: 'array',
     examTips: 'array'
@@ -992,36 +999,59 @@ function getMockNoteSummary(subjectName) {
   };
 }
 
-function getMockRevisionSheet(subjectName, topicName, mistookQuestions) {
-  const missedCount = Array.isArray(mistookQuestions) ? mistookQuestions.length : 0;
-  const questionsListMarkdown = Array.isArray(mistookQuestions) && mistookQuestions.length > 0
-    ? mistookQuestions.map((q, idx) => `* **Question ${idx + 1}**: ${q.questionText || q.question || 'Concept question'} (Selected option: ${q.userSelectedAnswer !== undefined ? q.userSelectedAnswer : 'Incorrect'})`).join('\n')
-    : '* Review general missed questions from quiz history.';
+/**
+ * 6. Transcribe & Summarize Audio
+ */
+exports.transcribeAndSummarizeAudio = async (fileBuffer, mimeType, subjectName) => {
+  if (!genAI) {
+    console.warn('Gemini API key not configured. Using Mock Audio transcription and summary.');
+    return {
+      transcription: `Mock transcription: Today we are discussing key topics in ${subjectName || 'this subject'}. In standard lectures, we cover core definitions and formulas.`,
+      summary: `This lecture introduces core definitions and principles relevant to ${subjectName || 'the subject'}.`,
+      keyConcepts: ['Introductory concepts', 'Core principles'],
+      examTips: ['Review basic formulas', 'Focus on terminology'],
+    };
+  }
 
-  return {
-    title: `AI Revision Summary: ${topicName || subjectName}`,
-    summaryMarkdown: `# AI Concept Revision Sheet: ${topicName || subjectName}
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const prompt = `
+      You are an expert academic tutor. You are given an audio recording from a study session or class for the subject "${subjectName || 'General Study'}".
+      Please perform two tasks:
+      1. Transcribe the audio content as accurately and completely as possible.
+      2. Generate a structured study summary based on the transcription.
 
-## Executive Summary
-This revision sheet analyzes your recent quiz attempt on **${subjectName} - ${topicName}**, where **${missedCount} question(s)** were identified as weak areas.
+      Return the result STRICTLY as a JSON object with this exact structure:
+      {
+        "transcription": "string",
+        "summary": "string",
+        "keyConcepts": ["string"],
+        "examTips": ["string"]
+      }
+    `;
 
-## Missed Questions & Target Weaknesses
-${questionsListMarkdown}
+    const result = await generateWithRetry(model, [
+      {
+        inlineData: {
+          data: Buffer.from(fileBuffer).toString('base64'),
+          mimeType: mimeType || 'audio/mp3',
+        },
+      },
+      prompt,
+    ]);
 
-## Core Concepts & Key Formulas
-1. **Fundamental Principle**: Ensure clear separation of core parameters and boundary conditions.
-2. **Formula / Rule**: $E = mc^2$ or $O(N \\log N)$ complexity bounds depending on algorithmic context.
-3. **Primary Definition**: Re-verify definition constraints before committing choices.
-
-## Key Takeaways
-- Read options carefully to eliminate distractor answers.
-- Pay attention to specific phrasing such as "NOT", "ALWAYS", or "EXCEPT".
-- Always calculate time and space constraints upfront.
-
-## Action Steps
-- [ ] Review lecture notes on ${topicName}.
-- [ ] Practice flashcards associated with ${subjectName}.
-- [ ] Attempt a refresher quiz on weak topics.
-`
-  };
-}
+    const parsed = cleanJSON(result.response.text());
+    return parsed;
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError || error instanceof GeminiServerError) {
+      throw error;
+    }
+    console.error('Gemini audio transcription and summarization failed:', error);
+    return {
+      transcription: `Unable to transcribe audio due to error: ${error.message}`,
+      summary: 'Failed to generate study summary from the audio.',
+      keyConcepts: [],
+      examTips: [],
+    };
+  }
+};
