@@ -788,6 +788,57 @@ exports.summarizeNoteText = async (content, subjectName = 'the subject', forceRe
 };
 
 /**
+ * 7. Generate AI Revision Sheet for Weak Topics & Incorrect Questions
+ */
+exports.generateRevisionSheet = async (mistookQuestions = [], subjectName = 'General Subject', topicName = 'Weak Concepts', forceRefresh = false) => {
+  if (!genAI) {
+    console.warn('Gemini API key not configured. Using Mock Data for Revision Sheet.');
+    return { _mock: true, ...getMockRevisionSheet(subjectName, topicName, mistookQuestions) };
+  }
+
+  const cacheKey = hashKey('revisionSheet', `${subjectName}:${topicName}:${JSON.stringify(mistookQuestions)}`);
+
+  if (!forceRefresh) {
+    const cached = responseCache.get(cacheKey);
+    if (cached) return cached;
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const prompt = `
+      You are an expert academic tutor and AI revision assistant.
+      The student recently attempted a practice quiz on "${subjectName} - ${topicName}" and made mistakes on the following question(s):
+      ${JSON.stringify(mistookQuestions, null, 2)}
+
+      Analyze these incorrect questions to extract the key underlying weak concepts, core formulas, critical facts, and common pitfalls.
+      Create a comprehensive, well-structured Markdown revision sheet for the student.
+
+      Your response MUST be a JSON object with this exact structure:
+      {
+        "title": "string (e.g. AI Concept Revision Sheet: Topic Name)",
+        "summaryMarkdown": "string (A rich GitHub-Flavored Markdown text containing # Title, ## Core Concepts & Formulas, ## Key Takeaways, ## Pitfalls to Avoid, and ## Quick Practice Hints)"
+      }
+    `;
+
+    const result = await generateWithRetry(model, prompt);
+    const parsed = cleanJSON(result.response.text());
+
+    if (!parsed || !parsed.summaryMarkdown) {
+      return getMockRevisionSheet(subjectName, topicName, mistookQuestions);
+    }
+
+    responseCache.set(cacheKey, parsed);
+    return parsed;
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError || error instanceof GeminiServerError) {
+      throw error;
+    }
+    console.error('Gemini revision sheet generation failed:', error);
+    return getMockRevisionSheet(subjectName, topicName, mistookQuestions);
+  }
+};
+
+/**
  * Condenses notes into a digest for flashcard/quiz generation. See
  * buildNotesDigestFromChunks for the chunking behavior.
  */
@@ -808,6 +859,7 @@ exports.mergeNoteSummaries = mergeNoteSummaries;
 exports.summarizeNoteChunks = summarizeNoteChunks;
 exports.buildNotesDigestFromChunks = buildNotesDigestFromChunks;
 exports.buildNotesDigest = buildNotesDigest;
+
 
 // Export validation helpers for unit testing
 exports.validateResponse = validateResponse;
