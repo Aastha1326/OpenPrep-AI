@@ -340,4 +340,17 @@ describe('Community Controller - Feedback List Pagination', () => {
       expect(res.body.data[0].title).toBe('Open Bug');
     });
   });
+
+  describe('Redis Caching Integration', () => {
+    it('should serve GET /api/community/roadmap with 200 status', async () => {
+      const res = await request(app)
+        .get('/api/community/roadmap')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveProperty('milestones');
+      expect(res.body.data).toHaveProperty('communityFeatures');
+    });
+  });
 });

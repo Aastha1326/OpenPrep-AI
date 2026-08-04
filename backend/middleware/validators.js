@@ -66,6 +66,23 @@ const validateRefreshToken = [
   handleValidationErrors,
 ];
 
+const validateResendVerification = [
+  body('email').trim().isEmail().withMessage('Please provide a valid email').normalizeEmail(),
+  handleValidationErrors,
+];
+
+const validateUpdateSettings = [
+  body('leaderboardVisible')
+    .optional()
+    .isBoolean()
+    .withMessage('leaderboardVisible must be a boolean'),
+  body('receiveWeeklyDigest')
+    .optional()
+    .isBoolean()
+    .withMessage('receiveWeeklyDigest must be a boolean'),
+  handleValidationErrors,
+];
+
 // ---------------------------------------------------------------------------
 // Academic routes
 // ---------------------------------------------------------------------------
@@ -111,6 +128,14 @@ const validateGenerateAIFlashcards = [
   handleValidationErrors,
 ];
 
+const validateGenerateFlashcardsFromNote = [
+  body('noteId').isUUID(4).withMessage('Valid note ID is required'),
+  body('count')
+    .optional()
+    .isInt({ min: 1, max: 50 })
+    .withMessage('Count must be between 1 and 50'),
+  handleValidationErrors,
+];
 const validateCreateFlashcard = [
   body('front').trim().notEmpty().withMessage('Please provide the front text'),
   body('back').trim().notEmpty().withMessage('Please provide the back text'),
@@ -219,9 +244,12 @@ const validateUploadPYQ = [
     .optional()
     .isInt({ min: 1900, max: 2100 })
     .withMessage('Year must be a valid year'),
+  body('difficulty')
+    .optional()
+    .isIn(['Easy', 'Medium', 'Hard'])
+    .withMessage('Difficulty must be "Easy", "Medium", or "Hard"'),
   handleValidationErrors,
 ];
-
 // ---------------------------------------------------------------------------
 // Study Plan routes
 // ---------------------------------------------------------------------------
@@ -322,15 +350,16 @@ module.exports = {
   validateForgotPassword,
   validateResetPassword,
   validateRefreshToken,
+  validateUpdateSettings,
   // Academic
   validateCreateExam,
   validateCreateSubject,
   validateCreateTopic,
   validateUpdateTopic,
-  // Flashcard
+// Flashcard
   validateGenerateAIFlashcards,
-  validateCreateFlashcard,
-  validateReviewFlashcard,
+  validateGenerateFlashcardsFromNote,
+  validateCreateFlashcard,  validateReviewFlashcard,
   validateExportFlashcards,
   validateImportFlashcards,
   // Quiz
@@ -349,4 +378,5 @@ module.exports = {
   validateUpdateTopicProgress,
   // Community
   validateSubmitFeedback,
+  validateResendVerification,
 };

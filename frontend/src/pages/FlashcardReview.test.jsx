@@ -181,4 +181,34 @@ describe('FlashcardReview', () => {
     });
     expect(await screen.findByText('What is Redux?')).toBeInTheDocument();
   });
+
+  test('disables rating buttons and ignores rapid clicks while a review is pending', async () => {
+    API.get.mockResolvedValue({ data: { data: sampleCards } });
+
+    // Keep the API.put request pending so we can observe the in-flight state.
+    let resolvePut;
+    API.put.mockImplementationOnce(() => new Promise((resolve) => { resolvePut = resolve; }));
+
+    renderReview();
+    await screen.findByText('What is React?');
+
+    // Flip the card and start a review that stays pending.
+    fireEvent.keyDown(window, { key: ' ' });
+    const goodButton = screen.getByRole('button', { name: 'Good' });
+    fireEvent.click(goodButton);
+
+    // Rating buttons are disabled while the request is pending...
+    await waitFor(() => expect(goodButton).toBeDisabled());
+
+    // ...so rapid keyboard input is debounced and only one request fires.
+    fireEvent.keyDown(window, { key: '4' });
+    fireEvent.keyDown(window, { key: '5' });
+    await waitFor(() => expect(API.put).toHaveBeenCalledTimes(1));
+    expect(API.put).toHaveBeenCalledWith('/flashcards/c1/review', { quality: 4 });
+
+    // Resolving the request advances to the next card and re-enables buttons.
+    resolvePut({ data: { data: { id: 'c1' } } });
+    expect(await screen.findByText('What is Redux?')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Good' })).toBeEnabled();
+  });
 });

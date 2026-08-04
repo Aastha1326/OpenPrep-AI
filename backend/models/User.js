@@ -65,6 +65,15 @@ const User = sequelize.define(
       type: DataTypes.STRING,
       defaultValue: '',
     },
+    leaderboardVisible: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+    },
+    receiveWeeklyDigest: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+      allowNull: false,
+    },
     isEmailVerified: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
@@ -95,6 +104,26 @@ const User = sequelize.define(
     lockoutUntil: {
       type: DataTypes.DATE,
       allowNull: true,
+    },
+    sm2EasyFactorModifier: {
+      type: DataTypes.FLOAT,
+      defaultValue: 1.0,
+      allowNull: false,
+    },
+    sm2IntervalModifier: {
+      type: DataTypes.FLOAT,
+      defaultValue: 1.0,
+      allowNull: false,
+    },
+    sm2Step1Interval: {
+      type: DataTypes.INTEGER,
+      defaultValue: 1,
+      allowNull: false,
+    },
+    sm2Step2Interval: {
+      type: DataTypes.INTEGER,
+      defaultValue: 6,
+      allowNull: false,
     },
   },
   {

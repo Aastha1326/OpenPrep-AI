@@ -2,8 +2,12 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FaCheckCircle, FaTimesCircle, FaArrowRight, FaTrophy, FaArrowLeft, FaBrain } from 'react-icons/fa';
 import API from '../services/api';
+<<<<<<< HEAD
 import RevisionSheetModal from '../components/dashboard/RevisionSheetModal';
 
+=======
+import { exportAsCSV, exportAsJSON } from '../utils/exportUtils';
+>>>>>>> upstream/main
 const SECONDS_PER_QUESTION = 60;
 
 const formatTime = (seconds) => {
@@ -12,6 +16,14 @@ const formatTime = (seconds) => {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 };
 
+const buildQuizResultRows = (quiz, answers) =>
+  quiz.questions.map((q, idx) => ({
+    questionNumber: idx + 1,
+    question: q.questionText,
+    yourAnswer: answers[q._id] ?? '',
+    correctAnswer: q.correctAnswer,
+    isCorrect: answers[q._id] === q.correctAnswer ? 'Yes' : 'No',
+  }));
 const QuizSession = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -26,11 +38,32 @@ const QuizSession = () => {
   const [result, setResult] = useState(null);
   const [isRevisionModalOpen, setIsRevisionModalOpen] = useState(false);
 
-  const [timeLeft, setTimeLeft] = useState(0);
+const [timeLeft, setTimeLeft] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const submittingRef = useRef(false);
-  const autoSubmittedRef = useRef(false);
+
+  const handleExportResultsCSV = () => {
+    const rows = buildQuizResultRows(quiz, answers);
+    exportAsCSV(
+      rows,
+      ['questionNumber', 'question', 'yourAnswer', 'correctAnswer', 'isCorrect'],
+      `quiz-result-${quiz.title}`
+    );
+  };
+
+  const handleExportResultsJSON = () => {
+    exportAsJSON(
+      {
+        quizTitle: quiz.title,
+        score: result?.score,
+        totalQuestions: quiz.questions.length,
+        completedAt: new Date().toISOString(),
+        answers: buildQuizResultRows(quiz, answers),
+      },
+      `quiz-result-${quiz.title}`
+    );
+  };  const autoSubmittedRef = useRef(false);
   
   useEffect(() => {
     fetchQuiz();
@@ -235,7 +268,7 @@ const QuizSession = () => {
               {isLastQuestion ? (
                 <button
                   onClick={() => submitQuiz()}
-                  disabled={timeElapsed || Object.keys(answers).length < quiz.questions.length}
+                  disabled={submitting || timeElapsed || Object.keys(answers).length < quiz.questions.length}
                   className="flex items-center px-6 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold shadow-lg shadow-emerald-500/20 transition-all"
                 >
                   Submit Quiz <FaCheckCircle className="ml-2" />
@@ -258,12 +291,25 @@ const QuizSession = () => {
               <div className="inline-flex items-center justify-center w-20 h-20 bg-emerald-500/10 rounded-full mb-4">
                 <FaTrophy className="text-4xl text-emerald-400" />
               </div>
-              <h2 className="text-3xl font-bold text-white mb-2">Quiz Completed!</h2>
+<h2 className="text-3xl font-bold text-white mb-2">Quiz Completed!</h2>
               <p className="text-slate-400 text-lg">
                 You scored <span className="text-emerald-400 font-bold text-2xl">{result?.score}</span> out of {quiz.questions.length}
               </p>
+              <div className="flex items-center justify-center gap-3 mt-4">
+                <button
+                  onClick={handleExportResultsCSV}
+                  className="px-4 py-2 text-sm bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition-colors"
+                >
+                  Export as CSV
+                </button>
+                <button
+                  onClick={handleExportResultsJSON}
+                  className="px-4 py-2 text-sm bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition-colors"
+                >
+                  Export as JSON
+                </button>
+              </div>
             </div>
-
             <div className="space-y-6">
               <h3 className="text-xl font-semibold border-b border-slate-700 pb-2 mb-4">Review Answers</h3>
               {quiz.questions.map((q, idx) => {

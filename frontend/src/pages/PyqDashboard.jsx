@@ -4,34 +4,81 @@ import {
   FileText, Upload, AlertCircle, RefreshCw, CheckCircle, PieChart as PieChartIcon,
   TrendingUp, Award, HelpCircle, Layers, Calendar, Filter, ArrowLeft, ArrowUpRight
 } from 'lucide-react';
-import { useNavigate, Link } from 'react-router-dom';
-import {
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as PieTooltip, Legend
 } from 'recharts';
 import API from '../services/api';
 import LeatherBoard from '../components/dashboard/LeatherBoard';
 import VintagePaper from '../components/dashboard/VintagePaper';
+import AudioReader from '../components/AudioReader';
+import HighlightedText from '../components/HighlightedText';
 import ThemeToggle from '../components/ThemeToggle';
 
 const COLORS = ['#8B4513', '#D4AF37', '#2563EB', '#059669', '#7C3AED', '#DB2777', '#D97706', '#4B5563'];
 
+const RepeatedQuestionCard = ({ rq }) => {
+  const [activeIndex, setActiveIndex] = useState(-1);
+
+  return (
+    <div className="p-3 bg-white border border-neutral-300 rounded text-xs text-neutral-800">
+      <div className="flex items-start justify-between gap-2">
+        <HighlightedText
+          text={rq.questionText}
+          activeIndex={activeIndex}
+          className="font-semibold text-neutral-900"
+        />
+        <AudioReader
+          text={rq.questionText}
+          className="shrink-0"
+          onSentenceChange={setActiveIndex}
+        />
+      </div>
+      {rq.years && (
+        <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+          <span className="text-[10px] font-bold text-neutral-500 uppercase">Appeared in:</span>
+          {Array.isArray(rq.years) ? (
+            rq.years.map((y, yi) => (
+              <span key={yi} className="bg-amber-100 text-amber-900 text-[10px] px-1.5 py-0.5 rounded font-bold">
+                {y}
+              </span>
+            ))
+          ) : (
+            <span className="bg-amber-100 text-amber-900 text-[10px] px-1.5 py-0.5 rounded font-bold">
+              {rq.years}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const DIFFICULTY_OPTIONS = ['Easy', 'Medium', 'Hard'];
+
 const PyqDashboard = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // State
   const [subjects, setSubjects] = useState([]);
-  const [selectedSubjectId, setSelectedSubjectId] = useState('');
+  const [selectedSubjectId, setSelectedSubjectId] = useState(searchParams.get('subjectId') || '');
+  const [selectedDifficulties, setSelectedDifficulties] = useState(
+    searchParams.get('difficulty') ? searchParams.get('difficulty').split(',') : []
+  );
+  const [selectedYear, setSelectedYear] = useState(searchParams.get('year') || '');
+  const [selectedChapter, setSelectedChapter] = useState(searchParams.get('chapter') || '');
+  const [chapterOptions, setChapterOptions] = useState([]);
   const [pyqList, setPyqList] = useState([]);
-  const [selectedPyq, setSelectedPyq] = useState(null);
-  
+  const [selectedPyq, setSelectedPyq] = useState(null);  
   // Upload form state
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState('');
   const [year, setYear] = useState(new Date().getFullYear());
-  const [uploadSubjectId, setUploadSubjectId] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
+const [uploadSubjectId, setUploadSubjectId] = useState('');
+  const [uploadDifficulty, setUploadDifficulty] = useState('Medium');  const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
   const [isTimeout, setIsTimeout] = useState(false);
+  const [trendActiveIndex, setTrendActiveIndex] = useState(-1);
 
   // Fetch subjects on mount
   useEffect(() => {
@@ -51,16 +98,25 @@ const PyqDashboard = () => {
     fetchSubjects();
   }, []);
 
-  // Fetch PYQs list
+// Fetch PYQs list, applying the active filters as query params
   const fetchPyqs = async () => {
     try {
-      const url = selectedSubjectId ? `/pyqs?subjectId=${selectedSubjectId}` : '/pyqs';
-      const res = await API.get(url);
+      const params = {};
+      if (selectedSubjectId) params.subjectId = selectedSubjectId;
+      if (selectedDifficulties.length > 0) params.difficulty = selectedDifficulties.join(',');
+      if (selectedYear) params.year = selectedYear;
+      if (selectedChapter) params.chapter = selectedChapter;
+
+      const res = await API.get('/pyqs', { params });
       if (res.data?.data) {
         setPyqList(res.data.data);
         if (res.data.data.length > 0 && !selectedPyq) {
           setSelectedPyq(res.data.data[0]);
         }
+        // Build the chapter dropdown from whatever papers are currently loaded
+        const chapters = new Set();
+        res.data.data.forEach((pyq) => (pyq.chapters || []).forEach((c) => chapters.add(c)));
+        setChapterOptions(Array.from(chapters).sort());
       }
     } catch (err) {
       console.error('Failed to fetch PYQs:', err);
@@ -69,8 +125,21 @@ const PyqDashboard = () => {
 
   useEffect(() => {
     fetchPyqs();
-  }, [selectedSubjectId]);
+    // Keep the active filters in the URL so the view is shareable
+    const nextParams = {};
+    if (selectedSubjectId) nextParams.subjectId = selectedSubjectId;
+    if (selectedDifficulties.length > 0) nextParams.difficulty = selectedDifficulties.join(',');
+    if (selectedYear) nextParams.year = selectedYear;
+    if (selectedChapter) nextParams.chapter = selectedChapter;
+    setSearchParams(nextParams, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSubjectId, selectedDifficulties, selectedYear, selectedChapter]);
 
+  const toggleDifficulty = (level) => {
+    setSelectedDifficulties((prev) =>
+      prev.includes(level) ? prev.filter((d) => d !== level) : [...prev, level]
+    );
+  };
   // Handle Drag & Drop / File Select
   const handleFileChange = (e) => {
     const selectedFile = e.target.files ? e.target.files[0] : null;
@@ -139,9 +208,9 @@ const PyqDashboard = () => {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('title', title || file.name);
-      formData.append('year', year);
+formData.append('year', year);
       formData.append('subjectId', uploadSubjectId);
-
+      formData.append('difficulty', uploadDifficulty);
       const res = await API.post('/pyqs/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         timeout: 60000,
@@ -278,20 +347,67 @@ const PyqDashboard = () => {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
-                    Year
-                  </label>
-                  <input
-                    type="number"
-                    value={year}
-                    onChange={(e) => setYear(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-neutral-300 rounded text-neutral-800 text-sm focus:ring-2 focus:ring-amber-600 outline-none"
-                    disabled={isUploading}
-                  />
-                </div>
-              </div>
+<div>
 
+                  <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+
+                    Year
+
+                  </label>
+
+                  <input
+
+                    type="number"
+
+                    value={year}
+
+                    onChange={(e) => setYear(e.target.value)}
+
+                    className="w-full px-3 py-2 bg-white border border-neutral-300 rounded text-neutral-800 text-sm focus:ring-2 focus:ring-amber-600 outline-none"
+
+                    disabled={isUploading}
+
+                  />
+
+                </div>
+
+
+
+                <div>
+
+                  <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+
+                    Difficulty
+
+                  </label>
+
+                  <select
+
+                    value={uploadDifficulty}
+
+                    onChange={(e) => setUploadDifficulty(e.target.value)}
+
+                    className="w-full px-3 py-2 bg-white border border-neutral-300 rounded text-neutral-800 text-sm focus:ring-2 focus:ring-amber-600 outline-none"
+
+                    disabled={isUploading}
+
+                  >
+
+                    {DIFFICULTY_OPTIONS.map((level) => (
+
+                      <option key={level} value={level}>
+
+                        {level}
+
+                      </option>
+
+                    ))}
+
+                  </select>
+
+                </div>
+
+              </div>
               {/* Drag and Drop Zone */}
               <div
                 onDragOver={handleDragOver}
@@ -351,7 +467,7 @@ const PyqDashboard = () => {
               <span className="text-xs font-normal text-neutral-600">({pyqList.length})</span>
             </h2>
 
-            <div className="mb-3">
+<div className="mb-3 space-y-2">
               <select
                 value={selectedSubjectId}
                 onChange={(e) => setSelectedSubjectId(e.target.value)}
@@ -364,8 +480,47 @@ const PyqDashboard = () => {
                   </option>
                 ))}
               </select>
-            </div>
 
+              <div className="flex flex-wrap gap-1.5">
+                {DIFFICULTY_OPTIONS.map((level) => (
+                  <button
+                    key={level}
+                    type="button"
+                    onClick={() => toggleDifficulty(level)}
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-colors ${
+                      selectedDifficulties.includes(level)
+                        ? 'bg-amber-800 text-white border-amber-900'
+                        : 'bg-white text-neutral-600 border-neutral-300 hover:bg-amber-100/60'
+                    }`}
+                  >
+                    {level}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  value={selectedChapter}
+                  onChange={(e) => setSelectedChapter(e.target.value)}
+                  className="w-full px-2 py-1.5 bg-white border border-neutral-300 rounded text-neutral-800 text-xs focus:outline-none"
+                >
+                  <option value="">All Chapters</option>
+                  {chapterOptions.map((ch) => (
+                    <option key={ch} value={ch}>
+                      {ch}
+                    </option>
+                  ))}
+                </select>
+
+                <input
+                  type="number"
+                  placeholder="Year"
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                  className="w-full px-2 py-1.5 bg-white border border-neutral-300 rounded text-neutral-800 text-xs focus:outline-none"
+                />
+              </div>
+            </div>
             <div className="flex-1 overflow-y-auto space-y-2 max-h-60">
               {pyqList.length === 0 ? (
                 <p className="text-xs text-neutral-500 italic text-center py-6">
@@ -447,10 +602,21 @@ const PyqDashboard = () => {
                   <TrendingUp className="w-5 h-5 text-indigo-700" /> AI Exam Trend Summary
                 </h3>
                 <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-sm flex-1 font-inter text-neutral-800 text-sm leading-relaxed space-y-3">
-                  <p className="font-medium text-amber-900 italic">
-                    Analysis for: <span className="font-bold font-playfair underline">{selectedPyq.title}</span> ({selectedPyq.year})
-                  </p>
-                  <p className="whitespace-pre-line text-neutral-700">{trendAnalysis}</p>
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="font-medium text-amber-900 italic">
+                      Analysis for: <span className="font-bold font-playfair underline">{selectedPyq.title}</span> ({selectedPyq.year})
+                    </p>
+                    <AudioReader
+                      text={trendAnalysis}
+                      className="shrink-0"
+                      onSentenceChange={setTrendActiveIndex}
+                    />
+                  </div>
+                  <HighlightedText
+                    text={trendAnalysis}
+                    activeIndex={trendActiveIndex}
+                    className="whitespace-pre-line text-neutral-700"
+                  />
                 </div>
               </VintagePaper>
             </div>
@@ -513,25 +679,7 @@ const PyqDashboard = () => {
                 ) : (
                   <div className="space-y-3 max-h-72 overflow-y-auto">
                     {repeatedQuestions.map((rq, idx) => (
-                      <div key={idx} className="p-3 bg-white border border-neutral-300 rounded text-xs text-neutral-800">
-                        <p className="font-semibold text-neutral-900">{rq.questionText}</p>
-                        {rq.years && (
-                          <div className="mt-2 flex items-center gap-1.5 flex-wrap">
-                            <span className="text-[10px] font-bold text-neutral-500 uppercase">Appeared in:</span>
-                            {Array.isArray(rq.years) ? (
-                              rq.years.map((y, yi) => (
-                                <span key={yi} className="bg-amber-100 text-amber-900 text-[10px] px-1.5 py-0.5 rounded font-bold">
-                                  {y}
-                                </span>
-                              ))
-                            ) : (
-                              <span className="bg-amber-100 text-amber-900 text-[10px] px-1.5 py-0.5 rounded font-bold">
-                                {rq.years}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                      <RepeatedQuestionCard key={idx} rq={rq} />
                     ))}
                   </div>
                 )}

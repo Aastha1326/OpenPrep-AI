@@ -5,9 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Flame, Play, FileText, Calendar, TrendingUp, Award, BookOpen,
   Target, CheckCircle, Clock, AlertCircle, RefreshCw, Lightbulb,
-  LogOut, X, Download, Upload,
+  LogOut, X, Download, Upload, Settings, MessageSquare,
 } from 'lucide-react';
 import API from '../services/api';
+import { toDateOnlyString } from '../utils/dateUtils';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip as LineTooltip, ResponsiveContainer,
@@ -24,12 +25,15 @@ import CreateNoteModal from '../components/dashboard/CreateNoteModal';
 import StudyPlanModal from '../components/dashboard/StudyPlanModal';
 import PyqAnalysisModal from '../components/dashboard/PyqAnalysisModal';
 import WeaknessDashboardWidget from '../components/dashboard/WeaknessDashboardWidget';
+import LeaderboardWidget from '../components/dashboard/LeaderboardWidget';
 import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
 import TargetExamOverviewWidget from '../components/dashboard/TargetExamOverviewWidget';
 import CompositeBundleModal from '../components/dashboard/CompositeBundleModal';
 import SyllabusImportModal from '../components/dashboard/SyllabusImportModal';
+import NotesWidget from '../components/dashboard/NotesWidget';
 import ThemeToggle from '../components/ThemeToggle';
 import BadgesList from '../components/BadgesList';
+import SM2SettingsModal from '../components/dashboard/SM2SettingsModal';
 
 
 import {
@@ -144,6 +148,19 @@ const EmptyState = ({ icon: Icon = Lightbulb, message = 'No data yet' }) => (
   </div>
 );
 
+// ── Analytics Charts Skeleton (shown while recharts chunk loads) ──
+const AnalyticsChartsFallback = () => (
+  <div className="bg-wood-desk rounded-lg shadow-inner border border-black/50 p-6 relative overflow-hidden grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <div className="absolute inset-0 shadow-[inset_0_0_50px_rgba(0,0,0,0.8)] pointer-events-none" />
+    {[0, 1].map((i) => (
+      <VintagePaper key={i} animate={false} className="w-full h-full p-6 shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
+        <Shimmer className="h-7 w-48 mb-6" />
+        <Shimmer className="h-64 w-full" />
+      </VintagePaper>
+    ))}
+  </div>
+);
+
 // ── Main Component ──
 const Dashboard = () => {
   const dispatch = useDispatch();
@@ -223,6 +240,7 @@ const Dashboard = () => {
   const [isPyqModalOpen, setIsPyqModalOpen] = useState(false);
   const [isBundleModalOpen, setIsBundleModalOpen] = useState(false);
   const [isSyllabusImportOpen, setIsSyllabusImportOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const syllabusPrefillRef = useRef(null);
   const [comingSoon, setComingSoon] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -290,12 +308,8 @@ const Dashboard = () => {
 
   const todayTasks = (() => {
     if (!activePlan?.dailyGoals) return [];
-    const now = new Date();
-    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    const todayGoal = activePlan.dailyGoals.find((g) => {
-      const goalDate = g.date ? g.date.split('T')[0] : null;
-      return goalDate === today;
-    });
+    const today = toDateOnlyString(new Date());
+    const todayGoal = activePlan.dailyGoals.find((g) => g.date && toDateOnlyString(g.date) === today);
     if (todayGoal?.tasks) {
       return todayGoal.tasks.map((t, i) => ({
         id: t.id || t._id || `task-${i}`,
@@ -344,14 +358,15 @@ const Dashboard = () => {
   return (
     <LeatherBoard>
       {/* --- QUICK ACTIONS TABS --- */}
-      <div className="absolute -left-4 top-24 flex flex-col gap-4 z-30 hidden md:flex">
+      <div className="absolute -left-4 top-24 flex-col gap-4 z-30 hidden md:flex">
         <GoldTabButton icon={Play} label="Start Quiz" delay={0.1} onClick={() => setComingSoon('Quiz feature coming soon!')} />
         <GoldTabButton icon={FileText} label="PYQ Intelligence" delay={0.2} onClick={() => navigate('/pyqs')} />
         <GoldTabButton icon={Calendar} label="Study Plan" delay={0.3} onClick={() => setIsStudyPlanOpen(true)} />
         <GoldTabButton icon={Upload} label="Import Syllabus" delay={0.35} onClick={() => setIsSyllabusImportOpen(true)} />
         <GoldTabButton icon={TrendingUp} label="Export Report" delay={0.4} onClick={() => handleExportReport('pdf')} />
+        <GoldTabButton icon={MessageSquare} label="Study Room" delay={0.45} onClick={() => navigate('/study-group')} />
         <button 
-          onClick={() => setIsNoteModalOpen(true)}
+          onClick={() => { setHasOpenedNoteModal(true); setIsNoteModalOpen(true); }}
           className="bg-neutral-800 text-yellow-500 border border-yellow-700/50 hover:bg-neutral-700 p-2 rounded-r-lg shadow-lg flex items-center justify-center relative group"
         >
           <FileText className="w-5 h-5" />
@@ -400,6 +415,16 @@ const Dashboard = () => {
             className="flex items-center space-x-6 mt-2 md:mt-0 shrink-0"
           >
             <ThemeToggle className="mr-2" />
+            <button
+              onClick={() => setIsSettingsModalOpen(true)}
+              className="bg-neutral-800 text-yellow-500 border border-yellow-700/50 hover:bg-neutral-700 p-2.5 rounded-sm shadow-[0_4px_10px_rgba(0,0,0,0.4)] flex items-center justify-center relative group"
+              aria-label="Settings"
+            >
+              <Settings className="w-5 h-5 transition-transform duration-300 group-hover:rotate-45" />
+              <div className="absolute top-full mt-2 px-2 py-1 bg-neutral-800 text-yellow-500 text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                SM-2 Settings
+              </div>
+            </button>
             <div className="flex flex-col items-center">
               <div className="relative">
                 <Flame className="w-12 h-12 text-orange-500 animate-pulse-glow" fill="currentColor" />
@@ -408,6 +433,15 @@ const Dashboard = () => {
               <span className="text-gold-foil font-bold text-2xl">{streakDays} Day</span>
               <span className="text-amber-200/50 text-xs uppercase tracking-widest">Streak</span>
             </div>
+
+            <button
+              onClick={() => navigate('/settings')}
+              className="bg-neutral-800 text-amber-100/80 px-4 py-3 rounded-sm border border-amber-700/40 shadow-[0_4px_15px_rgba(0,0,0,0.5)] hover:bg-neutral-700 hover:text-yellow-400 transition-all flex items-center gap-2 group"
+              aria-label="Settings"
+            >
+              <Settings className="w-5 h-5" />
+              <span className="font-playfair font-bold text-sm tracking-wide hidden sm:inline">Settings</span>
+            </button>
 
             <button
               onClick={handleLogout}
@@ -635,13 +669,19 @@ const Dashboard = () => {
           )}
         </div>
 
-        {/* --- AI WEAKNESS DETECTION WIDGET --- */}
-        <div className="my-6">
+        {/* --- LEADERBOARD & AI WEAKNESS DETECTION WIDGETS --- */}
+        <div className="my-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <LeaderboardWidget />
           <WeaknessDashboardWidget />
         </div>
 
         <div className="my-6">
           <BadgesList achievements={user?.achievements || []} />
+        </div>
+
+        {/* --- AI REVISION SUMMARIES + AUDIO READER --- */}
+        <div className="my-6">
+          <NotesWidget limit={5} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -821,33 +861,9 @@ const Dashboard = () => {
         isOpen={isStudyPlanOpen}
         onClose={() => setIsStudyPlanOpen(false)}
         activePlan={activePlan}
+        onPlanUpdate={() => dispatch(fetchActivePlan())}
         onPlanCreated={() => dispatch(fetchActivePlan())}
-        onBumpTime={async (taskId, minutesToAdd = 30) => {
-          const planId = activePlan?.id;
-          if (!planId) return;
-          setToggleError(null);
-          try {
-            const backendTaskId = taskId;
-            let currentDuration = 60;
-            if (activePlan?.dailyGoals) {
-              outer: for (const goal of activePlan.dailyGoals) {
-                for (const t of goal.tasks || []) {
-                  const thisTaskId = t.id || t._id;
-                  if (thisTaskId === backendTaskId) {
-                    currentDuration = t.duration || 60;
-                    break outer;
-                  }
-                }
-              }
-            }
-            await API.put(`/study-plans/${planId}/tasks/${backendTaskId}`, {
-              duration: currentDuration + minutesToAdd,
-            });
-            dispatch(fetchActivePlan());
-          } catch {
-            setToggleError('Failed to bump study time. Please try again.');
-          }
-        }}
+        onBumpTime={handleBumpStudyTime}
       />
 
       {/* --- PYQ ANALYSIS MODAL --- */}
@@ -881,6 +897,12 @@ const Dashboard = () => {
           dispatch(fetchSubjectBreakdown());
         }}
         onGoToStudyPlan={handleGoToStudyPlanFromImport}
+      />
+
+      {/* --- SM-2 SETTINGS MODAL --- */}
+      <SM2SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
       />
 
       {/* --- COMING SOON TOAST --- */}

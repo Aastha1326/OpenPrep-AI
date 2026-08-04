@@ -331,19 +331,44 @@ This document catalogs the REST API endpoints available in the **OpenPrep AI** b
 * **Request Body**:
 ```json
 {
-  "answers": [2] // Indicated indexes matching question array
+  "answers": [
+    { "questionId": "uuid", "selectedAnswer": 0 }
+  ],
+  "timeSpent": 120
 }
 ```
-* **Success Response (200 OK)**:
+* **Success Response (201 Created)** — new attempt created:
 ```json
 {
   "success": true,
-  "score": 100,
-  "correctCount": 1,
-  "totalQuestions": 1,
-  "attemptId": "60d0fe4f5311236168a10933"
+  "data": {
+    "id": "uuid",
+    "user": "uuid",
+    "quiz": "uuid",
+    "score": 100,
+    "totalQuestions": 2,
+    "answers": [...],
+    "timeSpent": 120,
+    "weakTopics": [],
+    "strongTopics": [],
+    "createdAt": "2026-08-03T10:00:00.000Z",
+    "updatedAt": "2026-08-03T10:00:00.000Z"
+  }
 }
 ```
+* **Duplicate Submission Response (200 OK)** — request within 5-second window:
+```json
+{
+  "success": true,
+  "duplicate": true,
+  "data": { ... } // the original attempt object
+}
+```
+* **Error Responses**:
+  * `400 Bad Request` — invalid answers format or incomplete submission
+  * `404 Not Found` — quiz not found or not owned by user
+
+> **Note**: To prevent duplicate attempts from rapid double-clicks, the server ignores submissions for the same quiz by the same user within a 5-second window. The duplicate response returns the original attempt with `duplicate: true`.
 
 ---
 

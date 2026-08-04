@@ -19,6 +19,7 @@ const { Server } = require('socket.io');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
 const passport = require('./config/passport');
+const { getCorsMiddleware } = require('./middleware/corsHandler');
 
 // Validate required environment variables at startup
 if (!process.env.JWT_SECRET) {
@@ -41,6 +42,7 @@ const flashcardRoutes = require('./routes/flashcardRoutes');
 const noteRoutes = require('./routes/noteRoutes');
 const progressRoutes = require('./routes/progressRoutes');
 const communityRoutes = require('./routes/communityRoutes');
+const userRoutes = require('./routes/userRoutes');
 
 // Connect to Database
 connectDB();
@@ -57,10 +59,7 @@ if (process.env.NODE_ENV === 'production') {
 
 // Security Middlewares
 app.use(helmet());
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
-  credentials: true,
-}));
+app.use(getCorsMiddleware());
 
 app.use(passport.initialize());
 
@@ -94,8 +93,12 @@ const apiLimiter = rateLimit({
 });
 app.use('/api/', apiLimiter);
 
+// Serve avatar images publicly — profile pictures are displayed to other
+// users (e.g. in community features) and aren't sensitive like notes/PYQs.
+app.use('/uploads/avatars', express.static(path.join(__dirname, 'uploads/avatars')));
+
 // Set Static Folder for File Uploads (Protected)
-// protect, Note, PYQ already imported at lines 12-15
+// protect, Note, PYQ already imported at top of file
 
 app.get('/uploads/:filename', protect, async (req, res, next) => {
   try {
@@ -141,6 +144,7 @@ app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/progress', progressRoutes);
 app.use('/api/community', communityRoutes);
+app.use('/api/users', userRoutes);
 
 // Base Route
 app.get('/', (req, res) => {
@@ -167,11 +171,12 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
+
 const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: corsOriginHandler,
     methods: ['GET', 'POST'],
     credentials: true,
   },
@@ -179,6 +184,11 @@ const io = new Server(server, {
 
 // Initialize socket handlers
 require('./sockets/battleHandler')(io);
+require('./sockets/chatHandler')(io);
+
+// Start weekly digest background scheduler
+const { startScheduler } = require('./services/weeklyDigestService');
+startScheduler();
 
 server.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);

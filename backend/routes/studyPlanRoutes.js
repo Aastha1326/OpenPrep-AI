@@ -6,6 +6,7 @@ const {
   getPlans,
   getWeaknessAnalysis,
   rescheduleAdaptivePlan,
+  rescheduleOverdueTasks,
 } = require('../controllers/studyPlanController');
 const { protect } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
@@ -333,5 +334,6 @@ router.post('/reschedule-adaptive', protect, rescheduleAdaptivePlan);
  */
 
 router.put('/:planId/tasks/:taskId', protect, validateToggleTask, toggleTaskCompletion);
+router.post('/:id/reschedule', protect, aiLimiter, checkQuota, rescheduleOverdueTasks);
 
 module.exports = router;

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Download, Calendar as CalendarIcon, CheckCircle, Circle, AlertTriangle, ClockPlus, Filter, Plus, RefreshCw, AlertCircle } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 import API from '../../services/api';
+import { toLocalDateString, formatDateOnly } from '../../utils/dateUtils';
 
 // Create Study Plan Form Component
 const CreateStudyPlanForm = ({ onClose, onSubmit, loading, error, formData, handleInputChange, minStartDate, minEndDate, exams }) => (
@@ -40,7 +41,7 @@ const CreateStudyPlanForm = ({ onClose, onSubmit, loading, error, formData, hand
           ) : (
             exams.map((exam) => (
               <option key={exam.id} value={exam.id}>
-                {exam.name} ({exam.date ? new Date(exam.date).toLocaleDateString() : 'No date'})
+                {exam.name} ({exam.date ? formatDateOnly(exam.date) : 'No date'})
               </option>
             ))
           )}
@@ -145,9 +146,11 @@ const BumpTimeButton = ({ onClick, disabled = false }) => (
   </button>
 );
 
-const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated }) => {
+const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated, onPlanUpdate }) => {
   const contentRef = useRef(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isRescheduling, setIsRescheduling] = useState(false);
+  const [rescheduleMessage, setRescheduleMessage] = useState(null);
   const [showWeakOnly, setShowWeakOnly] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -210,31 +213,66 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
     }
   }
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (!contentRef.current) return;
     setIsExporting(true);
 
-    const element = contentRef.current;
-    
-    const opt = {
-      margin: 10,
-      filename: 'My_Study_Plan.pdf',
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
+    try {
+      const { default: html2pdf } = await import('html2pdf.js');
 
-    html2pdf()
-      .set(opt)
-      .from(element)
-      .save()
-      .then(() => {
-        setIsExporting(false);
-      })
-      .catch(err => {
-        console.error('PDF export failed:', err);
-        setIsExporting(false);
+      const element = contentRef.current;
+
+      const opt = {
+        margin: 10,
+        filename: 'My_Study_Plan.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      await html2pdf()
+        .set(opt)
+        .from(element)
+        .save();
+    } catch (err) {
+      console.error('PDF export failed:', err);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleReschedule = async () => {
+    if (!activePlan?.id) return;
+
+    setIsRescheduling(true);
+    setRescheduleMessage(null);
+
+    try {
+      const response = await API.post(`/study-plans/${activePlan.id}/reschedule`, {
+        useAIRebalance: false
       });
+
+      setRescheduleMessage({
+        type: 'success',
+        text: response.data.message || 'Study plan rescheduled successfully'
+      });
+
+      // Notify parent component to refresh the plan
+      if (onPlanUpdate) {
+        onPlanUpdate();
+      }
+
+      setTimeout(() => setRescheduleMessage(null), 4000);
+    } catch (error) {
+      console.error('Reschedule failed:', error);
+      setRescheduleMessage({
+        type: 'error',
+        text: error.response?.data?.error || 'Failed to reschedule study plan'
+      });
+      setTimeout(() => setRescheduleMessage(null), 4000);
+    } finally {
+      setIsRescheduling(false);
+    }
   };
 
   const handleInputChange = (field, value) => {
@@ -284,7 +322,7 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
     }
   };
 
-  const minStartDate = new Date().toISOString().split('T')[0];
+  const minStartDate = toLocalDateString(new Date());
   const minEndDate = formData.startDate || minStartDate;
 
   const showForm = showCreateForm || !activePlan;
@@ -331,6 +369,15 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
                 {!showForm && (
                   <>
                     <button
+                      onClick={handleReschedule}
+                      disabled={isRescheduling}
+                      className="flex items-center space-x-2 bg-gradient-to-r from-blue-700 to-blue-900 text-white px-4 py-2 rounded-sm hover:from-blue-600 hover:to-blue-800 transition-colors disabled:opacity-50 cursor-pointer"
+                      title="Reschedule overdue tasks"
+                    >
+                      <RefreshCw className={`w-5 h-5 ${isRescheduling ? 'animate-spin' : ''}`} />
+                      <span className="font-semibold">{isRescheduling ? 'Rescheduling...' : 'Reschedule Tasks'}</span>
+                    </button>
+                    <button
                       onClick={() => setShowCreateForm(true)}
                       className="flex items-center gap-1.5 px-3 py-2 rounded-sm text-sm font-semibold transition-colors cursor-pointer border bg-white/70 text-[#8B4513] border-[#8B4513]/30 hover:bg-white"
                     >
@@ -367,6 +414,24 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
               </div>
             </div>
 
+            {/* Reschedule Message Toast */}
+            <AnimatePresence>
+              {rescheduleMessage && (
+                <motion.div
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className={`absolute top-20 left-1/2 -translate-x-1/2 px-6 py-3 rounded-sm border shadow-lg z-10 ${
+                    rescheduleMessage.type === 'success'
+                      ? 'bg-green-900 text-green-50 border-green-700/50'
+                      : 'bg-red-900 text-red-50 border-red-700/50'
+                  }`}
+                >
+                  <span className="font-medium text-sm">{rescheduleMessage.text}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Scrollable Content (PDF Target) */}
             <div className="overflow-y-auto p-8 flex-1 bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')]">
               {showForm ? (
@@ -401,7 +466,7 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
                 <div className="space-y-8">
                   {filteredDailyGoals && filteredDailyGoals.length > 0 ? (
                     filteredDailyGoals.map((day, idx) => {
-                      const dateStr = day.date ? new Date(day.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : `Day ${idx + 1}`;
+                      const dateStr = day.date ? formatDateOnly(day.date, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : `Day ${idx + 1}`;
                       const hasTasks = day.tasks && day.tasks.length > 0;
                       const weakDayCount = (day.tasks || []).filter((t) => t.topic?.status === 'Weak').length;
                       return (

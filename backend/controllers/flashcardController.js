@@ -9,6 +9,7 @@ const Progress = require('../models/Progress');
 const geminiService = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
 const { default: Exporter } = require('anki-apkg-export');
+const { calculateSM2 } = require('../utils/sm2');
 
 // @desc    Generate AI Flashcards
 // @route   POST /api/flashcards/generate-ai
@@ -41,8 +42,7 @@ exports.generateAIFlashcards = async (req, res, next) => {
     if (notes && notes.length > 0) {
       notesText = notes
         .map((n) => n.content || '')
-        .join('\n')
-        .substring(0, 5000);
+        .join('\n');
     }
 
     // Call Gemini
@@ -90,11 +90,67 @@ exports.generateAIFlashcards = async (req, res, next) => {
   }
 };
 
+// @desc    Preview AI-generated flashcards from a note's content (not saved)
+// @route   POST /api/flashcards/generate-from-note
+// @access  Private
+exports.generateFlashcardsFromNote = async (req, res, next) => {
+  try {
+    const { noteId, count } = req.body;
+
+    const note = await Note.findOne({
+      where: { id: noteId, user: req.user.id },
+      include: [
+        { model: Subject, as: 'subjectRef', attributes: ['id', 'name'] },
+        { model: Topic, as: 'topicRef', attributes: ['id', 'name'] },
+      ],
+    });
+
+    if (!note) {
+      return res.status(404).json({ success: false, error: 'Note not found' });
+    }
+
+    if (!note.content || note.content.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Note has no text content to generate flashcards from',
+      });
+    }
+
+    const subjectName = note.subjectRef ? note.subjectRef.name : 'General';
+    const topicName = note.topicRef ? note.topicRef.name : 'General overview';
+
+    const cardsList = await geminiService.generateFlashcards(
+      subjectName,
+      topicName,
+      note.content,
+      count || 6
+    );
+
+    res.status(200).json({
+      success: true,
+      count: cardsList.length,
+      subjectId: note.subjectRef ? note.subjectRef.id : note.subject,
+      data: cardsList,
+    });
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({ success: false, error: error.message });
+    }
+    next(error);
+  }
+};
+
 // @desc    Create manual Flashcard
 // @route   POST /api/flashcards
 // @access  Private
-exports.createFlashcard = async (req, res, next) => {
-  try {
+exports.createFlashcard = async (req, res, next) => {  try {
     const { subjectId, topicId, front, back } = req.body;
     const card = await Flashcard.create({
       user: req.user.id,
@@ -181,33 +237,24 @@ exports.reviewFlashcard = async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'Flashcard not found' });
     }
 
-    // SuperMemo SM-2 Algorithm
-    let { interval, repetitions, efactor } = card;
+    // SuperMemo SM-2 Algorithm using custom settings
+    const result = calculateSM2({
+      interval: card.interval,
+      repetitions: card.repetitions,
+      efactor: card.efactor,
+      quality,
+      easyFactorModifier: req.user.sm2EasyFactorModifier,
+      intervalModifier: req.user.sm2IntervalModifier,
+      step1Interval: req.user.sm2Step1Interval,
+      step2Interval: req.user.sm2Step2Interval,
+    });
 
-    if (quality >= 3) {
-      if (repetitions === 0) {
-        interval = 1;
-      } else if (repetitions === 1) {
-        interval = 6;
-      } else {
-        interval = Math.round(interval * efactor);
-      }
-      repetitions += 1;
-    } else {
-      repetitions = 0;
-      interval = 1;
-    }
-
-    // Adjust E-Factor
-    efactor = efactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
-    if (efactor < 1.3) efactor = 1.3;
-
-    card.interval = interval;
-    card.repetitions = repetitions;
-    card.efactor = efactor;
+    card.interval = result.interval;
+    card.repetitions = result.repetitions;
+    card.efactor = result.efactor;
 
     // Set next review date from now
-    card.nextReviewDate = new Date(Date.now() + interval * 24 * 60 * 60 * 1000);
+    card.nextReviewDate = new Date(Date.now() + card.interval * 24 * 60 * 60 * 1000);
     await card.save();
 
     // If card is mastered (quality >= 4), increment mastered count in progress

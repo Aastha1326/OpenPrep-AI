@@ -1,25 +1,25 @@
 const express = require('express');
 const {
   generateAIFlashcards,
+  generateFlashcardsFromNote,
   createFlashcard,
   getFlashcards,
   reviewFlashcard,
   deleteFlashcard,
   exportFlashcards,
   importFlashcards,
-} = require('../controllers/flashcardController');
-const { protect } = require('../middleware/auth');
+} = require('../controllers/flashcardController');const { protect } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
 const { checkQuota } = require('../middleware/quotaMiddleware');
 const flashcardUpload = require('../middleware/flashcardUpload');
 const {
   validateGenerateAIFlashcards,
+  validateGenerateFlashcardsFromNote,
   validateCreateFlashcard,
   validateReviewFlashcard,
   validateExportFlashcards,
   validateImportFlashcards,
 } = require('../middleware/validators');
-
 const router = express.Router();
 
 /**
@@ -103,7 +103,7 @@ const router = express.Router();
 
 // Static routes first (must come before /:id to avoid route shadowing)
 router.post('/generate-ai', protect, aiLimiter, checkQuota, validateGenerateAIFlashcards, generateAIFlashcards);
-
+router.post('/generate-from-note', protect, aiLimiter, checkQuota, validateGenerateFlashcardsFromNote, generateFlashcardsFromNote);
 /**
  * @swagger
  * /api/flashcards/export:
