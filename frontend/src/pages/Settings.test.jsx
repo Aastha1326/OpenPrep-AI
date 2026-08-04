@@ -95,4 +95,23 @@ describe('Settings Page', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Failed to save settings');
   });
+
+  test('renders Profile Picture section and handles file selection', async () => {
+    renderSettings({ avatar: '/uploads/avatars/user.png' });
+
+    expect(screen.getByRole('heading', { name: /Profile Picture/i })).toBeInTheDocument();
+    const selectBtn = screen.getByRole('button', { name: /Select Image/i });
+    expect(selectBtn).toBeInTheDocument();
+    
+    // File input selection
+    const file = new File(['mock content'], 'avatar.webp', { type: 'image/webp' });
+    const fileInput = screen.getByLabelText(/Select Image/i, { selector: 'input', suggest: false });
+    // Note: Since input is hidden and select button triggers click, we can target it by container
+    const input = document.getElementById('avatar-upload');
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Save Photo/i })).toBeInTheDocument();
+    });
+  });
 });
