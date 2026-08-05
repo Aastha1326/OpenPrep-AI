@@ -2,26 +2,26 @@ const express = require('express');
 const {
   generateAIFlashcards,
   generateFlashcardsFromNote,
+  autoTagFlashcard,
   createFlashcard,
   getFlashcards,
   reviewFlashcard,
   deleteFlashcard,
   exportFlashcards,
   importFlashcards,
-} = require('../controllers/flashcardController');
-const { protect } = require('../middleware/auth');
+} = require('../controllers/flashcardController');const { protect } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
 const { checkQuota } = require('../middleware/quotaMiddleware');
 const flashcardUpload = require('../middleware/flashcardUpload');
 const {
   validateGenerateAIFlashcards,
   validateGenerateFlashcardsFromNote,
+  validateAutoTagFlashcard,
   validateCreateFlashcard,
   validateReviewFlashcard,
   validateExportFlashcards,
   validateImportFlashcards,
-} = require('../middleware/validators');
-const router = express.Router();
+} = require('../middleware/validators');const router = express.Router();
 
 /**
  * @swagger

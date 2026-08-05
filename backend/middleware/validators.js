@@ -143,6 +143,11 @@ const validateCreateFlashcard = [
   handleValidationErrors,
 ];
 
+const validateAutoTagFlashcard = [
+  body('front').trim().notEmpty().withMessage('Please provide the front text'),
+  body('back').trim().notEmpty().withMessage('Please provide the back text'),
+  handleValidationErrors,
+];
 const validateReviewFlashcard = [
   body('quality')
     .isFloat({ min: 0, max: 5 })
@@ -377,10 +382,10 @@ module.exports = {
 // Flashcard
   validateGenerateAIFlashcards,
   validateGenerateFlashcardsFromNote,
-  validateCreateFlashcard,  validateReviewFlashcard,
+validateCreateFlashcard,  validateReviewFlashcard,
+  validateAutoTagFlashcard,
   validateExportFlashcards,
-  validateImportFlashcards,
-  // Quiz
+  validateImportFlashcards,  // Quiz
   validateGenerateAIQuiz,
   validateGenerateRevisionSheet,
   validateSubmitQuizAttempt,

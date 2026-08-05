@@ -90,11 +90,38 @@ exports.generateAIFlashcards = async (req, res, next) => {
   }
 };
 
+// @desc    Suggest AI tags & difficulty rating for a flashcard (not saved)
+// @route   POST /api/flashcards/auto-tag
+// @access  Private
+exports.autoTagFlashcard = async (req, res, next) => {
+  try {
+    const { front, back } = req.body;
+
+    const suggestion = await geminiService.generateFlashcardTags(front, back);
+
+    res.status(200).json({ success: true, data: suggestion });
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({
+        success: false,
+        error: error.message,
+      });
+    }
+    next(error);
+  }
+};
+
 // @desc    Preview AI-generated flashcards from a note's content (not saved)
 // @route   POST /api/flashcards/generate-from-note
 // @access  Private
-exports.generateFlashcardsFromNote = async (req, res, next) => {
-  try {
+exports.generateFlashcardsFromNote = async (req, res, next) => {  try {
     const { noteId, count } = req.body;
 
     const note = await Note.findOne({
@@ -151,15 +178,16 @@ exports.generateFlashcardsFromNote = async (req, res, next) => {
 // @route   POST /api/flashcards
 // @access  Private
 exports.createFlashcard = async (req, res, next) => {  try {
-    const { subjectId, topicId, front, back } = req.body;
+    const { subjectId, topicId, front, back, tags, difficulty } = req.body;
     const card = await Flashcard.create({
       user: req.user.id,
       subject: subjectId,
       topic: topicId || null,
       front,
       back,
-    });
-    res.status(201).json({ success: true, data: card });
+      tags: tags || [],
+      difficulty: difficulty || null,
+    });    res.status(201).json({ success: true, data: card });
   } catch (error) {
     next(error);
   }
