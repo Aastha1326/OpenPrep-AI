@@ -44,7 +44,9 @@ const communityRoutes = require('./routes/communityRoutes');
 const userRoutes = require('./routes/userRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const { initNotificationCron } = require('./services/notificationService');
+const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 initNotificationCron();
+initDifficultyCalibratorCron();
 
 // Connect to Database
 connectDB();

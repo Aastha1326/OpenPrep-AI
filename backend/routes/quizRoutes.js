@@ -6,6 +6,7 @@ const {
   submitQuizAttempt,
   getAttemptHistory,
   generateRevisionSheet,
+  getCalibrationReport,
 } = require('../controllers/quizController');
 const { protect } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
@@ -96,6 +97,8 @@ const router = express.Router();
  */
 
 router.post('/generate-ai', protect, aiLimiter, checkQuota, validateGenerateAIQuiz, generateAIQuiz);
+
+router.get('/admin/calibration-report', protect, getCalibrationReport);
 
 /**
  * @swagger
