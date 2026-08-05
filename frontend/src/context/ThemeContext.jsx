@@ -16,26 +16,25 @@ export const ThemeProvider = ({ children }) => {
     return false;
   });
 
-  // Fallback initial theme logic if Redux is not yet populated or in isolated context
   const getInitialTheme = () => {
     const saved = localStorage.getItem('openprep_theme') || localStorage.getItem('theme');
     if (saved) return saved;
-    if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      return 'dark';
-    }
-    return 'dark';
+    return 'system';
   };
 
   const theme = reduxTheme || getInitialTheme();
 
-  // Handle OS system preference changes dynamically if user hasn't explicitly set a preference
+  // Handle OS system preference changes dynamically
   useEffect(() => {
+    if (theme !== 'system') return;
+
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (e) => {
-      const saved = localStorage.getItem('openprep_theme') || localStorage.getItem('theme');
-      if (!saved) {
-        const newSystemTheme = e.matches ? 'dark' : 'light';
-        dispatch(setThemeAction(newSystemTheme));
+      const root = window.document.documentElement;
+      if (e.matches) {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
       }
     };
 
@@ -52,15 +51,22 @@ export const ThemeProvider = ({ children }) => {
         mediaQuery.removeListener(handleChange);
       }
     };
-  }, [dispatch]);
+  }, [theme]);
 
   // Sync theme changes with DOM root (html tag) and localStorage
   useEffect(() => {
     const root = window.document.documentElement;
     if (theme === 'dark') {
       root.classList.add('dark');
-    } else {
+    } else if (theme === 'light') {
       root.classList.remove('dark');
+    } else if (theme === 'system') {
+      const isSystemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (isSystemDark) {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
     }
     localStorage.setItem('openprep_theme', theme);
     localStorage.setItem('theme', theme);
