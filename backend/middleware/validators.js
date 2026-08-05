@@ -310,8 +310,26 @@ const validateTrackStudyTime = [
   handleValidationErrors,
 ];
 
-const validateUpdateTopicProgress = [
-  body('completionPercentage')
+const validateFocusSession = [
+  body('activeSeconds')
+    .isInt({ min: 0 })
+    .withMessage('Active seconds must be a non-negative integer'),
+  body('pausedSeconds')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Paused seconds must be a non-negative integer'),
+  body('interruptions')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Interruptions must be a non-negative integer'),
+  body('subjectId')
+    .optional()
+    .isUUID(4)
+    .withMessage('Subject ID must be a valid UUID'),
+  handleValidationErrors,
+];
+
+const validateUpdateTopicProgress = [  body('completionPercentage')
     .optional()
     .isFloat({ min: 0, max: 100 })
     .withMessage('Completion percentage must be between 0 and 100'),
@@ -373,10 +391,10 @@ module.exports = {
   // Study Plan
   validateGenerateAIPlan,
   validateToggleTask,
-  // Progress
+// Progress
   validateTrackStudyTime,
   validateUpdateTopicProgress,
-  // Community
+  validateFocusSession,  // Community
   validateSubmitFeedback,
   validateResendVerification,
 };
