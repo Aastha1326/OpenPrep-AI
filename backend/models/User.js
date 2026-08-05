@@ -96,6 +96,30 @@ const User = sequelize.define(
       type: DataTypes.DATE,
       allowNull: true,
     },
+    sm2EasyFactorModifier: {
+      type: DataTypes.FLOAT,
+      defaultValue: 1.0,
+    },
+    sm2IntervalModifier: {
+      type: DataTypes.FLOAT,
+      defaultValue: 1.0,
+    },
+    sm2Step1Interval: {
+      type: DataTypes.INTEGER,
+      defaultValue: 1,
+    },
+    sm2Step2Interval: {
+      type: DataTypes.INTEGER,
+      defaultValue: 6,
+    },
+    leaderboardVisible: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+    },
+    receiveWeeklyDigest: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+    },
   },
   {
     timestamps: true,

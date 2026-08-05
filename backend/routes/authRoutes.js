@@ -11,6 +11,9 @@ const {
   resetPassword,
   refreshToken,
   logout,
+  updateSettings,
+  updateSM2Settings,
+  resetSM2Settings,
 } = require('../controllers/authController');
 
 const { protect } = require('../middleware/auth');
@@ -538,5 +541,10 @@ router.get(
     res.redirect('/dashboard');
   }
 );
+
+// User settings routes
+router.patch('/settings', protect, updateSettings);
+router.put('/sm2-settings', protect, updateSM2Settings);
+router.post('/sm2-settings/reset', protect, resetSM2Settings);
 
 module.exports = router;

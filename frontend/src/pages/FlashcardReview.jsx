@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Brain, ArrowLeft, RotateCw, CheckCircle2, Volume2, VolumeX, AlertCircle } from 'lucide-react';
+import { Brain, ArrowLeft, RotateCw, CheckCircle2, Volume2, VolumeX, AlertCircle, Settings } from 'lucide-react';
 import API from '../services/api';
 
 const STORAGE_KEY = 'flashcardReviewSession';
@@ -49,6 +49,82 @@ const clearSession = () => {
 
 const FlashcardReview = () => {
   const navigate = useNavigate();
+
+  const [userSettings, setUserSettings] = useState({
+    sm2EasyFactorModifier: 1.0,
+    sm2IntervalModifier: 1.0,
+    sm2Step1Interval: 1,
+    sm2Step2Interval: 6,
+  });
+
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [modalSettings, setModalSettings] = useState(userSettings);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+
+  useEffect(() => {
+    const fetchUserSettings = async () => {
+      try {
+        const res = await API.get('/auth/me');
+        if (res.data?.success && res.data?.user) {
+          const u = res.data.user;
+          setUserSettings({
+            sm2EasyFactorModifier: u.sm2EasyFactorModifier ?? 1.0,
+            sm2IntervalModifier: u.sm2IntervalModifier ?? 1.0,
+            sm2Step1Interval: u.sm2Step1Interval ?? 1,
+            sm2Step2Interval: u.sm2Step2Interval ?? 6,
+          });
+        }
+      } catch (err) {
+        console.error("Failed to load user settings", err);
+      }
+    };
+    fetchUserSettings();
+  }, []);
+
+  useEffect(() => {
+    if (isSettingsOpen) {
+      setModalSettings(userSettings);
+    }
+  }, [isSettingsOpen, userSettings]);
+
+  const handleSaveSettings = async () => {
+    setIsSavingSettings(true);
+    try {
+      const res = await API.put('/auth/sm2-settings', modalSettings);
+      if (res.data?.success) {
+        setUserSettings(modalSettings);
+        setIsSettingsOpen(false);
+      }
+    } catch (err) {
+      console.error("Failed to save SM-2 settings", err);
+      alert("Failed to save settings. Please try again.");
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
+
+  const handleResetSettings = async () => {
+    setIsSavingSettings(true);
+    try {
+      const res = await API.post('/auth/sm2-settings/reset');
+      if (res.data?.success) {
+        const defaults = {
+          sm2EasyFactorModifier: 1.0,
+          sm2IntervalModifier: 1.0,
+          sm2Step1Interval: 1,
+          sm2Step2Interval: 6,
+        };
+        setUserSettings(defaults);
+        setModalSettings(defaults);
+        setIsSettingsOpen(false);
+      }
+    } catch (err) {
+      console.error("Failed to reset SM-2 settings", err);
+      alert("Failed to reset settings. Please try again.");
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
 
   const [savedSession] = useState(restoreSession);
 
@@ -323,8 +399,17 @@ const FlashcardReview = () => {
           <Brain className="w-5 h-5 text-primary-500" />
           <span>SM-2 Review Queue</span>
         </div>
-        <div className="text-sm font-semibold text-neutral-500 dark:text-neutral-400">
-          {currentIndex + 1} <span className="text-neutral-300 dark:text-neutral-600">/</span> {cards.length}
+        <div className="flex items-center gap-3">
+          <div className="text-sm font-semibold text-neutral-500 dark:text-neutral-400">
+            {currentIndex + 1} <span className="text-neutral-300 dark:text-neutral-600">/</span> {cards.length}
+          </div>
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="p-1.5 rounded-full hover:bg-neutral-200 dark:hover:bg-slate-800 text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-100 transition-colors"
+            title="SM-2 Settings"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
         </div>
       </div>
 
@@ -479,6 +564,156 @@ const FlashcardReview = () => {
           </div>
         </div>
       </div>
+
+      {/* Settings Modal */}
+      <AnimatePresence>
+        {isSettingsOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsSettingsOpen(false)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            />
+
+            {/* Modal Box */}
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              className="relative w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-neutral-200 dark:border-slate-700/80 p-6 z-10 flex flex-col gap-5 overflow-hidden"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-slate-700/60">
+                <h3 className="text-lg font-bold font-inter text-neutral-800 dark:text-neutral-100 flex items-center gap-2">
+                  <Settings className="w-5 h-5 text-primary-500" />
+                  SM-2 Algorithm Settings
+                </h3>
+              </div>
+
+              <div className="flex flex-col gap-4 py-2">
+                {/* Easy Factor Modifier */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-neutral-600 dark:text-neutral-300 uppercase tracking-wider">
+                    Easiness Factor Adjuster (Multiplier)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.05"
+                    min="0.1"
+                    max="5.0"
+                    value={modalSettings.sm2EasyFactorModifier}
+                    onChange={(e) => setModalSettings({
+                      ...modalSettings,
+                      sm2EasyFactorModifier: parseFloat(e.target.value) || 1.0
+                    })}
+                    className="w-full px-3 py-2 text-sm bg-neutral-50 dark:bg-slate-900 border border-neutral-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-primary-500 text-neutral-800 dark:text-neutral-100 transition-colors"
+                  />
+                  <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
+                    Controls how aggressively the easiness factor increases or decreases based on quality scores.
+                  </span>
+                </div>
+
+                {/* Interval Modifier */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-neutral-600 dark:text-neutral-300 uppercase tracking-wider">
+                    Interval Scale Factor (Multiplier)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.05"
+                    min="0.1"
+                    max="10.0"
+                    value={modalSettings.sm2IntervalModifier}
+                    onChange={(e) => setModalSettings({
+                      ...modalSettings,
+                      sm2IntervalModifier: parseFloat(e.target.value) || 1.0
+                    })}
+                    className="w-full px-3 py-2 text-sm bg-neutral-50 dark:bg-slate-900 border border-neutral-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-primary-500 text-neutral-800 dark:text-neutral-100 transition-colors"
+                  />
+                  <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
+                    Adjusts review intervals for third+ reviews. Larger values stretch review intervals further.
+                  </span>
+                </div>
+
+                {/* Step 1 Review Interval */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-neutral-600 dark:text-neutral-300 uppercase tracking-wider">
+                    Step 1 Review Interval (Days)
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="1"
+                    max="365"
+                    value={modalSettings.sm2Step1Interval}
+                    onChange={(e) => setModalSettings({
+                      ...modalSettings,
+                      sm2Step1Interval: parseInt(e.target.value, 10) || 1
+                    })}
+                    className="w-full px-3 py-2 text-sm bg-neutral-50 dark:bg-slate-900 border border-neutral-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-primary-500 text-neutral-800 dark:text-neutral-100 transition-colors"
+                  />
+                  <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
+                    The interval in days for the very first correct review.
+                  </span>
+                </div>
+
+                {/* Step 2 Review Interval */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-neutral-600 dark:text-neutral-300 uppercase tracking-wider">
+                    Step 2 Review Interval (Days)
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="1"
+                    max="365"
+                    value={modalSettings.sm2Step2Interval}
+                    onChange={(e) => setModalSettings({
+                      ...modalSettings,
+                      sm2Step2Interval: parseInt(e.target.value, 10) || 6
+                    })}
+                    className="w-full px-3 py-2 text-sm bg-neutral-50 dark:bg-slate-900 border border-neutral-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-primary-500 text-neutral-800 dark:text-neutral-100 transition-colors"
+                  />
+                  <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
+                    The interval in days for the second correct review.
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center pt-3 border-t border-neutral-100 dark:border-slate-700/60 mt-2">
+                <button
+                  type="button"
+                  disabled={isSavingSettings}
+                  onClick={handleResetSettings}
+                  className="px-4 py-2 text-xs font-bold text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-all"
+                >
+                  Reset Defaults
+                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={isSavingSettings}
+                    onClick={() => setIsSettingsOpen(false)}
+                    className="px-4 py-2 text-xs font-bold text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-slate-700 rounded-lg transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSavingSettings}
+                    onClick={handleSaveSettings}
+                    className="px-4 py-2 text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-lg shadow-md transition-all flex items-center gap-1.5"
+                  >
+                    {isSavingSettings ? 'Saving...' : 'Save Settings'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
