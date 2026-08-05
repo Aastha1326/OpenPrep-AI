@@ -109,14 +109,15 @@ describe('Error Handler Middleware', () => {
     });
   });
 
-  it('should return 500 if error has no message', () => {
-    const err = new Error();
+  it('should return 408 for a timeout error', () => {
+    const err = new Error('Gemini request timed out');
+    err.statusCode = 408;
     errorHandler(err, req, res, vi.fn());
 
-    expect(res.statusCode).toBe(500);
+    expect(res.statusCode).toBe(408);
     expect(res.body).toEqual({
       success: false,
-      error: 'Server Error',
+      error: 'Gemini request timed out',
     });
   });
 });

@@ -28,7 +28,7 @@ const User = sequelize.define(
     },
     password: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
       validate: {
         len: {
           args: [8],
@@ -39,6 +39,15 @@ const User = sequelize.define(
     role: {
       type: DataTypes.ENUM('student', 'contributor', 'admin'),
       defaultValue: 'student',
+    },
+    provider: {
+      type: DataTypes.STRING,
+      defaultValue: 'local',
+    },
+    socialId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      unique: true,
     },
     streakCount: {
       type: DataTypes.INTEGER,
@@ -55,6 +64,15 @@ const User = sequelize.define(
     avatar: {
       type: DataTypes.STRING,
       defaultValue: '',
+    },
+    leaderboardVisible: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+    },
+    receiveWeeklyDigest: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+      allowNull: false,
     },
     isEmailVerified: {
       type: DataTypes.BOOLEAN,
@@ -73,7 +91,7 @@ const User = sequelize.define(
       type: DataTypes.DATE,
     },
     refreshTokens: {
-      type: DataTypes.ARRAY(DataTypes.STRING),
+      type: DataTypes.JSONB,
       defaultValue: [],
     },
     refreshTokenExpire: {
@@ -86,6 +104,26 @@ const User = sequelize.define(
     lockoutUntil: {
       type: DataTypes.DATE,
       allowNull: true,
+    },
+    sm2EasyFactorModifier: {
+      type: DataTypes.FLOAT,
+      defaultValue: 1.0,
+      allowNull: false,
+    },
+    sm2IntervalModifier: {
+      type: DataTypes.FLOAT,
+      defaultValue: 1.0,
+      allowNull: false,
+    },
+    sm2Step1Interval: {
+      type: DataTypes.INTEGER,
+      defaultValue: 1,
+      allowNull: false,
+    },
+    sm2Step2Interval: {
+      type: DataTypes.INTEGER,
+      defaultValue: 6,
+      allowNull: false,
     },
   },
   {

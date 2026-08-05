@@ -26,15 +26,22 @@ const PYQ = sequelize.define(
       type: DataTypes.UUID,
       allowNull: false,
     },
-    year: {
+year: {
       type: DataTypes.INTEGER,
       allowNull: false,
+    },
+    difficulty: {
+      type: DataTypes.ENUM('Easy', 'Medium', 'Hard'),
+      defaultValue: 'Medium',
+    },
+    chapters: {
+      type: DataTypes.ARRAY(DataTypes.STRING),
+      defaultValue: [],
     },
     fileUrl: {
       type: DataTypes.STRING,
       allowNull: false,
-    },
-    analyzed: {
+    },    analyzed: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
@@ -54,7 +61,6 @@ const PYQ = sequelize.define(
   },
   {
     timestamps: true,
-    indexes: [
       {
         name: 'pyq_user_id_idx',
         unique: false,
@@ -71,6 +77,10 @@ const PYQ = sequelize.define(
       {
         name: 'pyq_user_exam_idx',
         fields: ['user', 'exam'],
+      },
+      {
+        name: 'pyq_subject_year_difficulty_idx',
+        fields: ['subject', 'year', 'difficulty'],
       },
     ],
     hooks: {

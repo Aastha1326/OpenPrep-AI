@@ -1,18 +1,72 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Lightbulb, AlertCircle, RefreshCw, BookOpen } from 'lucide-react';
+import { Lightbulb, AlertCircle, RefreshCw, BookOpen, Volume2, VolumeX } from 'lucide-react';
+
+import { useNavigate } from 'react-router-dom';
+import ExportDeckDropdown from '../flashcards/ExportDeckDropdown';
 
 const Shimmer = ({ className = '' }) => (
   <div className={`animate-pulse bg-neutral-300/60 rounded ${className}`} />
 );
 
 const FlashcardWidget = ({ flashcard = null, loading = false, error = null, totalDue = 0, onRetry, onReview }) => {
+  const navigate = useNavigate();
   const [isFlipped, setIsFlipped] = useState(false);
+  const [prevFlashcard, setPrevFlashcard] = useState(flashcard);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speechRate, setSpeechRate] = useState(1);
 
-  // Reset flip state when the flashcard changes (after render, not during)
+  if (flashcard !== prevFlashcard) {
+    setPrevFlashcard(flashcard);
+    setIsFlipped(false);
+  }
+
+  // Cancel speech synthesis whenever card flips or active flashcard changes
   useEffect(() => {
-    if (isFlipped) setIsFlipped(false);
-  }, [flashcard]);
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setIsSpeaking(false);
+  }, [flashcard, isFlipped]);
+
+  const speakText = (text, rate) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    if (!text) return;
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = rate;
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    setIsSpeaking(true);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const handleSpeak = (e) => {
+    e.stopPropagation();
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    } else {
+      const textToRead = isFlipped ? flashcard?.back : flashcard?.front;
+      speakText(textToRead, speechRate);
+    }
+  };
+
+  const handleRateToggle = (e) => {
+    e.stopPropagation();
+    const rates = [0.75, 1, 1.25];
+    const nextIndex = (rates.indexOf(speechRate) + 1) % rates.length;
+    const nextRate = rates[nextIndex];
+    setSpeechRate(nextRate);
+
+    if (isSpeaking) {
+      const textToRead = isFlipped ? flashcard?.back : flashcard?.front;
+      speakText(textToRead, nextRate);
+    }
+  };
 
   if (loading) {
     return (
@@ -64,6 +118,10 @@ const FlashcardWidget = ({ flashcard = null, loading = false, error = null, tota
 
   const handleRatingClick = (e, quality) => {
     e.stopPropagation();
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setIsSpeaking(false);
     if (onReview) {
       onReview(quality);
     }
@@ -106,6 +164,44 @@ const FlashcardWidget = ({ flashcard = null, loading = false, error = null, tota
               </span>
             )}
           </div>
+          <button 
+            type="button"
+            onClick={(e) => { e.stopPropagation(); navigate('/flashcards/review'); }}
+            className="absolute bottom-4 left-4 px-3 py-1 bg-yellow-100 dark:bg-yellow-900/50 hover:bg-yellow-200 dark:hover:bg-yellow-800 text-yellow-800 dark:text-yellow-200 text-xs font-bold rounded shadow z-10"
+          >
+            Full Review &rarr;
+          </button>
+          
+          <div className="absolute bottom-4 right-4 z-10" onClick={(e) => e.stopPropagation()}>
+            <ExportDeckDropdown />
+          </div>
+
+          {/* Audio Reader Controls */}
+          <div className="absolute top-2 right-2 flex items-center gap-1 z-10">
+            <button
+              type="button"
+              onClick={handleRateToggle}
+              className="px-1.5 py-0.5 text-[10px] font-semibold text-neutral-600 dark:text-neutral-300 bg-neutral-100 dark:bg-slate-700 hover:bg-neutral-200 dark:hover:bg-slate-600 rounded transition-colors"
+              title="Toggle speech rate"
+              aria-label={`Speech rate: ${speechRate}x`}
+            >
+              {speechRate}x
+            </button>
+            <button
+              type="button"
+              onClick={handleSpeak}
+              className={`p-1.5 rounded-full transition-colors ${
+                isSpeaking
+                  ? 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/50 animate-pulse'
+                  : 'text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-slate-700'
+              }`}
+              title={isSpeaking ? 'Stop reading' : 'Read question aloud'}
+              aria-label={isSpeaking ? 'Stop reading' : 'Read question aloud'}
+            >
+              {isSpeaking ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+            </button>
+          </div>
+
           <h3 className="text-xl font-bold font-inter text-neutral-800 dark:text-neutral-100 text-center leading-snug">
             {flashcard.front}
           </h3>
@@ -119,7 +215,32 @@ const FlashcardWidget = ({ flashcard = null, loading = false, error = null, tota
         >
           <div className="w-full flex justify-between items-center text-xs text-yellow-700 dark:text-yellow-400">
             <span className="font-semibold uppercase tracking-wider">Answer</span>
-            <span className="text-neutral-400 italic">Click to flip back</span>
+
+            <div className="flex items-center gap-1.5 z-10">
+              <button
+                type="button"
+                onClick={handleRateToggle}
+                className="px-1.5 py-0.5 text-[10px] font-semibold text-yellow-800 dark:text-yellow-200 bg-yellow-200/60 dark:bg-yellow-800/60 hover:bg-yellow-300/60 dark:hover:bg-yellow-700/60 rounded transition-colors"
+                title="Toggle speech rate"
+                aria-label={`Speech rate: ${speechRate}x`}
+              >
+                {speechRate}x
+              </button>
+              <button
+                type="button"
+                onClick={handleSpeak}
+                className={`p-1.5 rounded-full transition-colors ${
+                  isSpeaking
+                    ? 'text-yellow-800 bg-yellow-200 dark:bg-yellow-800 dark:text-yellow-100 animate-pulse'
+                    : 'text-yellow-700 hover:text-yellow-900 dark:text-yellow-300 dark:hover:text-yellow-100 hover:bg-yellow-200/50 dark:hover:bg-yellow-800/40'
+                }`}
+                title={isSpeaking ? 'Stop reading' : 'Read answer aloud'}
+                aria-label={isSpeaking ? 'Stop reading' : 'Read answer aloud'}
+              >
+                {isSpeaking ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+              </button>
+              <span className="text-neutral-400 italic ml-1">Click to flip back</span>
+            </div>
           </div>
           <p className="text-sm text-neutral-800 dark:text-neutral-200 font-inter leading-relaxed my-2">
             {flashcard.back}
@@ -161,3 +282,4 @@ const FlashcardWidget = ({ flashcard = null, loading = false, error = null, tota
 };
 
 export default FlashcardWidget;
+

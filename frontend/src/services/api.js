@@ -7,14 +7,41 @@ const API = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 });
 
-// Attach access token to every request
-API.interceptors.request.use((config) => {
+let csrfToken = null;
+
+// Function to fetch CSRF token if missing
+const fetchCsrfToken = async () => {
+  if (csrfToken) return csrfToken;
+  try {
+    const response = await axios.get(`${API.defaults.baseURL}/csrf-token`, {
+      withCredentials: true,
+    });
+    csrfToken = response.data.csrfToken;
+    return csrfToken;
+  } catch (error) {
+    console.error('Failed to fetch CSRF token', error);
+    return null;
+  }
+};
+
+// Attach access token and CSRF token to every request
+API.interceptors.request.use(async (config) => {
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  // Attach CSRF token for non-GET requests
+  if (config.method && config.method.toLowerCase() !== 'get') {
+    const token = await fetchCsrfToken();
+    if (token) {
+      config.headers['X-CSRF-Token'] = token;
+    }
+  }
+
   return config;
 }, (error) => {
   return Promise.reject(error);
@@ -42,7 +69,8 @@ API.interceptors.response.use(
     const originalRequest = error.config;
 
     // Only attempt refresh on 401, and only once per request
-    if (error.response?.status !== 401 || originalRequest._retry) {
+    const isAuthEndpoint = originalRequest?.url?.includes('/auth/');
+    if (error.response?.status !== 401 || originalRequest?._retry || isAuthEndpoint) {
       return Promise.reject(error);
     }
 

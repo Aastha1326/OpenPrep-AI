@@ -66,6 +66,23 @@ const validateRefreshToken = [
   handleValidationErrors,
 ];
 
+const validateResendVerification = [
+  body('email').trim().isEmail().withMessage('Please provide a valid email').normalizeEmail(),
+  handleValidationErrors,
+];
+
+const validateUpdateSettings = [
+  body('leaderboardVisible')
+    .optional()
+    .isBoolean()
+    .withMessage('leaderboardVisible must be a boolean'),
+  body('receiveWeeklyDigest')
+    .optional()
+    .isBoolean()
+    .withMessage('receiveWeeklyDigest must be a boolean'),
+  handleValidationErrors,
+];
+
 // ---------------------------------------------------------------------------
 // Academic routes
 // ---------------------------------------------------------------------------
@@ -111,6 +128,14 @@ const validateGenerateAIFlashcards = [
   handleValidationErrors,
 ];
 
+const validateGenerateFlashcardsFromNote = [
+  body('noteId').isUUID(4).withMessage('Valid note ID is required'),
+  body('count')
+    .optional()
+    .isInt({ min: 1, max: 50 })
+    .withMessage('Count must be between 1 and 50'),
+  handleValidationErrors,
+];
 const validateCreateFlashcard = [
   body('front').trim().notEmpty().withMessage('Please provide the front text'),
   body('back').trim().notEmpty().withMessage('Please provide the back text'),
@@ -122,6 +147,25 @@ const validateReviewFlashcard = [
   body('quality')
     .isFloat({ min: 0, max: 5 })
     .withMessage('Quality must be a number between 0 and 5'),
+  handleValidationErrors,
+];
+
+const validateExportFlashcards = [
+  query('format')
+    .optional()
+    .isIn(['json', 'csv', 'apkg'])
+    .withMessage('format must be "json", "csv", or "apkg"'),
+  query('subjectId')
+    .optional()
+    .isUUID(4)
+    .withMessage('subjectId must be a valid UUID'),
+  handleValidationErrors,
+];
+
+const validateImportFlashcards = [
+  query('subjectId')
+    .notEmpty().withMessage('subjectId query parameter is required')
+    .isUUID(4).withMessage('subjectId must be a valid UUID'),
   handleValidationErrors,
 ];
 
@@ -137,6 +181,30 @@ const validateGenerateAIQuiz = [
   handleValidationErrors,
 ];
 
+const validateGenerateRevisionSheet = [
+  body('quizAttemptId')
+    .optional()
+    .isUUID()
+    .withMessage('quizAttemptId must be a valid UUID'),
+  body('subjectId')
+    .optional()
+    .isUUID()
+    .withMessage('subjectId must be a valid UUID'),
+  body('topicId')
+    .optional()
+    .isUUID()
+    .withMessage('topicId must be a valid UUID'),
+  body('mistookQuestions')
+    .optional()
+    .isArray()
+    .withMessage('mistookQuestions must be an array'),
+  body('saveToNotes')
+    .optional()
+    .isBoolean()
+    .withMessage('saveToNotes must be a boolean'),
+  handleValidationErrors,
+];
+
 const validateSubmitQuizAttempt = [
   body('answers')
     .isArray({ min: 1 })
@@ -147,8 +215,8 @@ const validateSubmitQuizAttempt = [
     .isUUID(4)
     .withMessage('Each questionId must be a valid UUID'),
   body('answers.*.selectedAnswer')
-    .exists({ checkNull: true })
-    .withMessage('Each answer must have a selectedAnswer'),
+    .isInt({ min: 0, max: 3 })
+    .withMessage('Each answer must have a valid selectedAnswer option index'),
   body('timeSpent')
     .optional()
     .isFloat({ min: 0, max: 86400 })
@@ -176,9 +244,12 @@ const validateUploadPYQ = [
     .optional()
     .isInt({ min: 1900, max: 2100 })
     .withMessage('Year must be a valid year'),
+  body('difficulty')
+    .optional()
+    .isIn(['Easy', 'Medium', 'Hard'])
+    .withMessage('Difficulty must be "Easy", "Medium", or "Hard"'),
   handleValidationErrors,
 ];
-
 // ---------------------------------------------------------------------------
 // Study Plan routes
 // ---------------------------------------------------------------------------
@@ -279,17 +350,21 @@ module.exports = {
   validateForgotPassword,
   validateResetPassword,
   validateRefreshToken,
+  validateUpdateSettings,
   // Academic
   validateCreateExam,
   validateCreateSubject,
   validateCreateTopic,
   validateUpdateTopic,
-  // Flashcard
+// Flashcard
   validateGenerateAIFlashcards,
-  validateCreateFlashcard,
-  validateReviewFlashcard,
+  validateGenerateFlashcardsFromNote,
+  validateCreateFlashcard,  validateReviewFlashcard,
+  validateExportFlashcards,
+  validateImportFlashcards,
   // Quiz
   validateGenerateAIQuiz,
+  validateGenerateRevisionSheet,
   validateSubmitQuizAttempt,
   // Note
   validateUploadNote,
@@ -303,4 +378,5 @@ module.exports = {
   validateUpdateTopicProgress,
   // Community
   validateSubmitFeedback,
+  validateResendVerification,
 };

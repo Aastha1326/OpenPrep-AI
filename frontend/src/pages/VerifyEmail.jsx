@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useParams, Link, Navigate } from 'react-router-dom';
 import { CheckCircle, XCircle, Loader } from 'lucide-react';
@@ -9,8 +9,11 @@ const VerifyEmail = () => {
   const dispatch = useDispatch();
   const { loading, error, isAuthenticated } = useSelector((state) => state.auth);
 
+  const hasDispatched = useRef(false);
+
   useEffect(() => {
-    if (token) {
+    if (token && !hasDispatched.current) {
+      hasDispatched.current = true;
       dispatch(verifyEmail(token));
     }
   }, [token, dispatch]);

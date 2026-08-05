@@ -72,3 +72,28 @@ describe('Refresh token pruning logic', () => {
     expect(result).toEqual(['t1', 't2', 't3'])
   })
 })
+
+describe('Account lockout duration calculation', () => {
+  function calculateRemainingMinutes(lockoutUntil) {
+    if (!lockoutUntil) return null;
+    const lockoutTime = new Date(lockoutUntil);
+    if (!isNaN(lockoutTime.getTime()) && lockoutTime > new Date()) {
+      return Math.max(1, Math.ceil((lockoutTime - new Date()) / (1000 * 60)));
+    }
+    return 0;
+  }
+
+  it('should accurately calculate remaining minutes when lockoutUntil is an ISO string', () => {
+    const futureDateStr = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    const minutes = calculateRemainingMinutes(futureDateStr);
+    expect(minutes).toBeGreaterThan(0);
+    expect(Number.isNaN(minutes)).toBe(false);
+  });
+
+  it('should handle lockoutUntil as a Date object', () => {
+    const futureDate = new Date(Date.now() + 15 * 60 * 1000);
+    const minutes = calculateRemainingMinutes(futureDate);
+    expect(minutes).toBeGreaterThan(0);
+    expect(Number.isNaN(minutes)).toBe(false);
+  });
+})
