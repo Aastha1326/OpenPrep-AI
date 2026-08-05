@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import ThemeToggle from '../components/ThemeToggle';
+import heroImage from '../assets/hero.webp';
 
 const Landing = () => {
   const navigate = useNavigate();
@@ -206,7 +207,7 @@ const Landing = () => {
             <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-700 opacity-20 blur-xl group-hover:opacity-30 transition duration-1000" />
             <div className="relative rounded-2xl border border-black/10 dark:border-white/10 overflow-hidden shadow-2xl bg-[#F5E6CA] dark:bg-dark-card p-2 md:p-4">
               
-              {/* Fake Browser Chrome */}
+              <img src={heroImage} loading="lazy" decoding="async" width="1200" height="675" alt="Dashboard" className="w-full h-auto rounded-lg shadow-md mb-8" />{/* Fake Browser Chrome */}
               <div className="flex items-center justify-between border-b border-black/10 dark:border-white/10 pb-3 mb-4 px-2">
                 <div className="flex items-center gap-1.5">
                   <div className="h-3 w-3 rounded-full bg-red-400" />
