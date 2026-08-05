@@ -19,8 +19,7 @@ const { Server } = require('socket.io');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
 const passport = require('./config/passport');
-const { getCorsMiddleware } = require('./middleware/corsHandler');
-
+const { getCorsMiddleware, getSocketCorsOrigin } = require('./middleware/corsHandler');
 // Validate required environment variables at startup
 if (!process.env.JWT_SECRET) {
   console.error('FATAL ERROR: JWT_SECRET is not defined in environment variables.');
@@ -58,9 +57,29 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // Security Middlewares
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'", 'https:', 'data:'],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+        upgradeInsecureRequests: [],
+      },
+    },
+    hsts: {
+      maxAge: 63072000, // 2 years
+      includeSubDomains: true,
+      preload: true,
+    },
+  })
+);
 app.use(getCorsMiddleware());
-
 app.use(passport.initialize());
 
 // Cookie parser (required for csurf cookie-based tokens)
@@ -176,11 +195,10 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: corsOriginHandler,
+    origin: getSocketCorsOrigin(),
     methods: ['GET', 'POST'],
     credentials: true,
-  },
-  // Longer timeouts tolerate throttled timers in backgrounded/idle browser
+  },  // Longer timeouts tolerate throttled timers in backgrounded/idle browser
   // tabs, so active lobby players aren't disconnected on a missed heartbeat.
   pingTimeout: 60000,
   pingInterval: 25000,
