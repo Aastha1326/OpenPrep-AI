@@ -1,5 +1,5 @@
 const express = require('express');
-const { uploadAndAnalyzePYQ, getPYQs, getPYQDetails, getPYQAnalysis, deletePYQ } = require('../controllers/pyqController');
+const { uploadAndAnalyzePYQ, getPYQs, getPYQDetails, getPYQAnalysis, deletePYQ, getPYQTrends } = require('../controllers/pyqController');
 const { protect } = require('../middleware/auth');
 const { strictAiLimiter } = require('../middleware/rateLimiter');
 const { checkQuota } = require('../middleware/quotaMiddleware');
@@ -10,7 +10,7 @@ const cacheMiddleware = require('../middleware/cache');
 const clearCache = require('../middleware/clearCache');
 
 const router = express.Router();
-router.get('/trends', protect, pyqController.getPYQTrends);
+router.get('/trends', protect, getPYQTrends);
 /**
  * @swagger
  * tags:

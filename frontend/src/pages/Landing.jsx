@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import SoundToggle from '../components/SoundToggle';
+import heroImage from '../assets/hero.webp';
 
 const Landing = () => {
   const navigate = useNavigate();

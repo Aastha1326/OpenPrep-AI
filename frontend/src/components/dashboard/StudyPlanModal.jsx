@@ -1,12 +1,12 @@
 import { useRef, useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Download, Calendar as CalendarIcon, CheckCircle, Circle, AlertTriangle, ClockPlus, Filter, Plus, RefreshCw, AlertCircle, CalendarDays } from 'lucide-react';
+import { X, Download, Calendar as CalendarIcon, CheckCircle, Circle, AlertTriangle, ClockPlus, Filter, Plus, RefreshCw, AlertCircle, CalendarDays, List, GanttChartSquare, Flag, CheckCircle2, Sparkles } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 import API from '../../services/api';
 import { toLocalDateString, formatDateOnly } from '../../utils/dateUtils';
 import StudyPlanGanttView from './StudyPlanGanttView';
 // Create Study Plan Form Component
-const CreateStudyPlanForm = ({ onClose, onSubmit, loading, error, formData, handleInputChange, minStartDate, minEndDate, exams }) => (
+const CreateStudyPlanForm = ({ onClose, onSubmit, loading, error, formData, handleInputChange, minStartDate, minEndDate, exams, prefillExamName }) => (
   <div className="max-w-xl mx-auto">
     <div className="flex items-center justify-between mb-6">
       <h3 className="text-2xl font-bold font-playfair text-[#3E2723]">Create Study Plan</h3>
@@ -23,6 +23,16 @@ const CreateStudyPlanForm = ({ onClose, onSubmit, loading, error, formData, hand
         <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
+        </div>
+      )}
+
+      {prefillExamName && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm rounded flex items-start gap-2">
+          <Sparkles className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>
+            Prefilled from imported syllabus: <span className="font-semibold">{prefillExamName}</span>. Adjust the
+            dates if needed.
+          </span>
         </div>
       )}
 
@@ -146,7 +156,70 @@ const BumpTimeButton = ({ onClick, disabled = false }) => (
   </button>
 );
 
-const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated, onPlanUpdate }) => {
+const MILESTONE_TYPE_LABELS = {
+  weekly_checkpoint: 'Checkpoint',
+  mid_course_review: 'Mid-Course',
+  final_review: 'Final Review',
+  exam_day: 'Exam Day',
+};
+
+const MilestoneBadge = ({ date, status }) => {
+  const today = toLocalDateString(new Date());
+  let label;
+  let cls;
+  if (status === 'completed') {
+    label = 'Completed';
+    cls = 'bg-emerald-100 text-emerald-700 border-emerald-200';
+  } else if (date < today) {
+    label = 'Overdue';
+    cls = 'bg-red-100 text-red-700 border-red-200';
+  } else if (date === today) {
+    label = 'Due Today';
+    cls = 'bg-amber-100 text-amber-700 border-amber-200';
+  } else {
+    label = 'Upcoming';
+    cls = 'bg-blue-100 text-blue-700 border-blue-200';
+  }
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full border shrink-0 ${cls}`}>
+      {status === 'completed' ? <CheckCircle2 className="w-3 h-3" /> : <Flag className="w-3 h-3" />}
+      {label}
+    </span>
+  );
+};
+
+const MilestonesSection = ({ milestones }) => (
+  <div className="mb-10">
+    <h2 className="text-2xl font-bold font-playfair text-[#8B4513] mb-4 flex items-center gap-2 border-b-2 border-[#8B4513]/30 pb-2">
+      <Flag className="w-5 h-5" />
+      Milestones &amp; Checkpoints
+    </h2>
+    <div className="space-y-3">
+      {milestones.map((m) => (
+        <div key={m.id || m.date} className="flex items-start gap-3 bg-white rounded border border-[#8B4513]/20 p-3 shadow-sm">
+          <div className="mt-0.5 shrink-0">
+            <Flag className="w-4 h-4 text-[#8B4513]" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <p className="font-semibold text-neutral-800">{m.title}</p>
+              <span className="text-xs text-neutral-500 font-medium">
+                {formatDateOnly(m.date, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+              </span>
+              <span className="inline-flex items-center px-2 py-0.5 text-[10px] uppercase tracking-wide font-bold rounded bg-[#8B4513]/10 text-[#8B4513]">
+                {MILESTONE_TYPE_LABELS[m.type] || 'Milestone'}
+              </span>
+            </div>
+            <p className="text-sm text-neutral-600 mt-1">{m.description}</p>
+          </div>
+          <MilestoneBadge date={m.date} status={m.status} />
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated, onPlanUpdate, syllabusPrefill }) => {
   const contentRef = useRef(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
@@ -156,6 +229,7 @@ const [showWeakOnly, setShowWeakOnly] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [prefillConsumed, setPrefillConsumed] = useState(false);
   const [formData, setFormData] = useState({
     examId: '',
     startDate: '',
@@ -163,6 +237,8 @@ const [showWeakOnly, setShowWeakOnly] = useState(false);
     studyHoursPerDay: 3,
   });
   const [exams, setExams] = useState([]);
+
+  const createFormVisible = showCreateForm || !activePlan;
 
   const dailyGoals = useMemo(() => activePlan?.dailyGoals || [], [activePlan?.dailyGoals]);
 
@@ -186,14 +262,20 @@ const [showWeakOnly, setShowWeakOnly] = useState(false);
 
   // Fetch exams when create form is shown
   useEffect(() => {
-    if (showCreateForm && exams.length === 0) {
+    if (createFormVisible && exams.length === 0) {
       const fetchExams = async () => {
         try {
           const res = await API.get('/academic/exams');
           const fetchedExams = Array.isArray(res.data?.data) ? res.data.data : [];
           setExams(fetchedExams);
           if (fetchedExams.length > 0) {
-            setFormData((prev) => ({ ...prev, examId: fetchedExams[0].id }));
+            setFormData((prev) => {
+              // Keep a prefilled exam from the syllabus import if present
+              if (prev.examId && fetchedExams.some((e) => e.id === prev.examId)) {
+                return prev;
+              }
+              return { ...prev, examId: fetchedExams[0].id };
+            });
           }
         } catch (err) {
           console.error('Failed to load exams:', err);
@@ -201,7 +283,25 @@ const [showWeakOnly, setShowWeakOnly] = useState(false);
       };
       fetchExams();
     }
-  }, [showCreateForm, exams.length]);
+  }, [createFormVisible, exams.length]);
+
+  // Apply the syllabus import prefill to the create form once
+  useEffect(() => {
+    if (createFormVisible && syllabusPrefill && !prefillConsumed) {
+      const today = toLocalDateString(new Date());
+      const examDate =
+        syllabusPrefill.examDate && syllabusPrefill.examDate >= today
+          ? syllabusPrefill.examDate
+          : '';
+      setFormData((prev) => ({
+        ...prev,
+        examId: syllabusPrefill.examId || prev.examId,
+        startDate: today,
+        endDate: examDate || prev.endDate,
+      }));
+      setPrefillConsumed(true);
+    }
+  }, [createFormVisible, syllabusPrefill, prefillConsumed]);
 
   // Reset form when modal closes
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
@@ -210,6 +310,7 @@ const [showWeakOnly, setShowWeakOnly] = useState(false);
     if (!isOpen) {
       setShowCreateForm(false);
       setError(null);
+      setPrefillConsumed(false);
       setFormData({ examId: '', startDate: '', endDate: '', studyHoursPerDay: 3 });
     }
   }
@@ -495,6 +596,7 @@ const [showWeakOnly, setShowWeakOnly] = useState(false);
                   minStartDate={minStartDate}
                   minEndDate={minEndDate}
                   exams={exams}
+                  prefillExamName={syllabusPrefill?.examName}
                 />
 ) : showTimeline ? (
                 <div className="bg-white/80 p-6 rounded-sm shadow-sm border border-[#8B4513]/10">
@@ -517,6 +619,9 @@ const [showWeakOnly, setShowWeakOnly] = useState(false);
                 </div>
 
                 <div className="space-y-8">
+                  {activePlan?.milestones?.length > 0 && (
+                    <MilestonesSection milestones={activePlan.milestones} />
+                  )}
                   {filteredDailyGoals && filteredDailyGoals.length > 0 ? (
                     filteredDailyGoals.map((day, idx) => {
                       const dateStr = day.date ? formatDateOnly(day.date, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : `Day ${idx + 1}`;

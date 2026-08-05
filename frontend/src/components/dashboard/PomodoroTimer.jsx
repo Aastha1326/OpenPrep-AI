@@ -61,7 +61,8 @@ const logFocusSession = useCallback(async (activeSeconds) => {
 
   const logStudyTime = useCallback(async () => {
     try {
-      const studyHours = 0.42; // 25 minutes in hours      const description = selectedSubject 
+      const studyHours = 0.42; // 25 minutes in hours
+      const description = selectedSubject
         ? `Completed 25-min Pomodoro Study Session for ${selectedSubject.name}`
         : 'Completed 25-min Pomodoro Study Session';
 
@@ -99,13 +100,15 @@ const logFocusSession = useCallback(async (activeSeconds) => {
     if (isActive) {
 interval = setInterval(() => {
         setTimeLeft((time) => {
-          // paused-time accumulation only happens while inactive (see effect below)          if (time <= 1) {
-setIsActive(false);
+          // paused-time accumulation only happens while inactive (see effect below)
+          if (time <= 1) {
+            setIsActive(false);
             setIsCompleted(true);
             playChime();
             logStudyTime(); // Auto-log study time on completion
             logFocusSession(25 * 60 - pausedSeconds); // Log focus quality breakdown
-            return 0;          }
+            return 0;
+          }
           return time - 1;
         });
       }, 1000);

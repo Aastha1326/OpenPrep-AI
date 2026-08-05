@@ -8,6 +8,7 @@ import API from '../services/api';
 
 vi.mock('../services/api', () => ({
   default: {
+    defaults: { baseURL: '' },
     get: vi.fn(() => Promise.resolve({ data: { user: {} } })),
     patch: vi.fn(),
   },
@@ -105,7 +106,6 @@ describe('Settings Page', () => {
     
     // File input selection
     const file = new File(['mock content'], 'avatar.webp', { type: 'image/webp' });
-    const fileInput = screen.getByLabelText(/Select Image/i, { selector: 'input', suggest: false });
     // Note: Since input is hidden and select button triggers click, we can target it by container
     const input = document.getElementById('avatar-upload');
     fireEvent.change(input, { target: { files: [file] } });

@@ -361,7 +361,6 @@ exports.getMe = async (req, res, next) => {
         leaderboardVisible: user.leaderboardVisible,
         receiveWeeklyDigest: user.receiveWeeklyDigest,
         achievements: user.achievements || [],
-        leaderboardVisible: user.leaderboardVisible,
         sm2EasyFactorModifier: user.sm2EasyFactorModifier,
         sm2IntervalModifier: user.sm2IntervalModifier,
         sm2Step1Interval: user.sm2Step1Interval,

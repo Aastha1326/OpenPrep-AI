@@ -8,6 +8,7 @@ const {
   getWeaknessAnalysis,
   rescheduleAdaptivePlan,
   rescheduleOverdueTasks,
+  exportStudyPlanIcs,
 } = require('../controllers/studyPlanController');
 const { protect } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
@@ -96,7 +97,7 @@ const router = express.Router();
  */
 
 router.post('/generate-ai', protect, aiLimiter, checkQuota, validateGenerateAIPlan, generateAIPlan);
-router.get('/:id/export-ics', protect, studyPlanController.exportStudyPlanIcs);
+router.get('/:id/export-ics', protect, exportStudyPlanIcs);
 
 /**
  * @swagger

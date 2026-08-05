@@ -8,6 +8,10 @@ import GenerateFlashcardsFromNoteModal from './GenerateFlashcardsFromNoteModal';
 
 const RecordVoiceNoteModal = lazy(() => import('./RecordVoiceNoteModal'));
 
+const Shimmer = ({ className = '' }) => (
+  <div className={`animate-pulse bg-neutral-300/60 rounded ${className}`} />
+);
+
 const VoiceNotePlayer = ({ fileUrl }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
