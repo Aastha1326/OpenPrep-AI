@@ -30,6 +30,7 @@ import CompositeBundleModal from '../components/dashboard/CompositeBundleModal';
 import SyllabusImportModal from '../components/dashboard/SyllabusImportModal';
 import ThemeToggle from '../components/ThemeToggle';
 import BadgesList from '../components/BadgesList';
+import SpacedRepetitionHeatmap from '../components/dashboard/SpacedRepetitionHeatmap';
 
 
 import {
@@ -633,6 +634,11 @@ const Dashboard = () => {
               <ErrorBanner message={toggleError} />
             </div>
           )}
+        </div>
+
+        {/* --- SPACED REPETITION HEATMAP FORECAST --- */}
+        <div className="my-6 max-w-4xl mx-auto">
+          <SpacedRepetitionHeatmap />
         </div>
 
         {/* --- AI WEAKNESS DETECTION WIDGET --- */}

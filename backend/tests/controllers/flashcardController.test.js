@@ -265,4 +265,47 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
       expect(res.status).toBe(404);
     });
   });
+
+  describe('GET /api/flashcards/forecast', () => {
+    it('should retrieve 30-day review forecast details', async () => {
+      // Create some cards due on specific dates
+      const today = new Date();
+      const tomorrow = new Date();
+      tomorrow.setDate(today.getDate() + 1);
+
+      await Flashcard.create({
+        user: testUser.id,
+        subject: testSubject.id,
+        front: 'Forecast Today?',
+        back: 'Yes',
+        nextReviewDate: today,
+      });
+
+      await Flashcard.create({
+        user: testUser.id,
+        subject: testSubject.id,
+        front: 'Forecast Tomorrow?',
+        back: 'Yes',
+        nextReviewDate: tomorrow,
+      });
+
+      const res = await request(app)
+        .get('/api/flashcards/forecast')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toBeDefined();
+      expect(res.body.data.length).toBe(30);
+
+      const todayStr = today.toISOString().split('T')[0];
+      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+      const todayForecast = res.body.data.find((f) => f.date === todayStr);
+      const tomorrowForecast = res.body.data.find((f) => f.date === tomorrowStr);
+
+      expect(todayForecast.count).toBeGreaterThanOrEqual(1);
+      expect(tomorrowForecast.count).toBeGreaterThanOrEqual(1);
+    });
+  });
 });
