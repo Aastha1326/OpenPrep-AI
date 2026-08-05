@@ -2,7 +2,19 @@ import { useState, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Eye, EyeOff, Loader2, ShieldCheck, UserCircle, Upload, Save, Trash, AlertCircle, CheckCircle } from 'lucide-react';
+import {
+  ArrowLeft,
+  Eye,
+  EyeOff,
+  Loader2,
+  ShieldCheck,
+  UserCircle,
+  Upload,
+  Save,
+  Trash,
+  AlertCircle,
+  CheckCircle,
+} from 'lucide-react';
 import LeatherBoard from '../components/dashboard/LeatherBoard';
 import VintagePaper from '../components/dashboard/VintagePaper';
 import API from '../services/api';
@@ -112,10 +124,12 @@ const Settings = () => {
     }
   }, [leaderboardVisible, dispatch]);
 
-  const baseURL = API.defaults.baseURL || '';
+  const baseURL = API?.defaults?.baseURL || '';
   const cleanBaseURL = baseURL.replace(/\/api\/?$/, '');
   const avatarUrl = user?.avatar
-    ? (user.avatar.startsWith('http') ? user.avatar : `${cleanBaseURL}${user.avatar}`)
+    ? user.avatar.startsWith('http')
+      ? user.avatar
+      : `${cleanBaseURL}${user.avatar}`
     : null;
 
   return (
@@ -162,7 +176,10 @@ const Settings = () => {
                   src={previewUrl || avatarUrl}
                   alt="Profile Avatar"
                   className={`w-24 h-24 rounded-full border-2 border-amber-600 shadow-[0_4px_10px_rgba(0,0,0,0.2)] object-cover bg-white ${
-                    (previewUrl || avatarUrl).endsWith('.svg') || (previewUrl || avatarUrl).includes('image/svg+xml') ? 'p-2 object-contain' : ''
+                    (previewUrl || avatarUrl).endsWith('.svg') ||
+                    (previewUrl || avatarUrl).includes('image/svg+xml')
+                      ? 'p-2 object-contain'
+                      : ''
                   }`}
                   onError={(e) => {
                     e.target.onerror = null;
@@ -180,13 +197,14 @@ const Settings = () => {
               <p className="text-sm text-neutral-600 dark:text-neutral-300">
                 Upload a JPEG, PNG, WEBP, or SVG image (max 5MB).
               </p>
-              
+
               <div className="flex flex-wrap gap-2.5">
                 <input
                   type="file"
                   id="avatar-upload"
                   accept="image/png, image/jpeg, image/jpg, image/webp, image/svg+xml"
                   onChange={handleFileChange}
+                  aria-label="Select Image"
                   className="hidden"
                 />
                 <button
@@ -253,8 +271,8 @@ const Settings = () => {
 
           <p className="text-neutral-600 dark:text-neutral-300 mb-6 leading-relaxed">
             The weekly study leaderboard ranks students by focus hours, quizzes completed and
-            flashcards reviewed. You can choose whether your real name is shown to other students
-            or replaced with an anonymous handle.
+            flashcards reviewed. You can choose whether your real name is shown to other students or
+            replaced with an anonymous handle.
           </p>
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-neutral-100/60 dark:bg-neutral-800/60 border border-neutral-300 dark:border-neutral-600 rounded-sm">

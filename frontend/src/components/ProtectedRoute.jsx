@@ -1,8 +1,13 @@
+import { useSelector } from 'react-redux';
 import { Navigate } from 'react-router-dom';
+import PageLoader from './PageLoader';
 
 const ProtectedRoute = ({ children }) => {
-  // TEMPORARY BYPASS FOR LOCAL TESTING
-  const isAuthenticated = true; // bypass auth check
+  const { isAuthenticated, loading } = useSelector((state) => state.auth);
+
+  if (loading) {
+    return <PageLoader />;
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
