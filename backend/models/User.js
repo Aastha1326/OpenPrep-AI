@@ -105,6 +105,15 @@ const User = sequelize.define(
       type: DataTypes.DATE,
       allowNull: true,
     },
+    pushSubscription: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+    },
+    dailyReminderTime: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      defaultValue: '09:00', // Default reminder time
+    },
     sm2EasyFactorModifier: {
       type: DataTypes.FLOAT,
       defaultValue: 1.0,
