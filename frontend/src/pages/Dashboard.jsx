@@ -23,6 +23,7 @@ import PinnedTasks from '../components/dashboard/PinnedTasks';
 import CreateNoteModal from '../components/dashboard/CreateNoteModal';
 import StudyPlanModal from '../components/dashboard/StudyPlanModal';
 import ThemeToggle from '../components/ThemeToggle';
+import SoundToggle from '../components/SoundToggle';
 
 import {
   fetchDashboardStats,
@@ -293,14 +294,15 @@ const Dashboard = () => {
             </p>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-            className="flex items-center space-x-6 mt-6 md:mt-0"
-          >
-            <ThemeToggle className="mr-2" />
-            <div className="flex flex-col items-center">
+          <motion.div 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="flex items-center space-x-4 mt-6 md:mt-0"
+            >
+              <SoundToggle />
+              <ThemeToggle className="mr-2" />
+              <div className="flex flex-col items-center">
               <div className="relative">
                 <Flame className="w-12 h-12 text-orange-500 animate-pulse-glow" fill="currentColor" />
                 <div className="absolute inset-0 blur-md bg-orange-500/30 rounded-full" />

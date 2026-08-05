@@ -1,33 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Play, Pause, RotateCcw, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { playTimerCompleteSound } from '../../utils/audio';
 
 const PomodoroTimer = () => {
   const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [isActive, setIsActive] = useState(false);
 
   const [isCompleted, setIsCompleted] = useState(false);
-
-  const playChime = () => {
-    try {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (!AudioContext) return;
-      const ctx = new AudioContext();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15); // A5
-      gain.gain.setValueAtTime(0.3, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.6);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.6);
-    } catch {
-      // Audio context fallback
-    }
-  };
 
   useEffect(() => {
     let interval = null;
@@ -37,7 +17,7 @@ const PomodoroTimer = () => {
           if (time <= 1) {
             setIsActive(false);
             setIsCompleted(true);
-            playChime();
+            playTimerCompleteSound();
             return 0;
           }
           return time - 1;
