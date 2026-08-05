@@ -4,7 +4,7 @@ import { X, Download, Calendar as CalendarIcon, CheckCircle, Circle, AlertTriang
 import html2pdf from 'html2pdf.js';
 import API from '../../services/api';
 import { toLocalDateString, formatDateOnly } from '../../utils/dateUtils';
-
+import StudyPlanGanttView from './StudyPlanGanttView';
 // Create Study Plan Form Component
 const CreateStudyPlanForm = ({ onClose, onSubmit, loading, error, formData, handleInputChange, minStartDate, minEndDate, exams }) => (
   <div className="max-w-xl mx-auto">
@@ -152,9 +152,9 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
   const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
   const [isRescheduling, setIsRescheduling] = useState(false);
   const [rescheduleMessage, setRescheduleMessage] = useState(null);
-  const [showWeakOnly, setShowWeakOnly] = useState(false);
+const [showWeakOnly, setShowWeakOnly] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [showTimeline, setShowTimeline] = useState(false);  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [formData, setFormData] = useState({
     examId: '',
@@ -424,7 +424,7 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
                       <Plus className="w-4 h-4" />
                       New Plan
                     </button>
-                    <button
+<button
                       onClick={() => setShowWeakOnly((v) => !v)}
                       className={`flex items-center gap-1.5 px-3 py-2 rounded-sm text-sm font-semibold transition-colors cursor-pointer border ${
                         showWeakOnly
@@ -436,6 +436,16 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
                       {showWeakOnly ? 'Showing Weak Only' : 'Filter Weak Topics'}
                     </button>
                     <button
+                      onClick={() => setShowTimeline((v) => !v)}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-sm text-sm font-semibold transition-colors cursor-pointer border ${
+                        showTimeline
+                          ? 'bg-indigo-700 text-white border-indigo-800'
+                          : 'bg-white/70 text-[#8B4513] border-[#8B4513]/30 hover:bg-white'
+                      }`}
+                    >
+                      {showTimeline ? <List className="w-4 h-4" /> : <GanttChartSquare className="w-4 h-4" />}
+                      {showTimeline ? 'List View' : 'Timeline View'}
+                    </button>                    <button
                       onClick={handleExportPDF}
                       disabled={isExporting}
                       className="flex items-center space-x-2 bg-gradient-to-r from-yellow-700 to-yellow-900 text-white px-4 py-2 rounded-sm hover:from-yellow-600 hover:to-yellow-800 transition-colors disabled:opacity-50 cursor-pointer"
@@ -486,9 +496,12 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
                   minEndDate={minEndDate}
                   exams={exams}
                 />
+) : showTimeline ? (
+                <div className="bg-white/80 p-6 rounded-sm shadow-sm border border-[#8B4513]/10">
+                  <StudyPlanGanttView activePlan={activePlan} onPlanUpdate={onPlanUpdate} />
+                </div>
               ) : (
-              <div ref={contentRef} className="bg-white/80 p-8 rounded-sm shadow-sm border border-[#8B4513]/10 max-w-3xl mx-auto" id="study-plan-content">
-                <div className="text-center mb-10">
+              <div ref={contentRef} className="bg-white/80 p-8 rounded-sm shadow-sm border border-[#8B4513]/10 max-w-3xl mx-auto" id="study-plan-content">                <div className="text-center mb-10">
                   <h1 className="text-4xl font-bold font-playfair text-[#3E2723] mb-2 border-b-2 border-[#8B4513]/30 pb-4 inline-block">
                     My Study Journey
                   </h1>

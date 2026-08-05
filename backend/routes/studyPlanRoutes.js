@@ -3,6 +3,7 @@ const {
   generateAIPlan,
   getActivePlan,
   toggleTaskCompletion,
+  moveTaskDate,
   getPlans,
   getWeaknessAnalysis,
   rescheduleAdaptivePlan,
@@ -14,8 +15,8 @@ const { checkQuota } = require('../middleware/quotaMiddleware');
 const {
   validateGenerateAIPlan,
   validateToggleTask,
+  validateMoveTaskDate,
 } = require('../middleware/validators');
-
 const router = express.Router();
 
 /**
@@ -335,6 +336,7 @@ router.post('/reschedule-adaptive', protect, rescheduleAdaptivePlan);
  */
 
 router.put('/:planId/tasks/:taskId', protect, validateToggleTask, toggleTaskCompletion);
+router.put('/:planId/tasks/:taskId/date', protect, validateMoveTaskDate, moveTaskDate);
 
 /**
  * @swagger

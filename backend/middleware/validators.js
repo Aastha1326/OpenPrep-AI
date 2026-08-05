@@ -292,6 +292,10 @@ const validateToggleTask = [
   handleValidationErrors,
 ];
 
+const validateMoveTaskDate = [
+  body('newDate').isISO8601().withMessage('A valid newDate is required'),
+  handleValidationErrors,
+];
 // ---------------------------------------------------------------------------
 // Progress routes
 // ---------------------------------------------------------------------------
@@ -393,10 +397,10 @@ validateCreateFlashcard,  validateReviewFlashcard,
   validateUploadNote,
   // PYQ
   validateUploadPYQ,
-  // Study Plan
+// Study Plan
   validateGenerateAIPlan,
   validateToggleTask,
-// Progress
+  validateMoveTaskDate,// Progress
   validateTrackStudyTime,
   validateUpdateTopicProgress,
   validateFocusSession,  // Community
