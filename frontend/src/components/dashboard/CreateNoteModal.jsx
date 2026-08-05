@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Save, AlertCircle } from 'lucide-react';
-import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import API from '../../services/api';
+
+const ReactQuill = lazy(() => import('react-quill'));
 
 const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
   const [title, setTitle] = useState('');
@@ -32,7 +33,7 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
 
       const response = await API.post('/notes', formData, {
         headers: {
-          'Content-Type': 'multipart/form-data',
+          'Content-Type': undefined,
         },
       });
 
@@ -111,15 +112,23 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
                     Content
                   </label>
                   <div className="bg-white rounded overflow-hidden">
-                    <ReactQuill
-                      theme="snow"
-                      value={content}
-                      onChange={setContent}
-                      modules={modules}
-                      placeholder="Write your study notes here..."
-                      className="h-[300px] mb-12"
-                      readOnly={loading}
-                    />
+                    <Suspense
+                      fallback={
+                        <div className="h-[300px] flex items-center justify-center text-neutral-400 text-sm animate-pulse">
+                          Loading editor...
+                        </div>
+                      }
+                    >
+                      <ReactQuill
+                        theme="snow"
+                        value={content}
+                        onChange={setContent}
+                        modules={modules}
+                        placeholder="Write your study notes here..."
+                        className="h-[300px] mb-12"
+                        readOnly={loading}
+                      />
+                    </Suspense>
                   </div>
                 </div>
               </div>

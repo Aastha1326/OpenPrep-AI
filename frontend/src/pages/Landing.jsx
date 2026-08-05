@@ -10,17 +10,13 @@ import {
   ArrowRight, 
   Sparkles, 
   Check,
-  ChevronRight,
-  Sun,
-  Moon
+  ChevronRight
 } from 'lucide-react';
-import { useTheme } from '../context/ThemeContext';
 import ThemeToggle from '../components/ThemeToggle';
-import heroImage from '../assets/hero.webp';
+import SoundToggle from '../components/SoundToggle';
 
 const Landing = () => {
   const navigate = useNavigate();
-  const { theme, toggleTheme } = useTheme();
   const { isAuthenticated } = useSelector((state) => state.auth);
 
   // Fade-in animation variants
@@ -109,10 +105,13 @@ const Landing = () => {
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Light/Dark Toggle */}
-          <ThemeToggle />
+            {/* Toggles */}
+            <div className="flex items-center gap-2">
+              <SoundToggle />
+              <ThemeToggle />
+            </div>
 
-          {/* Dynamic Auth Button */}
+            {/* Dynamic Auth Button */}
           {isAuthenticated ? (
             <Link 
               to="/dashboard"

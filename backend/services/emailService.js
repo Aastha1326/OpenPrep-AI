@@ -6,7 +6,10 @@ const sendEmail = async (options) => {
   if (!process.env.SMTP_HOST) {
     console.log(`\n[EMAIL] To: ${options.to}`);
     console.log(`[EMAIL] Subject: ${options.subject}`);
-    console.log(`[EMAIL] Body:\n${options.text}\n`);
+    console.log(`[EMAIL] Body:\n${options.text || options.html}\n`);
+    if (options.attachments) {
+      console.log(`[EMAIL] Attachments: ${options.attachments.map(a => a.filename).join(', ')}`);
+    }
     return { success: true, preview: true };
   }
 
@@ -26,6 +29,7 @@ const sendEmail = async (options) => {
     subject: options.subject,
     text: options.text,
     html: options.html,
+    attachments: options.attachments,
   };
 
   await transporter.sendMail(message);

@@ -15,7 +15,8 @@ const Progress = require('./Progress');
 const Feedback = require('./Feedback');
 const ActivityLog = require('./ActivityLog');
 const UsageQuota = require('./UsageQuota');
-
+const Achievement = require('./Achievement');
+const FocusSession = require('./FocusSession');
 // Define Associations
 
 // User associations
@@ -31,6 +32,7 @@ User.hasMany(Flashcard, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Progress, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Feedback, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(ActivityLog, { foreignKey: 'user', onDelete: 'CASCADE' });
+User.hasMany(Achievement, { foreignKey: 'userId', as: 'achievements', onDelete: 'CASCADE' });
 
 // Exam associations
 Exam.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
@@ -96,8 +98,13 @@ Feedback.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 // ActivityLog associations
 ActivityLog.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 
-module.exports = {
-  sequelize,
+// Achievement associations
+Achievement.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+// FocusSession associations
+FocusSession.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
+module.exports = {  sequelize,
   User,
   Exam,
   Subject,
@@ -111,5 +118,7 @@ module.exports = {
   Progress,
   Feedback,
   ActivityLog,
-  UsageQuota,
+UsageQuota,
+  Achievement,
+  FocusSession,
 };

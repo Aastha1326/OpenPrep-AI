@@ -4,6 +4,8 @@ import authReducer, {
   clearError,
   clearMessage,
   clearRegistrationSuccess,
+  clearSessionExpired,
+  checkTokenFreshness,
   registerUser,
   loginUser,
   loadUser,
@@ -50,6 +52,7 @@ describe('authSlice', () => {
         loading: false,
         error: null,
         message: null,
+        sessionExpired: false,
       });
     });
 
@@ -487,6 +490,81 @@ describe('authSlice', () => {
       expect(state.user).toBeNull();
       expect(localStorage.getItem('token')).toBeNull();
       expect(localStorage.getItem('refreshToken')).toBeNull();
+    });
+  });
+
+  // ── checkTokenFreshness reducer ──
+  describe('checkTokenFreshness reducer', () => {
+    /**
+     * Build a minimal JWT-like base64 payload. The real check only needs
+     * the `exp` (Unix timestamp) field so we don't need a real key.
+     */
+    const makeJwtWithExp = (expOffset) => {
+      const exp = Math.floor(Date.now() / 1000) + expOffset;
+      const payload = btoa(JSON.stringify({ id: 'user1', type: 'refresh', exp }));
+      return `header.${payload}.sig`;
+    };
+
+    beforeEach(() => {
+      localStorage.clear();
+    });
+
+    test('should set sessionExpired when refreshToken is expired', () => {
+      // exp in the past
+      const expiredToken = makeJwtWithExp(-60);
+      localStorage.setItem('token', makeJwtWithExp(900));
+      localStorage.setItem('refreshToken', expiredToken);
+
+      const state = authReducer(
+        { token: makeJwtWithExp(900), refreshToken: expiredToken, isAuthenticated: true, user: { id: 'user1' }, sessionExpired: false },
+        checkTokenFreshness()
+      );
+
+      expect(state.sessionExpired).toBe(true);
+      expect(state.isAuthenticated).toBe(false);
+      expect(state.token).toBeNull();
+      expect(state.refreshToken).toBeNull();
+      expect(state.user).toBeNull();
+      expect(localStorage.getItem('token')).toBeNull();
+      expect(localStorage.getItem('refreshToken')).toBeNull();
+    });
+
+    test('should NOT set sessionExpired when refreshToken is still valid', () => {
+      // exp in the future
+      const validToken = makeJwtWithExp(3600);
+      localStorage.setItem('token', makeJwtWithExp(900));
+      localStorage.setItem('refreshToken', validToken);
+
+      const state = authReducer(
+        { token: makeJwtWithExp(900), refreshToken: validToken, isAuthenticated: true, user: { id: 'user1' }, sessionExpired: false },
+        checkTokenFreshness()
+      );
+
+      expect(state.sessionExpired).toBe(false);
+      expect(state.isAuthenticated).toBe(true);
+    });
+
+    test('should do nothing when no tokens exist in localStorage', () => {
+      const state = authReducer(
+        { token: null, refreshToken: null, isAuthenticated: false, user: null, sessionExpired: false },
+        checkTokenFreshness()
+      );
+
+      expect(state.sessionExpired).toBe(false);
+      expect(state.isAuthenticated).toBe(false);
+    });
+  });
+
+  // ── clearSessionExpired reducer ──
+  describe('clearSessionExpired reducer', () => {
+    test('should set sessionExpired to false', () => {
+      const state = authReducer({ sessionExpired: true }, clearSessionExpired());
+      expect(state.sessionExpired).toBe(false);
+    });
+
+    test('should remain false when already false', () => {
+      const state = authReducer({ sessionExpired: false }, clearSessionExpired());
+      expect(state.sessionExpired).toBe(false);
     });
   });
 });

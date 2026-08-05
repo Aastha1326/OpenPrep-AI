@@ -1,13 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Flame, Play, FileText, Calendar, TrendingUp, Award, BookOpen,
   Target, CheckCircle, Clock, AlertCircle, RefreshCw, Lightbulb,
-  LogOut, X,
+  LogOut, X, Download, Upload, Settings, MessageSquare,
 } from 'lucide-react';
 import API from '../services/api';
+import { toDateOnlyString } from '../utils/dateUtils';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip as LineTooltip, ResponsiveContainer,
@@ -19,16 +20,28 @@ import VintagePaper from '../components/dashboard/VintagePaper';
 import GoldTabButton from '../components/dashboard/GoldTabButton';
 import PomodoroTimer from '../components/dashboard/PomodoroTimer';
 import FlashcardWidget from '../components/dashboard/FlashcardWidget';
+import BadgeGrid from '../components/dashboard/BadgeGrid';
 import PinnedTasks from '../components/dashboard/PinnedTasks';
 import CreateNoteModal from '../components/dashboard/CreateNoteModal';
 import StudyPlanModal from '../components/dashboard/StudyPlanModal';
+import PyqAnalysisModal from '../components/dashboard/PyqAnalysisModal';
+import WeaknessDashboardWidget from '../components/dashboard/WeaknessDashboardWidget';import LeaderboardWidget from '../components/dashboard/LeaderboardWidget';
+import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
+import TargetExamOverviewWidget from '../components/dashboard/TargetExamOverviewWidget';
+import CompositeBundleModal from '../components/dashboard/CompositeBundleModal';
+import SyllabusImportModal from '../components/dashboard/SyllabusImportModal';
+import NotesWidget from '../components/dashboard/NotesWidget';
 import ThemeToggle from '../components/ThemeToggle';
+import BadgesList from '../components/BadgesList';
+import SM2SettingsModal from '../components/dashboard/SM2SettingsModal';
+
 
 import {
   fetchDashboardStats,
   fetchSubjectBreakdown,
   fetchActivePlan,
   fetchDueFlashcards,
+  reviewFlashcard,
 } from '../store/slices/dashboardSlice';
 import { logout } from '../store/slices/authSlice';
 
@@ -135,6 +148,19 @@ const EmptyState = ({ icon: Icon = Lightbulb, message = 'No data yet' }) => (
   </div>
 );
 
+// ── Analytics Charts Skeleton (shown while recharts chunk loads) ──
+const AnalyticsChartsFallback = () => (
+  <div className="bg-wood-desk rounded-lg shadow-inner border border-black/50 p-6 relative overflow-hidden grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <div className="absolute inset-0 shadow-[inset_0_0_50px_rgba(0,0,0,0.8)] pointer-events-none" />
+    {[0, 1].map((i) => (
+      <VintagePaper key={i} animate={false} className="w-full h-full p-6 shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
+        <Shimmer className="h-7 w-48 mb-6" />
+        <Shimmer className="h-64 w-full" />
+      </VintagePaper>
+    ))}
+  </div>
+);
+
 // ── Main Component ──
 const Dashboard = () => {
   const dispatch = useDispatch();
@@ -190,10 +216,44 @@ const Dashboard = () => {
     }
   };
 
-  // ── Note Modal State ──
+  const handleBumpStudyTime = async (taskId, minutesToAdd = 30) => {
+    const planId = activePlan?.id;
+    if (!planId) return;
+    const task = todayTasks.find((t) => t.id === taskId);
+    if (!task) return;
+    const backendTaskId = task.meta?.taskId || task.id;
+    setToggleError(null);
+    try {
+      const currentDuration = task.duration || 60;
+      await API.put(`/study-plans/${planId}/tasks/${backendTaskId}`, {
+        duration: currentDuration + minutesToAdd,
+      });
+      dispatch(fetchActivePlan());
+    } catch {
+      setToggleError('Failed to bump study time. Please try again.');
+    }
+  };
+
+  // ── Note & PYQ Modal State ──
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isStudyPlanOpen, setIsStudyPlanOpen] = useState(false);
+  const [isPyqModalOpen, setIsPyqModalOpen] = useState(false);
+  const [isBundleModalOpen, setIsBundleModalOpen] = useState(false);
+  const [isSyllabusImportOpen, setIsSyllabusImportOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const syllabusPrefillRef = useRef(null);
   const [comingSoon, setComingSoon] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleGoToStudyPlanFromImport = (prefill) => {
+    if (prefill) syllabusPrefillRef.current = prefill;
+    // Refresh dashboard caches so the new exam appears immediately in select
+    dispatch(fetchDashboardStats());
+    dispatch(fetchSubjectBreakdown());
+    dispatch(fetchActivePlan());
+    setIsStudyPlanOpen(true);
+  };
+
 
   useEffect(() => {
     if (comingSoon) {
@@ -201,6 +261,34 @@ const Dashboard = () => {
       return () => clearTimeout(timer);
     }
   }, [comingSoon]);
+
+  const handleExportReport = async (format = 'pdf') => {
+    setIsExporting(true);
+    try {
+      const response = await API.get(`/progress/export/${format}`, {
+        responseType: 'blob',
+      });
+
+      const blob = new Blob([response.data], {
+        type: format === 'pdf' ? 'application/pdf' : 'text/csv',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute(
+        'download',
+        `progress_report_${new Date().toISOString().split('T')[0]}.${format}`
+      );
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      setComingSoon('Failed to export progress report.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // ── Derived Data ──
   const chartData = weeklyChartData.length > 0
@@ -220,33 +308,52 @@ const Dashboard = () => {
 
   const todayTasks = (() => {
     if (!activePlan?.dailyGoals) return [];
-    const today = new Date().toISOString().split('T')[0];
-    const todayGoal = activePlan.dailyGoals.find((g) => {
-      const goalDate = g.date ? g.date.split('T')[0] : null;
-      return goalDate === today;
+    const today = toDateOnlyString(new Date());
+    const todayGoal = activePlan.dailyGoals.find((g) => g.date && toDateOnlyString(g.date) === today);
+    const rawTasks = todayGoal?.tasks || activePlan.dailyGoals[0]?.tasks || [];
+    return rawTasks.map((t, i) => {
+      const text = t.title || t.description || t.topic?.name || 'Untitled task';
+      const isBonus = !!(t.isBonus || t.optional || text.toLowerCase().includes('bonus') || text.toLowerCase().includes('optional'));
+      return {
+        id: t.id || t._id || `task-${i}`,
+        text,
+        completed: t.completed || false,
+        topic: t.topic || null,
+        duration: t.duration || 60,
+        meta: { taskId: t.id || t._id },
+        isBonus,
+      };
     });
-    if (todayGoal?.tasks) {
-      return todayGoal.tasks.map((t, i) => ({
-        id: t.id || `task-${i}`,
-        text: t.title || t.description || t.topic?.name || 'Untitled task',
-        completed: t.completed || false,
-        meta: { taskId: t.id },
-      }));
-    }
-    // Fallback: show first day's tasks
-    const firstDay = activePlan.dailyGoals[0];
-    if (firstDay?.tasks) {
-      return firstDay.tasks.map((t, i) => ({
-        id: t.id || `task-${i}`,
-        text: t.title || t.description || t.topic?.name || 'Untitled task',
-        completed: t.completed || false,
-        meta: { taskId: t.id },
-      }));
-    }
-    return [];
   })();
 
+  const tasksProgress = (() => {
+    if (todayTasks.length === 0) return 0;
+    const regularTasks = todayTasks.filter((t) => !t.isBonus);
+    const completedTasksCount = todayTasks.filter((t) => t.completed).length;
+    const targetTasksCount = regularTasks.length;
+
+    let percentage = 0;
+    if (targetTasksCount > 0) {
+      percentage = Math.round((completedTasksCount / targetTasksCount) * 100);
+    } else {
+      const completedBonusCount = todayTasks.filter((t) => t.completed).length;
+      percentage = Math.round((completedBonusCount / todayTasks.length) * 100);
+    }
+    return Math.min(100, Math.max(0, percentage));
+  })();
+
+  const completedBonusCount = todayTasks.filter((t) => t.isBonus && t.completed).length;
+
   const firstDueCard = dueFlashcards.length > 0 ? dueFlashcards[0] : null;
+
+  const handleReviewCard = useCallback((quality) => {
+    if (!firstDueCard) return;
+    dispatch(reviewFlashcard({ cardId: firstDueCard.id, quality })).then(() => {
+      if (dueFlashcards.length <= 1) {
+        dispatch(fetchDueFlashcards());
+      }
+    });
+  }, [dispatch, firstDueCard, dueFlashcards.length]);
 
   // ── Streak display ──
   const streakDays = stats?.streak ?? 0;
@@ -260,13 +367,15 @@ const Dashboard = () => {
   return (
     <LeatherBoard>
       {/* --- QUICK ACTIONS TABS --- */}
-      <div className="absolute -left-4 top-24 flex flex-col gap-4 z-30 hidden md:flex">
+      <div className="absolute -left-4 top-24 flex-col gap-4 z-30 hidden md:flex">
         <GoldTabButton icon={Play} label="Start Quiz" delay={0.1} onClick={() => setComingSoon('Quiz feature coming soon!')} />
-        <GoldTabButton icon={FileText} label="Analyze PYQ" delay={0.2} onClick={() => setComingSoon('PYQ Analysis coming soon!')} />
+        <GoldTabButton icon={FileText} label="PYQ Intelligence" delay={0.2} onClick={() => navigate('/pyqs')} />
         <GoldTabButton icon={Calendar} label="Study Plan" delay={0.3} onClick={() => setIsStudyPlanOpen(true)} />
-        <GoldTabButton icon={TrendingUp} label="Reports" delay={0.4} onClick={() => setComingSoon('Reports coming soon!')} />
+        <GoldTabButton icon={Upload} label="Import Syllabus" delay={0.35} onClick={() => setIsSyllabusImportOpen(true)} />
+        <GoldTabButton icon={TrendingUp} label="Export Report" delay={0.4} onClick={() => handleExportReport('pdf')} />
+        <GoldTabButton icon={MessageSquare} label="Study Room" delay={0.45} onClick={() => navigate('/study-group')} />
         <button 
-          onClick={() => setIsNoteModalOpen(true)}
+          onClick={() => { setHasOpenedNoteModal(true); setIsNoteModalOpen(true); }}
           className="bg-neutral-800 text-yellow-500 border border-yellow-700/50 hover:bg-neutral-700 p-2 rounded-r-lg shadow-lg flex items-center justify-center relative group"
         >
           <FileText className="w-5 h-5" />
@@ -278,7 +387,7 @@ const Dashboard = () => {
 
       <div className="pl-4 md:pl-16 pr-4 lg:pr-8 py-8 space-y-12">
         {/* --- HERO SECTION --- */}
-        <div className="flex flex-col md:flex-row justify-between items-end border-b border-black/20 pb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start border-b border-black/20 pb-8 gap-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -291,15 +400,40 @@ const Dashboard = () => {
             <p className="text-amber-100/70 text-lg italic font-playfair">
               &ldquo;The roots of education are bitter, but the fruit is sweet.&rdquo; – Aristotle
             </p>
+
+            {/* --- EXAM COUNTDOWN WIDGET --- */}
+            {activePlan?.exam?.date && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.4 }}
+                className="mt-5"
+              >
+                <ExamCountdownWidget
+                  examDate={activePlan.exam.date}
+                  examName={activePlan.exam.name}
+                />
+              </motion.div>
+            )}
           </motion.div>
 
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, delay: 0.3 }}
-            className="flex items-center space-x-6 mt-6 md:mt-0"
+            className="flex items-center space-x-6 mt-2 md:mt-0 shrink-0"
           >
             <ThemeToggle className="mr-2" />
+            <button
+              onClick={() => setIsSettingsModalOpen(true)}
+              className="bg-neutral-800 text-yellow-500 border border-yellow-700/50 hover:bg-neutral-700 p-2.5 rounded-sm shadow-[0_4px_10px_rgba(0,0,0,0.4)] flex items-center justify-center relative group"
+              aria-label="Settings"
+            >
+              <Settings className="w-5 h-5 transition-transform duration-300 group-hover:rotate-45" />
+              <div className="absolute top-full mt-2 px-2 py-1 bg-neutral-800 text-yellow-500 text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                SM-2 Settings
+              </div>
+            </button>
             <div className="flex flex-col items-center">
               <div className="relative">
                 <Flame className="w-12 h-12 text-orange-500 animate-pulse-glow" fill="currentColor" />
@@ -308,6 +442,15 @@ const Dashboard = () => {
               <span className="text-gold-foil font-bold text-2xl">{streakDays} Day</span>
               <span className="text-amber-200/50 text-xs uppercase tracking-widest">Streak</span>
             </div>
+
+            <button
+              onClick={() => navigate('/settings')}
+              className="bg-neutral-800 text-amber-100/80 px-4 py-3 rounded-sm border border-amber-700/40 shadow-[0_4px_15px_rgba(0,0,0,0.5)] hover:bg-neutral-700 hover:text-yellow-400 transition-all flex items-center gap-2 group"
+              aria-label="Settings"
+            >
+              <Settings className="w-5 h-5" />
+              <span className="font-playfair font-bold text-sm tracking-wide hidden sm:inline">Settings</span>
+            </button>
 
             <button
               onClick={handleLogout}
@@ -320,10 +463,17 @@ const Dashboard = () => {
           </motion.div>
         </div>
 
+        {/* --- TARGET EXAM COMPOSITE BUNDLE OVERVIEW --- */}
+        <TargetExamOverviewWidget
+          onOpenBundleModal={() => setIsBundleModalOpen(true)}
+          onGenerateStudyPlan={() => setIsStudyPlanOpen(true)}
+        />
+
         {/* --- STATISTICS OVERVIEW --- */}
         {errorStats && !loadingStats ? (
           <ErrorBanner message={errorStats} onRetry={handleRetry(fetchDashboardStats)} />
         ) : null}
+
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {loadingStats ? (
@@ -389,14 +539,39 @@ const Dashboard = () => {
         </div>
 
         {/* --- ANALYTICS SECTION (WOODEN DESK) --- */}
-        <div className="bg-wood-desk rounded-lg shadow-inner border border-black/50 p-6 relative overflow-hidden grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="absolute inset-0 shadow-[inset_0_0_50px_rgba(0,0,0,0.8)] pointer-events-none" />
-
-          {/* Line Chart — Weekly Performance */}
-          <VintagePaper animate={false} className="w-full h-full p-6 shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
-            <h2 className="text-2xl font-bold font-playfair text-neutral-900 mb-6 border-b border-neutral-400 pb-2">
-              Weekly Performance
+        <div className="space-y-4">
+          <div className="flex justify-between items-center px-1">
+            <h2 className="text-2xl font-bold font-playfair text-amber-100 flex items-center gap-2">
+              <TrendingUp className="w-6 h-6 text-yellow-500" /> Performance Analytics
             </h2>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleExportReport('csv')}
+                disabled={isExporting}
+                className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-yellow-400 border border-yellow-700/50 rounded text-xs font-semibold flex items-center gap-1.5 shadow transition-all disabled:opacity-50"
+                title="Export report as CSV"
+              >
+                <Download className="w-3.5 h-3.5" /> Export CSV
+              </button>
+              <button
+                onClick={() => handleExportReport('pdf')}
+                disabled={isExporting}
+                className="px-3 py-1.5 bg-gradient-to-r from-yellow-700 to-yellow-600 hover:from-yellow-600 hover:to-yellow-500 text-yellow-50 rounded text-xs font-semibold flex items-center gap-1.5 shadow transition-all disabled:opacity-50"
+                title="Export report as PDF"
+              >
+                <Download className="w-3.5 h-3.5" /> Export PDF
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-wood-desk rounded-lg shadow-inner border border-black/50 p-6 relative overflow-hidden grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="absolute inset-0 shadow-[inset_0_0_50px_rgba(0,0,0,0.8)] pointer-events-none" />
+
+            {/* Line Chart — Weekly Performance */}
+            <VintagePaper animate={false} className="w-full h-full p-6 shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
+              <h2 className="text-2xl font-bold font-playfair text-neutral-900 mb-6 border-b border-neutral-400 pb-2">
+                Weekly Performance
+              </h2>
             <div className="h-64 w-full" style={{ minHeight: '250px', minWidth: '100%' }}>
               {loadingStats ? (
                 <div className="flex items-center justify-center h-full">
@@ -469,6 +644,7 @@ const Dashboard = () => {
             </div>
           </VintagePaper>
         </div>
+        </div>
 
         {/* --- NEW WIDGETS ROW --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-center py-4">
@@ -482,15 +658,25 @@ const Dashboard = () => {
               error={errorFlashcards}
               totalDue={dueFlashcards.length}
               onRetry={handleRetry(fetchDueFlashcards)}
+              onReview={handleReviewCard}
             />
           </div>
+
+          {/* BADGES / GAMIFICATION */}
+          <div className="md:col-span-2 mt-6">
+            <BadgeGrid />
+          </div>
+
           <div className="flex justify-center">
             <PinnedTasks
               tasks={todayTasks}
+              progress={tasksProgress}
+              completedBonus={completedBonusCount}
               loading={loadingPlan}
               error={errorPlan}
               onRetry={handleRetry(fetchActivePlan)}
               onToggle={handleToggleTask}
+              onBumpTime={handleBumpStudyTime}
             />
           </div>
           {toggleError && (
@@ -498,6 +684,24 @@ const Dashboard = () => {
               <ErrorBanner message={toggleError} />
             </div>
           )}
+        </div>
+
+        {/* --- LEADERBOARD & AI WEAKNESS DETECTION WIDGETS --- */}
+<div className="my-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <LeaderboardWidget />
+          <WeaknessDashboardWidget />
+        </div>
+
+        <div className="my-6">
+          <FocusEfficiencyWidget />
+        </div>
+        <div className="my-6">
+          <BadgesList achievements={user?.achievements || []} />
+        </div>
+
+        {/* --- AI REVISION SUMMARIES + AUDIO READER --- */}
+        <div className="my-6">
+          <NotesWidget limit={5} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -677,9 +881,52 @@ const Dashboard = () => {
         isOpen={isStudyPlanOpen}
         onClose={() => setIsStudyPlanOpen(false)}
         activePlan={activePlan}
+        onPlanUpdate={() => dispatch(fetchActivePlan())}
+        onPlanCreated={() => dispatch(fetchActivePlan())}
+        onBumpTime={handleBumpStudyTime}
+      />
+
+      {/* --- PYQ ANALYSIS MODAL --- */}
+      <PyqAnalysisModal
+        isOpen={isPyqModalOpen}
+        onClose={() => setIsPyqModalOpen(false)}
+        onAnalysisComplete={() => {
+          setIsPyqModalOpen(false);
+          dispatch(fetchDashboardStats());
+          dispatch(fetchSubjectBreakdown());
+        }}
+      />
+
+      {/* --- COMPOSITE BUNDLE MODAL --- */}
+      <CompositeBundleModal
+        isOpen={isBundleModalOpen}
+        onClose={() => setIsBundleModalOpen(false)}
+        onSuccess={() => {
+          setIsBundleModalOpen(false);
+          dispatch(fetchDashboardStats());
+          dispatch(fetchSubjectBreakdown());
+        }}
+      />
+
+      {/* --- SYLLABUS IMPORT MODAL --- */}
+      <SyllabusImportModal
+        isOpen={isSyllabusImportOpen}
+        onClose={() => setIsSyllabusImportOpen(false)}
+        onSuccess={() => {
+          dispatch(fetchDashboardStats());
+          dispatch(fetchSubjectBreakdown());
+        }}
+        onGoToStudyPlan={handleGoToStudyPlanFromImport}
+      />
+
+      {/* --- SM-2 SETTINGS MODAL --- */}
+      <SM2SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
       />
 
       {/* --- COMING SOON TOAST --- */}
+
       <AnimatePresence>
         {comingSoon && (
           <motion.div
