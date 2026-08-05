@@ -1,5 +1,5 @@
 const fs = require('fs');
-const path = path = require('path');
+const path = require('path');
 const { Op } = require('sequelize');
 const Note = require('../models/Note');
 const Subject = require('../models/Subject');

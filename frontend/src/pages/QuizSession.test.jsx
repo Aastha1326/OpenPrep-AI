@@ -14,8 +14,20 @@ const sampleQuiz = {
   id: 'q1',
   title: 'Math Quiz',
   questions: [
-    { _id: 'qq1', questionText: 'What is 2+2?', options: ['3', '4', '5'], correctAnswer: '4', explanation: '' },
-    { _id: 'qq2', questionText: 'What is 2*3?', options: ['5', '6', '7'], correctAnswer: '6', explanation: '' },
+    {
+      _id: 'qq1',
+      questionText: 'What is 2+2?',
+      options: ['3', '4', '5'],
+      correctAnswer: '4',
+      explanation: '',
+    },
+    {
+      _id: 'qq2',
+      questionText: 'What is 2*3?',
+      options: ['5', '6', '7'],
+      correctAnswer: '6',
+      explanation: '',
+    },
   ],
 };
 
@@ -135,5 +147,32 @@ describe('QuizSession', () => {
       });
     });
     expect(await screen.findByText('Quiz Completed!')).toBeInTheDocument();
+  });
+
+  test('handles rapid option switching without state race conditions and submits final selection', async () => {
+    API.get.mockResolvedValue({ data: { data: sampleQuiz } });
+    API.post.mockResolvedValue({ data: { data: { score: 100 } } });
+    renderQuiz();
+
+    fireEvent.click(await screen.findByText('What is 2+2?'));
+
+    // Rapidly click options '3', '5', and finally '4'
+    fireEvent.click(screen.getByRole('button', { name: '3' }));
+    fireEvent.click(screen.getByRole('button', { name: '5' }));
+    fireEvent.click(screen.getByRole('button', { name: '4' }));
+
+    fireEvent.click(screen.getByRole('button', { name: /Next/i }));
+    fireEvent.click(await screen.findByText('What is 2*3?'));
+    fireEvent.click(screen.getByRole('button', { name: '6' }));
+    fireEvent.click(screen.getByRole('button', { name: /Submit Quiz/i }));
+
+    await waitFor(() => {
+      expect(API.post).toHaveBeenCalledWith('/quizzes/q1/submit', {
+        answers: [
+          { questionId: 'qq1', selectedAnswer: '4' },
+          { questionId: 'qq2', selectedAnswer: '6' },
+        ],
+      });
+    });
   });
 });
