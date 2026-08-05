@@ -11,9 +11,10 @@ const PomodoroTimer = () => {
   const [subjects, setSubjects] = useState([]);
   const [selectedSubject, setSelectedSubject] = useState(null);
   const [isSubjectDropdownOpen, setIsSubjectDropdownOpen] = useState(false);
-  const [showToast, setShowToast] = useState(null);
+const [showToast, setShowToast] = useState(null);
   const [totalStudyHours, setTotalStudyHours] = useState(0);
-
+  const [pausedSeconds, setPausedSeconds] = useState(0);
+  const [interruptions, setInterruptions] = useState(0);
   // Fetch user's subjects on component mount
   useEffect(() => {
     const fetchSubjects = async () => {
@@ -48,10 +49,19 @@ const PomodoroTimer = () => {
     }
   };
 
+const logFocusSession = useCallback(async (activeSeconds) => {
+    try {
+      const payload = { activeSeconds, pausedSeconds, interruptions };
+      if (selectedSubject) payload.subjectId = selectedSubject.id;
+      await API.post('/progress/focus-session', payload);
+    } catch (error) {
+      console.error('Failed to log focus session:', error);
+    }
+  }, [pausedSeconds, interruptions, selectedSubject]);
+
   const logStudyTime = useCallback(async () => {
     try {
-      const studyHours = 0.42; // 25 minutes in hours
-      const description = selectedSubject 
+      const studyHours = 0.42; // 25 minutes in hours      const description = selectedSubject 
         ? `Completed 25-min Pomodoro Study Session for ${selectedSubject.name}`
         : 'Completed 25-min Pomodoro Study Session';
 
@@ -87,32 +97,44 @@ const PomodoroTimer = () => {
   useEffect(() => {
     let interval = null;
     if (isActive) {
-      interval = setInterval(() => {
+interval = setInterval(() => {
         setTimeLeft((time) => {
-          if (time <= 1) {
-            setIsActive(false);
+          // paused-time accumulation only happens while inactive (see effect below)          if (time <= 1) {
+setIsActive(false);
             setIsCompleted(true);
             playChime();
             logStudyTime(); // Auto-log study time on completion
-            return 0;
-          }
+            logFocusSession(25 * 60 - pausedSeconds); // Log focus quality breakdown
+            return 0;          }
           return time - 1;
         });
       }, 1000);
     }
-    return () => clearInterval(interval);
+return () => clearInterval(interval);
   }, [isActive]);
 
-  const toggleTimer = () => {
+  // Track paused duration whenever the timer is stopped mid-session
+  useEffect(() => {
+    let pauseInterval = null;
+    if (!isActive && !isCompleted && timeLeft < 25 * 60 && timeLeft > 0) {
+      pauseInterval = setInterval(() => {
+        setPausedSeconds((s) => s + 1);
+      }, 1000);
+    }
+    return () => clearInterval(pauseInterval);
+  }, [isActive, isCompleted, timeLeft]);
+const toggleTimer = () => {
     if (isCompleted) setIsCompleted(false);
+    if (isActive) setInterruptions((count) => count + 1); // user is pausing -> count it
     setIsActive(!isActive);
   };
   const resetTimer = () => {
     setIsActive(false);
     setIsCompleted(false);
     setTimeLeft(25 * 60);
+    setPausedSeconds(0);
+    setInterruptions(0);
   };
-
   const handleSubjectSelect = (subject) => {
     setSelectedSubject(subject);
     setIsSubjectDropdownOpen(false);

@@ -25,8 +25,7 @@ import PinnedTasks from '../components/dashboard/PinnedTasks';
 import CreateNoteModal from '../components/dashboard/CreateNoteModal';
 import StudyPlanModal from '../components/dashboard/StudyPlanModal';
 import PyqAnalysisModal from '../components/dashboard/PyqAnalysisModal';
-import WeaknessDashboardWidget from '../components/dashboard/WeaknessDashboardWidget';
-import LeaderboardWidget from '../components/dashboard/LeaderboardWidget';
+import WeaknessDashboardWidget from '../components/dashboard/WeaknessDashboardWidget';import LeaderboardWidget from '../components/dashboard/LeaderboardWidget';
 import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
 import TargetExamOverviewWidget from '../components/dashboard/TargetExamOverviewWidget';
 import CompositeBundleModal from '../components/dashboard/CompositeBundleModal';
@@ -688,11 +687,14 @@ const Dashboard = () => {
         </div>
 
         {/* --- LEADERBOARD & AI WEAKNESS DETECTION WIDGETS --- */}
-        <div className="my-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
+<div className="my-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
           <LeaderboardWidget />
           <WeaknessDashboardWidget />
         </div>
 
+        <div className="my-6">
+          <FocusEfficiencyWidget />
+        </div>
         <div className="my-6">
           <BadgesList achievements={user?.achievements || []} />
         </div>
