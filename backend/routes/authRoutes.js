@@ -23,6 +23,7 @@ const {
   validateResetPassword,
   validateRefreshToken,
 } = require('../middleware/validators');
+const { validateRequest, registerSchema } = require('../middleware/validate');
 
 const router = express.Router();
 
@@ -174,7 +175,7 @@ const resetPasswordLimiter = rateLimit({
  */
 
 // Register a new user account
-router.post('/register', registerLimiter, validateRegister, register);
+router.post('/register', registerLimiter, validateRequest(registerSchema), register);
 
 /**
  * @swagger

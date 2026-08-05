@@ -15,6 +15,7 @@ const {
   validateGenerateAIPlan,
   validateToggleTask,
 } = require('../middleware/validators');
+const { validateRequest, createStudyPlanSchema } = require('../middleware/validate');
 
 const router = express.Router();
 
@@ -94,7 +95,7 @@ const router = express.Router();
  *               $ref: '#/components/schemas/Error'
  */
 
-router.post('/generate-ai', protect, aiLimiter, checkQuota, validateGenerateAIPlan, generateAIPlan);
+router.post('/generate-ai', protect, aiLimiter, checkQuota, validateRequest(createStudyPlanSchema), generateAIPlan);
 
 /**
  * @swagger
