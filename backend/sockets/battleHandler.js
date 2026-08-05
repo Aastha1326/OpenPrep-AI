@@ -125,6 +125,17 @@ module.exports = (io) => {
       handleJoinAttempt(normalizedPayload, callback);
     });
 
+
+       // Re-sync a client's view of the room (e.g. after the tab regains focus)
+    socket.on('request_sync', ({ roomId }) => {
+      const room = rooms[roomId];
+      if (!room) return;
+
+      socket.emit('room_update', {
+        players: room.players,
+        status: room.status,
+      });
+    });
     socket.on('toggle_ready', ({ roomId }) => {
       const player = rooms[roomId] && rooms[roomId].players[socket.id];
       if (!player) return;

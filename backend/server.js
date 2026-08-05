@@ -180,8 +180,11 @@ const io = new Server(server, {
     methods: ['GET', 'POST'],
     credentials: true,
   },
+  // Longer timeouts tolerate throttled timers in backgrounded/idle browser
+  // tabs, so active lobby players aren't disconnected on a missed heartbeat.
+  pingTimeout: 60000,
+  pingInterval: 25000,
 });
-
 // Initialize socket handlers
 require('./sockets/battleHandler')(io);
 require('./sockets/chatHandler')(io);

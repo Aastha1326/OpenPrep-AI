@@ -63,6 +63,20 @@ const BattleArena = () => {
   const typingTimers = useRef({});
 
   useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible' || !joinedRef.current) return;
+
+      if (!socket.connected) {
+        socket.connect();
+      } else {
+        socket.emit('request_sync', { roomId: roomIdRef.current });
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+  useEffect(() => {
     socket.connect();
 
     socket.on('connect', () => {
