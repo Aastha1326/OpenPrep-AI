@@ -169,6 +169,7 @@ exports.register = async (req, res, next) => {
         streak: {
           count: user.streakCount,
           lastActive: user.streakLastActive,
+          freezes: user.streakFreezes || 0,
         },
         studyHours: user.studyHours,
         isEmailVerified: user.isEmailVerified,
@@ -295,8 +296,20 @@ exports.login = async (req, res, next) => {
       user.streakCount = 1;
     } else if (diffDays === 1) {
       user.streakCount += 1;
+      if (user.streakCount > 0 && user.streakCount % 7 === 0) {
+        user.streakFreezes = (user.streakFreezes || 0) + 1;
+      }
     } else if (diffDays > 1) {
-      user.streakCount = 1;
+      const missedDays = diffDays - 1;
+      if (user.streakFreezes && user.streakFreezes >= missedDays) {
+        user.streakFreezes -= missedDays;
+        user.streakCount += 1;
+        if (user.streakCount > 0 && user.streakCount % 7 === 0) {
+          user.streakFreezes = (user.streakFreezes || 0) + 1;
+        }
+      } else {
+        user.streakCount = 1;
+      }
     }
     user.streakLastActive = new Date();
 
@@ -320,6 +333,7 @@ exports.login = async (req, res, next) => {
         streak: {
           count: user.streakCount,
           lastActive: user.streakLastActive,
+          freezes: user.streakFreezes || 0,
         },
         studyHours: user.studyHours,
         isEmailVerified: user.isEmailVerified,
@@ -356,6 +370,7 @@ exports.getMe = async (req, res, next) => {
         streak: {
           count: user.streakCount,
           lastActive: user.streakLastActive,
+          freezes: user.streakFreezes || 0,
         },
         studyHours: user.studyHours,
         isEmailVerified: user.isEmailVerified,
@@ -395,6 +410,7 @@ exports.updateSettings = async (req, res, next) => {
         streak: {
           count: req.user.streakCount,
           lastActive: req.user.streakLastActive,
+          freezes: req.user.streakFreezes || 0,
         },
         studyHours: req.user.studyHours,
         isEmailVerified: req.user.isEmailVerified,
@@ -669,6 +685,7 @@ exports.updateSM2Settings = async (req, res, next) => {
         streak: {
           count: user.streakCount,
           lastActive: user.streakLastActive,
+          freezes: user.streakFreezes || 0,
         },
         studyHours: user.studyHours,
         isEmailVerified: user.isEmailVerified,
@@ -714,6 +731,7 @@ exports.resetSM2Settings = async (req, res, next) => {
         streak: {
           count: user.streakCount,
           lastActive: user.streakLastActive,
+          freezes: user.streakFreezes || 0,
         },
         studyHours: user.studyHours,
         isEmailVerified: user.isEmailVerified,
@@ -799,6 +817,7 @@ exports.updateSettings = async (req, res, next) => {
         streak: {
           count: user.streakCount,
           lastActive: user.streakLastActive,
+          freezes: user.streakFreezes || 0,
         },
         studyHours: user.studyHours,
         isEmailVerified: user.isEmailVerified,

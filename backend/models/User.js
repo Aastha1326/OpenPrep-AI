@@ -57,6 +57,10 @@ const User = sequelize.define(
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
     },
+    streakFreezes: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
     studyHours: {
       type: DataTypes.FLOAT,
       defaultValue: 0,
