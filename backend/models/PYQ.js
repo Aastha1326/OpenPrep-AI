@@ -61,7 +61,6 @@ year: {
   },
   {
     timestamps: true,
-    indexes: [
       {
         name: 'pyq_user_id_idx',
         unique: false,
@@ -78,6 +77,10 @@ year: {
       {
         name: 'pyq_user_exam_idx',
         fields: ['user', 'exam'],
+      },
+      {
+        name: 'pyq_subject_year_difficulty_idx',
+        fields: ['subject', 'year', 'difficulty'],
       },
     ],
     hooks: {

@@ -388,3 +388,118 @@ exports.getAttemptHistory = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Generate AI Revision Sheet for weak concepts from quiz history
+// @route   POST /api/quizzes/generate-revision-sheet or POST /api/quiz/generate-revision-sheet
+// @access  Private
+exports.generateRevisionSheet = async (req, res, next) => {
+  try {
+    const { quizAttemptId, mistookQuestions: payloadQuestions, subjectId, topicId, saveToNotes = true } = req.body;
+
+    let mistookQuestions = payloadQuestions || [];
+    let targetSubjectName = 'General Subject';
+    let targetTopicName = 'Weak Topics';
+    let matchedSubjectId = subjectId || null;
+    let matchedTopicId = topicId || null;
+
+    if (quizAttemptId) {
+      const attempt = await QuizAttempt.findOne({
+        where: { id: quizAttemptId, user: req.user.id },
+        include: [
+          {
+            model: Quiz,
+            as: 'quizRef',
+            include: [
+              { model: Subject, as: 'subjectRef' },
+              { model: Topic, as: 'topicRef' },
+            ],
+          },
+        ],
+      });
+
+      if (attempt) {
+        if (attempt.quizRef) {
+          matchedSubjectId = matchedSubjectId || attempt.quizRef.subject;
+          matchedTopicId = matchedTopicId || attempt.quizRef.topic;
+
+          if (attempt.quizRef.subjectRef) targetSubjectName = attempt.quizRef.subjectRef.name;
+          if (attempt.quizRef.topicRef) targetTopicName = attempt.quizRef.topicRef.name;
+
+          const quizQuestions = attempt.quizRef.questions || [];
+          const userAnswers = attempt.answers || [];
+
+          mistookQuestions = quizQuestions
+            .filter((q) => {
+              const ans = userAnswers.find((a) => String(a.questionId) === String(q._id || q.id));
+              return ans && !ans.isCorrect;
+            })
+            .map((q) => {
+              const userAns = userAnswers.find((a) => String(a.questionId) === String(q._id || q.id));
+              return {
+                questionText: q.questionText,
+                options: q.options,
+                correctAnswer: q.correctAnswer,
+                explanation: q.explanation,
+                userSelectedAnswer: userAns ? userAns.selectedAnswer : -1,
+              };
+            });
+        }
+      }
+    }
+
+    if (subjectId && targetSubjectName === 'General Subject') {
+      const sub = await Subject.findByPk(subjectId);
+      if (sub) targetSubjectName = sub.name;
+    }
+
+    if (topicId && targetTopicName === 'Weak Topics') {
+      const top = await Topic.findByPk(topicId);
+      if (top) targetTopicName = top.name;
+    }
+
+    // Call Gemini Service
+    const revisionSheet = await geminiService.generateRevisionSheet(
+      mistookQuestions,
+      targetSubjectName,
+      targetTopicName,
+      req.query.refresh === 'true'
+    );
+
+    let savedNote = null;
+    if (saveToNotes && matchedSubjectId) {
+      savedNote = await Note.create({
+        title: revisionSheet.title || `AI Revision Sheet: ${targetTopicName}`,
+        content: revisionSheet.summaryMarkdown,
+        subject: matchedSubjectId,
+        topic: matchedTopicId,
+        category: 'Summary',
+        user: req.user.id,
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      data: {
+        title: revisionSheet.title,
+        summaryMarkdown: revisionSheet.summaryMarkdown,
+        savedNote,
+      },
+    });
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({
+        success: false,
+        error: error.message,
+      });
+    }
+    next(error);
+  }
+};
+

@@ -20,6 +20,7 @@ import VintagePaper from '../components/dashboard/VintagePaper';
 import GoldTabButton from '../components/dashboard/GoldTabButton';
 import PomodoroTimer from '../components/dashboard/PomodoroTimer';
 import FlashcardWidget from '../components/dashboard/FlashcardWidget';
+import BadgeGrid from '../components/dashboard/BadgeGrid';
 import PinnedTasks from '../components/dashboard/PinnedTasks';
 import CreateNoteModal from '../components/dashboard/CreateNoteModal';
 import StudyPlanModal from '../components/dashboard/StudyPlanModal';
@@ -310,30 +311,39 @@ const Dashboard = () => {
     if (!activePlan?.dailyGoals) return [];
     const today = toDateOnlyString(new Date());
     const todayGoal = activePlan.dailyGoals.find((g) => g.date && toDateOnlyString(g.date) === today);
-    if (todayGoal?.tasks) {
-      return todayGoal.tasks.map((t, i) => ({
+    const rawTasks = todayGoal?.tasks || activePlan.dailyGoals[0]?.tasks || [];
+    return rawTasks.map((t, i) => {
+      const text = t.title || t.description || t.topic?.name || 'Untitled task';
+      const isBonus = !!(t.isBonus || t.optional || text.toLowerCase().includes('bonus') || text.toLowerCase().includes('optional'));
+      return {
         id: t.id || t._id || `task-${i}`,
-        text: t.title || t.description || t.topic?.name || 'Untitled task',
+        text,
         completed: t.completed || false,
         topic: t.topic || null,
         duration: t.duration || 60,
         meta: { taskId: t.id || t._id },
-      }));
-    }
-    // Fallback: show first day's tasks
-    const firstDay = activePlan.dailyGoals[0];
-    if (firstDay?.tasks) {
-      return firstDay.tasks.map((t, i) => ({
-        id: t.id || t._id || `task-${i}`,
-        text: t.title || t.description || t.topic?.name || 'Untitled task',
-        completed: t.completed || false,
-        topic: t.topic || null,
-        duration: t.duration || 60,
-        meta: { taskId: t.id || t._id },
-      }));
-    }
-    return [];
+        isBonus,
+      };
+    });
   })();
+
+  const tasksProgress = (() => {
+    if (todayTasks.length === 0) return 0;
+    const regularTasks = todayTasks.filter((t) => !t.isBonus);
+    const completedTasksCount = todayTasks.filter((t) => t.completed).length;
+    const targetTasksCount = regularTasks.length;
+
+    let percentage = 0;
+    if (targetTasksCount > 0) {
+      percentage = Math.round((completedTasksCount / targetTasksCount) * 100);
+    } else {
+      const completedBonusCount = todayTasks.filter((t) => t.completed).length;
+      percentage = Math.round((completedBonusCount / todayTasks.length) * 100);
+    }
+    return Math.min(100, Math.max(0, percentage));
+  })();
+
+  const completedBonusCount = todayTasks.filter((t) => t.isBonus && t.completed).length;
 
   const firstDueCard = dueFlashcards.length > 0 ? dueFlashcards[0] : null;
 
@@ -652,9 +662,17 @@ const Dashboard = () => {
               onReview={handleReviewCard}
             />
           </div>
+
+          {/* BADGES / GAMIFICATION */}
+          <div className="md:col-span-2 mt-6">
+            <BadgeGrid />
+          </div>
+
           <div className="flex justify-center">
             <PinnedTasks
               tasks={todayTasks}
+              progress={tasksProgress}
+              completedBonus={completedBonusCount}
               loading={loadingPlan}
               error={errorPlan}
               onRetry={handleRetry(fetchActivePlan)}

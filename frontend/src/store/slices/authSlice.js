@@ -166,6 +166,23 @@ export const resetSM2Settings = createAsyncThunk(
   }
 );
 
+// Helper to safely parse JWT payload
+const parseJwt = (token) => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
+};
+
 // ── Initial State ──
 const initialState = {
   get token() { return getInitialToken(); },
@@ -176,6 +193,7 @@ const initialState = {
   get loading() { return !!getInitialToken(); },
   error: null,
   message: null,
+  sessionExpired: false,
 };
 
 // ── Slice ──
@@ -193,6 +211,7 @@ const authSlice = createSlice({
       state.user = null;
       state.error = null;
       state.message = null;
+      state.sessionExpired = false;
     },
     clearError: (state) => {
       state.error = null;
@@ -202,6 +221,30 @@ const authSlice = createSlice({
     },
     clearRegistrationSuccess: (state) => {
       state.registrationSuccess = false;
+    },
+    clearSessionExpired: (state) => {
+      state.sessionExpired = false;
+    },
+    checkTokenFreshness: (state) => {
+      const token = localStorage.getItem('token');
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (!token && !refreshToken) return;
+
+      const decodedToken = token ? parseJwt(token) : null;
+      const decodedRefresh = refreshToken ? parseJwt(refreshToken) : null;
+
+      const now = Math.floor(Date.now() / 1000);
+      
+      // If refresh token exists but has expired, trigger session timeout
+      if (decodedRefresh && decodedRefresh.exp && decodedRefresh.exp < now) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        state.token = null;
+        state.refreshToken = null;
+        state.isAuthenticated = false;
+        state.user = null;
+        state.sessionExpired = true;
+      }
     },
   },
   extraReducers: (builder) => {
@@ -386,5 +429,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { logout, clearError, clearMessage, clearRegistrationSuccess } = authSlice.actions;
+export const { logout, clearError, clearMessage, clearRegistrationSuccess, clearSessionExpired, checkTokenFreshness } = authSlice.actions;
 export default authSlice.reducer;

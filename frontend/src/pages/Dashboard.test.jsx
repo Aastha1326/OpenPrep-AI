@@ -353,4 +353,37 @@ describe('Dashboard', () => {
 
     expect(screen.getByText('Future task')).toBeInTheDocument();
   });
+
+  // ── Clamping and Bonus Badges ──
+
+  test('clamps task progress to 100% and displays bonus indicator badge when completing bonus tasks', () => {
+    const now = new Date();
+    const todayLocal = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    renderDashboard({}, {
+      activePlan: {
+        id: 'plan-1',
+        dailyGoals: [
+          {
+            date: `${todayLocal}T00:00:00.000Z`,
+            tasks: [
+              { id: 't1', title: 'Regular Study task', completed: true },
+              { id: 't2', title: '[Bonus] Extra Flashcards', completed: true, isBonus: true },
+            ],
+          },
+        ],
+      },
+    });
+
+    // Verify progress is calculated, but clamped at 100% (since 2 completed / 1 regular = 200% clamped to 100%)
+    expect(screen.getByText('100%')).toBeInTheDocument();
+
+    // Verify progress bar fill style has 100% width
+    const fillEl = screen.getByTestId('daily-progress-fill');
+    expect(fillEl.style.width).toBe('100%');
+
+    // Verify bonus indicators are displayed
+    expect(screen.getByText('Bonus')).toBeInTheDocument();
+    expect(screen.getByText(/1 Bonus Done/)).toBeInTheDocument();
+  });
 });

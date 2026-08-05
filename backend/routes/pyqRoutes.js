@@ -10,7 +10,7 @@ const cacheMiddleware = require('../middleware/cache');
 const clearCache = require('../middleware/clearCache');
 
 const router = express.Router();
-
+router.get('/trends', protect, pyqController.getPYQTrends);
 /**
  * @swagger
  * tags:

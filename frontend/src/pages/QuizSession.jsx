@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FaCheckCircle, FaTimesCircle, FaArrowRight, FaTrophy, FaArrowLeft } from 'react-icons/fa';
+import { FaCheckCircle, FaTimesCircle, FaArrowRight, FaTrophy, FaArrowLeft, FaBrain } from 'react-icons/fa';
 import API from '../services/api';
+
+import RevisionSheetModal from '../components/dashboard/RevisionSheetModal';
+
 import { exportAsCSV, exportAsJSON } from '../utils/exportUtils';
+
 const SECONDS_PER_QUESTION = 60;
 
 const formatTime = (seconds) => {
@@ -19,6 +23,7 @@ const buildQuizResultRows = (quiz, answers) =>
     correctAnswer: q.correctAnswer,
     isCorrect: answers[q._id] === q.correctAnswer ? 'Yes' : 'No',
   }));
+
 const QuizSession = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -31,11 +36,16 @@ const QuizSession = () => {
   const [answers, setAnswers] = useState({}); // { questionId: selectedOption }
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState(null);
+  const [isRevisionModalOpen, setIsRevisionModalOpen] = useState(false);
 
-const [timeLeft, setTimeLeft] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const submittingRef = useRef(false);
+  
+  // Absolute deadline timestamp reference to prevent background tab timer throttling drift
+  const endTimeRef = useRef(null);
+  const autoSubmittedRef = useRef(false);
 
   const handleExportResultsCSV = () => {
     const rows = buildQuizResultRows(quiz, answers);
@@ -57,8 +67,8 @@ const [timeLeft, setTimeLeft] = useState(0);
       },
       `quiz-result-${quiz.title}`
     );
-  };  const autoSubmittedRef = useRef(false);
-  
+  }; 
+
   useEffect(() => {
     fetchQuiz();
   }, [id]);
@@ -68,7 +78,9 @@ const [timeLeft, setTimeLeft] = useState(0);
       const res = await API.get(`/quizzes/${id}`);
       const loadedQuiz = res.data.data;
       setQuiz(loadedQuiz);
-      setTimeLeft((loadedQuiz?.questions?.length || 0) * SECONDS_PER_QUESTION);
+      const totalSeconds = (loadedQuiz?.questions?.length || 0) * SECONDS_PER_QUESTION;
+      setTimeLeft(totalSeconds);
+      endTimeRef.current = Date.now() + totalSeconds * 1000;
       setLoading(false);
     } catch (err) {
       setError('Failed to load quiz details.');
@@ -122,20 +134,35 @@ const [timeLeft, setTimeLeft] = useState(0);
     }
   }, [answers, id]);
 
-  // Countdown: tick once per second until the time limit is reached.
+  // Countdown using absolute timestamps and visibilitychange recalibration to fix tab-switching throttling (#518)
   useEffect(() => {
-    if (!quiz || submitted || timeLeft <= 0) return;
-    const interval = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [quiz, submitted, timeLeft]);
+    if (!quiz || submitted || !endTimeRef.current) return;
+
+    const updateTimer = () => {
+      const now = Date.now();
+      const remaining = Math.max(0, Math.ceil((endTimeRef.current - now) / 1000));
+      setTimeLeft(remaining);
+
+      if (remaining <= 0) {
+        clearInterval(interval);
+      }
+    };
+
+    const interval = setInterval(updateTimer, 250);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        updateTimer();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [quiz, submitted]);
 
   // When the countdown reaches zero, freeze input and submit automatically.
   useEffect(() => {
@@ -285,7 +312,7 @@ const [timeLeft, setTimeLeft] = useState(0);
               <div className="inline-flex items-center justify-center w-20 h-20 bg-emerald-500/10 rounded-full mb-4">
                 <FaTrophy className="text-4xl text-emerald-400" />
               </div>
-<h2 className="text-3xl font-bold text-white mb-2">Quiz Completed!</h2>
+              <h2 className="text-3xl font-bold text-white mb-2">Quiz Completed!</h2>
               <p className="text-slate-400 text-lg">
                 You scored <span className="text-emerald-400 font-bold text-2xl">{result?.score}</span> out of {quiz.questions.length}
               </p>
@@ -346,14 +373,30 @@ const [timeLeft, setTimeLeft] = useState(0);
               })}
             </div>
             
-            <div className="mt-8 text-center">
+            <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+              <button
+                onClick={() => setIsRevisionModalOpen(true)}
+                className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-lg font-semibold shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2 transition-all"
+              >
+                <FaBrain className="text-yellow-300" /> Generate AI Concept Revision Sheet
+              </button>
+
               <button
                 onClick={() => navigate('/dashboard')}
-                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 rounded-lg font-medium transition-colors"
+                className="w-full sm:w-auto px-6 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition-colors"
               >
                 Back to Dashboard
               </button>
             </div>
+
+            <RevisionSheetModal
+              isOpen={isRevisionModalOpen}
+              onClose={() => setIsRevisionModalOpen(false)}
+              quizAttemptId={result?.id || result?._id}
+              subjectId={quiz.subject?.id || quiz.subject}
+              topicId={quiz.topic?.id || quiz.topic}
+              topicName={quiz.topic?.name}
+            />
           </div>
         )}
       </div>

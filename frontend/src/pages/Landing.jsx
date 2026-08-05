@@ -13,6 +13,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
+import SoundToggle from '../components/SoundToggle';
 
 const Landing = () => {
   const navigate = useNavigate();
@@ -104,10 +105,13 @@ const Landing = () => {
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Light/Dark Toggle */}
-          <ThemeToggle />
+            {/* Toggles */}
+            <div className="flex items-center gap-2">
+              <SoundToggle />
+              <ThemeToggle />
+            </div>
 
-          {/* Dynamic Auth Button */}
+            {/* Dynamic Auth Button */}
           {isAuthenticated ? (
             <Link 
               to="/dashboard"

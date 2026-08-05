@@ -2,6 +2,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const NodeCache = require('node-cache');
 const crypto = require('crypto');
 const { splitIntoChunks } = require('../utils/textChunking');
+const { toLocalDateString } = require('../utils/dateUtils');
 
 // Notes larger than this are split into semantic chunks and summarized
 // across multiple Gemini passes so no content is silently dropped.
@@ -20,7 +21,7 @@ if (apiKey && apiKey !== 'your_gemini_api_key_here') {
 const responseCache = new NodeCache({
   stdTTL: parseInt(process.env.CACHE_TTL) || 3600,
   checkperiod: 300,
-  maxKeys: parseInt(process.env.CACHE_MAX_KEYS) || 1000
+  maxKeys: parseInt(process.env.CACHE_MAX_KEYS) || 1000,
 });
 
 // ==========================================
@@ -98,7 +99,12 @@ function extractStatusFromError(err) {
   if (err?.code === 'RESOURCE_EXHAUSTED') return 429; // gRPC status code
   if (err?.message?.includes('429')) return 429;
   if (err?.message?.includes('rate limit') || err?.message?.includes('quota')) return 429;
-  if (err?.message?.includes('500') || err?.message?.includes('502') || err?.message?.includes('503')) return 500;
+  if (
+    err?.message?.includes('500') ||
+    err?.message?.includes('502') ||
+    err?.message?.includes('503')
+  )
+    return 500;
   return null;
 }
 
@@ -106,7 +112,7 @@ function extractStatusFromError(err) {
  * Retry wrapper with exponential backoff and random jitter.
  * Retries on 429 (rate limit), 5xx (server) errors, and timeouts.
  * Each attempt uses callWithTimeout for per-request timeout.
- * 
+ *
  * @param {Object} model - Gemini model instance
  * @param {string} prompt - Prompt to send
  * @param {number} retries - Maximum retry attempts (default: 3)
@@ -122,38 +128,43 @@ async function generateWithRetry(model, prompt, retries = 3) {
       return result;
     } catch (err) {
       const status = extractStatusFromError(err);
-      const isRetryable = status === 429 || (status >= 500 && status < 600) || err.message === 'Gemini request timed out';
-      
+      const isRetryable =
+        status === 429 ||
+        (status >= 500 && status < 600) ||
+        err.message === 'Gemini request timed out';
+
       if (isRetryable && attempt < retries - 1) {
         // Exponential backoff with random jitter: base * 2^attempt + random(0-1000ms)
         const baseDelay = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s
         const jitter = Math.random() * 1000; // 0-1000ms random jitter
         const delay = baseDelay + jitter;
-        
-        console.warn(`Gemini API attempt ${attempt + 1} failed (status: ${status || 'timeout'}), retrying in ${Math.round(delay)}ms...`);
-        await new Promise(r => setTimeout(r, delay));
+
+        console.warn(
+          `Gemini API attempt ${attempt + 1} failed (status: ${status || 'timeout'}), retrying in ${Math.round(delay)}ms...`
+        );
+        await new Promise((r) => setTimeout(r, delay));
         continue;
       }
-      
+
       // Exhausted retries or non-retryable error - throw appropriate error
       if (status === 429) {
         // Extract retry-after from error if available, default to 60 seconds
-        const retryAfter = err?.response?.headers?.['retry-after'] 
-          ? parseInt(err.response.headers['retry-after'], 10) 
+        const retryAfter = err?.response?.headers?.['retry-after']
+          ? parseInt(err.response.headers['retry-after'], 10)
           : 60;
         throw new GeminiRateLimitError(
           'Gemini API rate limit exceeded. Please try again later.',
           retryAfter
         );
       }
-      
+
       if (status >= 500 && status < 600) {
         throw new GeminiServerError(
           `Gemini API server error (${status}). Please try again later.`,
           status
         );
       }
-      
+
       // Non-retryable error - rethrow
       throw err;
     }
@@ -167,32 +178,52 @@ async function generateWithRetry(model, prompt, retries = 3) {
 const RESPONSE_SCHEMAS = {
   pyqAnalysis: {
     chapterWeightage: { type: 'array', itemSchema: { chapterName: 'string', weightage: 'number' } },
-    importantTopics: { type: 'array', itemSchema: { topicName: 'string', importance: 'string', frequency: 'number' } },
+    importantTopics: {
+      type: 'array',
+      itemSchema: { topicName: 'string', importance: 'string', frequency: 'number' },
+    },
     repeatedQuestions: { type: 'array', itemSchema: { questionText: 'string', years: 'array' } },
-    trendAnalysis: 'string'
+    trendAnalysis: 'string',
   },
   studyPlan: {
     // Array of objects with date, tasks
     _type: 'array',
-    _itemSchema: { date: 'string', tasks: 'array' }
+    _itemSchema: { date: 'string', tasks: 'array' },
   },
   quiz: {
     title: 'string',
-    questions: { type: 'array', itemSchema: { questionText: 'string', options: 'array', correctAnswer: 'number', explanation: 'string' } }
+    questions: {
+      type: 'array',
+      itemSchema: {
+        questionText: 'string',
+        options: 'array',
+        correctAnswer: 'number',
+        explanation: 'string',
+      },
+    },
   },
   flashcard: {
     _type: 'array',
-    _itemSchema: { front: 'string', back: 'string' }
+    _itemSchema: { front: 'string', back: 'string' },
   },
   performance: {
     weakSubjects: 'array', // array of primitive strings — no itemSchema needed
-    recommendations: { type: 'array', itemSchema: { subject: 'string', topic: 'string', suggestion: 'string', priority: 'string' } }
+    recommendations: {
+      type: 'array',
+      itemSchema: { subject: 'string', topic: 'string', suggestion: 'string', priority: 'string' },
+    },
   },
   noteSummary: {
     summary: 'string',
     keyConcepts: 'array',
-    examTips: 'array'
-  }
+    examTips: 'array',
+  },
+  audioSummary: {
+    transcription: 'string',
+    summary: 'string',
+    keyConcepts: 'array',
+    examTips: 'array',
+  },
 };
 
 /**
@@ -279,10 +310,10 @@ const cleanJSON = (text) => {
     const lastBrace = text.lastIndexOf('}');
     const firstBracket = text.indexOf('[');
     const lastBracket = text.lastIndexOf(']');
-    
+
     let startIdx = -1;
     let endIdx = -1;
-    
+
     if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
       startIdx = firstBrace;
       endIdx = lastBrace;
@@ -290,7 +321,7 @@ const cleanJSON = (text) => {
       startIdx = firstBracket;
       endIdx = lastBracket;
     }
-    
+
     if (startIdx !== -1 && endIdx !== -1) {
       try {
         return JSON.parse(text.substring(startIdx, endIdx + 1));
@@ -374,7 +405,15 @@ exports.analyzePYQText = async (rawText, subjectName = 'the subject', forceRefre
 /**
  * 2. Generate AI Study Plan
  */
-exports.generateStudyPlan = async (examName, subjectsAndTopics, startDate, endDate, studyHoursPerDay = 3, forceRefresh = false, language = 'en') => {
+exports.generateStudyPlan = async (
+  examName,
+  subjectsAndTopics,
+  startDate,
+  endDate,
+  studyHoursPerDay = 3,
+  forceRefresh = false,
+  language = 'en'
+) => {
   if (!genAI) {
     console.warn('Gemini API key not configured. Using Mock Data for Study Plan.');
     return getMockStudyPlan(examName, subjectsAndTopics, startDate, endDate);
@@ -441,7 +480,13 @@ exports.generateStudyPlan = async (examName, subjectsAndTopics, startDate, endDa
 /**
  * 3. Generate AI Quiz
  */
-exports.generateQuiz = async (subjectName, topicName, notesText = '', count = 5, forceRefresh = false) => {
+exports.generateQuiz = async (
+  subjectName,
+  topicName,
+  notesText = '',
+  count = 5,
+  forceRefresh = false
+) => {
   if (!genAI) {
     console.warn('Gemini API key not configured. Using Mock Data for Quiz.');
     return { _mock: true, ...getMockQuiz(subjectName, topicName, count) };
@@ -510,7 +555,13 @@ exports.generateQuiz = async (subjectName, topicName, notesText = '', count = 5,
 /**
  * 4. Generate AI Flashcards
  */
-exports.generateFlashcards = async (subjectName, topicName, notesText = '', count = 6, forceRefresh = false) => {
+exports.generateFlashcards = async (
+  subjectName,
+  topicName,
+  notesText = '',
+  count = 6,
+  forceRefresh = false
+) => {
   if (!genAI) {
     console.warn('Gemini API key not configured. Using Mock Data for Flashcards.');
     return getMockFlashcards(subjectName, topicName, count);
@@ -663,8 +714,12 @@ function mergeNoteSummaries(results) {
   const dedupe = (items) => [...new Set(items.map((item) => item.trim()).filter(Boolean))];
 
   const summaries = dedupe(results.map((r) => r.summary || ''));
-  const keyConcepts = dedupe(results.flatMap((r) => (Array.isArray(r.keyConcepts) ? r.keyConcepts : []))).slice(0, 10);
-  const examTips = dedupe(results.flatMap((r) => (Array.isArray(r.examTips) ? r.examTips : []))).slice(0, 5);
+  const keyConcepts = dedupe(
+    results.flatMap((r) => (Array.isArray(r.keyConcepts) ? r.keyConcepts : []))
+  ).slice(0, 10);
+  const examTips = dedupe(
+    results.flatMap((r) => (Array.isArray(r.examTips) ? r.examTips : []))
+  ).slice(0, 5);
 
   return {
     summary: summaries.join('\n\n') || 'No summary available.',
@@ -781,6 +836,65 @@ exports.summarizeNoteText = async (content, subjectName = 'the subject', forceRe
 };
 
 /**
+ * 7. Generate AI Revision Sheet for Weak Topics & Incorrect Questions
+ */
+exports.generateRevisionSheet = async (
+  mistookQuestions = [],
+  subjectName = 'General Subject',
+  topicName = 'Weak Concepts',
+  forceRefresh = false
+) => {
+  if (!genAI) {
+    console.warn('Gemini API key not configured. Using Mock Data for Revision Sheet.');
+    return { _mock: true, ...getMockRevisionSheet(subjectName, topicName, mistookQuestions) };
+  }
+
+  const cacheKey = hashKey(
+    'revisionSheet',
+    `${subjectName}:${topicName}:${JSON.stringify(mistookQuestions)}`
+  );
+
+  if (!forceRefresh) {
+    const cached = responseCache.get(cacheKey);
+    if (cached) return cached;
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const prompt = `
+      You are an expert academic tutor and AI revision assistant.
+      The student recently attempted a practice quiz on "${subjectName} - ${topicName}" and made mistakes on the following question(s):
+      ${JSON.stringify(mistookQuestions, null, 2)}
+
+      Analyze these incorrect questions to extract the key underlying weak concepts, core formulas, critical facts, and common pitfalls.
+      Create a comprehensive, well-structured Markdown revision sheet for the student.
+
+      Your response MUST be a JSON object with this exact structure:
+      {
+        "title": "string (e.g. AI Concept Revision Sheet: Topic Name)",
+        "summaryMarkdown": "string (A rich GitHub-Flavored Markdown text containing # Title, ## Core Concepts & Formulas, ## Key Takeaways, ## Pitfalls to Avoid, and ## Quick Practice Hints)"
+      }
+    `;
+
+    const result = await generateWithRetry(model, prompt);
+    const parsed = cleanJSON(result.response.text());
+
+    if (!parsed || !parsed.summaryMarkdown) {
+      return getMockRevisionSheet(subjectName, topicName, mistookQuestions);
+    }
+
+    responseCache.set(cacheKey, parsed);
+    return parsed;
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError || error instanceof GeminiServerError) {
+      throw error;
+    }
+    console.error('Gemini revision sheet generation failed:', error);
+    return getMockRevisionSheet(subjectName, topicName, mistookQuestions);
+  }
+};
+
+/**
  * Condenses notes into a digest for flashcard/quiz generation. See
  * buildNotesDigestFromChunks for the chunking behavior.
  */
@@ -830,11 +944,13 @@ function getMockPYQAnalysis(subjectName) {
     ],
     repeatedQuestions: [
       {
-        questionText: 'Explain the difference between Dynamic Programming and Greedy Algorithms with examples.',
+        questionText:
+          'Explain the difference between Dynamic Programming and Greedy Algorithms with examples.',
         years: [2021, 2023, 2025],
       },
       {
-        questionText: 'What is Time Complexity and how does Quicksort compare to Mergesort in average vs worst cases?',
+        questionText:
+          'What is Time Complexity and how does Quicksort compare to Mergesort in average vs worst cases?',
         years: [2022, 2024],
       },
     ],
@@ -846,7 +962,7 @@ function getMockStudyPlan(examName, subjectsAndTopics, startDate, endDate) {
   const days = [];
   const start = new Date(startDate);
   const end = new Date(endDate);
-  
+
   // Generate study days (max 7 days for demo/mock simplicity)
   let current = new Date(start);
   const limitDays = 7;
@@ -859,10 +975,18 @@ function getMockStudyPlan(examName, subjectsAndTopics, startDate, endDate) {
     days.push({
       date: formattedDate,
       tasks: [
-        { title: 'Read introductory slides & outline syllabus', duration: 45, topicName: 'Overview' },
-        { title: 'Complete practice problems & formula cheat sheet', duration: 90, topicName: 'Practice' },
-        { title: 'AI Mock Quiz & Review weak areas', duration: 45, topicName: 'Evaluation' }
-      ]
+        {
+          title: 'Read introductory slides & outline syllabus',
+          duration: 45,
+          topicName: 'Overview',
+        },
+        {
+          title: 'Complete practice problems & formula cheat sheet',
+          duration: 90,
+          topicName: 'Practice',
+        },
+        { title: 'AI Mock Quiz & Review weak areas', duration: 45, topicName: 'Evaluation' },
+      ],
     });
     current.setDate(current.getDate() + 1);
     count++;
@@ -909,16 +1033,25 @@ function getMockRecommendations() {
       {
         subject: 'Computer Architecture',
         topic: 'Cache Coherence Protocols',
-        suggestion: 'Revise MESI protocol state transitions. Make flashcards to memorize state conditions.',
+        suggestion:
+          'Revise MESI protocol state transitions. Make flashcards to memorize state conditions.',
         priority: 'High',
       },
       {
         subject: 'Data Structures',
         topic: 'AVL Tree Rotations',
-        suggestion: 'Practice double rotations on paper and complete a mini quiz to verify your progress.',
+        suggestion:
+          'Practice double rotations on paper and complete a mini quiz to verify your progress.',
         priority: 'Medium',
       },
     ],
+  };
+}
+
+function getMockRevisionSheet(subjectName, topicName, mistookQuestions = []) {
+  return {
+    title: `AI Concept Revision Sheet: ${topicName || subjectName || 'Weak Concepts'}`,
+    summaryMarkdown: `# AI Concept Revision Sheet: ${subjectName} - ${topicName}\n\n## Core Concepts & Formulas\n- Review key theoretical foundations and definitions.\n\n## Key Takeaways\n- Focus on understanding mistakes made in practice questions.\n\n## Pitfalls to Avoid\n- Watch out for common calculation and conceptual traps.\n`,
   };
 }
 
@@ -939,3 +1072,60 @@ function getMockNoteSummary(subjectName) {
     ],
   };
 }
+
+/**
+ * 6. Transcribe & Summarize Audio
+ */
+exports.transcribeAndSummarizeAudio = async (fileBuffer, mimeType, subjectName) => {
+  if (!genAI) {
+    console.warn('Gemini API key not configured. Using Mock Audio transcription and summary.');
+    return {
+      transcription: `Mock transcription: Today we are discussing key topics in ${subjectName || 'this subject'}. In standard lectures, we cover core definitions and formulas.`,
+      summary: `This lecture introduces core definitions and principles relevant to ${subjectName || 'the subject'}.`,
+      keyConcepts: ['Introductory concepts', 'Core principles'],
+      examTips: ['Review basic formulas', 'Focus on terminology'],
+    };
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const prompt = `
+      You are an expert academic tutor. You are given an audio recording from a study session or class for the subject "${subjectName || 'General Study'}".
+      Please perform two tasks:
+      1. Transcribe the audio content as accurately and completely as possible.
+      2. Generate a structured study summary based on the transcription.
+
+      Return the result STRICTLY as a JSON object with this exact structure:
+      {
+        "transcription": "string",
+        "summary": "string",
+        "keyConcepts": ["string"],
+        "examTips": ["string"]
+      }
+    `;
+
+    const result = await generateWithRetry(model, [
+      {
+        inlineData: {
+          data: Buffer.from(fileBuffer).toString('base64'),
+          mimeType: mimeType || 'audio/mp3',
+        },
+      },
+      prompt,
+    ]);
+
+    const parsed = cleanJSON(result.response.text());
+    return parsed;
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError || error instanceof GeminiServerError) {
+      throw error;
+    }
+    console.error('Gemini audio transcription and summarization failed:', error);
+    return {
+      transcription: `Unable to transcribe audio due to error: ${error.message}`,
+      summary: 'Failed to generate study summary from the audio.',
+      keyConcepts: [],
+      examTips: [],
+    };
+  }
+};

@@ -1,7 +1,7 @@
 import { useEffect, lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
-import { loadUser } from './store/slices/authSlice';
+import { useDispatch, useSelector } from 'react-redux';
+import { loadUser, checkTokenFreshness } from './store/slices/authSlice';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
 import CustomCursor from './components/CustomCursor';
@@ -27,11 +27,31 @@ const StudyGroupChat = lazy(() => import('./pages/StudyGroupChat'));
 
 function App() {
   const dispatch = useDispatch();
+  const { sessionExpired } = useSelector((state) => state.auth);
 
   useEffect(() => {
     if (localStorage.getItem('token')) {
       dispatch(loadUser());
     }
+  }, [dispatch]);
+
+  // Check token freshness when the user returns to a background tab
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        dispatch(checkTokenFreshness());
+      }
+    };
+    const handleFocus = () => {
+      dispatch(checkTokenFreshness());
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, [dispatch]);
 
   return (
