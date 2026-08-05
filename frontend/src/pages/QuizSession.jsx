@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FaCheckCircle, FaTimesCircle, FaArrowRight, FaTrophy, FaArrowLeft, FaBrain } from 'react-icons/fa';
+import {
+  FaCheckCircle,
+  FaTimesCircle,
+  FaArrowRight,
+  FaTrophy,
+  FaArrowLeft,
+  FaBrain,
+} from 'react-icons/fa';
 import API from '../services/api';
 
 import RevisionSheetModal from '../components/dashboard/RevisionSheetModal';
@@ -27,11 +34,11 @@ const buildQuizResultRows = (quiz, answers) =>
 const QuizSession = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  
+
   const [quiz, setQuiz] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState({}); // { questionId: selectedOption }
   const [submitted, setSubmitted] = useState(false);
@@ -42,7 +49,7 @@ const QuizSession = () => {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const submittingRef = useRef(false);
-  
+
   // Absolute deadline timestamp reference to prevent background tab timer throttling drift
   const endTimeRef = useRef(null);
   const autoSubmittedRef = useRef(false);
@@ -67,7 +74,7 @@ const QuizSession = () => {
       },
       `quiz-result-${quiz.title}`
     );
-  }; 
+  };
 
   useEffect(() => {
     fetchQuiz();
@@ -89,11 +96,11 @@ const QuizSession = () => {
   };
 
   const handleOptionSelect = (questionId, option) => {
-    if (submitted || timeElapsed) return;
-    setAnswers({
-      ...answers,
-      [questionId]: option
-    });
+    if (submitted || timeElapsed || submitting) return;
+    setAnswers((prevAnswers) => ({
+      ...prevAnswers,
+      [questionId]: option,
+    }));
   };
 
   const handleNext = () => {
@@ -119,7 +126,7 @@ const QuizSession = () => {
       // Format answers for API
       const formattedAnswers = Object.entries(answers).map(([qId, selected]) => ({
         questionId: qId,
-        selectedAnswer: selected
+        selectedAnswer: selected,
       }));
 
       const res = await API.post(`/quizzes/${id}/submit`, { answers: formattedAnswers });
@@ -184,7 +191,12 @@ const QuizSession = () => {
     return (
       <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center">
         <p className="text-red-400 mb-4">{error || 'Quiz not found.'}</p>
-        <button onClick={() => navigate('/dashboard')} className="px-4 py-2 bg-indigo-600 rounded-lg">Return to Dashboard</button>
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="px-4 py-2 bg-indigo-600 rounded-lg"
+        >
+          Return to Dashboard
+        </button>
       </div>
     );
   }
@@ -260,14 +272,16 @@ const QuizSession = () => {
                   <button
                     key={index}
                     onClick={() => handleOptionSelect(currentQuestion._id, option)}
-                    disabled={submitted || timeElapsed}
+                    disabled={submitted || timeElapsed || submitting}
                     className={`w-full text-left p-4 rounded-lg border transition-all duration-200 flex items-center disabled:opacity-60 disabled:cursor-not-allowed ${
-                      isSelected 
-                        ? 'bg-indigo-600/20 border-indigo-500 text-indigo-100' 
+                      isSelected
+                        ? 'bg-indigo-600/20 border-indigo-500 text-indigo-100'
                         : 'bg-slate-700/50 border-slate-600 hover:border-indigo-400 hover:bg-slate-700 text-slate-200'
                     }`}
                   >
-                    <div className={`w-5 h-5 rounded-full border flex-shrink-0 mr-4 flex items-center justify-center ${isSelected ? 'border-indigo-400' : 'border-slate-400'}`}>
+                    <div
+                      className={`w-5 h-5 rounded-full border flex-shrink-0 mr-4 flex items-center justify-center ${isSelected ? 'border-indigo-400' : 'border-slate-400'}`}
+                    >
                       {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-indigo-400"></div>}
                     </div>
                     <span>{option}</span>
@@ -285,11 +299,13 @@ const QuizSession = () => {
               >
                 <FaArrowLeft className="mr-2" /> Previous
               </button>
-              
+
               {isLastQuestion ? (
                 <button
                   onClick={() => submitQuiz()}
-                  disabled={submitting || timeElapsed || Object.keys(answers).length < quiz.questions.length}
+                  disabled={
+                    submitting || timeElapsed || Object.keys(answers).length < quiz.questions.length
+                  }
                   className="flex items-center px-6 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold shadow-lg shadow-emerald-500/20 transition-all"
                 >
                   Submit Quiz <FaCheckCircle className="ml-2" />
@@ -314,7 +330,9 @@ const QuizSession = () => {
               </div>
               <h2 className="text-3xl font-bold text-white mb-2">Quiz Completed!</h2>
               <p className="text-slate-400 text-lg">
-                You scored <span className="text-emerald-400 font-bold text-2xl">{result?.score}</span> out of {quiz.questions.length}
+                You scored{' '}
+                <span className="text-emerald-400 font-bold text-2xl">{result?.score}</span> out of{' '}
+                {quiz.questions.length}
               </p>
               <div className="flex items-center justify-center gap-3 mt-4">
                 <button
@@ -332,32 +350,45 @@ const QuizSession = () => {
               </div>
             </div>
             <div className="space-y-6">
-              <h3 className="text-xl font-semibold border-b border-slate-700 pb-2 mb-4">Review Answers</h3>
+              <h3 className="text-xl font-semibold border-b border-slate-700 pb-2 mb-4">
+                Review Answers
+              </h3>
               {quiz.questions.map((q, idx) => {
                 const userAnswer = answers[q._id];
                 const isCorrect = userAnswer === q.correctAnswer;
 
                 return (
-                  <div key={q._id} className="p-5 bg-slate-900/50 rounded-lg border border-slate-700">
-                    <p className="font-medium text-slate-200 mb-3"><span className="text-slate-400 mr-2">{idx + 1}.</span>{q.questionText}</p>
-                    
+                  <div
+                    key={q._id}
+                    className="p-5 bg-slate-900/50 rounded-lg border border-slate-700"
+                  >
+                    <p className="font-medium text-slate-200 mb-3">
+                      <span className="text-slate-400 mr-2">{idx + 1}.</span>
+                      {q.questionText}
+                    </p>
+
                     <div className="space-y-2 mb-4">
                       {q.options.map((opt, oIdx) => {
-                        let btnClass = "w-full text-left p-3 rounded-md border text-sm flex items-center justify-between ";
-                        
+                        let btnClass =
+                          'w-full text-left p-3 rounded-md border text-sm flex items-center justify-between ';
+
                         if (opt === q.correctAnswer) {
-                          btnClass += "bg-emerald-500/20 border-emerald-500 text-emerald-100";
+                          btnClass += 'bg-emerald-500/20 border-emerald-500 text-emerald-100';
                         } else if (opt === userAnswer && !isCorrect) {
-                          btnClass += "bg-red-500/20 border-red-500 text-red-100";
+                          btnClass += 'bg-red-500/20 border-red-500 text-red-100';
                         } else {
-                          btnClass += "bg-slate-800 border-slate-700 text-slate-400 opacity-75";
+                          btnClass += 'bg-slate-800 border-slate-700 text-slate-400 opacity-75';
                         }
 
                         return (
                           <div key={oIdx} className={btnClass}>
                             <span>{opt}</span>
-                            {opt === q.correctAnswer && <FaCheckCircle className="text-emerald-400" />}
-                            {opt === userAnswer && !isCorrect && <FaTimesCircle className="text-red-400" />}
+                            {opt === q.correctAnswer && (
+                              <FaCheckCircle className="text-emerald-400" />
+                            )}
+                            {opt === userAnswer && !isCorrect && (
+                              <FaTimesCircle className="text-red-400" />
+                            )}
                           </div>
                         );
                       })}
@@ -365,14 +396,16 @@ const QuizSession = () => {
 
                     {q.explanation && (
                       <div className="bg-indigo-900/30 p-3 rounded border border-indigo-500/30">
-                        <p className="text-sm text-indigo-200"><span className="font-semibold">Explanation:</span> {q.explanation}</p>
+                        <p className="text-sm text-indigo-200">
+                          <span className="font-semibold">Explanation:</span> {q.explanation}
+                        </p>
                       </div>
                     )}
                   </div>
                 );
               })}
             </div>
-            
+
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
               <button
                 onClick={() => setIsRevisionModalOpen(true)}

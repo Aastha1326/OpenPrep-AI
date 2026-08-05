@@ -129,7 +129,10 @@ exports.register = async (req, res, next) => {
 
     const isDevelopment = process.env.NODE_ENV === 'development';
     const isEmailVerified = isDevelopment;
-    const user = await User.create({ name, email, password, role: 'student', isEmailVerified }, { transaction: t });
+    const user = await User.create(
+      { name, email, password, role: 'student', isEmailVerified },
+      { transaction: t }
+    );
 
     if (!isEmailVerified) {
       // Send verification email (logs to console if SMTP not configured)
@@ -341,9 +344,7 @@ exports.login = async (req, res, next) => {
 exports.getMe = async (req, res, next) => {
   try {
     const user = await User.findByPk(req.user.id, {
-      include: [
-        { model: Achievement, as: 'achievements' }
-      ]
+      include: [{ model: Achievement, as: 'achievements' }],
     });
     res.status(200).json({
       success: true,
@@ -514,8 +515,8 @@ exports.refreshToken = async (req, res, next) => {
           refreshTokenExpire: { [Op.gt]: new Date() },
         },
       });
-      user = users.find((u) =>
-        Array.isArray(u.refreshTokens) && u.refreshTokens.some((t) => t.token === hashed)
+      user = users.find(
+        (u) => Array.isArray(u.refreshTokens) && u.refreshTokens.some((t) => t.token === hashed)
       );
     }
 
@@ -539,7 +540,9 @@ exports.refreshToken = async (req, res, next) => {
       user.refreshTokens = [];
       await user.save();
       clearRefreshTokenCookie(res);
-      return res.status(401).json({ success: false, error: 'Token reuse detected. All sessions invalidated.' });
+      return res
+        .status(401)
+        .json({ success: false, error: 'Token reuse detected. All sessions invalidated.' });
     }
 
     // Remove old token (rotation)
@@ -576,7 +579,7 @@ exports.logout = async (req, res, next) => {
   try {
     // Support both cookie and body for refresh token
     const rawToken = req.cookies?.refreshToken || req.body?.refreshToken;
-    
+
     if (rawToken) {
       const hashed = crypto.createHash('sha256').update(rawToken).digest('hex');
 
@@ -614,7 +617,8 @@ exports.logout = async (req, res, next) => {
 // ---------------------------------------------------------------------------
 exports.updateSM2Settings = async (req, res, next) => {
   try {
-    const { sm2EasyFactorModifier, sm2IntervalModifier, sm2Step1Interval, sm2Step2Interval } = req.body;
+    const { sm2EasyFactorModifier, sm2IntervalModifier, sm2Step1Interval, sm2Step2Interval } =
+      req.body;
     const user = await User.findByPk(req.user.id);
     if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });
@@ -622,25 +626,33 @@ exports.updateSM2Settings = async (req, res, next) => {
 
     if (sm2EasyFactorModifier !== undefined) {
       if (typeof sm2EasyFactorModifier !== 'number' || sm2EasyFactorModifier <= 0) {
-        return res.status(400).json({ success: false, error: 'Easy factor modifier must be a positive number' });
+        return res
+          .status(400)
+          .json({ success: false, error: 'Easy factor modifier must be a positive number' });
       }
       user.sm2EasyFactorModifier = sm2EasyFactorModifier;
     }
     if (sm2IntervalModifier !== undefined) {
       if (typeof sm2IntervalModifier !== 'number' || sm2IntervalModifier <= 0) {
-        return res.status(400).json({ success: false, error: 'Interval modifier must be a positive number' });
+        return res
+          .status(400)
+          .json({ success: false, error: 'Interval modifier must be a positive number' });
       }
       user.sm2IntervalModifier = sm2IntervalModifier;
     }
     if (sm2Step1Interval !== undefined) {
       if (!Number.isInteger(sm2Step1Interval) || sm2Step1Interval <= 0) {
-        return res.status(400).json({ success: false, error: 'Step 1 interval must be a positive integer' });
+        return res
+          .status(400)
+          .json({ success: false, error: 'Step 1 interval must be a positive integer' });
       }
       user.sm2Step1Interval = sm2Step1Interval;
     }
     if (sm2Step2Interval !== undefined) {
       if (!Number.isInteger(sm2Step2Interval) || sm2Step2Interval <= 0) {
-        return res.status(400).json({ success: false, error: 'Step 2 interval must be a positive integer' });
+        return res
+          .status(400)
+          .json({ success: false, error: 'Step 2 interval must be a positive integer' });
       }
       user.sm2Step2Interval = sm2Step2Interval;
     }
@@ -666,7 +678,7 @@ exports.updateSM2Settings = async (req, res, next) => {
         sm2IntervalModifier: user.sm2IntervalModifier,
         sm2Step1Interval: user.sm2Step1Interval,
         sm2Step2Interval: user.sm2Step2Interval,
-      }
+      },
     });
   } catch (error) {
     next(error);
@@ -711,7 +723,7 @@ exports.resetSM2Settings = async (req, res, next) => {
         sm2IntervalModifier: user.sm2IntervalModifier,
         sm2Step1Interval: user.sm2Step1Interval,
         sm2Step2Interval: user.sm2Step2Interval,
-      }
+      },
     });
   } catch (error) {
     next(error);
@@ -802,4 +814,3 @@ exports.updateSettings = async (req, res, next) => {
     next(error);
   }
 };
-

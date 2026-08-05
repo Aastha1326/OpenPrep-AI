@@ -128,8 +128,14 @@ router.post('/generate-ai', protect, aiLimiter, checkQuota, validateGenerateAIQu
  *       429:
  *         description: Rate limit exceeded
  */
-router.post('/generate-revision-sheet', protect, aiLimiter, checkQuota, validateGenerateRevisionSheet, generateRevisionSheet);
-
+router.post(
+  '/generate-revision-sheet',
+  protect,
+  aiLimiter,
+  checkQuota,
+  validateGenerateRevisionSheet,
+  generateRevisionSheet
+);
 
 /**
  * @swagger

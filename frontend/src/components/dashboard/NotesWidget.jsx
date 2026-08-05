@@ -1,5 +1,17 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
-import { FileText, Volume2, Loader, AlertCircle, RefreshCw, Sparkles, CheckCircle, Layers, Mic, Play, Pause } from 'lucide-react';
+import {
+  FileText,
+  Volume2,
+  Loader,
+  AlertCircle,
+  RefreshCw,
+  Sparkles,
+  CheckCircle,
+  Layers,
+  Mic,
+  Play,
+  Pause,
+} from 'lucide-react';
 import API from '../../services/api';
 import VintagePaper from './VintagePaper';
 import AudioReader from '../AudioReader';
@@ -58,13 +70,17 @@ const VoiceNotePlayer = ({ fileUrl }) => {
   return (
     <div className="flex items-center gap-3 p-3 bg-amber-50/60 dark:bg-slate-900/30 border border-amber-700/20 rounded mt-3">
       <audio ref={audioRef} src={audioSrc} onEnded={handleEnded} className="hidden" />
-      
+
       <button
         type="button"
         onClick={togglePlay}
         className="p-2 bg-amber-700 hover:bg-amber-800 text-white rounded-full transition-colors flex items-center justify-center shadow"
       >
-        {isPlaying ? <Pause className="w-3.5 h-3.5 fill-white" /> : <Play className="w-3.5 h-3.5 fill-white ml-0.5" />}
+        {isPlaying ? (
+          <Pause className="w-3.5 h-3.5 fill-white" />
+        ) : (
+          <Play className="w-3.5 h-3.5 fill-white ml-0.5" />
+        )}
       </button>
 
       <div className="flex-1 flex items-center gap-1 h-8 relative">
@@ -132,7 +148,9 @@ const NotesWidget = ({ limit = 5 }) => {
 
   const handleSentenceChange = useCallback(
     (noteId) => (index) => {
-      setActiveSentenceByNote((prev) => (prev[noteId] === index ? prev : { ...prev, [noteId]: index }));
+      setActiveSentenceByNote((prev) =>
+        prev[noteId] === index ? prev : { ...prev, [noteId]: index }
+      );
     },
     []
   );
@@ -183,16 +201,22 @@ const NotesWidget = ({ limit = 5 }) => {
       ) : (
         <div className="space-y-4">
           {notes.map((note) => {
-            const summary = summaries[note.id] || (note.aiSummary ? { data: note.aiSummary } : null);
+            const summary =
+              summaries[note.id] || (note.aiSummary ? { data: note.aiSummary } : null);
             const activeIndex = activeSentenceByNote[note.id] ?? -1;
             const summaryText = summary?.data?.summary || '';
 
             return (
-              <div key={note.id} className="p-4 bg-white border border-neutral-300 rounded shadow-sm">
+              <div
+                key={note.id}
+                className="p-4 bg-white border border-neutral-300 rounded shadow-sm"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-semibold text-neutral-900 text-sm truncate flex items-center gap-1.5">
-                      {note.fileType === 'audio' && <Mic className="w-4 h-4 text-amber-700 shrink-0" />}
+                      {note.fileType === 'audio' && (
+                        <Mic className="w-4 h-4 text-amber-700 shrink-0" />
+                      )}
                       {note.title}
                     </p>
                     {note.subject?.name && (
@@ -257,16 +281,22 @@ const NotesWidget = ({ limit = 5 }) => {
                       />
                     )}
 
-                    {Array.isArray(summary.data.keyConcepts) && summary.data.keyConcepts.length > 0 && (
-                      <div className="mt-3 flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] font-bold text-neutral-500 uppercase">Key Concepts:</span>
-                        {summary.data.keyConcepts.map((concept, idx) => (
-                          <span key={idx} className="bg-amber-100 text-amber-900 text-[10px] px-1.5 py-0.5 rounded font-bold">
-                            {concept}
+                    {Array.isArray(summary.data.keyConcepts) &&
+                      summary.data.keyConcepts.length > 0 && (
+                        <div className="mt-3 flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[10px] font-bold text-neutral-500 uppercase">
+                            Key Concepts:
                           </span>
-                        ))}
-                      </div>
-                    )}
+                          {summary.data.keyConcepts.map((concept, idx) => (
+                            <span
+                              key={idx}
+                              className="bg-amber-100 text-amber-900 text-[10px] px-1.5 py-0.5 rounded font-bold"
+                            >
+                              {concept}
+                            </span>
+                          ))}
+                        </div>
+                      )}
 
                     {Array.isArray(summary.data.examTips) && summary.data.examTips.length > 0 && (
                       <ul className="mt-3 space-y-1 list-disc list-inside text-xs text-neutral-600 font-serif">

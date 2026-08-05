@@ -3,16 +3,41 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Flame, Play, FileText, Calendar, TrendingUp, Award, BookOpen,
-  Target, CheckCircle, Clock, AlertCircle, RefreshCw, Lightbulb,
-  LogOut, X, Download, Upload, Settings, MessageSquare,
+  Flame,
+  Play,
+  FileText,
+  Calendar,
+  TrendingUp,
+  Award,
+  BookOpen,
+  Target,
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  RefreshCw,
+  Lightbulb,
+  LogOut,
+  X,
+  Download,
+  Upload,
+  Settings,
+  MessageSquare,
 } from 'lucide-react';
 import API from '../services/api';
 import { toDateOnlyString } from '../utils/dateUtils';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip as LineTooltip, ResponsiveContainer,
-  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as LineTooltip,
+  ResponsiveContainer,
+  RadarChart,
+  Radar,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
 } from 'recharts';
 
 import LeatherBoard from '../components/dashboard/LeatherBoard';
@@ -26,6 +51,7 @@ import CreateNoteModal from '../components/dashboard/CreateNoteModal';
 import StudyPlanModal from '../components/dashboard/StudyPlanModal';
 import PyqAnalysisModal from '../components/dashboard/PyqAnalysisModal';
 import WeaknessDashboardWidget from '../components/dashboard/WeaknessDashboardWidget';
+import FocusEfficiencyWidget from '../components/dashboard/FocusEfficiencyWidget';
 import LeaderboardWidget from '../components/dashboard/LeaderboardWidget';
 import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
 import TargetExamOverviewWidget from '../components/dashboard/TargetExamOverviewWidget';
@@ -36,7 +62,6 @@ import NotesWidget from '../components/dashboard/NotesWidget';
 import ThemeToggle from '../components/ThemeToggle';
 import BadgesList from '../components/BadgesList';
 import SM2SettingsModal from '../components/dashboard/SM2SettingsModal';
-
 
 import {
   fetchDashboardStats,
@@ -65,11 +90,11 @@ function timeAgo(dateStr) {
 }
 
 const activityConfig = {
-  quiz_attempt:       { icon: Target,    color: 'text-blue-900' },
-  pyq_upload:         { icon: FileText,  color: 'text-green-900' },
-  flashcard_review:   { icon: BookOpen,  color: 'text-purple-900' },
-  study_plan_create:  { icon: Calendar,  color: 'text-yellow-700' },
-  note_upload:        { icon: FileText,  color: 'text-gray-700' },
+  quiz_attempt: { icon: Target, color: 'text-blue-900' },
+  pyq_upload: { icon: FileText, color: 'text-green-900' },
+  flashcard_review: { icon: BookOpen, color: 'text-purple-900' },
+  study_plan_create: { icon: Calendar, color: 'text-yellow-700' },
+  note_upload: { icon: FileText, color: 'text-gray-700' },
 };
 
 function getActivityConfig(type) {
@@ -155,7 +180,11 @@ const AnalyticsChartsFallback = () => (
   <div className="bg-wood-desk rounded-lg shadow-inner border border-black/50 p-6 relative overflow-hidden grid grid-cols-1 lg:grid-cols-2 gap-8">
     <div className="absolute inset-0 shadow-[inset_0_0_50px_rgba(0,0,0,0.8)] pointer-events-none" />
     {[0, 1].map((i) => (
-      <VintagePaper key={i} animate={false} className="w-full h-full p-6 shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
+      <VintagePaper
+        key={i}
+        animate={false}
+        className="w-full h-full p-6 shadow-[0_10px_30px_rgba(0,0,0,0.5)]"
+      >
         <Shimmer className="h-7 w-48 mb-6" />
         <Shimmer className="h-64 w-full" />
       </VintagePaper>
@@ -170,10 +199,20 @@ const Dashboard = () => {
 
   const { user } = useSelector((state) => state.auth);
   const {
-    stats, weeklyChartData, recentActivity, subjectBreakdown,
-    activePlan, dueFlashcards,
-    loadingStats, loadingSubjects, loadingPlan, loadingFlashcards,
-    errorStats, errorSubjects, errorPlan, errorFlashcards,
+    stats,
+    weeklyChartData,
+    recentActivity,
+    subjectBreakdown,
+    activePlan,
+    dueFlashcards,
+    loadingStats,
+    loadingSubjects,
+    loadingPlan,
+    loadingFlashcards,
+    errorStats,
+    errorSubjects,
+    errorPlan,
+    errorFlashcards,
   } = useSelector((state) => state.dashboard);
 
   useEffect(() => {
@@ -256,7 +295,6 @@ const Dashboard = () => {
     setIsStudyPlanOpen(true);
   };
 
-
   useEffect(() => {
     if (comingSoon) {
       const timer = setTimeout(() => setComingSoon(null), 3000);
@@ -293,9 +331,10 @@ const Dashboard = () => {
   };
 
   // ── Derived Data ──
-  const chartData = weeklyChartData.length > 0
-    ? weeklyChartData.map((d) => ({ name: d.day, score: d.completion }))
-    : [];
+  const chartData =
+    weeklyChartData.length > 0
+      ? weeklyChartData.map((d) => ({ name: d.day, score: d.completion }))
+      : [];
 
   const radarData = subjectBreakdown.map((s) => ({
     subject: s.subjectName,
@@ -311,11 +350,18 @@ const Dashboard = () => {
   const todayTasks = (() => {
     if (!activePlan?.dailyGoals) return [];
     const today = toDateOnlyString(new Date());
-    const todayGoal = activePlan.dailyGoals.find((g) => g.date && toDateOnlyString(g.date) === today);
+    const todayGoal = activePlan.dailyGoals.find(
+      (g) => g.date && toDateOnlyString(g.date) === today
+    );
     const rawTasks = todayGoal?.tasks || activePlan.dailyGoals[0]?.tasks || [];
     return rawTasks.map((t, i) => {
       const text = t.title || t.description || t.topic?.name || 'Untitled task';
-      const isBonus = !!(t.isBonus || t.optional || text.toLowerCase().includes('bonus') || text.toLowerCase().includes('optional'));
+      const isBonus = !!(
+        t.isBonus ||
+        t.optional ||
+        text.toLowerCase().includes('bonus') ||
+        text.toLowerCase().includes('optional')
+      );
       return {
         id: t.id || t._id || `task-${i}`,
         text,
@@ -348,14 +394,17 @@ const Dashboard = () => {
 
   const firstDueCard = dueFlashcards.length > 0 ? dueFlashcards[0] : null;
 
-  const handleReviewCard = useCallback((quality) => {
-    if (!firstDueCard) return;
-    dispatch(reviewFlashcard({ cardId: firstDueCard.id, quality })).then(() => {
-      if (dueFlashcards.length <= 1) {
-        dispatch(fetchDueFlashcards());
-      }
-    });
-  }, [dispatch, firstDueCard, dueFlashcards.length]);
+  const handleReviewCard = useCallback(
+    (quality) => {
+      if (!firstDueCard) return;
+      dispatch(reviewFlashcard({ cardId: firstDueCard.id, quality })).then(() => {
+        if (dueFlashcards.length <= 1) {
+          dispatch(fetchDueFlashcards());
+        }
+      });
+    },
+    [dispatch, firstDueCard, dueFlashcards.length]
+  );
 
   // ── Streak display ──
   const streakDays = stats?.streak ?? 0;
@@ -370,14 +419,46 @@ const Dashboard = () => {
     <LeatherBoard>
       {/* --- QUICK ACTIONS TABS --- */}
       <div className="absolute -left-4 top-24 flex-col gap-4 z-30 hidden md:flex">
-        <GoldTabButton icon={Play} label="Start Quiz" delay={0.1} onClick={() => setComingSoon('Quiz feature coming soon!')} />
-        <GoldTabButton icon={FileText} label="PYQ Intelligence" delay={0.2} onClick={() => navigate('/pyqs')} />
-        <GoldTabButton icon={Calendar} label="Study Plan" delay={0.3} onClick={() => setIsStudyPlanOpen(true)} />
-        <GoldTabButton icon={Upload} label="Import Syllabus" delay={0.35} onClick={() => setIsSyllabusImportOpen(true)} />
-        <GoldTabButton icon={TrendingUp} label="Export Report" delay={0.4} onClick={() => handleExportReport('pdf')} />
-        <GoldTabButton icon={MessageSquare} label="Study Room" delay={0.45} onClick={() => navigate('/study-group')} />
-        <button 
-          onClick={() => { setIsNoteModalOpen(true); }}
+        <GoldTabButton
+          icon={Play}
+          label="Start Quiz"
+          delay={0.1}
+          onClick={() => setComingSoon('Quiz feature coming soon!')}
+        />
+        <GoldTabButton
+          icon={FileText}
+          label="PYQ Intelligence"
+          delay={0.2}
+          onClick={() => navigate('/pyqs')}
+        />
+        <GoldTabButton
+          icon={Calendar}
+          label="Study Plan"
+          delay={0.3}
+          onClick={() => setIsStudyPlanOpen(true)}
+        />
+        <GoldTabButton
+          icon={Upload}
+          label="Import Syllabus"
+          delay={0.35}
+          onClick={() => setIsSyllabusImportOpen(true)}
+        />
+        <GoldTabButton
+          icon={TrendingUp}
+          label="Export Report"
+          delay={0.4}
+          onClick={() => handleExportReport('pdf')}
+        />
+        <GoldTabButton
+          icon={MessageSquare}
+          label="Study Room"
+          delay={0.45}
+          onClick={() => navigate('/study-group')}
+        />
+        <button
+          onClick={() => {
+            setIsNoteModalOpen(true);
+          }}
           className="bg-neutral-800 text-yellow-500 border border-yellow-700/50 hover:bg-neutral-700 p-2 rounded-r-lg shadow-lg flex items-center justify-center relative group"
         >
           <FileText className="w-5 h-5" />
@@ -438,7 +519,10 @@ const Dashboard = () => {
             </button>
             <div className="flex flex-col items-center">
               <div className="relative">
-                <Flame className="w-12 h-12 text-orange-500 animate-pulse-glow" fill="currentColor" />
+                <Flame
+                  className="w-12 h-12 text-orange-500 animate-pulse-glow"
+                  fill="currentColor"
+                />
                 <div className="absolute inset-0 blur-md bg-orange-500/30 rounded-full" />
               </div>
               <span className="text-gold-foil font-bold text-2xl">{streakDays} Day</span>
@@ -451,7 +535,9 @@ const Dashboard = () => {
               aria-label="Settings"
             >
               <Settings className="w-5 h-5" />
-              <span className="font-playfair font-bold text-sm tracking-wide hidden sm:inline">Settings</span>
+              <span className="font-playfair font-bold text-sm tracking-wide hidden sm:inline">
+                Settings
+              </span>
             </button>
 
             <button
@@ -460,7 +546,9 @@ const Dashboard = () => {
               aria-label="Log out"
             >
               <LogOut className="w-5 h-5 group-hover:text-white" />
-              <span className="font-playfair font-bold text-sm tracking-wide group-hover:text-white hidden sm:inline">Logout</span>
+              <span className="font-playfair font-bold text-sm tracking-wide group-hover:text-white hidden sm:inline">
+                Logout
+              </span>
             </button>
           </motion.div>
         </div>
@@ -476,7 +564,6 @@ const Dashboard = () => {
           <ErrorBanner message={errorStats} onRetry={handleRetry(fetchDashboardStats)} />
         ) : null}
 
-
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {loadingStats ? (
             <>
@@ -489,7 +576,9 @@ const Dashboard = () => {
             <>
               <VintagePaper delay={0.2} className="border-t-4 border-t-red-800">
                 <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-neutral-800 dark:text-neutral-100 font-playfair font-bold text-xl">Total Solved</h3>
+                  <h3 className="text-neutral-800 dark:text-neutral-100 font-playfair font-bold text-xl">
+                    Total Solved
+                  </h3>
                   <Target className="text-neutral-600 dark:text-neutral-400 w-5 h-5" />
                 </div>
                 <p className="text-4xl font-bold text-neutral-900 dark:text-white font-playfair">
@@ -502,10 +591,14 @@ const Dashboard = () => {
 
               <VintagePaper delay={0.3} className="border-t-4 border-t-green-800">
                 <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-neutral-800 dark:text-neutral-100 font-playfair font-bold text-xl">Mastery</h3>
+                  <h3 className="text-neutral-800 dark:text-neutral-100 font-playfair font-bold text-xl">
+                    Mastery
+                  </h3>
                   <CheckCircle className="text-neutral-600 dark:text-neutral-400 w-5 h-5" />
                 </div>
-                <p className="text-4xl font-bold text-neutral-900 dark:text-white font-playfair">{syllabusProgress}%</p>
+                <p className="text-4xl font-bold text-neutral-900 dark:text-white font-playfair">
+                  {syllabusProgress}%
+                </p>
                 <p className="text-neutral-600 dark:text-neutral-400 text-sm mt-2 italic border-t border-neutral-300 dark:border-neutral-600 pt-2">
                   Syllabus completion
                 </p>
@@ -513,7 +606,9 @@ const Dashboard = () => {
 
               <VintagePaper delay={0.4} className="border-t-4 border-t-blue-800">
                 <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-neutral-800 dark:text-neutral-100 font-playfair font-bold text-xl">Study Hours</h3>
+                  <h3 className="text-neutral-800 dark:text-neutral-100 font-playfair font-bold text-xl">
+                    Study Hours
+                  </h3>
                   <Clock className="text-neutral-600 dark:text-neutral-400 w-5 h-5" />
                 </div>
                 <p className="text-4xl font-bold text-neutral-900 dark:text-white font-playfair">
@@ -526,14 +621,18 @@ const Dashboard = () => {
 
               <VintagePaper delay={0.5} className="border-t-4 border-t-purple-800">
                 <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-neutral-800 dark:text-neutral-100 font-playfair font-bold text-xl">Topics Done</h3>
+                  <h3 className="text-neutral-800 dark:text-neutral-100 font-playfair font-bold text-xl">
+                    Topics Done
+                  </h3>
                   <BookOpen className="text-neutral-600 dark:text-neutral-400 w-5 h-5" />
                 </div>
                 <p className="text-4xl font-bold text-neutral-900 dark:text-white font-playfair">
                   {strong + medium}/{totalTopics}
                 </p>
                 <p className="text-neutral-600 dark:text-neutral-400 text-sm mt-2 italic border-t border-neutral-300 dark:border-neutral-600 pt-2">
-                  {totalTopics > 0 ? `${Math.round(((strong + medium) / totalTopics) * 100)}% Course completion` : 'No topics yet'}
+                  {totalTopics > 0
+                    ? `${Math.round(((strong + medium) / totalTopics) * 100)}% Course completion`
+                    : 'No topics yet'}
                 </p>
               </VintagePaper>
             </>
@@ -570,82 +669,109 @@ const Dashboard = () => {
             <div className="absolute inset-0 shadow-[inset_0_0_50px_rgba(0,0,0,0.8)] pointer-events-none" />
 
             {/* Line Chart — Weekly Performance */}
-            <VintagePaper animate={false} className="w-full h-full p-6 shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
+            <VintagePaper
+              animate={false}
+              className="w-full h-full p-6 shadow-[0_10px_30px_rgba(0,0,0,0.5)]"
+            >
               <h2 className="text-2xl font-bold font-playfair text-neutral-900 mb-6 border-b border-neutral-400 pb-2">
                 Weekly Performance
               </h2>
-            <div className="h-64 w-full" style={{ minHeight: '250px', minWidth: '100%' }}>
-              {loadingStats ? (
-                <div className="flex items-center justify-center h-full">
-                  <Shimmer className="w-full h-48" />
-                </div>
-              ) : errorStats ? (
-                <div className="flex flex-col items-center justify-center h-full text-neutral-500">
-                  <AlertCircle className="w-8 h-8 mb-2" />
-                  <p className="text-sm">Could not load chart</p>
-                </div>
-              ) : chartData.length === 0 ? (
-                <EmptyState message="No weekly data yet — start studying to see your progress!" />
-              ) : (
-                <ResponsiveContainer width="99%" height="100%" minHeight={250}>
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#d4d4d4" />
-                    <XAxis dataKey="name" stroke="#525252" tick={{ fontFamily: 'Inter' }} />
-                    <YAxis stroke="#525252" tick={{ fontFamily: 'Inter' }} domain={[0, 100]} />
-                    <LineTooltip
-                      contentStyle={{ backgroundColor: '#F5E6CA', border: '1px solid #8B4513', borderRadius: '4px' }}
-                      itemStyle={{ color: '#3E2723', fontWeight: 'bold' }}
-                    />
-                    <Line
-                      type="monotone" dataKey="score" stroke="#8B4513" strokeWidth={3}
-                      dot={{ fill: '#8B4513', r: 5 }} activeDot={{ r: 8, fill: '#D4AF37' }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </VintagePaper>
+              <div className="h-64 w-full" style={{ minHeight: '250px', minWidth: '100%' }}>
+                {loadingStats ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Shimmer className="w-full h-48" />
+                  </div>
+                ) : errorStats ? (
+                  <div className="flex flex-col items-center justify-center h-full text-neutral-500">
+                    <AlertCircle className="w-8 h-8 mb-2" />
+                    <p className="text-sm">Could not load chart</p>
+                  </div>
+                ) : chartData.length === 0 ? (
+                  <EmptyState message="No weekly data yet — start studying to see your progress!" />
+                ) : (
+                  <ResponsiveContainer width="99%" height="100%" minHeight={250}>
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#d4d4d4" />
+                      <XAxis dataKey="name" stroke="#525252" tick={{ fontFamily: 'Inter' }} />
+                      <YAxis stroke="#525252" tick={{ fontFamily: 'Inter' }} domain={[0, 100]} />
+                      <LineTooltip
+                        contentStyle={{
+                          backgroundColor: '#F5E6CA',
+                          border: '1px solid #8B4513',
+                          borderRadius: '4px',
+                        }}
+                        itemStyle={{ color: '#3E2723', fontWeight: 'bold' }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="score"
+                        stroke="#8B4513"
+                        strokeWidth={3}
+                        dot={{ fill: '#8B4513', r: 5 }}
+                        activeDot={{ r: 8, fill: '#D4AF37' }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </VintagePaper>
 
-          {/* Radar Chart — Subject Mastery */}
-          <VintagePaper animate={false} className="w-full h-full p-6 shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
-            <h2 className="text-2xl font-bold font-playfair text-neutral-900 mb-6 border-b border-neutral-400 pb-2">
-              Subject Mastery
-            </h2>
-            <div className="h-64 w-full" style={{ minHeight: '250px', minWidth: '100%' }}>
-              {loadingSubjects ? (
-                <div className="flex items-center justify-center h-full">
-                  <Shimmer className="w-full h-48" />
-                </div>
-              ) : errorSubjects ? (
-                <div className="flex flex-col items-center justify-center h-full text-neutral-500">
-                  <AlertCircle className="w-8 h-8 mb-2" />
-                  <p className="text-sm">Could not load subjects</p>
-                </div>
-              ) : radarData.length === 0 ? (
-                <EmptyState message="Add subjects to see your mastery breakdown" />
-              ) : (
-                <ResponsiveContainer width="99%" height="100%" minHeight={250}>
-                  <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
-                    <PolarGrid stroke="#d4d4d4" />
-                    <PolarAngleAxis
-                      dataKey="subject"
-                      tick={{ fontFamily: 'Inter', fill: '#525252', fontSize: 12, fontWeight: 'bold' }}
-                    />
-                    <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                    <Radar
-                      name="Mastery" dataKey="A" stroke="#8B4513" strokeWidth={2}
-                      fill="#D4AF37" fillOpacity={0.6}
-                    />
-                    <LineTooltip
-                      contentStyle={{ backgroundColor: '#F5E6CA', border: '1px solid #8B4513', borderRadius: '4px' }}
-                      itemStyle={{ color: '#3E2723', fontWeight: 'bold' }}
-                    />
-                  </RadarChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </VintagePaper>
-        </div>
+            {/* Radar Chart — Subject Mastery */}
+            <VintagePaper
+              animate={false}
+              className="w-full h-full p-6 shadow-[0_10px_30px_rgba(0,0,0,0.5)]"
+            >
+              <h2 className="text-2xl font-bold font-playfair text-neutral-900 mb-6 border-b border-neutral-400 pb-2">
+                Subject Mastery
+              </h2>
+              <div className="h-64 w-full" style={{ minHeight: '250px', minWidth: '100%' }}>
+                {loadingSubjects ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Shimmer className="w-full h-48" />
+                  </div>
+                ) : errorSubjects ? (
+                  <div className="flex flex-col items-center justify-center h-full text-neutral-500">
+                    <AlertCircle className="w-8 h-8 mb-2" />
+                    <p className="text-sm">Could not load subjects</p>
+                  </div>
+                ) : radarData.length === 0 ? (
+                  <EmptyState message="Add subjects to see your mastery breakdown" />
+                ) : (
+                  <ResponsiveContainer width="99%" height="100%" minHeight={250}>
+                    <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
+                      <PolarGrid stroke="#d4d4d4" />
+                      <PolarAngleAxis
+                        dataKey="subject"
+                        tick={{
+                          fontFamily: 'Inter',
+                          fill: '#525252',
+                          fontSize: 12,
+                          fontWeight: 'bold',
+                        }}
+                      />
+                      <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                      <Radar
+                        name="Mastery"
+                        dataKey="A"
+                        stroke="#8B4513"
+                        strokeWidth={2}
+                        fill="#D4AF37"
+                        fillOpacity={0.6}
+                      />
+                      <LineTooltip
+                        contentStyle={{
+                          backgroundColor: '#F5E6CA',
+                          border: '1px solid #8B4513',
+                          borderRadius: '4px',
+                        }}
+                        itemStyle={{ color: '#3E2723', fontWeight: 'bold' }}
+                      />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </VintagePaper>
+          </div>
         </div>
 
         {/* --- NEW WIDGETS ROW --- */}
@@ -689,7 +815,7 @@ const Dashboard = () => {
         </div>
 
         {/* --- LEADERBOARD & AI WEAKNESS DETECTION WIDGETS --- */}
-<div className="my-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="my-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
           <LeaderboardWidget />
           <WeaknessDashboardWidget />
         </div>
@@ -739,7 +865,7 @@ const Dashboard = () => {
                       <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${topic.prog}%` }}
-                        transition={{ duration: 1.5, delay: 0.5 + (i * 0.1), ease: 'easeOut' }}
+                        transition={{ duration: 1.5, delay: 0.5 + i * 0.1, ease: 'easeOut' }}
                         className="h-full bg-gradient-to-r from-blue-900 to-indigo-800 relative z-10"
                       />
                     </div>
@@ -770,7 +896,10 @@ const Dashboard = () => {
               ) : errorStats ? (
                 <ErrorBanner message={errorStats} onRetry={handleRetry(fetchDashboardStats)} />
               ) : recentActivity.length === 0 ? (
-                <EmptyState icon={BookOpen} message="No activity yet — start your learning journey!" />
+                <EmptyState
+                  icon={BookOpen}
+                  message="No activity yet — start your learning journey!"
+                />
               ) : (
                 <div className="space-y-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-yellow-700/50 before:to-transparent">
                   {recentActivity.slice(0, 6).map((item, i) => {
@@ -781,10 +910,12 @@ const Dashboard = () => {
                         key={item.id || i}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.8 + (i * 0.2) }}
+                        transition={{ delay: 0.8 + i * 0.2 }}
                         className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active"
                       >
-                        <div className={`mt-1 bg-white dark:bg-slate-800 border border-neutral-300 dark:border-slate-600 p-2 rounded-full shadow-sm ${config.color} group-hover:scale-110 transition-transform`}>
+                        <div
+                          className={`mt-1 bg-white dark:bg-slate-800 border border-neutral-300 dark:border-slate-600 p-2 rounded-full shadow-sm ${config.color} group-hover:scale-110 transition-transform`}
+                        >
                           <Icon className="w-4 h-4" />
                         </div>
                         <div className="ml-4 flex-1 border-b border-neutral-200 dark:border-slate-700 pb-4">
@@ -815,22 +946,38 @@ const Dashboard = () => {
                 const earned = badge.earned(stats);
                 const Icon = badge.icon;
                 return (
-                  <div key={badge.id} className="flex flex-col items-center group cursor-pointer" title={badge.description}>
-                    <div className={`w-20 h-20 rounded-full p-1 shadow-[0_4px_10px_rgba(0,0,0,0.3)] group-hover:scale-110 transition-transform relative ${
-                      earned
-                        ? 'bg-gradient-to-br from-yellow-300 via-yellow-500 to-yellow-700'
-                        : 'bg-gradient-to-br from-neutral-300 via-neutral-400 to-neutral-500 opacity-50'
-                    }`}>
-                      <div className={`w-full h-full rounded-full border-2 flex items-center justify-center ${
-                        earned ? 'border-yellow-200/50 bg-leather' : 'border-neutral-400/50 bg-neutral-200'
-                      }`}>
-                        <Icon className={`w-10 h-10 ${earned ? 'text-gold-foil' : 'text-neutral-400'}`} />
+                  <div
+                    key={badge.id}
+                    className="flex flex-col items-center group cursor-pointer"
+                    title={badge.description}
+                  >
+                    <div
+                      className={`w-20 h-20 rounded-full p-1 shadow-[0_4px_10px_rgba(0,0,0,0.3)] group-hover:scale-110 transition-transform relative ${
+                        earned
+                          ? 'bg-gradient-to-br from-yellow-300 via-yellow-500 to-yellow-700'
+                          : 'bg-gradient-to-br from-neutral-300 via-neutral-400 to-neutral-500 opacity-50'
+                      }`}
+                    >
+                      <div
+                        className={`w-full h-full rounded-full border-2 flex items-center justify-center ${
+                          earned
+                            ? 'border-yellow-200/50 bg-leather'
+                            : 'border-neutral-400/50 bg-neutral-200'
+                        }`}
+                      >
+                        <Icon
+                          className={`w-10 h-10 ${earned ? 'text-gold-foil' : 'text-neutral-400'}`}
+                        />
                       </div>
                     </div>
-                    <span className={`text-sm font-bold mt-3 text-center ${earned ? 'text-neutral-800' : 'text-neutral-400'}`}>
+                    <span
+                      className={`text-sm font-bold mt-3 text-center ${earned ? 'text-neutral-800' : 'text-neutral-400'}`}
+                    >
                       {badge.label}
                     </span>
-                    <span className={`text-xs ${earned ? 'text-green-700' : 'text-neutral-400 italic'}`}>
+                    <span
+                      className={`text-xs ${earned ? 'text-green-700' : 'text-neutral-400 italic'}`}
+                    >
                       {earned ? 'Earned' : 'Locked'}
                     </span>
                   </div>
@@ -847,7 +994,12 @@ const Dashboard = () => {
               {weeklyChartData.length > 0
                 ? weeklyChartData.map((d, i) => {
                     const intensity = Math.min(3, Math.floor((d.completion || 0) / 33));
-                    const colors = ['bg-neutral-300 dark:bg-slate-700', 'bg-yellow-700/40', 'bg-yellow-700/70', 'bg-yellow-800'];
+                    const colors = [
+                      'bg-neutral-300 dark:bg-slate-700',
+                      'bg-yellow-700/40',
+                      'bg-yellow-700/70',
+                      'bg-yellow-800',
+                    ];
                     return (
                       <motion.div
                         key={i}
@@ -872,9 +1024,9 @@ const Dashboard = () => {
         </div>
       </div>
       {/* --- CREATE NOTE MODAL --- */}
-      <CreateNoteModal 
-        isOpen={isNoteModalOpen} 
-        onClose={() => setIsNoteModalOpen(false)} 
+      <CreateNoteModal
+        isOpen={isNoteModalOpen}
+        onClose={() => setIsNoteModalOpen(false)}
         onNoteCreated={() => setIsNoteModalOpen(false)}
       />
 
@@ -943,7 +1095,10 @@ const Dashboard = () => {
           >
             <AlertCircle className="w-5 h-5 text-yellow-400 shrink-0" />
             <span className="font-inter font-medium">{comingSoon}</span>
-            <button onClick={() => setComingSoon(null)} className="ml-2 text-yellow-400 hover:text-yellow-200">
+            <button
+              onClick={() => setComingSoon(null)}
+              className="ml-2 text-yellow-400 hover:text-yellow-200"
+            >
               <X className="w-4 h-4" />
             </button>
           </motion.div>

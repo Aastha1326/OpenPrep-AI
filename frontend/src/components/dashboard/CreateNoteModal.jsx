@@ -40,7 +40,7 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
       if (onNoteCreated) {
         onNoteCreated(response.data);
       }
-      
+
       setTitle('');
       setContent('');
       onClose();
@@ -53,10 +53,10 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
 
   const modules = {
     toolbar: [
-      [{ 'header': [1, 2, 3, false] }],
+      [{ header: [1, 2, 3, false] }],
       ['bold', 'italic', 'underline', 'strike'],
-      [{'list': 'ordered'}, {'list': 'bullet'}],
-      ['clean']
+      [{ list: 'ordered' }, { list: 'bullet' }],
+      ['clean'],
     ],
   };
 
@@ -93,7 +93,10 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
 
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="title" className="block text-sm font-semibold text-neutral-700 mb-1">
+                  <label
+                    htmlFor="title"
+                    className="block text-sm font-semibold text-neutral-700 mb-1"
+                  >
                     Title
                   </label>
                   <input
