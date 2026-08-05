@@ -262,6 +262,38 @@ describe('Academic Controller - Integration Tests', () => {
         const topicsLeft = await Topic.findAll({ where: { subject: subject.id } });
         expect(topicsLeft.length).toBe(0);
       });
+
+      it('should delete a subject with linked PYQs without foreign key constraint errors', async () => {
+        const subject = await Subject.create({
+          name: 'Subject with PYQ',
+          description: 'Testing PYQ cascade delete',
+          exam: examForSubject.id,
+          user: testUser.id,
+        });
+
+        const pyq = await PYQ.create({
+          title: '2025 Physics PYQ',
+          exam: examForSubject.id,
+          subject: subject.id,
+          year: 2025,
+          difficulty: 'Medium',
+          fileUrl: 'uploads/sample.pdf',
+          user: testUser.id,
+        });
+
+        const res = await request(app)
+          .delete(`/api/academic/subjects/${subject.id}`)
+          .set('Authorization', `Bearer ${authToken}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(true);
+
+        const pyqsLeft = await PYQ.findAll({ where: { subject: subject.id } });
+        expect(pyqsLeft.length).toBe(0);
+
+        const subjectDeleted = await Subject.findByPk(subject.id);
+        expect(subjectDeleted).toBeNull();
+      });
     });
   });
 
