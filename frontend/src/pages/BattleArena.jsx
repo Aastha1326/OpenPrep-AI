@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { socket } from '../services/socket';
-import { FaPlay, FaCheck, FaUsers, FaCopy, FaCrown, FaWifi } from 'react-icons/fa';
+import { FaPlay, FaCheck, FaUsers, FaCopy, FaCrown, FaWifi, FaLock, FaUnlock } from 'react-icons/fa';
 
 const MOCK_QUESTIONS = [
   { id: 'q1', text: 'What is the powerhouse of the cell?', options: ['Nucleus', 'Mitochondria', 'Ribosome', 'Endoplasmic Reticulum'], correct: 'Mitochondria' },
@@ -36,19 +37,29 @@ const ReconnectBanner = ({ connected }) => {
 
 const BattleArena = () => {
   const { user } = useSelector((state) => state.auth);
-  
+  const { roomId: routeRoomId } = useParams();
+
   const [roomId, setRoomId] = useState('');
+  const [roomName, setRoomName] = useState('');
   const [joined, setJoined] = useState(false);
   const [players, setPlayers] = useState({});
   const [status, setStatus] = useState('waiting');
   const [isConnected, setIsConnected] = useState(socket.connected);
   const [typingPlayers, setTypingPlayers] = useState({});
-  
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [password, setPassword] = useState('');
+  const [accessError, setAccessError] = useState('');
+  const [accessPending, setAccessPending] = useState(false);
+  const [pendingRoomId, setPendingRoomId] = useState('');
+  const [inviteLink, setInviteLink] = useState('');
+
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
 
   const joinedRef = useRef(false);
   const roomIdRef = useRef('');
+  const passwordRef = useRef('');
+  const roomNameRef = useRef('');
   const typingTimers = useRef({});
 
   useEffect(() => {
@@ -56,9 +67,12 @@ const BattleArena = () => {
 
     socket.on('connect', () => {
       setIsConnected(true);
-      // Gracefully rejoin after an unexpected disconnect
       if (joinedRef.current) {
-        socket.emit('join_room', { roomId: roomIdRef.current, username: user?.name || 'Anonymous' });
+        socket.emit('join-room', {
+          roomId: roomIdRef.current,
+          username: user?.name || 'Anonymous',
+          password: passwordRef.current,
+        });
       }
     });
 
@@ -137,23 +151,104 @@ const BattleArena = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!routeRoomId) return;
+
+    const normalizedRoomId = routeRoomId.toUpperCase();
+    setRoomId(normalizedRoomId);
+    setAccessError('');
+    setAccessPending(true);
+    setPendingRoomId(normalizedRoomId);
+
+    socket.emit('join-room', {
+      roomId: normalizedRoomId,
+      username: user?.name || 'Anonymous',
+      password: '',
+    }, (response) => {
+      setAccessPending(false);
+      if (response?.success) {
+        setJoined(true);
+        setIsPrivate(Boolean(response.room?.password));
+        setInviteLink(`${window.location.origin}/battle/join/${normalizedRoomId}`);
+        joinedRef.current = true;
+        roomIdRef.current = normalizedRoomId;
+        passwordRef.current = '';
+        roomNameRef.current = response.room?.name || roomNameRef.current || 'Battle Room';
+        setRoomName(roomNameRef.current);
+        setPendingRoomId('');
+        setAccessError('');
+      } else if (response?.requiresPassword) {
+        setJoined(false);
+        setPendingRoomId(normalizedRoomId);
+        setAccessError('Enter the room password to continue.');
+      } else {
+        setJoined(false);
+        setAccessError(response?.message || 'Unable to join this room.');
+      }
+    });
+  }, [routeRoomId, user?.name]);
+
+  const joinRoom = (targetRoomId, { createMode = false, enteredPassword = '' } = {}) => {
+    const normalizedRoomId = (targetRoomId || '').trim().toUpperCase();
+    if (!normalizedRoomId) return;
+
+    setAccessError('');
+    setAccessPending(true);
+    setPendingRoomId(normalizedRoomId);
+
+    const payload = {
+      roomId: normalizedRoomId,
+      roomName: (roomNameRef.current || roomName || 'Battle Room').trim() || 'Battle Room',
+      username: user?.name || 'Anonymous',
+      password: enteredPassword,
+    };
+
+    const eventName = createMode ? 'create-room' : 'join-room';
+    socket.emit(eventName, payload, (response) => {
+      setAccessPending(false);
+      if (response?.success) {
+        const nextRoomName = response.room?.name || payload.roomName;
+        setRoomId(normalizedRoomId);
+        setRoomName(nextRoomName);
+        roomIdRef.current = normalizedRoomId;
+        passwordRef.current = enteredPassword;
+        roomNameRef.current = nextRoomName;
+        setIsPrivate(Boolean(response.room?.password));
+        setInviteLink(`${window.location.origin}/battle/join/${normalizedRoomId}`);
+        joinedRef.current = true;
+        setJoined(true);
+        setPendingRoomId('');
+        setAccessError('');
+      } else if (response?.requiresPassword) {
+        setJoined(false);
+        setPendingRoomId(normalizedRoomId);
+        setAccessError('Enter the room password to continue.');
+      } else {
+        setJoined(false);
+        setAccessError(response?.message || 'Unable to join this room.');
+      }
+    });
+  };
+
   const handleJoin = (e) => {
     e.preventDefault();
-    if (roomId.trim()) {
-      roomIdRef.current = roomId.trim();
-      joinedRef.current = true;
-      socket.emit('join_room', { roomId: roomIdRef.current, username: user?.name || 'Anonymous' });
-      setJoined(true);
-    }
+    joinRoom(roomId, { createMode: false, enteredPassword: password });
   };
 
   const handleCreateRoom = () => {
     const newRoomId = Math.random().toString(36).substring(2, 8).toUpperCase();
     setRoomId(newRoomId);
-    roomIdRef.current = newRoomId;
-    joinedRef.current = true;
-    socket.emit('join_room', { roomId: newRoomId, username: user?.name || 'Anonymous' });
-    setJoined(true);
+    roomNameRef.current = roomName || 'Battle Room';
+    joinRoom(newRoomId, { createMode: true, enteredPassword: isPrivate ? password : '' });
+  };
+
+  const handlePasswordSubmit = () => {
+    joinRoom(pendingRoomId, { createMode: false, enteredPassword: password });
+  };
+
+  const handleCopyLink = async () => {
+    if (!inviteLink) return;
+    await navigator.clipboard.writeText(inviteLink);
   };
 
   const handleToggleReady = () => {
@@ -188,6 +283,8 @@ const BattleArena = () => {
   };
 
   if (!joined) {
+    const showPasswordPrompt = Boolean(accessPending || pendingRoomId);
+
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
         <ReconnectBanner connected={isConnected} />
@@ -198,25 +295,85 @@ const BattleArena = () => {
             <p className="text-slate-400">Join a lobby to battle your friends in real-time!</p>
           </div>
 
-          <form onSubmit={handleJoin} className="space-y-4 mb-6">
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Room Code</label>
+          {showPasswordPrompt ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-indigo-500/30 bg-indigo-500/10 p-4 text-sm text-indigo-200">
+                <p className="font-semibold mb-1">Enter Password</p>
+                <p className="text-indigo-100/80">This room is private. Enter the password to join.</p>
+              </div>
               <input
-                type="text"
-                value={roomId}
-                onChange={(e) => setRoomId(e.target.value.toUpperCase())}
-                placeholder="Enter 6-digit code"
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-indigo-500 uppercase tracking-widest text-center text-lg font-mono"
-                required
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Password"
+                className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-indigo-500"
               />
+              {accessError && <p className="text-sm text-red-400">{accessError}</p>}
+              <button
+                onClick={handlePasswordSubmit}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 rounded-lg transition-colors"
+              >
+                Join Room
+              </button>
             </div>
-            <button
-              type="submit"
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center"
-            >
-              Join Lobby <FaPlay className="ml-2 text-sm" />
-            </button>
-          </form>
+          ) : (
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Room Name</label>
+                <input
+                  type="text"
+                  value={roomName}
+                  onChange={(e) => {
+                    const nextValue = e.target.value;
+                    setRoomName(nextValue);
+                    roomNameRef.current = nextValue;
+                  }}
+                  placeholder="My Battle Room"
+                  className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2">
+                <label className="text-sm font-medium text-slate-300">Private Room</label>
+                <input
+                  type="checkbox"
+                  checked={isPrivate}
+                  onChange={(e) => setIsPrivate(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-indigo-500 focus:ring-indigo-500"
+                />
+              </div>
+              {isPrivate && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Password</label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter room password"
+                    className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              )}
+              <form onSubmit={handleJoin} className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Room Code</label>
+                  <input
+                    type="text"
+                    value={roomId}
+                    onChange={(e) => setRoomId(e.target.value.toUpperCase())}
+                    placeholder="Enter 6-digit code"
+                    className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-indigo-500 uppercase tracking-widest text-center text-lg font-mono"
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center"
+                >
+                  Join Lobby <FaPlay className="ml-2 text-sm" />
+                </button>
+              </form>
+            </div>
+          )}
 
           <div className="relative flex py-4 items-center">
             <div className="flex-grow border-t border-slate-600"></div>
@@ -245,19 +402,48 @@ const BattleArena = () => {
         <div className="max-w-4xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-center bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg mb-8">
             <div>
-              <h1 className="text-2xl font-bold mb-1">Lobby: <span className="text-indigo-400 font-mono tracking-wider">{roomId}</span></h1>
+              <div className="flex items-center gap-2 mb-2">
+                <h1 className="text-2xl font-bold">Lobby: <span className="text-indigo-400 font-mono tracking-wider">{roomId}</span></h1>
+                {isPrivate ? <FaLock className="text-amber-400" /> : <FaUnlock className="text-emerald-400" />}
+              </div>
               <p className="text-slate-400 text-sm flex items-center flex-wrap gap-1">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block" />
                 Waiting for players to get ready... <span className="text-emerald-400 font-medium">{onlineCount} online</span>
               </p>
+              <p className="text-slate-500 text-sm mt-1">{roomName || 'Battle Room'}</p>
             </div>
-            <button
-              onClick={() => navigator.clipboard.writeText(roomId)}
-              className="mt-4 md:mt-0 flex items-center text-sm bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg transition-colors"
-            >
-              <FaCopy className="mr-2" /> Copy Code
-            </button>
+            <div className="flex flex-col md:flex-row gap-2 mt-4 md:mt-0">
+              <button
+                onClick={() => navigator.clipboard.writeText(roomId)}
+                className="flex items-center text-sm bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg transition-colors"
+              >
+                <FaCopy className="mr-2" /> Copy Code
+              </button>
+              {inviteLink && (
+                <button
+                  onClick={handleCopyLink}
+                  className="flex items-center text-sm bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg transition-colors"
+                >
+                  <FaCopy className="mr-2" /> Copy Invite
+                </button>
+              )}
+            </div>
           </div>
+
+          {inviteLink && (
+            <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg mb-6">
+              <p className="text-sm font-semibold text-slate-300 mb-2">Invite Link</p>
+              <div className="flex flex-col md:flex-row items-start md:items-center gap-3">
+                <span className="text-sm text-indigo-300 break-all">{inviteLink}</span>
+                <button
+                  onClick={handleCopyLink}
+                  className="text-sm bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg transition-colors"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">

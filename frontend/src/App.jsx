@@ -8,7 +8,6 @@ import CustomCursor from './components/CustomCursor';
 import ScrollToTop from './components/ScrollToTop';
 import MobileNavDrawer from './components/MobileNavDrawer';
 import PageLoader from './components/PageLoader';
-import SessionTimeoutModal from './components/dashboard/SessionTimeoutModal';
 import './App.css';
 
 const Landing = lazy(() => import('./pages/Landing'));
@@ -60,7 +59,6 @@ function App() {
       <CustomCursor />
       <ScrollToTop />
       <MobileNavDrawer />
-      <SessionTimeoutModal isOpen={sessionExpired} />
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<Landing />} />
@@ -88,6 +86,14 @@ function App() {
           />
           <Route
             path="/battle"
+            element={
+              <ProtectedRoute>
+                <BattleArena />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/battle/join/:roomId"
             element={
               <ProtectedRoute>
                 <BattleArena />
