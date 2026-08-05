@@ -19,6 +19,7 @@ import VintagePaper from '../components/dashboard/VintagePaper';
 import GoldTabButton from '../components/dashboard/GoldTabButton';
 import PomodoroTimer from '../components/dashboard/PomodoroTimer';
 import FlashcardWidget from '../components/dashboard/FlashcardWidget';
+import BadgeGrid from '../components/dashboard/BadgeGrid';
 import PinnedTasks from '../components/dashboard/PinnedTasks';
 import CreateNoteModal from '../components/dashboard/CreateNoteModal';
 import StudyPlanModal from '../components/dashboard/StudyPlanModal';
@@ -484,6 +485,12 @@ const Dashboard = () => {
               onRetry={handleRetry(fetchDueFlashcards)}
             />
           </div>
+
+          {/* BADGES / GAMIFICATION */}
+          <div className="md:col-span-2 mt-6">
+            <BadgeGrid />
+          </div>
+
           <div className="flex justify-center">
             <PinnedTasks
               tasks={todayTasks}
