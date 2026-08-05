@@ -9,6 +9,7 @@ const User = require('../models/User');
 const geminiService = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
 const { toDateOnlyString, toLocalDateString } = require('../utils/dateUtils');
+const { generateMilestones } = require('../services/milestoneGeneratorService');
 
 // @desc    Generate AI Study Plan
 // @route   POST /api/study-plans/generate-ai
@@ -92,12 +93,20 @@ exports.generateAIPlan = async (req, res, next) => {
       { where: { user: req.user.id, exam: examId, status: 'active' } }
     );
 
+    const milestones = generateMilestones({
+      startDate: toDateOnlyString(startDate),
+      endDate: toDateOnlyString(endDate),
+      dailyGoals: formattedGoals,
+      examName: exam.name,
+    });
+
     const studyPlan = await StudyPlan.create({
       exam: examId,
       user: req.user.id,
       startDate: new Date(startDate),
       endDate: new Date(endDate),
       dailyGoals: formattedGoals,
+      milestones,
       status: 'active',
     });
 

@@ -4,7 +4,8 @@ import {
   FileText, Upload, AlertCircle, RefreshCw, CheckCircle, PieChart as PieChartIcon,
   TrendingUp, Award, HelpCircle, Layers, Calendar, Filter, ArrowLeft, ArrowUpRight
 } from 'lucide-react';
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';import {
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as PieTooltip, Legend
 } from 'recharts';
 import API from '../services/api';
@@ -132,7 +133,6 @@ const [uploadSubjectId, setUploadSubjectId] = useState('');
     if (selectedYear) nextParams.year = selectedYear;
     if (selectedChapter) nextParams.chapter = selectedChapter;
     setSearchParams(nextParams, { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSubjectId, selectedDifficulties, selectedYear, selectedChapter]);
 
   const toggleDifficulty = (level) => {

@@ -51,6 +51,16 @@ const CreateStudyPlanForm = ({
         </div>
       )}
 
+      {prefillExamName && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm rounded flex items-start gap-2">
+          <Sparkles className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>
+            Prefilled from imported syllabus: <span className="font-semibold">{prefillExamName}</span>. Adjust the
+            dates if needed.
+          </span>
+        </div>
+      )}
+
       <div>
         <label className="block text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
           Select Exam
@@ -189,6 +199,7 @@ const StudyPlanModal = ({
   const [showTimeline, setShowTimeline] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [prefillConsumed, setPrefillConsumed] = useState(false);
   const [formData, setFormData] = useState({
     examId: '',
     startDate: '',
@@ -196,6 +207,8 @@ const StudyPlanModal = ({
     studyHoursPerDay: 3,
   });
   const [exams, setExams] = useState([]);
+
+  const createFormVisible = showCreateForm || !activePlan;
 
   const dailyGoals = useMemo(() => activePlan?.dailyGoals || [], [activePlan?.dailyGoals]);
 
@@ -219,14 +232,20 @@ const StudyPlanModal = ({
 
   // Fetch exams when create form is shown
   useEffect(() => {
-    if (showCreateForm && exams.length === 0) {
+    if (createFormVisible && exams.length === 0) {
       const fetchExams = async () => {
         try {
           const res = await API.get('/academic/exams');
           const fetchedExams = Array.isArray(res.data?.data) ? res.data.data : [];
           setExams(fetchedExams);
           if (fetchedExams.length > 0) {
-            setFormData((prev) => ({ ...prev, examId: fetchedExams[0].id }));
+            setFormData((prev) => {
+              // Keep a prefilled exam from the syllabus import if present
+              if (prev.examId && fetchedExams.some((e) => e.id === prev.examId)) {
+                return prev;
+              }
+              return { ...prev, examId: fetchedExams[0].id };
+            });
           }
         } catch (err) {
           console.error('Failed to load exams:', err);
@@ -234,7 +253,25 @@ const StudyPlanModal = ({
       };
       fetchExams();
     }
-  }, [showCreateForm, exams.length]);
+  }, [createFormVisible, exams.length]);
+
+  // Apply the syllabus import prefill to the create form once
+  useEffect(() => {
+    if (createFormVisible && syllabusPrefill && !prefillConsumed) {
+      const today = toLocalDateString(new Date());
+      const examDate =
+        syllabusPrefill.examDate && syllabusPrefill.examDate >= today
+          ? syllabusPrefill.examDate
+          : '';
+      setFormData((prev) => ({
+        ...prev,
+        examId: syllabusPrefill.examId || prev.examId,
+        startDate: today,
+        endDate: examDate || prev.endDate,
+      }));
+      setPrefillConsumed(true);
+    }
+  }, [createFormVisible, syllabusPrefill, prefillConsumed]);
 
   // Reset form when modal closes
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
@@ -243,6 +280,7 @@ const StudyPlanModal = ({
     if (!isOpen) {
       setShowCreateForm(false);
       setError(null);
+      setPrefillConsumed(false);
       setFormData({ examId: '', startDate: '', endDate: '', studyHoursPerDay: 3 });
     }
   }
@@ -539,6 +577,7 @@ const StudyPlanModal = ({
                   minStartDate={minStartDate}
                   minEndDate={minEndDate}
                   exams={exams}
+                  prefillExamName={syllabusPrefill?.examName}
                 />
               ) : showTimeline ? (
                 <div className="bg-white/80 p-6 rounded-sm shadow-sm border border-[#8B4513]/10">

@@ -27,7 +27,6 @@ const GenerateFlashcardsFromNoteModal = ({ note, onClose, onImported }) => {
 
   useState(() => {
     generate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const toggleCard = (idx) => {

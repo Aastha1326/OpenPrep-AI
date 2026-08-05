@@ -29,6 +29,10 @@ const StudyPlan = sequelize.define(
       type: DataTypes.JSONB,
       defaultValue: [],
     },
+    milestones: {
+      type: DataTypes.JSONB,
+      defaultValue: [],
+    },
     status: {
       type: DataTypes.ENUM('active', 'completed', 'archived'),
       defaultValue: 'active',

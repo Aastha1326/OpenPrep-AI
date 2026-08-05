@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { sequelize } = require('../config/db');
+require('../models');
 
 async function run() {
   console.log('Starting DB migration and schema verification test...');

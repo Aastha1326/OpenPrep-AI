@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -55,6 +55,7 @@ import FocusEfficiencyWidget from '../components/dashboard/FocusEfficiencyWidget
 import LeaderboardWidget from '../components/dashboard/LeaderboardWidget';
 import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
 import TargetExamOverviewWidget from '../components/dashboard/TargetExamOverviewWidget';
+import FocusEfficiencyWidget from '../components/dashboard/FocusEfficiencyWidget';
 import CompositeBundleModal from '../components/dashboard/CompositeBundleModal';
 import SyllabusImportModal from '../components/dashboard/SyllabusImportModal';
 import NotesWidget from '../components/dashboard/NotesWidget';
@@ -281,12 +282,12 @@ const Dashboard = () => {
   const [isBundleModalOpen, setIsBundleModalOpen] = useState(false);
   const [isSyllabusImportOpen, setIsSyllabusImportOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const syllabusPrefillRef = useRef(null);
+  const [syllabusPrefill, setSyllabusPrefill] = useState(null);
   const [comingSoon, setComingSoon] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
 
   const handleGoToStudyPlanFromImport = (prefill) => {
-    if (prefill) syllabusPrefillRef.current = prefill;
+    if (prefill) setSyllabusPrefill(prefill);
     // Refresh dashboard caches so the new exam appears immediately in select
     dispatch(fetchDashboardStats());
     dispatch(fetchSubjectBreakdown());
@@ -1032,8 +1033,12 @@ const Dashboard = () => {
       {/* --- STUDY PLAN MODAL --- */}
       <StudyPlanModal
         isOpen={isStudyPlanOpen}
-        onClose={() => setIsStudyPlanOpen(false)}
+        onClose={() => {
+          setSyllabusPrefill(null);
+          setIsStudyPlanOpen(false);
+        }}
         activePlan={activePlan}
+        syllabusPrefill={syllabusPrefill}
         onPlanUpdate={() => dispatch(fetchActivePlan())}
         onPlanCreated={() => dispatch(fetchActivePlan())}
         onBumpTime={handleBumpStudyTime}
