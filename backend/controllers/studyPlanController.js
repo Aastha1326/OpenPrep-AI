@@ -259,11 +259,66 @@ exports.toggleTaskCompletion = async (req, res, next) => {
   }
 };
 
+// @desc    Move a task to a new date (used by the Gantt/timeline drag view)
+// @route   PUT /api/study-plans/:planId/tasks/:taskId/date
+// @access  Private
+exports.moveTaskDate = async (req, res, next) => {
+  try {
+    const { planId, taskId } = req.params;
+    const { newDate } = req.body;
+
+    const plan = await StudyPlan.findOne({ where: { id: planId, user: req.user.id } });
+    if (!plan) {
+      return res.status(404).json({ success: false, error: 'Study plan not found' });
+    }
+
+    const planStart = toDateOnlyString(plan.startDate);
+    const planEnd = toDateOnlyString(plan.endDate);
+    const targetDate = toDateOnlyString(newDate);
+
+    if (targetDate < planStart || targetDate > planEnd) {
+      return res.status(400).json({
+        success: false,
+        error: `Date must be between ${planStart} and ${planEnd}`,
+      });
+    }
+
+    const dailyGoals = JSON.parse(JSON.stringify(plan.dailyGoals));
+    let movedTask = null;
+
+    for (const goal of dailyGoals) {
+      const idx = (goal.tasks || []).findIndex((t) => t._id === taskId || t.id === taskId);
+      if (idx !== -1) {
+        [movedTask] = goal.tasks.splice(idx, 1);
+        break;
+      }
+    }
+
+    if (!movedTask) {
+      return res.status(404).json({ success: false, error: 'Task not found in plan' });
+    }
+
+    let targetGoal = dailyGoals.find((g) => toDateOnlyString(g.date) === targetDate);
+    if (!targetGoal) {
+      targetGoal = { date: newDate, tasks: [] };
+      dailyGoals.push(targetGoal);
+      dailyGoals.sort((a, b) => new Date(a.date) - new Date(b.date));
+    }
+    targetGoal.tasks.push(movedTask);
+
+    plan.dailyGoals = dailyGoals;
+    await plan.save();
+
+    res.status(200).json({ success: true, data: plan });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Get all Study Plans
 // @route   GET /api/study-plans/plans
 // @access  Private
-exports.getPlans = async (req, res, next) => {
-  try {
+exports.getPlans = async (req, res, next) => {  try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
     const offset = (page - 1) * limit;
