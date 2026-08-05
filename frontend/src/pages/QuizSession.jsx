@@ -7,8 +7,10 @@ import {
   FaTrophy,
   FaArrowLeft,
   FaBrain,
+  FaFilePdf,
 } from 'react-icons/fa';
 import API from '../services/api';
+import html2pdf from 'html2pdf.js';
 
 import RevisionSheetModal from '../components/dashboard/RevisionSheetModal';
 
@@ -74,6 +76,18 @@ const QuizSession = () => {
       },
       `quiz-result-${quiz.title}`
     );
+  };
+
+  const handleExportResultsPDF = () => {
+    const element = document.getElementById('quiz-results-container');
+    const opt = {
+      margin: 0.5,
+      filename: `quiz-result-${quiz.title}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+    html2pdf().from(element).set(opt).save();
   };
 
   useEffect(() => {
@@ -323,7 +337,7 @@ const QuizSession = () => {
           </div>
         ) : (
           /* Results View */
-          <div className="bg-slate-800 rounded-xl p-8 shadow-xl border border-slate-700">
+          <div id="quiz-results-container" className="bg-slate-800 rounded-xl p-8 shadow-xl border border-slate-700">
             <div className="text-center mb-10">
               <div className="inline-flex items-center justify-center w-20 h-20 bg-emerald-500/10 rounded-full mb-4">
                 <FaTrophy className="text-4xl text-emerald-400" />
@@ -346,6 +360,12 @@ const QuizSession = () => {
                   className="px-4 py-2 text-sm bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition-colors"
                 >
                   Export as JSON
+                </button>
+                <button
+                  onClick={handleExportResultsPDF}
+                  className="px-4 py-2 text-sm bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 rounded-lg font-medium transition-colors flex items-center gap-2"
+                >
+                  <FaFilePdf /> Download PDF Summary
                 </button>
               </div>
             </div>
