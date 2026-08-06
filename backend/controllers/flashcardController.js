@@ -591,3 +591,63 @@ exports.importFlashcards = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Get flashcard review forecast for next 30 days
+// @route   GET /api/flashcards/forecast
+// @access  Private
+exports.getReviewForecast = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const now = new Date();
+    
+    // We want to forecast the next 30 days starting from today.
+    const forecast = [];
+    const dateCounts = {};
+
+    for (let i = 0; i < 30; i++) {
+      const date = new Date();
+      date.setDate(now.getDate() + i);
+      const dateString = date.toISOString().split('T')[0];
+      dateCounts[dateString] = 0;
+      forecast.push({
+        date: dateString,
+        count: 0,
+      });
+    }
+
+    // Query all flashcards for this user
+    const cards = await Flashcard.findAll({
+      where: {
+        user: userId,
+      },
+      attributes: ['nextReviewDate'],
+    });
+
+    const todayStr = now.toISOString().split('T')[0];
+
+    cards.forEach((card) => {
+      if (!card.nextReviewDate) return;
+      
+      const cardDate = new Date(card.nextReviewDate);
+      const cardDateStr = cardDate.toISOString().split('T')[0];
+
+      if (cardDate <= now) {
+        // Overdue cards are due today
+        dateCounts[todayStr] = (dateCounts[todayStr] || 0) + 1;
+      } else {
+        if (dateCounts[cardDateStr] !== undefined) {
+          dateCounts[cardDateStr]++;
+        }
+      }
+    });
+
+    const data = forecast.map((f) => ({
+      date: f.date,
+      count: dateCounts[f.date] || 0,
+    }));
+
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+};

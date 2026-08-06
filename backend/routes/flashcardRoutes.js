@@ -316,6 +316,46 @@ router.post(
 
 /**
  * @swagger
+ * /api/flashcards/forecast:
+ *   get:
+ *     summary: Retrieve scheduled card review counts aggregated over next 30 days
+ *     tags: [Flashcards]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 30-day review workload forecast retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       date:
+ *                         type: string
+ *                         format: date
+ *                         example: "2026-08-05"
+ *                       count:
+ *                         type: integer
+ *                         example: 12
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.get('/forecast', protect, getReviewForecast);
+
+/**
+ * @swagger
  * /api/flashcards:
  *   post:
  *     summary: Create a new flashcard
