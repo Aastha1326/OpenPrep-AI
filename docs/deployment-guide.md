@@ -4,23 +4,25 @@ This guide describes how to deploy **OpenPrep AI** in production environments.
 
 ---
 
-## 🗄️ MongoDB Atlas Configuration
+## 🗄️ PostgreSQL Configuration
 
-For production, do not run local MongoDB instances. Use **MongoDB Atlas** for a fully managed database cluster.
+For production, use a managed PostgreSQL provider. The project uses **Neon** or **Render PostgreSQL** for fully managed database hosting.
 
-1. **Create an Account**: Visit [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) and sign up.
-2. **Deploy a Free Cluster**: Choose the shared free tier cluster, selecting your preferred cloud provider (AWS/GCP) and region close to your target audience.
-3. **Database Security Access**:
-   * Create a database user (e.g., `openprep_user`) and generate a strong password. Keep read/write privileges enabled.
-4. **Network Whitelisting**:
-   * Navigate to the **Network Access** tab.
-   * Whitelist IP addresses: Add the static IP of your application host (VPS) or set it to `0.0.0.0/0` if deploying on dynamic platforms like Render or Railway.
-5. **Fetch Connection String**:
-   * Click **Connect** on the Database dashboard.
-   * Select **Connect your application**.
-   * Copy the connection URI:
-     `mongodb+srv://openprep_user:<password>@cluster0.abcde.mongodb.net/openprep_db?retryWrites=true&w=majority`
-   * Replace `<password>` with your created database user's password.
+### Option A: Neon (Serverless PostgreSQL — Recommended)
+
+1. **Create an Account**: Visit [Neon](https://neon.tech) and sign up.
+2. **Create a Project**: Click **New Project**, name it `openprep-ai`, and select your preferred region.
+3. **Copy Connection String**: From your project dashboard, copy the connection string:
+   `postgres://alice_1234:password@ep-cool-darkness-123456.us-east-2.aws.neon.tech/openprep-ai?sslmode=require`
+4. **Set Environment Variable**: Add the connection string as `DATABASE_URL` in your deployment.
+
+### Option B: Render PostgreSQL
+
+1. **Create an Account**: Visit [Render](https://render.com) and sign up.
+2. **Create a New PostgreSQL Database**: In the Render dashboard, click **New +** → **PostgreSQL**.
+3. **Configure**: Choose the free or paid tier, set the database name to `openprep`, and create.
+4. **Copy Internal Connection String**: Once provisioned, copy the **Internal Database URL** from the Render dashboard.
+5. **Set Environment Variable**: Add the connection string as `DATABASE_URL` in your backend service environment variables.
 
 ---
 
@@ -40,7 +42,7 @@ Render allows easy Git-push automatic deployments for frontend and backend compo
    * **Start Command**: `npm start`
 4. Under **Advanced**, add your Production Environment Variables:
    * `PORT`: `5000`
-   * `MONGO_URI`: `mongodb+srv://...` (Your Atlas URI)
+   * `DATABASE_URL`: (Your PostgreSQL connection string from Neon/Render)
    * `JWT_SECRET`: (Random strong string)
    * `GEMINI_API_KEY`: (Your Gemini Key)
 
@@ -64,7 +66,7 @@ Railway is excellent for running containerized setups using your existing config
 2. Create a new project, select **Deploy from GitHub repo**, and select your repository.
 3. Define backend build attributes:
    * Railway automatically reads `backend/Dockerfile` and builds the Node container.
-   * Add the required environment variables (`MONGO_URI`, `JWT_SECRET`, `GEMINI_API_KEY`) in the Railway variables tab.
+   * Add the required environment variables (`DATABASE_URL`, `JWT_SECRET`, `GEMINI_API_KEY`) in the Railway variables tab.
 4. Define frontend build attributes:
    * Set `VITE_API_URL` pointing to your Railway backend domain.
    * Railway builds the static SPA and serves it.
@@ -102,7 +104,7 @@ sudo npm install -g pm2
 3. Setup and run backend under PM2:
    ```bash
    cd ../backend
-   # Create .env and configure MONGO_URI, JWT_SECRET, etc.
+   # Create .env and configure DATABASE_URL, JWT_SECRET, etc.
    npm install
    pm2 start server.js --name "openprep-backend"
    pm2 save
