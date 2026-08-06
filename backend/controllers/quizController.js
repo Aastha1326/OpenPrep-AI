@@ -8,6 +8,24 @@ const Note = require('../models/Note');
 const ActivityLog = require('../models/ActivityLog');
 const Progress = require('../models/Progress');
 const geminiService = require('../services/geminiService');
+const { sequelize } = require('../config/db');
+
+
+const executeWithRetry = async (fn, maxRetries = 3) => {
+  let attempt = 0;
+  while (attempt < maxRetries) {
+    try {
+      return await fn();
+    } catch (err) {
+      const isLockError = err.name === 'SequelizeTimeoutError' || 
+                          (err.message && (err.message.includes('deadlock') || err.message.includes('database is locked')));
+      attempt++;
+      if (attempt >= maxRetries || !isLockError) throw err;
+      const delay = Math.pow(2, attempt) * 100 + Math.random() * 100;
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+};
 
 // @desc    Generate AI Quiz
 // @route   POST /api/quizzes/generate-ai
@@ -188,7 +206,7 @@ exports.submitQuizAttempt = async (req, res, next) => {
     const weakTopics = [];
     const strongTopics = [];
     if (quiz.topic) {
-      const topicObj = await Topic.findByPk(quiz.topic);
+      const topicObj = await Topic.findByPk(quiz.topic, { transaction: t });
       if (topicObj) {
         if (score < 60) {
           weakTopics.push(quiz.topic);
@@ -199,12 +217,12 @@ exports.submitQuizAttempt = async (req, res, next) => {
         } else {
           topicObj.status = 'Medium';
         }
-        await topicObj.save();
+        await topicObj.save({ transaction: t });
       }
     }
 
     // Save Attempt
-    const attempt = await QuizAttempt.create({
+    const attemptRecord = await QuizAttempt.create({
       user: req.user.id,
       quiz: quiz.id,
       score,
@@ -213,7 +231,7 @@ exports.submitQuizAttempt = async (req, res, next) => {
       timeSpent: timeSpent || 0,
       weakTopics,
       strongTopics,
-    });
+    }, { transaction: t });
 
     // Update Progress
     if (quiz.topic) {
@@ -222,26 +240,26 @@ exports.submitQuizAttempt = async (req, res, next) => {
           user: req.user.id,
           subject: quiz.subject,
           topic: quiz.topic,
-        },
-      });
+        }
+      }, { transaction: t });
 
       if (progress) {
         const quizScores = [...progress.quizScores];
-        quizScores.push({ attempt: attempt.id, score, date: new Date() });
+        quizScores.push({ attempt: attemptRecord.id, score, date: new Date() });
         progress.quizScores = quizScores;
 
         if (score > progress.completionPercentage) {
           progress.completionPercentage = Math.min(score, 100);
         }
-        await progress.save();
+        await progress.save({ transaction: t });
       } else {
         await Progress.create({
           user: req.user.id,
           subject: quiz.subject,
           topic: quiz.topic,
           completionPercentage: score,
-          quizScores: [{ attempt: attempt.id, score, date: new Date() }],
-        });
+          quizScores: [{ attempt: attemptRecord.id, score, date: new Date() }],
+        }, { transaction: t });
       }
     }
 
@@ -250,7 +268,7 @@ exports.submitQuizAttempt = async (req, res, next) => {
       user: req.user.id,
       activityType: 'quiz_attempt',
       description: `Completed practice quiz: "${quiz.title}" with score ${score}%`,
-    });
+    }, { transaction: t });
 
     res.status(201).json({
       success: true,
