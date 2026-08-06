@@ -1,4 +1,4 @@
-import { Sun, Moon, Eye } from 'lucide-react';
+import { Sun, Moon, Eye, Monitor } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 
 const ThemeToggle = ({ className = '' }) => {
@@ -10,12 +10,14 @@ const ThemeToggle = ({ className = '' }) => {
         onClick={toggleTheme}
         className="p-2 rounded-lg bg-amber-100/50 hover:bg-amber-100 dark:bg-slate-800 dark:hover:bg-slate-700/80 transition"
         aria-label="Toggle theme"
-        title="Toggle Theme"
+        title={`Toggle Theme (Current: ${theme})`}
       >
         {theme === 'dark' ? (
-          <Sun className="h-5 w-5 text-amber-400" />
+          <Moon className="h-5 w-5 text-amber-400" />
+        ) : theme === 'light' ? (
+          <Sun className="h-5 w-5 text-amber-900" />
         ) : (
-          <Moon className="h-5 w-5 text-amber-900" />
+          <Monitor className="h-5 w-5 text-amber-600 dark:text-amber-400" />
         )}
       </button>
 

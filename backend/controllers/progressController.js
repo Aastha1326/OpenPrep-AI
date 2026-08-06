@@ -16,6 +16,7 @@ exports.getDashboardStats = async (req, res, next) => {
 
     // 1. User profile stats (streak & study hours)
     const streak = req.user.streakCount || 0;
+    const streakFreezes = req.user.streakFreezes || 0;
     const totalStudyHours = req.user.studyHours || 0;
 
     // 2. Topic statistics breakdown (Strong, Medium, Weak counts) via aggregation
@@ -99,6 +100,7 @@ exports.getDashboardStats = async (req, res, next) => {
       success: true,
       data: {
         streak,
+        streakFreezes,
         totalStudyHours,
         syllabusProgress,
         topicsBreakdown: {

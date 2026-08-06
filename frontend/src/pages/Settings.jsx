@@ -14,12 +14,25 @@ import {
   Trash,
   AlertCircle,
   CheckCircle,
+  Bell,
 } from 'lucide-react';
 import LeatherBoard from '../components/dashboard/LeatherBoard';
 import VintagePaper from '../components/dashboard/VintagePaper';
 import API from '../services/api';
+import { getVapidPublicKey, subscribeToPush, unsubscribeFromPush, updateNotificationPreferences } from '../services/notificationApi';
 import { loadUser } from '../store/slices/authSlice';
 import { validateAvatarFile } from '../utils/fileValidation';
+
+const urlBase64ToUint8Array = (base64String) => {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+};
 
 const Settings = () => {
   const dispatch = useDispatch();
@@ -123,6 +136,72 @@ const Settings = () => {
       setSaving(false);
     }
   }, [leaderboardVisible, dispatch]);
+
+  const [reminderTime, setReminderTime] = useState(user?.dailyReminderTime || '09:00');
+  const [pushStatus, setPushStatus] = useState(Notification.permission);
+  const [pushSubscribed, setPushSubscribed] = useState(!!user?.pushSubscription);
+  const [pushLoading, setPushLoading] = useState(false);
+
+  const handleEnablePush = async () => {
+    try {
+      setPushLoading(true);
+      const permission = await Notification.requestPermission();
+      setPushStatus(permission);
+
+      if (permission === 'granted') {
+        const registration = await navigator.serviceWorker.register('/service-worker.js');
+        const vapidPublicKey = await getVapidPublicKey();
+        const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
+
+        const subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: convertedVapidKey,
+        });
+
+        await subscribeToPush(subscription);
+        setPushSubscribed(true);
+        dispatch(loadUser());
+      }
+    } catch (err) {
+      console.error('Failed to subscribe to push notifications', err);
+      setError('Failed to enable push notifications.');
+    } finally {
+      setPushLoading(false);
+    }
+  };
+
+  const handleDisablePush = async () => {
+    try {
+      setPushLoading(true);
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      if (subscription) {
+        await subscription.unsubscribe();
+      }
+      await unsubscribeFromPush();
+      setPushSubscribed(false);
+      dispatch(loadUser());
+    } catch (err) {
+      console.error('Failed to unsubscribe', err);
+      setError('Failed to disable push notifications.');
+    } finally {
+      setPushLoading(false);
+    }
+  };
+
+  const handleSaveReminderTime = async () => {
+    try {
+      setSaving(true);
+      setSaved(false);
+      await updateNotificationPreferences(reminderTime);
+      setSaved(true);
+      dispatch(loadUser());
+    } catch (err) {
+      setError('Failed to update reminder time.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const baseURL = API?.defaults?.baseURL || '';
   const cleanBaseURL = baseURL.replace(/\/api\/?$/, '');
@@ -326,6 +405,81 @@ const Settings = () => {
               {error}
             </p>
           )}
+        </VintagePaper>
+
+        {/* --- PUSH NOTIFICATIONS --- */}
+        <VintagePaper className="border-t-4 border-t-amber-700">
+          <div className="flex items-center gap-3 mb-3">
+            <Bell className="w-7 h-7 text-amber-700" />
+            <h2 className="text-2xl font-bold font-playfair text-neutral-800 dark:text-neutral-100">
+              Daily Study Reminders
+            </h2>
+          </div>
+
+          <p className="text-neutral-600 dark:text-neutral-300 mb-6 leading-relaxed">
+            Enable web push notifications to get daily reminders for your study goals. Set your preferred time below.
+          </p>
+
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-neutral-100/60 dark:bg-neutral-800/60 border border-neutral-300 dark:border-neutral-600 rounded-sm">
+              <div>
+                <p className="font-playfair font-bold text-lg text-neutral-800 dark:text-neutral-100">
+                  Push Notifications
+                </p>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-0.5">
+                  {pushStatus === 'denied' ? 'Notifications are blocked by your browser.' : (pushSubscribed ? 'Notifications are enabled.' : 'You are not subscribed to notifications.')}
+                </p>
+              </div>
+
+              {pushSubscribed ? (
+                <button
+                  type="button"
+                  onClick={handleDisablePush}
+                  disabled={pushLoading}
+                  className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-800 border border-red-200 rounded-sm text-sm font-semibold shadow transition-all disabled:opacity-50"
+                >
+                  {pushLoading ? 'Disabling...' : 'Disable'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleEnablePush}
+                  disabled={pushLoading || pushStatus === 'denied'}
+                  className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-yellow-400 border border-yellow-700/50 rounded-sm text-sm font-semibold shadow transition-all disabled:opacity-50"
+                >
+                  {pushLoading ? 'Enabling...' : 'Enable Push Notifications'}
+                </button>
+              )}
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-neutral-100/60 dark:bg-neutral-800/60 border border-neutral-300 dark:border-neutral-600 rounded-sm">
+              <div>
+                <p className="font-playfair font-bold text-lg text-neutral-800 dark:text-neutral-100">
+                  Reminder Time
+                </p>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-0.5">
+                  When would you like to be reminded to study?
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <input
+                  type="time"
+                  value={reminderTime}
+                  onChange={(e) => setReminderTime(e.target.value)}
+                  className="px-3 py-2 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveReminderTime}
+                  disabled={saving}
+                  className="px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white rounded-sm text-sm font-semibold shadow transition-all disabled:opacity-50"
+                >
+                  {saving ? 'Saving...' : 'Save Time'}
+                </button>
+              </div>
+            </div>
+          </div>
         </VintagePaper>
       </div>
     </LeatherBoard>

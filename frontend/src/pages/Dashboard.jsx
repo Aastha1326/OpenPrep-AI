@@ -22,6 +22,7 @@ import {
   Upload,
   Settings,
   MessageSquare,
+  Shield,
 } from 'lucide-react';
 import API from '../services/api';
 import { toDateOnlyString } from '../utils/dateUtils';
@@ -414,6 +415,7 @@ const Dashboard = () => {
   const strong = stats?.topicsBreakdown?.strong ?? 0;
   const medium = stats?.topicsBreakdown?.medium ?? 0;
   const totalTopics = stats?.topicsBreakdown?.total ?? 0;
+  const streakFreezes = stats?.streakFreezes ?? 0;
 
   return (
     <LeatherBoard>
@@ -528,6 +530,20 @@ const Dashboard = () => {
               <span className="text-gold-foil font-bold text-2xl">{streakDays} Day</span>
               <span className="text-amber-200/50 text-xs uppercase tracking-widest">Streak</span>
             </div>
+
+            {streakFreezes > 0 && (
+              <div className="flex flex-col items-center ml-2">
+                <div className="relative group cursor-pointer" title="Streak Freeze Shield">
+                  <Shield
+                    className="w-10 h-10 text-cyan-400 animate-pulse"
+                    fill="currentColor"
+                  />
+                  <div className="absolute inset-0 blur-md bg-cyan-400/30 rounded-full" />
+                </div>
+                <span className="text-cyan-300 font-bold text-xl">{streakFreezes}</span>
+                <span className="text-cyan-200/50 text-[10px] uppercase tracking-widest">Freezes</span>
+              </div>
+            )}
 
             <button
               onClick={() => navigate('/settings')}

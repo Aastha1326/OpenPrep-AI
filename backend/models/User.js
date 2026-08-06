@@ -57,6 +57,10 @@ const User = sequelize.define(
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
     },
+    streakFreezes: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
     studyHours: {
       type: DataTypes.FLOAT,
       defaultValue: 0,
@@ -104,6 +108,15 @@ const User = sequelize.define(
     lockoutUntil: {
       type: DataTypes.DATE,
       allowNull: true,
+    },
+    pushSubscription: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+    },
+    dailyReminderTime: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      defaultValue: '09:00', // Default reminder time
     },
     sm2EasyFactorModifier: {
       type: DataTypes.FLOAT,

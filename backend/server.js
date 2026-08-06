@@ -42,6 +42,11 @@ const noteRoutes = require('./routes/noteRoutes');
 const progressRoutes = require('./routes/progressRoutes');
 const communityRoutes = require('./routes/communityRoutes');
 const userRoutes = require('./routes/userRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const { initNotificationCron } = require('./services/notificationService');
+const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
+initNotificationCron();
+initDifficultyCalibratorCron();
 
 // Connect to Database
 connectDB();
@@ -164,6 +169,7 @@ app.use('/api/notes', noteRoutes);
 app.use('/api/progress', progressRoutes);
 app.use('/api/community', communityRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Base Route
 app.get('/', (req, res) => {

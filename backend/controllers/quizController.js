@@ -10,6 +10,7 @@ const ActivityLog = require('../models/ActivityLog');
 const Progress = require('../models/Progress');
 const geminiService = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
+const { runCalibration } = require('../services/difficultyCalibrator');
 
 // Window (ms) during which duplicate quiz submissions for the same quiz are ignored.
 // Prevents double-click on "Submit Quiz" from creating duplicate attempt records.
@@ -503,3 +504,24 @@ exports.generateRevisionSheet = async (req, res, next) => {
   }
 };
 
+// @desc    Run difficulty calibration report
+// @route   GET /api/quizzes/admin/calibration-report
+// @access  Private/Admin
+exports.getCalibrationReport = async (req, res, next) => {
+  try {
+    // Check if user is admin if role exists
+    if (req.user && req.user.role && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Not authorized as admin' });
+    }
+
+    const report = await runCalibration();
+    
+    if (report.success) {
+      res.status(200).json({ success: true, data: report });
+    } else {
+      res.status(500).json({ success: false, error: report.error });
+    }
+  } catch (error) {
+    next(error);
+  }
+};
