@@ -8,6 +8,8 @@ const ActivityLog = require('../models/ActivityLog');
 const User = require('../models/User');
 const geminiService = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
+const { toDateOnlyString, toLocalDateString } = require('../utils/dateUtils');
+const { generateMilestones } = require('../services/milestoneGeneratorService');
 
 // @desc    Generate AI Study Plan
 // @route   POST /api/study-plans/generate-ai
@@ -78,7 +80,9 @@ exports.generateAIPlan = async (req, res, next) => {
         });
       }
       formattedGoals.push({
-        date: new Date(day.date),
+        // Store plain YYYY-MM-DD date strings (local day) instead of UTC
+        // timestamps so schedule items never shift by a day across timezones.
+        date: toDateOnlyString(day.date),
         tasks,
       });
     }
@@ -89,12 +93,20 @@ exports.generateAIPlan = async (req, res, next) => {
       { where: { user: req.user.id, exam: examId, status: 'active' } }
     );
 
+    const milestones = generateMilestones({
+      startDate: toDateOnlyString(startDate),
+      endDate: toDateOnlyString(endDate),
+      dailyGoals: formattedGoals,
+      examName: exam.name,
+    });
+
     const studyPlan = await StudyPlan.create({
       exam: examId,
       user: req.user.id,
       startDate: new Date(startDate),
       endDate: new Date(endDate),
       dailyGoals: formattedGoals,
+      milestones,
       status: 'active',
     });
 
@@ -256,11 +268,66 @@ exports.toggleTaskCompletion = async (req, res, next) => {
   }
 };
 
+// @desc    Move a task to a new date (used by the Gantt/timeline drag view)
+// @route   PUT /api/study-plans/:planId/tasks/:taskId/date
+// @access  Private
+exports.moveTaskDate = async (req, res, next) => {
+  try {
+    const { planId, taskId } = req.params;
+    const { newDate } = req.body;
+
+    const plan = await StudyPlan.findOne({ where: { id: planId, user: req.user.id } });
+    if (!plan) {
+      return res.status(404).json({ success: false, error: 'Study plan not found' });
+    }
+
+    const planStart = toDateOnlyString(plan.startDate);
+    const planEnd = toDateOnlyString(plan.endDate);
+    const targetDate = toDateOnlyString(newDate);
+
+    if (targetDate < planStart || targetDate > planEnd) {
+      return res.status(400).json({
+        success: false,
+        error: `Date must be between ${planStart} and ${planEnd}`,
+      });
+    }
+
+    const dailyGoals = JSON.parse(JSON.stringify(plan.dailyGoals));
+    let movedTask = null;
+
+    for (const goal of dailyGoals) {
+      const idx = (goal.tasks || []).findIndex((t) => t._id === taskId || t.id === taskId);
+      if (idx !== -1) {
+        [movedTask] = goal.tasks.splice(idx, 1);
+        break;
+      }
+    }
+
+    if (!movedTask) {
+      return res.status(404).json({ success: false, error: 'Task not found in plan' });
+    }
+
+    let targetGoal = dailyGoals.find((g) => toDateOnlyString(g.date) === targetDate);
+    if (!targetGoal) {
+      targetGoal = { date: newDate, tasks: [] };
+      dailyGoals.push(targetGoal);
+      dailyGoals.sort((a, b) => new Date(a.date) - new Date(b.date));
+    }
+    targetGoal.tasks.push(movedTask);
+
+    plan.dailyGoals = dailyGoals;
+    await plan.save();
+
+    res.status(200).json({ success: true, data: plan });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Get all Study Plans
 // @route   GET /api/study-plans/plans
 // @access  Private
-exports.getPlans = async (req, res, next) => {
-  try {
+exports.getPlans = async (req, res, next) => {  try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
     const offset = (page - 1) * limit;
@@ -309,6 +376,8 @@ exports.rescheduleOverdueTasks = async (req, res, next) => {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    // Plain local-date string (YYYY-MM-DD) immune to timezone drift
+    const todayStr = toLocalDateString(new Date());
     const examDate = new Date(exam.date);
     const daysUntilExam = Math.ceil((examDate - today) / (1000 * 60 * 60 * 24));
 
@@ -339,8 +408,8 @@ exports.rescheduleOverdueTasks = async (req, res, next) => {
       const generatedGoals = await geminiService.generateStudyPlan(
         exam.name,
         syllabus,
-        today.toISOString().split('T')[0],
-        examDate.toISOString().split('T')[0],
+        todayStr,
+        toDateOnlyString(exam.date),
         3, // Default 3 hours per day
         true // Force refresh
       );
@@ -372,7 +441,7 @@ exports.rescheduleOverdueTasks = async (req, res, next) => {
           });
         }
         formattedGoals.push({
-          date: new Date(day.date),
+          date: toDateOnlyString(day.date),
           tasks,
         });
       }
@@ -398,12 +467,13 @@ exports.rescheduleOverdueTasks = async (req, res, next) => {
     const overdueTasks = [];
     const futureGoals = [];
 
-    // Separate overdue incomplete tasks from future goals
+    // Separate overdue incomplete tasks from future goals.
+    // Compare plain YYYY-MM-DD strings so the reschedule never drifts a day
+    // based on the server/client timezone.
     for (const goal of dailyGoals) {
-      const goalDate = new Date(goal.date);
-      goalDate.setHours(0, 0, 0, 0);
+      const goalDateStr = toDateOnlyString(goal.date);
 
-      if (goalDate < today) {
+      if (goalDateStr < todayStr) {
         // This is a past date - collect incomplete tasks
         for (const task of goal.tasks) {
           if (!task.completed) {
@@ -472,11 +542,7 @@ exports.rescheduleOverdueTasks = async (req, res, next) => {
     }
 
     // Rebuild dailyGoals with today's date onwards
-    const todayGoals = dailyGoals.filter(g => {
-      const goalDate = new Date(g.date);
-      goalDate.setHours(0, 0, 0, 0);
-      return goalDate >= today;
-    });
+    const todayGoals = dailyGoals.filter((g) => toDateOnlyString(g.date) >= todayStr);
 
     plan.dailyGoals = [...todayGoals, ...rescheduledGoals];
     await plan.save();
@@ -521,6 +587,94 @@ exports.rescheduleAdaptivePlan = async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'No active study plan found to reschedule' });
     }
     res.status(200).json({ success: true, data: result, message: 'Adaptive study plan rescheduled successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+// @desc    Export Study Plan as RFC 5545 .ics calendar file
+// @route   GET /api/study-plans/:id/export-ics
+// @access  Private
+exports.exportStudyPlanIcs = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const plan = await StudyPlan.findOne({
+      where: { id, user: req.user.id },
+      include: [{ model: Exam, as: 'examRef' }],
+    });
+
+    if (!plan) {
+      return res.status(404).json({ success: false, error: 'Study plan not found' });
+    }
+
+    const examName = plan.examRef ? plan.examRef.name : 'Exam Study Plan';
+    
+    // Helper to format JS date to RFC 5545 UTC timestamp format (YYYYMMDDTHHmmssZ)
+    const formatIcsDate = (date) => {
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+      return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    };
+
+    const nowTimestamp = formatIcsDate(new Date());
+
+    let icsLines = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//OpenPrep-AI//Study Plan Calendar//EN',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      `X-WR-CALNAME:${examName} - Study Plan`,
+    ];
+
+    if (Array.isArray(plan.dailyGoals)) {
+      for (const goal of plan.dailyGoals) {
+        const goalDateStr = goal.date; // YYYY-MM-DD format
+        if (!goalDateStr || !Array.isArray(goal.tasks)) continue;
+
+        // Base start time for tasks on this day (e.g., 09:00:00 UTC)
+        let baseHour = 9;
+        for (const task of goal.tasks) {
+          const startDateObj = new Date(`${goalDateStr}T${String(baseHour).padStart(2, '0')}:00:00Z`);
+          const durationMinutes = task.duration || 60;
+          const endDateObj = new Date(startDateObj.getTime() + durationMinutes * 60000);
+
+          const dtStart = formatIcsDate(startDateObj);
+          const dtEnd = formatIcsDate(endDateObj);
+          const uid = `${task._id || uuidv4()}@openprep.ai`;
+          const summary = `Study: ${task.title} (${examName})`;
+          const description = `Scheduled study session for exam: ${examName}. Duration: ${durationMinutes} minutes.`;
+
+          icsLines.push(
+            'BEGIN:VEVENT',
+            `UID:${uid}`,
+            `DTSTAMP:${nowTimestamp}`,
+            `DTSTART:${dtStart}`,
+            `DTEND:${dtEnd}`,
+            `SUMMARY:${summary}`,
+            `DESCRIPTION:${description}`,
+            // Add reminder notification metadata (VALARM - 15 minutes prior)
+            'BEGIN:VALARM',
+            'TRIGGER:-PT15M',
+            'ACTION:DISPLAY',
+            `DESCRIPTION:Reminder: ${task.title} starts in 15 minutes`,
+            'END:VALARM',
+            'END:VEVENT'
+          );
+
+          // Increment start hour for subsequent tasks on the same day
+          baseHour += Math.ceil(durationMinutes / 60);
+          if (baseHour > 20) baseHour = 9; // wrap around if too late
+        }
+      }
+    }
+
+    icsLines.push('END:VCALENDAR');
+
+    const icsContent = icsLines.join('\r\n');
+
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="study-plan-${id}.ics"`);
+    return res.status(200).send(icsContent);
   } catch (error) {
     next(error);
   }

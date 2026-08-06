@@ -7,4 +7,8 @@ const URL = import.meta.env.VITE_API_URL
 export const socket = io(URL, {
   autoConnect: false,
   withCredentials: true,
+  reconnection: true,
+  reconnectionAttempts: Infinity,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000,
 });

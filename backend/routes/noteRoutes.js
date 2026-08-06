@@ -1,5 +1,12 @@
 const express = require('express');
-const { uploadNote, getNotes, downloadNote, deleteNote, summarizeNote } = require('../controllers/noteController');
+const {
+  uploadNote,
+  getNotes,
+  downloadNote,
+  deleteNote,
+  summarizeNote,
+  uploadVoiceNote,
+} = require('../controllers/noteController');
 const { protect } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const { validateUploadNote } = require('../middleware/validators');
@@ -87,32 +94,58 @@ const router = express.Router();
  *               $ref: '#/components/schemas/Error'
  */
 
-router.post('/', protect, upload.single('file'), validateUploadNote, clearCache('notes:*'), uploadNote);
+router.post(
+  '/',
+  protect,
+  upload.single('file'),
+  validateUploadNote,
+  clearCache('notes:*'),
+  uploadNote
+);
 
 /**
  * @swagger
- * /api/notes:
- *   get:
- *     summary: Get all notes for the authenticated user
+ * /api/notes/voice:
+ *   post:
+ *     summary: Upload and process voice note audio file with AI transcription & summary
  *     tags: [Notes]
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: subjectId
- *         schema:
- *           type: string
- *           format: uuid
- *         description: Filter by subject
- *       - in: query
- *         name: topicId
- *         schema:
- *           type: string
- *           format: uuid
- *         description: Filter by topic
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - file
+ *               - title
+ *               - subjectId
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: Audio file (.mp3, .wav, .m4a, etc.)
+ *               title:
+ *                 type: string
+ *                 minLength: 1
+ *                 maxLength: 100
+ *                 example: "Physics Lecture Audio Recording"
+ *               subjectId:
+ *                 type: string
+ *                 format: uuid
+ *                 example: "123e4567-e89b-12d3-a456-426614174000"
+ *               topicId:
+ *                 type: string
+ *                 format: uuid
+ *                 example: "123e4567-e89b-12d3-a456-426614174001"
+ *               isPublic:
+ *                 type: boolean
+ *                 default: false
+ *                 example: false
  *     responses:
- *       200:
- *         description: List of notes
+ *       201:
+ *         description: Voice note processed and saved successfully
  *         content:
  *           application/json:
  *             schema:
@@ -122,9 +155,97 @@ router.post('/', protect, upload.single('file'), validateUploadNote, clearCache(
  *                   type: boolean
  *                   example: true
  *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Note'
+ *                   $ref: '#/components/schemas/Note'
+ *       400:
+ *         description: Missing file or validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Subject not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       429:
+ *         description: Rate limit exceeded
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       503:
+ *         description: AI transcription service unavailable
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.post(
+  '/voice',
+  protect,
+  upload.single('file'),
+  validateUploadNote,
+  clearCache('notes:*'),
+  uploadVoiceNote
+);
+
+/**
+ * @swagger
+ * /api/notes:
+ *   get:
+ *     summary: Get all notes for the authenticated user (with filtering, search, pagination)
+ *     tags: [Notes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: subjectId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Filter by subject ID
+ *       - in: query
+ *         name: category
+ *         schema:
+ *           type: string
+ *           enum: ['Lecture Notes', 'Study Guide', 'Cheat Sheet', 'Summary', 'Other']
+ *         description: Filter by note category
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search keyword in title or content
+ *       - in: query
+ *         name: publicOnly
+ *         schema:
+ *           type: boolean
+ *         description: Retrieve public community notes only
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Number of items per page
+ *     responses:
+ *       200:
+ *         description: List of notes retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/PaginatedResponse'
  *       401:
  *         description: Not authenticated
  *         content:
@@ -133,7 +254,12 @@ router.post('/', protect, upload.single('file'), validateUploadNote, clearCache(
  *               $ref: '#/components/schemas/Error'
  */
 
-router.get('/', protect, cacheMiddleware(req => `notes:${req.user.id}:${req.originalUrl}`), getNotes);
+router.get(
+  '/',
+  protect,
+  cacheMiddleware((req) => `notes:${req.user.id}:${req.originalUrl}`),
+  getNotes
+);
 
 /**
  * @swagger

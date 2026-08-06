@@ -5,6 +5,8 @@ const {
   getQuizDetails,
   submitQuizAttempt,
   getAttemptHistory,
+  generateRevisionSheet,
+  getCalibrationReport,
 } = require('../controllers/quizController');
 const { protect } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
@@ -12,6 +14,7 @@ const { checkQuota } = require('../middleware/quotaMiddleware');
 const {
   validateGenerateAIQuiz,
   validateSubmitQuizAttempt,
+  validateGenerateRevisionSheet,
 } = require('../middleware/validators');
 
 const router = express.Router();
@@ -94,6 +97,48 @@ const router = express.Router();
  */
 
 router.post('/generate-ai', protect, aiLimiter, checkQuota, validateGenerateAIQuiz, generateAIQuiz);
+
+router.get('/admin/calibration-report', protect, getCalibrationReport);
+
+/**
+ * @swagger
+ * /api/quizzes/generate-revision-sheet:
+ *   post:
+ *     summary: Generate AI Revision Sheet for weak concepts from quiz history
+ *     tags: [Quizzes]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               quizAttemptId:
+ *                 type: string
+ *                 format: uuid
+ *               mistookQuestions:
+ *                 type: array
+ *               saveToNotes:
+ *                 type: boolean
+ *                 default: true
+ *     responses:
+ *       201:
+ *         description: Revision sheet generated successfully
+ *       401:
+ *         description: Not authenticated
+ *       429:
+ *         description: Rate limit exceeded
+ */
+router.post(
+  '/generate-revision-sheet',
+  protect,
+  aiLimiter,
+  checkQuota,
+  validateGenerateRevisionSheet,
+  generateRevisionSheet
+);
 
 /**
  * @swagger

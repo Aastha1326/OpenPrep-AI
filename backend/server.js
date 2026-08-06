@@ -19,7 +19,7 @@ const { Server } = require('socket.io');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
 const passport = require('./config/passport');
-
+const { getCorsMiddleware, getSocketCorsOrigin } = require('./middleware/corsHandler');
 // Validate required environment variables at startup
 if (!process.env.JWT_SECRET) {
   console.error('FATAL ERROR: JWT_SECRET is not defined in environment variables.');
@@ -41,6 +41,12 @@ const flashcardRoutes = require('./routes/flashcardRoutes');
 const noteRoutes = require('./routes/noteRoutes');
 const progressRoutes = require('./routes/progressRoutes');
 const communityRoutes = require('./routes/communityRoutes');
+const userRoutes = require('./routes/userRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const { initNotificationCron } = require('./services/notificationService');
+const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
+initNotificationCron();
+initDifficultyCalibratorCron();
 
 // Connect to Database
 connectDB();
@@ -55,44 +61,30 @@ if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
 
-// ── CORS origin resolver ──────────────────────────────────────────────────
-// Supports:
-//   CLIENT_URL  – primary production / staging frontend URL
-//   CORS_ORIGIN – legacy / alternative explicit override
-//   Fallback    – http://localhost:5173 (local dev)
-//   Pattern     – *.vercel.app and *.openprep.ai preview deployments
-const buildAllowedOrigins = () => {
-  const origins = new Set(['http://localhost:5173']);
-  if (process.env.CLIENT_URL)  origins.add(process.env.CLIENT_URL.replace(/\/$/, ''));
-  if (process.env.CORS_ORIGIN) origins.add(process.env.CORS_ORIGIN.replace(/\/$/, ''));
-  return origins;
-};
-
-const allowedOrigins = buildAllowedOrigins();
-
-const corsOriginHandler = (origin, callback) => {
-  // Allow server-to-server / curl requests with no Origin header
-  if (!origin) return callback(null, true);
-
-  // Exact match against configured origins
-  if (allowedOrigins.has(origin)) return callback(null, true);
-
-  // Pattern match: Vercel preview deployments and *.openprep.ai staging
-  const isVercelPreview = /^https:\/\/[\w-]+-[\w-]+\.vercel\.app$/.test(origin);
-  const isStagingDomain = /^https:\/\/[\w-]+\.openprep\.ai$/.test(origin);
-
-  if (isVercelPreview || isStagingDomain) return callback(null, true);
-
-  callback(new Error(`CORS: origin '${origin}' is not allowed`));
-};
-
 // Security Middlewares
-app.use(helmet());
-app.use(cors({
-  origin: corsOriginHandler,
-  credentials: true,
-}));
-
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'", 'https:', 'data:'],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+        upgradeInsecureRequests: [],
+      },
+    },
+    hsts: {
+      maxAge: 63072000, // 2 years
+      includeSubDomains: true,
+      preload: true,
+    },
+  })
+);
+app.use(getCorsMiddleware());
 app.use(passport.initialize());
 
 // Cookie parser (required for csurf cookie-based tokens)
@@ -125,6 +117,9 @@ const apiLimiter = rateLimit({
 });
 app.use('/api/', apiLimiter);
 
+// Serve avatar images publicly — profile pictures are displayed to other
+// users (e.g. in community features) and aren't sensitive like notes/PYQs.
+app.use('/uploads/avatars', express.static(path.join(__dirname, 'uploads/avatars')));
 
 // Set Static Folder for File Uploads (Protected)
 // protect, Note, PYQ already imported at top of file
@@ -168,10 +163,13 @@ app.use('/api/academic', academicRoutes);
 app.use('/api/pyqs', pyqRoutes);
 app.use('/api/study-plans', studyPlanRoutes);
 app.use('/api/quizzes', quizRoutes);
+app.use('/api/quiz', quizRoutes);
 app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/progress', progressRoutes);
 app.use('/api/community', communityRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Base Route
 app.get('/', (req, res) => {
@@ -203,14 +201,21 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: corsOriginHandler,
+    origin: getSocketCorsOrigin(),
     methods: ['GET', 'POST'],
     credentials: true,
-  },
+  },  // Longer timeouts tolerate throttled timers in backgrounded/idle browser
+  // tabs, so active lobby players aren't disconnected on a missed heartbeat.
+  pingTimeout: 60000,
+  pingInterval: 25000,
 });
-
 // Initialize socket handlers
 require('./sockets/battleHandler')(io);
+require('./sockets/chatHandler')(io);
+
+// Start weekly digest background scheduler
+const { startScheduler } = require('./services/weeklyDigestService');
+startScheduler();
 
 server.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);

@@ -40,12 +40,210 @@ const router = express.Router();
 
 // Exams & Bundles
 router.post('/exams', protect, validateCreateExam, clearCache(req => `exams:${req.user.id}:*`), createExam);
+
+/**
+ * @swagger
+ * /api/academic/bundles:
+ *   post:
+ *     summary: Create a composite bundle (exam + subjects + topics)
+ *     tags: [Academic]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - date
+ *               - subjects
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "Composite Exam Bundle"
+ *               date:
+ *                 type: string
+ *                 format: date
+ *                 example: "2025-06-01"
+ *               description:
+ *                 type: string
+ *                 example: "A sample composite bundle"
+ *               subjects:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - name
+ *                     - topics
+ *                   properties:
+ *                     name:
+ *                       type: string
+ *                       example: "Physics"
+ *                     description:
+ *                       type: string
+ *                       example: "Physics Subject"
+ *                     topics:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         required:
+ *                           - name
+ *                         properties:
+ *                           name:
+ *                             type: string
+ *                             example: "Thermodynamics"
+ *                           description:
+ *                             type: string
+ *                             example: "Thermodynamics Topic"
+ *                           weightage:
+ *                             type: number
+ *                             example: 10
+ *     responses:
+ *       201:
+ *         description: Composite bundle created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.post('/bundles', protect, clearCache(req => `exams:${req.user.id}:*`), createCompositeBundle);
+
+/**
+ * @swagger
+ * /api/academic/bundles/{examId}/weightages:
+ *   put:
+ *     summary: Update subject weightages for a bundle
+ *     tags: [Academic]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: examId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Exam ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - weightages
+ *             properties:
+ *               weightages:
+ *                 type: object
+ *                 additionalProperties:
+ *                   type: number
+ *                 example:
+ *                   "123e4567-e89b-12d3-a456-426614174000": 40
+ *                   "123e4567-e89b-12d3-a456-426614174001": 60
+ *     responses:
+ *       200:
+ *         description: Weightages updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: string
+ *                   example: "Subject weightages updated successfully"
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.put('/bundles/:examId/weightages', protect, clearCache(req => `subjects:${req.user.id}:*`), updateSubjectWeightages);
 
-// Syllabus File Importer
-// Uses multer single file upload (field: 'syllabusFile'), AI quota middleware + rate limiter
-// because PDF imports call Gemini for parsing. Clears the full exams cache after import.
+/**
+ * @swagger
+ * /api/academic/import-syllabus:
+ *   post:
+ *     summary: Import and parse a syllabus PDF using AI
+ *     tags: [Academic]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - syllabusFile
+ *             properties:
+ *               syllabusFile:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Syllabus imported and parsed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     exam:
+ *                       $ref: '#/components/schemas/Exam'
+ *       400:
+ *         description: File missing or validation failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       429:
+ *         description: Rate limit or AI quota exceeded
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.post(
   '/import-syllabus',
   protect,

@@ -1,6 +1,7 @@
 const errorHandler = (err, req, res, next) => {
   let error = { ...err };
   error.message = err.message;
+  error.statusCode = err.statusCode || err.status;
 
   // Log to console for developer
   console.error(err);
@@ -51,6 +52,22 @@ const errorHandler = (err, req, res, next) => {
   // Custom file type validation error
   if (err.name === 'FileValidationError') {
     error.statusCode = 400;
+  }
+
+  // JWT Errors
+  if (err.name === 'TokenExpiredError') {
+    return res.status(401).json({
+      success: false,
+      message: 'Token expired',
+      error: 'Token expired',
+    });
+  }
+  if (err.name === 'JsonWebTokenError') {
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid token',
+      error: 'Not authorized to access this route',
+    });
   }
 
   // Timeout error handling
