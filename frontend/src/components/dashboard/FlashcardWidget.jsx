@@ -81,12 +81,12 @@ const FlashcardWidget = ({ flashcard = null, loading = false, error = null, tota
         initial={false}
         animate={{ rotateY: isFlipped ? 180 : 0 }}
         transition={{ duration: 0.6, type: 'spring', stiffness: 200, damping: 20 }}
-        style={{ transformStyle: 'preserve-3d' }}
+        style={{ transformStyle: 'preserve-3d', WebkitTransformStyle: 'preserve-3d', willChange: 'transform' }}
       >
         {/* Front of Card */}
         <div
           className="absolute inset-0 bg-white dark:bg-slate-800 shadow-md border border-neutral-300 dark:border-slate-700 rounded-sm p-6 flex flex-col justify-center items-center backface-hidden"
-          style={{ backfaceVisibility: 'hidden' }}
+          style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
         >
           <div className="absolute top-2 left-2 flex items-center text-xs font-bold text-yellow-600 uppercase tracking-widest">
             <Lightbulb className="w-3 h-3 mr-1" />
@@ -106,7 +106,7 @@ const FlashcardWidget = ({ flashcard = null, loading = false, error = null, tota
         {/* Back of Card */}
         <div
           className="absolute inset-0 bg-yellow-50 dark:bg-yellow-900/30 shadow-md border border-yellow-200 dark:border-yellow-700/50 rounded-sm p-6 flex flex-col justify-center items-center backface-hidden text-center overflow-y-auto"
-          style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+          style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
         >
           <div className="absolute top-2 right-2 flex items-center text-xs text-yellow-600">
             <ChevronRight className="w-3 h-3" />
