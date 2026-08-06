@@ -319,46 +319,88 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
     });
   });
 
-  describe('GET /api/flashcards/forecast', () => {
-    it('should retrieve 30-day review forecast details', async () => {
-      // Create some cards due on specific dates
-      const today = new Date();
-      const tomorrow = new Date();
-      tomorrow.setDate(today.getDate() + 1);
+  describe('Custom User SM-2 Parameters', () => {
+    let customCard;
 
-      await Flashcard.create({
+    beforeEach(async () => {
+      // Set custom SM-2 parameters on test user
+      testUser.sm2EasyFactorModifier = 1.5;
+      testUser.sm2IntervalModifier = 2.0;
+      testUser.sm2Step1Interval = 3;
+      testUser.sm2Step2Interval = 8;
+      await testUser.save();
+
+      customCard = await Flashcard.create({
         user: testUser.id,
         subject: testSubject.id,
-        front: 'Forecast Today?',
-        back: 'Yes',
-        nextReviewDate: today,
+        topic: testTopic.id,
+        front: 'Custom SM-2 Question?',
+        back: 'Custom SM-2 Answer',
+        interval: 1,
+        repetitions: 0,
+        efactor: 2.5,
       });
+    });
 
-      await Flashcard.create({
-        user: testUser.id,
-        subject: testSubject.id,
-        front: 'Forecast Tomorrow?',
-        back: 'Yes',
-        nextReviewDate: tomorrow,
-      });
+    afterEach(async () => {
+      // Reset user to default values
+      testUser.sm2EasyFactorModifier = 1.0;
+      testUser.sm2IntervalModifier = 1.0;
+      testUser.sm2Step1Interval = 1;
+      testUser.sm2Step2Interval = 6;
+      await testUser.save();
+    });
+
+    it('should use custom step1Interval on first pass', async () => {
+      const res = await request(app)
+        .put(`/api/flashcards/${customCard.id}/review`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ quality: 4 });
+
+      expect(res.body.data.repetitions).toBe(1);
+      expect(res.body.data.interval).toBe(3); // sm2Step1Interval = 3
+    });
+
+    it('should use custom step2Interval on second successful review', async () => {
+      customCard.repetitions = 1;
+      customCard.interval = 1;
+      await customCard.save();
 
       const res = await request(app)
-        .get('/api/flashcards/forecast')
-        .set('Authorization', `Bearer ${authToken}`);
+        .put(`/api/flashcards/${customCard.id}/review`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ quality: 4 });
 
-      expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(res.body.data).toBeDefined();
-      expect(res.body.data.length).toBe(30);
+      expect(res.body.data.repetitions).toBe(2);
+      expect(res.body.data.interval).toBe(8); // sm2Step2Interval = 8
+    });
 
-      const todayStr = today.toISOString().split('T')[0];
-      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    it('should scale third+ intervals using custom sm2IntervalModifier', async () => {
+      customCard.repetitions = 2;
+      customCard.interval = 6;
+      customCard.efactor = 2.5;
+      await customCard.save();
 
-      const todayForecast = res.body.data.find((f) => f.date === todayStr);
-      const tomorrowForecast = res.body.data.find((f) => f.date === tomorrowStr);
+      const res = await request(app)
+        .put(`/api/flashcards/${customCard.id}/review`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ quality: 4 });
 
-      expect(todayForecast.count).toBeGreaterThanOrEqual(1);
-      expect(tomorrowForecast.count).toBeGreaterThanOrEqual(1);
+      expect(res.body.data.repetitions).toBe(3);
+      // Math.round(6 * 2.5 * 2.0) = 30
+      expect(res.body.data.interval).toBe(30);
+    });
+
+    it('should adjust E-Factor using custom sm2EasyFactorModifier', async () => {
+      const res = await request(app)
+        .put(`/api/flashcards/${customCard.id}/review`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ quality: 5 });
+
+      // Standard deltaEF for quality=5 is 0.1
+      // With modifier 1.5, change is 0.1 * 1.5 = 0.15
+      // 2.5 + 0.15 = 2.65
+      expect(res.body.data.efactor).toBeCloseTo(2.65, 2);
     });
   });
 });

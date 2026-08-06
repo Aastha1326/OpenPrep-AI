@@ -265,17 +265,31 @@ exports.reviewFlashcard = async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'Flashcard not found' });
     }
 
-    // SuperMemo SM-2 Algorithm using custom settings
-    const result = calculateSM2({
-      interval: card.interval,
-      repetitions: card.repetitions,
-      efactor: card.efactor,
-      quality,
-      easyFactorModifier: req.user.sm2EasyFactorModifier,
-      intervalModifier: req.user.sm2IntervalModifier,
-      step1Interval: req.user.sm2Step1Interval,
-      step2Interval: req.user.sm2Step2Interval,
-    });
+    // SuperMemo SM-2 Algorithm with User customizable parameters
+    let { interval, repetitions, efactor } = card;
+    const easyFactorModifier = req.user.sm2EasyFactorModifier ?? 1.0;
+    const intervalModifier = req.user.sm2IntervalModifier ?? 1.0;
+    const step1Interval = req.user.sm2Step1Interval ?? 1;
+    const step2Interval = req.user.sm2Step2Interval ?? 6;
+
+    if (quality >= 3) {
+      if (repetitions === 0) {
+        interval = step1Interval;
+      } else if (repetitions === 1) {
+        interval = step2Interval;
+      } else {
+        interval = Math.round(interval * efactor * intervalModifier);
+      }
+      repetitions += 1;
+    } else {
+      repetitions = 0;
+      interval = step1Interval;
+    }
+
+    // Adjust E-Factor
+    const deltaEF = (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
+    efactor = efactor + deltaEF * easyFactorModifier;
+    if (efactor < 1.3) efactor = 1.3;
 
     card.interval = result.interval;
     card.repetitions = result.repetitions;

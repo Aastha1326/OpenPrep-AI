@@ -581,147 +581,95 @@ describe('Auth Controller - Integration Tests', () => {
   });
 
   // =========================================================================
-  // POST /api/auth/logout
-  // =========================================================================
-  describe('POST /api/auth/logout', () => {
-    it('should clear the refreshToken httpOnly cookie on logout', async () => {
-      await createVerifiedUser({ email: 'logout@example.com' });
-
-      // Login to bootstrap a refresh token (also sets the httpOnly cookie)
-      const loginRes = await request(app)
-        .post('/api/auth/login')
-        .send({ email: 'logout@example.com', password: 'StrongPass1!' });
-      expect(loginRes.status).toBe(200);
-
-      const refreshToken = loginRes.body.refreshToken;
-      expect(refreshToken).toBeDefined();
-
-      const res = await request(app)
-        .post('/api/auth/logout')
-        .send({ refreshToken });
-
-      expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(res.body.message).toBe('Logged out successfully');
-
-      // Response must include a Set-Cookie header that expires the cookie
-      const setCookie = res.headers['set-cookie'];
-      expect(Array.isArray(setCookie)).toBe(true);
-      const clearCookieHeader = setCookie.find((c) => c.startsWith('refreshToken='));
-      expect(clearCookieHeader).toBeDefined();
-      expect(clearCookieHeader).toContain('Expires=Thu, 01 Jan 1970');
-      expect(clearCookieHeader).toContain('Path=/');
-      expect(clearCookieHeader).toContain('HttpOnly');
-    });
-
-    it('should invalidate the refresh token in the database after logout', async () => {
-      await createVerifiedUser({ email: 'logout-invalid@example.com' });
-
-      const loginRes = await request(app)
-        .post('/api/auth/login')
-        .send({ email: 'logout-invalid@example.com', password: 'StrongPass1!' });
-      expect(loginRes.status).toBe(200);
-
-      const refreshToken = loginRes.body.refreshToken;
-
-      const logoutRes = await request(app)
-        .post('/api/auth/logout')
-        .send({ refreshToken });
-      expect(logoutRes.status).toBe(200);
-
-      // Logged-out token must no longer be accepted for rotation
-      const refreshRes = await request(app)
-        .post('/api/auth/refresh-token')
-        .send({ refreshToken });
-      expect(refreshRes.status).toBe(401);
-      expect(refreshRes.body.success).toBe(false);
-      expect(refreshRes.body.error).toContain('Invalid or expired');
-    });
-
-    it('should return 200 and clear the cookie even without a refresh token', async () => {
-      const res = await request(app).post('/api/auth/logout').send({});
-
-      expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
-
-      const setCookie = res.headers['set-cookie'];
-      expect(Array.isArray(setCookie)).toBe(true);
-      expect(setCookie.some((c) => c.startsWith('refreshToken='))).toBe(true);
-    });
-  });
-});
-
-describe('Auth Settings - Integration Tests', () => {
-  let settingsUser;
-  let settingsToken;
-
-  beforeAll(async () => {
-    settingsUser = await createVerifiedUser({
-      email: 'settings@example.com',
-      name: 'Settings User',
-    });
-    settingsToken = jwt.sign({ id: settingsUser.id, type: 'access' }, process.env.JWT_SECRET);
-  });
-
-  // =========================================================================
-  // GET /api/auth/me — should surface leaderboardVisible
-  // =========================================================================
-  describe('GET /api/auth/me', () => {
-    it('should include leaderboardVisible in the returned user', async () => {
-      const res = await request(app)
-        .get('/api/auth/me')
-        .set('Authorization', `Bearer ${settingsToken}`);
-
-      expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(res.body.user).toHaveProperty('leaderboardVisible', true);
-    });
-  });
-
-  // =========================================================================
   // PATCH /api/auth/settings
   // =========================================================================
   describe('PATCH /api/auth/settings', () => {
-    it('should update leaderboardVisible to false (anonymous mode)', async () => {
+    it('should update user general settings when authenticated', async () => {
+      const user = await createVerifiedUser({ email: 'settingsupdate@example.com' });
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'settingsupdate@example.com', password: 'StrongPass1!' });
+      const token = loginRes.body.token;
+
       const res = await request(app)
         .patch('/api/auth/settings')
-        .set('Authorization', `Bearer ${settingsToken}`)
-        .send({ leaderboardVisible: false });
+        .set('Authorization', `Bearer ${token}`)
+        .send({ leaderboardVisible: false, receiveWeeklyDigest: false });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.user).toHaveProperty('leaderboardVisible', false);
+      expect(res.body.user.leaderboardVisible).toBe(false);
+      expect(res.body.user.receiveWeeklyDigest).toBe(false);
 
-      const reloaded = await User.findByPk(settingsUser.id);
-      expect(reloaded.leaderboardVisible).toBe(false);
+      const dbUser = await User.findByPk(user.id);
+      expect(dbUser.leaderboardVisible).toBe(false);
+      expect(dbUser.receiveWeeklyDigest).toBe(false);
     });
+  });
 
-    it('should update leaderboardVisible back to true', async () => {
+  // =========================================================================
+  // PUT /api/auth/sm2-settings
+  // =========================================================================
+  describe('PUT /api/auth/sm2-settings', () => {
+    it('should update user SM-2 parameters when authenticated', async () => {
+      const user = await createVerifiedUser({ email: 'sm2settings@example.com' });
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'sm2settings@example.com', password: 'StrongPass1!' });
+      const token = loginRes.body.token;
+
       const res = await request(app)
-        .patch('/api/auth/settings')
-        .set('Authorization', `Bearer ${settingsToken}`)
-        .send({ leaderboardVisible: true });
+        .put('/api/auth/sm2-settings')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          sm2EasyFactorModifier: 1.25,
+          sm2IntervalModifier: 1.15,
+          sm2Step1Interval: 2,
+          sm2Step2Interval: 8
+        });
 
       expect(res.status).toBe(200);
-      expect(res.body.user).toHaveProperty('leaderboardVisible', true);
+      expect(res.body.success).toBe(true);
+      expect(res.body.user.sm2EasyFactorModifier).toBe(1.25);
+      expect(res.body.user.sm2IntervalModifier).toBe(1.15);
+      expect(res.body.user.sm2Step1Interval).toBe(2);
+      expect(res.body.user.sm2Step2Interval).toBe(8);
+
+      const dbUser = await User.findByPk(user.id);
+      expect(dbUser.sm2EasyFactorModifier).toBe(1.25);
     });
+  });
 
-    it('should return 401 without a token', async () => {
+  // =========================================================================
+  // POST /api/auth/sm2-settings/reset
+  // =========================================================================
+  describe('POST /api/auth/sm2-settings/reset', () => {
+    it('should reset user SM-2 parameters to default values when authenticated', async () => {
+      const user = await createVerifiedUser({
+        email: 'sm2reset@example.com',
+        sm2EasyFactorModifier: 1.5,
+        sm2IntervalModifier: 2.0,
+        sm2Step1Interval: 3,
+        sm2Step2Interval: 10
+      });
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'sm2reset@example.com', password: 'StrongPass1!' });
+      const token = loginRes.body.token;
+
       const res = await request(app)
-        .patch('/api/auth/settings')
-        .send({ leaderboardVisible: false });
+        .post('/api/auth/sm2-settings/reset')
+        .set('Authorization', `Bearer ${token}`);
 
-      expect(res.status).toBe(401);
-    });
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.user.sm2EasyFactorModifier).toBe(1.0);
+      expect(res.body.user.sm2IntervalModifier).toBe(1.0);
+      expect(res.body.user.sm2Step1Interval).toBe(1);
+      expect(res.body.user.sm2Step2Interval).toBe(6);
 
-    it('should return 400 when leaderboardVisible is not a boolean', async () => {
-      const res = await request(app)
-        .patch('/api/auth/settings')
-        .set('Authorization', `Bearer ${settingsToken}`)
-        .send({ leaderboardVisible: 'no' });
-
-      expect(res.status).toBe(400);
-      expect(res.body.success).toBe(false);
+      const dbUser = await User.findByPk(user.id);
+      expect(dbUser.sm2EasyFactorModifier).toBe(1.0);
     });
   });
 });

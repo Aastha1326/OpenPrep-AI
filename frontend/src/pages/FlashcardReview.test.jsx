@@ -31,6 +31,22 @@ describe('FlashcardReview', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
+    API.get.mockImplementation((url) => {
+      if (url === '/auth/me') {
+        return Promise.resolve({
+          data: {
+            success: true,
+            user: {
+              sm2EasyFactorModifier: 1.0,
+              sm2IntervalModifier: 1.0,
+              sm2Step1Interval: 1,
+              sm2Step2Interval: 6,
+            }
+          }
+        });
+      }
+      return Promise.resolve({ data: { data: [] } });
+    });
   });
 
   test('shows loading state while fetching due cards', () => {
