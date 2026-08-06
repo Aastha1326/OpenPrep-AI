@@ -129,7 +129,10 @@ exports.register = async (req, res, next) => {
 
     const isDevelopment = process.env.NODE_ENV === 'development';
     const isEmailVerified = isDevelopment;
-    const user = await User.create({ name, email, password, role: 'student', isEmailVerified }, { transaction: t });
+    const user = await User.create(
+      { name, email, password, role: 'student', isEmailVerified },
+      { transaction: t }
+    );
 
     if (!isEmailVerified) {
       // Send verification email (logs to console if SMTP not configured)
@@ -166,9 +169,11 @@ exports.register = async (req, res, next) => {
         streak: {
           count: user.streakCount,
           lastActive: user.streakLastActive,
+          freezes: user.streakFreezes || 0,
         },
         studyHours: user.studyHours,
         isEmailVerified: user.isEmailVerified,
+        leaderboardVisible: user.leaderboardVisible,
       };
     }
 
@@ -291,8 +296,20 @@ exports.login = async (req, res, next) => {
       user.streakCount = 1;
     } else if (diffDays === 1) {
       user.streakCount += 1;
+      if (user.streakCount > 0 && user.streakCount % 7 === 0) {
+        user.streakFreezes = (user.streakFreezes || 0) + 1;
+      }
     } else if (diffDays > 1) {
-      user.streakCount = 1;
+      const missedDays = diffDays - 1;
+      if (user.streakFreezes && user.streakFreezes >= missedDays) {
+        user.streakFreezes -= missedDays;
+        user.streakCount += 1;
+        if (user.streakCount > 0 && user.streakCount % 7 === 0) {
+          user.streakFreezes = (user.streakFreezes || 0) + 1;
+        }
+      } else {
+        user.streakCount = 1;
+      }
     }
     user.streakLastActive = new Date();
 
@@ -316,9 +333,16 @@ exports.login = async (req, res, next) => {
         streak: {
           count: user.streakCount,
           lastActive: user.streakLastActive,
+          freezes: user.streakFreezes || 0,
         },
         studyHours: user.studyHours,
         isEmailVerified: user.isEmailVerified,
+        leaderboardVisible: user.leaderboardVisible,
+        receiveWeeklyDigest: user.receiveWeeklyDigest,
+        sm2EasyFactorModifier: user.sm2EasyFactorModifier,
+        sm2IntervalModifier: user.sm2IntervalModifier,
+        sm2Step1Interval: user.sm2Step1Interval,
+        sm2Step2Interval: user.sm2Step2Interval,
       },
     });
   } catch (error) {
@@ -334,9 +358,7 @@ exports.login = async (req, res, next) => {
 exports.getMe = async (req, res, next) => {
   try {
     const user = await User.findByPk(req.user.id, {
-      include: [
-        { model: Achievement, as: 'achievements' }
-      ]
+      include: [{ model: Achievement, as: 'achievements' }],
     });
     res.status(200).json({
       success: true,
@@ -348,10 +370,51 @@ exports.getMe = async (req, res, next) => {
         streak: {
           count: user.streakCount,
           lastActive: user.streakLastActive,
+          freezes: user.streakFreezes || 0,
         },
         studyHours: user.studyHours,
         isEmailVerified: user.isEmailVerified,
+        leaderboardVisible: user.leaderboardVisible,
+        receiveWeeklyDigest: user.receiveWeeklyDigest,
         achievements: user.achievements || [],
+        sm2EasyFactorModifier: user.sm2EasyFactorModifier,
+        sm2IntervalModifier: user.sm2IntervalModifier,
+        sm2Step1Interval: user.sm2Step1Interval,
+        sm2Step2Interval: user.sm2Step2Interval,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// @desc    Update current user settings (e.g. leaderboard name visibility)
+// @route   PATCH /api/auth/settings
+// @access  Private
+// ---------------------------------------------------------------------------
+exports.updateSettings = async (req, res, next) => {
+  try {
+    const { leaderboardVisible } = req.body;
+
+    req.user.leaderboardVisible = leaderboardVisible;
+    await req.user.save();
+
+    res.status(200).json({
+      success: true,
+      user: {
+        id: req.user.id,
+        name: req.user.name,
+        email: req.user.email,
+        role: req.user.role,
+        streak: {
+          count: req.user.streakCount,
+          lastActive: req.user.streakLastActive,
+          freezes: req.user.streakFreezes || 0,
+        },
+        studyHours: req.user.studyHours,
+        isEmailVerified: req.user.isEmailVerified,
+        leaderboardVisible: req.user.leaderboardVisible,
       },
     });
   } catch (error) {
@@ -468,8 +531,8 @@ exports.refreshToken = async (req, res, next) => {
           refreshTokenExpire: { [Op.gt]: new Date() },
         },
       });
-      user = users.find((u) =>
-        Array.isArray(u.refreshTokens) && u.refreshTokens.some((t) => t.token === hashed)
+      user = users.find(
+        (u) => Array.isArray(u.refreshTokens) && u.refreshTokens.some((t) => t.token === hashed)
       );
     }
 
@@ -493,7 +556,9 @@ exports.refreshToken = async (req, res, next) => {
       user.refreshTokens = [];
       await user.save();
       clearRefreshTokenCookie(res);
-      return res.status(401).json({ success: false, error: 'Token reuse detected. All sessions invalidated.' });
+      return res
+        .status(401)
+        .json({ success: false, error: 'Token reuse detected. All sessions invalidated.' });
     }
 
     // Remove old token (rotation)
@@ -530,7 +595,7 @@ exports.logout = async (req, res, next) => {
   try {
     // Support both cookie and body for refresh token
     const rawToken = req.cookies?.refreshToken || req.body?.refreshToken;
-    
+
     if (rawToken) {
       const hashed = crypto.createHash('sha256').update(rawToken).digest('hex');
 
@@ -561,3 +626,210 @@ exports.logout = async (req, res, next) => {
   }
 };
 
+// ---------------------------------------------------------------------------
+// @desc    Update custom SM-2 settings
+// @route   PUT /api/auth/sm2-settings
+// @access  Private
+// ---------------------------------------------------------------------------
+exports.updateSM2Settings = async (req, res, next) => {
+  try {
+    const { sm2EasyFactorModifier, sm2IntervalModifier, sm2Step1Interval, sm2Step2Interval } =
+      req.body;
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    if (sm2EasyFactorModifier !== undefined) {
+      if (typeof sm2EasyFactorModifier !== 'number' || sm2EasyFactorModifier <= 0) {
+        return res
+          .status(400)
+          .json({ success: false, error: 'Easy factor modifier must be a positive number' });
+      }
+      user.sm2EasyFactorModifier = sm2EasyFactorModifier;
+    }
+    if (sm2IntervalModifier !== undefined) {
+      if (typeof sm2IntervalModifier !== 'number' || sm2IntervalModifier <= 0) {
+        return res
+          .status(400)
+          .json({ success: false, error: 'Interval modifier must be a positive number' });
+      }
+      user.sm2IntervalModifier = sm2IntervalModifier;
+    }
+    if (sm2Step1Interval !== undefined) {
+      if (!Number.isInteger(sm2Step1Interval) || sm2Step1Interval <= 0) {
+        return res
+          .status(400)
+          .json({ success: false, error: 'Step 1 interval must be a positive integer' });
+      }
+      user.sm2Step1Interval = sm2Step1Interval;
+    }
+    if (sm2Step2Interval !== undefined) {
+      if (!Number.isInteger(sm2Step2Interval) || sm2Step2Interval <= 0) {
+        return res
+          .status(400)
+          .json({ success: false, error: 'Step 2 interval must be a positive integer' });
+      }
+      user.sm2Step2Interval = sm2Step2Interval;
+    }
+
+    await user.save();
+    res.status(200).json({
+      success: true,
+      message: 'SM-2 settings updated successfully',
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        streak: {
+          count: user.streakCount,
+          lastActive: user.streakLastActive,
+          freezes: user.streakFreezes || 0,
+        },
+        studyHours: user.studyHours,
+        isEmailVerified: user.isEmailVerified,
+        leaderboardVisible: user.leaderboardVisible,
+        receiveWeeklyDigest: user.receiveWeeklyDigest,
+        sm2EasyFactorModifier: user.sm2EasyFactorModifier,
+        sm2IntervalModifier: user.sm2IntervalModifier,
+        sm2Step1Interval: user.sm2Step1Interval,
+        sm2Step2Interval: user.sm2Step2Interval,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// @desc    Reset SM-2 settings to defaults
+// @route   POST /api/auth/sm2-settings/reset
+// @access  Private
+// ---------------------------------------------------------------------------
+exports.resetSM2Settings = async (req, res, next) => {
+  try {
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    user.sm2EasyFactorModifier = 1.0;
+    user.sm2IntervalModifier = 1.0;
+    user.sm2Step1Interval = 1;
+    user.sm2Step2Interval = 6;
+
+    await user.save();
+    res.status(200).json({
+      success: true,
+      message: 'SM-2 settings reset to default values',
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        streak: {
+          count: user.streakCount,
+          lastActive: user.streakLastActive,
+          freezes: user.streakFreezes || 0,
+        },
+        studyHours: user.studyHours,
+        isEmailVerified: user.isEmailVerified,
+        leaderboardVisible: user.leaderboardVisible,
+        receiveWeeklyDigest: user.receiveWeeklyDigest,
+        sm2EasyFactorModifier: user.sm2EasyFactorModifier,
+        sm2IntervalModifier: user.sm2IntervalModifier,
+        sm2Step1Interval: user.sm2Step1Interval,
+        sm2Step2Interval: user.sm2Step2Interval,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// @desc    Resend email verification link
+// @route   POST /api/auth/resend-verification
+// @access  Public
+// ---------------------------------------------------------------------------
+exports.resendVerification = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'Please provide an email' });
+    }
+
+    const user = await User.findOne({ where: { email } });
+    if (!user) {
+      // Security best practice: prevent user enumeration by returning success message
+      return res.status(200).json({
+        success: true,
+        message: 'If a matching user account exists, a new verification link has been sent.',
+      });
+    }
+
+    if (user.isEmailVerified) {
+      return res.status(400).json({ success: false, error: 'Email is already verified' });
+    }
+
+    await sendVerificationEmail(user);
+
+    res.status(200).json({
+      success: true,
+      message: 'If a matching user account exists, a new verification link has been sent.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// @desc    Update general user settings
+// @route   PATCH /api/auth/settings
+// @access  Private
+// ---------------------------------------------------------------------------
+exports.updateSettings = async (req, res, next) => {
+  try {
+    const { leaderboardVisible, receiveWeeklyDigest } = req.body;
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    if (leaderboardVisible !== undefined) {
+      user.leaderboardVisible = leaderboardVisible;
+    }
+    if (receiveWeeklyDigest !== undefined) {
+      user.receiveWeeklyDigest = receiveWeeklyDigest;
+    }
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Settings updated successfully',
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        streak: {
+          count: user.streakCount,
+          lastActive: user.streakLastActive,
+          freezes: user.streakFreezes || 0,
+        },
+        studyHours: user.studyHours,
+        isEmailVerified: user.isEmailVerified,
+        leaderboardVisible: user.leaderboardVisible,
+        receiveWeeklyDigest: user.receiveWeeklyDigest,
+        sm2EasyFactorModifier: user.sm2EasyFactorModifier,
+        sm2IntervalModifier: user.sm2IntervalModifier,
+        sm2Step1Interval: user.sm2Step1Interval,
+        sm2Step2Interval: user.sm2Step2Interval,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};

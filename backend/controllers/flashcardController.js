@@ -9,6 +9,7 @@ const Progress = require('../models/Progress');
 const geminiService = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
 const { default: Exporter } = require('anki-apkg-export');
+const { calculateSM2 } = require('../utils/sm2');
 
 // @desc    Generate AI Flashcards
 // @route   POST /api/flashcards/generate-ai
@@ -41,8 +42,7 @@ exports.generateAIFlashcards = async (req, res, next) => {
     if (notes && notes.length > 0) {
       notesText = notes
         .map((n) => n.content || '')
-        .join('\n')
-        .substring(0, 5000);
+        .join('\n');
     }
 
     // Call Gemini
@@ -90,20 +90,104 @@ exports.generateAIFlashcards = async (req, res, next) => {
   }
 };
 
+// @desc    Suggest AI tags & difficulty rating for a flashcard (not saved)
+// @route   POST /api/flashcards/auto-tag
+// @access  Private
+exports.autoTagFlashcard = async (req, res, next) => {
+  try {
+    const { front, back } = req.body;
+
+    const suggestion = await geminiService.generateFlashcardTags(front, back);
+
+    res.status(200).json({ success: true, data: suggestion });
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({
+        success: false,
+        error: error.message,
+      });
+    }
+    next(error);
+  }
+};
+
+// @desc    Preview AI-generated flashcards from a note's content (not saved)
+// @route   POST /api/flashcards/generate-from-note
+// @access  Private
+exports.generateFlashcardsFromNote = async (req, res, next) => {  try {
+    const { noteId, count } = req.body;
+
+    const note = await Note.findOne({
+      where: { id: noteId, user: req.user.id },
+      include: [
+        { model: Subject, as: 'subjectRef', attributes: ['id', 'name'] },
+        { model: Topic, as: 'topicRef', attributes: ['id', 'name'] },
+      ],
+    });
+
+    if (!note) {
+      return res.status(404).json({ success: false, error: 'Note not found' });
+    }
+
+    if (!note.content || note.content.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Note has no text content to generate flashcards from',
+      });
+    }
+
+    const subjectName = note.subjectRef ? note.subjectRef.name : 'General';
+    const topicName = note.topicRef ? note.topicRef.name : 'General overview';
+
+    const cardsList = await geminiService.generateFlashcards(
+      subjectName,
+      topicName,
+      note.content,
+      count || 6
+    );
+
+    res.status(200).json({
+      success: true,
+      count: cardsList.length,
+      subjectId: note.subjectRef ? note.subjectRef.id : note.subject,
+      data: cardsList,
+    });
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({ success: false, error: error.message });
+    }
+    next(error);
+  }
+};
+
 // @desc    Create manual Flashcard
 // @route   POST /api/flashcards
 // @access  Private
-exports.createFlashcard = async (req, res, next) => {
-  try {
-    const { subjectId, topicId, front, back } = req.body;
+exports.createFlashcard = async (req, res, next) => {  try {
+    const { subjectId, topicId, front, back, tags, difficulty } = req.body;
     const card = await Flashcard.create({
       user: req.user.id,
       subject: subjectId,
       topic: topicId || null,
       front,
       back,
-    });
-    res.status(201).json({ success: true, data: card });
+      tags: tags || [],
+      difficulty: difficulty || null,
+    });    res.status(201).json({ success: true, data: card });
   } catch (error) {
     next(error);
   }
@@ -181,33 +265,24 @@ exports.reviewFlashcard = async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'Flashcard not found' });
     }
 
-    // SuperMemo SM-2 Algorithm
-    let { interval, repetitions, efactor } = card;
+    // SuperMemo SM-2 Algorithm using custom settings
+    const result = calculateSM2({
+      interval: card.interval,
+      repetitions: card.repetitions,
+      efactor: card.efactor,
+      quality,
+      easyFactorModifier: req.user.sm2EasyFactorModifier,
+      intervalModifier: req.user.sm2IntervalModifier,
+      step1Interval: req.user.sm2Step1Interval,
+      step2Interval: req.user.sm2Step2Interval,
+    });
 
-    if (quality >= 3) {
-      if (repetitions === 0) {
-        interval = 1;
-      } else if (repetitions === 1) {
-        interval = 6;
-      } else {
-        interval = Math.round(interval * efactor);
-      }
-      repetitions += 1;
-    } else {
-      repetitions = 0;
-      interval = 1;
-    }
-
-    // Adjust E-Factor
-    efactor = efactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
-    if (efactor < 1.3) efactor = 1.3;
-
-    card.interval = interval;
-    card.repetitions = repetitions;
-    card.efactor = efactor;
+    card.interval = result.interval;
+    card.repetitions = result.repetitions;
+    card.efactor = result.efactor;
 
     // Set next review date from now
-    card.nextReviewDate = new Date(Date.now() + interval * 24 * 60 * 60 * 1000);
+    card.nextReviewDate = new Date(Date.now() + card.interval * 24 * 60 * 60 * 1000);
     await card.save();
 
     // If card is mastered (quality >= 4), increment mastered count in progress
@@ -513,6 +588,66 @@ exports.importFlashcards = async (req, res, next) => {
     if (req.file) {
       try { fs.unlinkSync(req.file.path); } catch { /* ignore */ }
     }
+    next(error);
+  }
+};
+
+// @desc    Get flashcard review forecast for next 30 days
+// @route   GET /api/flashcards/forecast
+// @access  Private
+exports.getReviewForecast = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const now = new Date();
+    
+    // We want to forecast the next 30 days starting from today.
+    const forecast = [];
+    const dateCounts = {};
+
+    for (let i = 0; i < 30; i++) {
+      const date = new Date();
+      date.setDate(now.getDate() + i);
+      const dateString = date.toISOString().split('T')[0];
+      dateCounts[dateString] = 0;
+      forecast.push({
+        date: dateString,
+        count: 0,
+      });
+    }
+
+    // Query all flashcards for this user
+    const cards = await Flashcard.findAll({
+      where: {
+        user: userId,
+      },
+      attributes: ['nextReviewDate'],
+    });
+
+    const todayStr = now.toISOString().split('T')[0];
+
+    cards.forEach((card) => {
+      if (!card.nextReviewDate) return;
+      
+      const cardDate = new Date(card.nextReviewDate);
+      const cardDateStr = cardDate.toISOString().split('T')[0];
+
+      if (cardDate <= now) {
+        // Overdue cards are due today
+        dateCounts[todayStr] = (dateCounts[todayStr] || 0) + 1;
+      } else {
+        if (dateCounts[cardDateStr] !== undefined) {
+          dateCounts[cardDateStr]++;
+        }
+      }
+    });
+
+    const data = forecast.map((f) => ({
+      date: f.date,
+      count: dateCounts[f.date] || 0,
+    }));
+
+    res.status(200).json({ success: true, data });
+  } catch (error) {
     next(error);
   }
 };

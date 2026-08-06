@@ -14,8 +14,20 @@ const sampleQuiz = {
   id: 'q1',
   title: 'Math Quiz',
   questions: [
-    { _id: 'qq1', questionText: 'What is 2+2?', options: ['3', '4', '5'], correctAnswer: '4', explanation: '' },
-    { _id: 'qq2', questionText: 'What is 2*3?', options: ['5', '6', '7'], correctAnswer: '6', explanation: '' },
+    {
+      _id: 'qq1',
+      questionText: 'What is 2+2?',
+      options: ['3', '4', '5'],
+      correctAnswer: '4',
+      explanation: '',
+    },
+    {
+      _id: 'qq2',
+      questionText: 'What is 2*3?',
+      options: ['5', '6', '7'],
+      correctAnswer: '6',
+      explanation: '',
+    },
   ],
 };
 

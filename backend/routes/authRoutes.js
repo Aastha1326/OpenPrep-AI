@@ -6,11 +6,15 @@ const {
   register,
   login,
   getMe,
+  updateSettings,
   forgotPassword,
   verifyEmail,
   resetPassword,
   refreshToken,
   logout,
+  updateSM2Settings,
+  resetSM2Settings,
+  resendVerification,
 } = require('../controllers/authController');
 
 const { protect } = require('../middleware/auth');
@@ -22,7 +26,10 @@ const {
   validateForgotPassword,
   validateResetPassword,
   validateRefreshToken,
+  validateResendVerification,
+  validateUpdateSettings,
 } = require('../middleware/validators');
+const { validateRequest, registerSchema } = require('../middleware/validate');
 
 const router = express.Router();
 
@@ -72,6 +79,8 @@ const forgotPasswordLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: true,
 });
+
+const { authEmailLimiter } = require('../middleware/rateLimiter');
 
 // Refresh token rate limiter: 10 attempts per 15 minutes per IP
 const refreshTokenLimiter = rateLimit({
@@ -174,7 +183,7 @@ const resetPasswordLimiter = rateLimit({
  */
 
 // Register a new user account
-router.post('/register', registerLimiter, validateRegister, register);
+router.post('/register', registerLimiter, validateRequest(registerSchema), register);
 
 /**
  * @swagger
@@ -288,9 +297,17 @@ router.post('/login', loginLimiter, validateLogin, login);
 // Request a password reset email
 router.post(
   '/forgot-password',
-  forgotPasswordLimiter,
+  authEmailLimiter,
   validateForgotPassword,
   forgotPassword
+);
+
+// Resend email verification link
+router.post(
+  '/resend-verification',
+  authEmailLimiter,
+  validateResendVerification,
+  resendVerification
 );
 
 /**
@@ -527,6 +544,57 @@ router.post('/logout', logout);
 // Requires authentication
 router.get('/me', protect, getMe);
 
+/**
+ * @swagger
+ * /api/auth/settings:
+ *   patch:
+ *     summary: Update the authenticated user's settings (leaderboard name visibility)
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - leaderboardVisible
+ *             properties:
+ *               leaderboardVisible:
+ *                 type: boolean
+ *                 description: When false, the user appears as an anonymous handle on the weekly leaderboard
+ *                 example: false
+ *     responses:
+ *       200:
+ *         description: Settings updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+
+// Update authenticated user settings
+router.patch('/settings', protect, validateUpdateSettings, updateSettings);
+
 // OAuth2 Google routes
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
@@ -538,5 +606,9 @@ router.get(
     res.redirect('/dashboard');
   }
 );
+
+// SM-2 algorithm settings
+router.put('/sm2-settings', protect, updateSM2Settings);
+router.post('/sm2-settings/reset', protect, resetSM2Settings);
 
 module.exports = router;

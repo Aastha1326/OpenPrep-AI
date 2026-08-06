@@ -226,6 +226,59 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
       expect(res.body.data.efactor).toBeGreaterThanOrEqual(1.3);
     });
 
+    it('should respect custom user SM-2 settings during review calculation', async () => {
+      // Set custom user settings
+      testUser.sm2EasyFactorModifier = 2.0;
+      testUser.sm2IntervalModifier = 1.5;
+      testUser.sm2Step1Interval = 3;
+      testUser.sm2Step2Interval = 10;
+      await testUser.save();
+
+      // Test repetition = 0 step 1: interval should be step1Interval = 3
+      const res1 = await request(app)
+        .put(`/api/flashcards/${card.id}/review`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ quality: 4 });
+
+      expect(res1.body.data.interval).toBe(3);
+
+      // Reset repetitions to 2 and interval to 6 to test third review
+      // 6 days * 2.5 EFactor * 1.5 custom interval modifier = 22.5 => 23 days
+      card.repetitions = 2;
+      card.interval = 6;
+      card.efactor = 2.5;
+      await card.save();
+
+      const res2 = await request(app)
+        .put(`/api/flashcards/${card.id}/review`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ quality: 4 });
+
+      expect(res2.body.data.interval).toBe(23);
+
+      // Verify E-Factor change with modifier = 2.0
+      // For quality 5, standard change is 0.1
+      // Expected E-Factor = 2.5 + (0.1 * 2.0) = 2.7
+      card.repetitions = 2;
+      card.interval = 6;
+      card.efactor = 2.5;
+      await card.save();
+
+      const res3 = await request(app)
+        .put(`/api/flashcards/${card.id}/review`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ quality: 5 });
+
+      expect(res3.body.data.efactor).toBeCloseTo(2.7, 2);
+
+      // Reset user settings to defaults for other tests
+      testUser.sm2EasyFactorModifier = 1.0;
+      testUser.sm2IntervalModifier = 1.0;
+      testUser.sm2Step1Interval = 1;
+      testUser.sm2Step2Interval = 6;
+      await testUser.save();
+    });
+
     it('should set nextReviewDate in the future for successful review', async () => {
       const before = Date.now();
 
@@ -263,6 +316,49 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(404);
+    });
+  });
+
+  describe('GET /api/flashcards/forecast', () => {
+    it('should retrieve 30-day review forecast details', async () => {
+      // Create some cards due on specific dates
+      const today = new Date();
+      const tomorrow = new Date();
+      tomorrow.setDate(today.getDate() + 1);
+
+      await Flashcard.create({
+        user: testUser.id,
+        subject: testSubject.id,
+        front: 'Forecast Today?',
+        back: 'Yes',
+        nextReviewDate: today,
+      });
+
+      await Flashcard.create({
+        user: testUser.id,
+        subject: testSubject.id,
+        front: 'Forecast Tomorrow?',
+        back: 'Yes',
+        nextReviewDate: tomorrow,
+      });
+
+      const res = await request(app)
+        .get('/api/flashcards/forecast')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toBeDefined();
+      expect(res.body.data.length).toBe(30);
+
+      const todayStr = today.toISOString().split('T')[0];
+      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+      const todayForecast = res.body.data.find((f) => f.date === todayStr);
+      const tomorrowForecast = res.body.data.find((f) => f.date === tomorrowStr);
+
+      expect(todayForecast.count).toBeGreaterThanOrEqual(1);
+      expect(tomorrowForecast.count).toBeGreaterThanOrEqual(1);
     });
   });
 });

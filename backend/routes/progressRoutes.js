@@ -9,13 +9,15 @@ const {
   getActivityFeed,
   exportCSV,
   exportPDF,
+  logFocusSession,
+  getWeeklyFocusEfficiency,
 } = require('../controllers/progressController');
 const { protect } = require('../middleware/auth');
 const {
   validateTrackStudyTime,
   validateUpdateTopicProgress,
+  validateFocusSession,
 } = require('../middleware/validators');
-
 const router = express.Router();
 
 router.get('/composite-overview', protect, getCompositeBundleOverview);
@@ -488,5 +490,8 @@ router.put('/topic/:id', protect, validateUpdateTopicProgress, updateTopicProgre
  */
 
 router.get('/activity', protect, getActivityFeed);
+
+router.post('/focus-session', protect, validateFocusSession, logFocusSession);
+router.get('/focus-session/weekly', protect, getWeeklyFocusEfficiency);
 
 module.exports = router;

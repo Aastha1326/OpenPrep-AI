@@ -38,4 +38,21 @@ const strictAiLimiter = rateLimit({
   legacyHeaders: true,
 });
 
-module.exports = { aiLimiter, strictAiLimiter };
+/**
+ * Auth Email Endpoint Rate Limiter
+ * Limits sensitive email-sending endpoints to prevent spam and SMTP exhaustion.
+ * - 3 requests per 15 minutes per IP
+ */
+const authEmailLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 3,
+  skip: shouldSkip,
+  message: {
+    success: false,
+    error: 'Too many requests. Please try again after 15 minutes.',
+  },
+  standardHeaders: true,
+  legacyHeaders: true,
+});
+
+module.exports = { aiLimiter, strictAiLimiter, authEmailLimiter };

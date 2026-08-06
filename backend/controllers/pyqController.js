@@ -39,8 +39,7 @@ const pdfParseSemaphore = new Semaphore(2);
 // @access  Private
 exports.uploadAndAnalyzePYQ = async (req, res, next) => {
   try {
-    const { examId, subjectId, year, title } = req.body;
-
+const { examId, subjectId, year, title, difficulty } = req.body;
     if (!req.file) {
       return res.status(400).json({ success: false, error: 'Please upload a question paper PDF' });
     }
@@ -69,18 +68,23 @@ exports.uploadAndAnalyzePYQ = async (req, res, next) => {
     // Call Gemini API for structure analysis
     const analysis = await geminiService.analyzePYQText(extractedText, subject.name, req.query.refresh === 'true');
 
-    // Save to Database
+// Save to Database
+    const chapters = Array.isArray(analysis?.chapterWeightage)
+      ? analysis.chapterWeightage.map((ch) => ch.chapterName).filter(Boolean)
+      : [];
+
     const pyq = await PYQ.create({
       title: title || `${subject.name} Question Paper - ${year}`,
       exam: examId,
       subject: subjectId,
       year: parseInt(year),
+      difficulty: ['Easy', 'Medium', 'Hard'].includes(difficulty) ? difficulty : 'Medium',
+      chapters,
       fileUrl: `/uploads/${req.file.filename}`,
       analyzed: true,
       analysisResults: analysis,
       user: req.user.id,
     });
-
     // Automatically register/update detected topics in Database
     if (analysis && analysis.importantTopics) {
       for (const t of analysis.importantTopics) {
@@ -169,9 +173,8 @@ exports.uploadAndAnalyzePYQ = async (req, res, next) => {
 // @access  Private
 exports.getPYQs = async (req, res, next) => {
   try {
-    const { subjectId, courseId } = req.query;
+    const { subjectId, courseId, year, difficulty, chapter } = req.query;
     const targetId = subjectId || courseId;
-
     if (targetId) {
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
       if (!uuidRegex.test(targetId)) {
@@ -188,9 +191,14 @@ exports.getPYQs = async (req, res, next) => {
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const offset = (page - 1) * limit;
 
-    const filter = { user: req.user.id };
+const filter = { user: req.user.id };
     if (targetId) filter.subject = targetId;
-
+    if (year) filter.year = parseInt(year, 10);
+    if (difficulty) {
+      const difficultyList = difficulty.split(',').filter((d) => ['Easy', 'Medium', 'Hard'].includes(d));
+      if (difficultyList.length > 0) filter.difficulty = { [Op.in]: difficultyList };
+    }
+    if (chapter) filter.chapters = { [Op.contains]: [chapter] };
     const { count: total, rows: pyqs } = await PYQ.findAndCountAll({
       where: filter,
       order: [['year', 'DESC']],
@@ -329,6 +337,83 @@ exports.deletePYQ = async (req, res, next) => {
 
     await pyq.destroy();
     res.status(200).json({ success: true, data: {} });
+  } catch (error) {
+    next(error);
+  }
+};
+// @desc    Get PYQ Frequency and Difficulty Trend Analysis
+// @route   GET /api/pyqs/trends
+// @access  Private
+exports.getPYQTrends = async (req, res, next) => {
+  try {
+    const { subjectId, startYear, endYear } = req.query;
+    const filter = { user: req.user.id };
+
+    if (subjectId) {
+      filter.subject = subjectId;
+    }
+
+    if (startYear || endYear) {
+      filter.year = {};
+      if (startYear) filter.year[Op.gte] = parseInt(startYear, 10);
+      if (endYear) filter.year[Op.lte] = parseInt(endYear, 10);
+    }
+
+    const pyqs = await PYQ.findAll({
+      where: filter,
+      order: [['year', 'ASC']],
+    });
+
+    // Aggregate topic weightages and difficulty trends year-over-year
+    const yearlyTrends = {};
+    const topicAggregates = {};
+    const difficultyCounts = { Easy: 0, Medium: 0, Hard: 0 };
+
+    pyqs.forEach((pyq) => {
+      const year = pyq.year;
+      if (!yearlyTrends[year]) {
+        yearlyTrends[year] = { year, totalPapers: 0, topics: {}, difficulties: { Easy: 0, Medium: 0, Hard: 0 } };
+      }
+
+      yearlyTrends[year].totalPapers += 1;
+      if (pyq.difficulty && difficultyCounts[pyq.difficulty] !== undefined) {
+        difficultyCounts[pyq.difficulty] += 1;
+        yearlyTrends[year].difficulties[pyq.difficulty] += 1;
+      }
+
+      // Extract important topics from analysisResults JSONB
+      const analysis = pyq.analysisResults;
+      const importantTopics = analysis?.importantTopics || [];
+
+      importantTopics.forEach((t) => {
+        if (!t || !t.topicName) return;
+        const topicName = t.topicName.trim();
+        const frequency = t.frequency || t.weightage || 1;
+
+        if (!yearlyTrends[year].topics[topicName]) {
+          yearlyTrends[year].topics[topicName] = 0;
+        }
+        yearlyTrends[year].topics[topicName] += frequency;
+
+        if (!topicAggregates[topicName]) {
+          topicAggregates[topicName] = { topicName, totalFrequency: 0, appearances: 0 };
+        }
+        topicAggregates[topicName].totalFrequency += frequency;
+        topicAggregates[topicName].appearances += 1;
+      });
+    });
+
+    const formattedTrends = Object.values(yearlyTrends).sort((a, b) => a.year - b.year);
+    const topTopics = Object.values(topicAggregates).sort((a, b) => b.totalFrequency - a.totalFrequency);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        trends: formattedTrends,
+        topTopics,
+        difficultySummary: difficultyCounts,
+      },
+    });
   } catch (error) {
     next(error);
   }

@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FaCheckCircle, FaTimesCircle, FaArrowRight, FaTrophy, FaArrowLeft } from 'react-icons/fa';
+import {
+  FaCheckCircle,
+  FaTimesCircle,
+  FaArrowRight,
+  FaTrophy,
+  FaArrowLeft,
+  FaBrain,
+  FaFilePdf,
+} from 'react-icons/fa';
 import API from '../services/api';
 import MathRenderer from '../components/common/MathRenderer';
 
@@ -12,25 +20,72 @@ const formatTime = (seconds) => {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 };
 
+const buildQuizResultRows = (quiz, answers) =>
+  quiz.questions.map((q, idx) => ({
+    questionNumber: idx + 1,
+    question: q.questionText,
+    yourAnswer: answers[q._id] ?? '',
+    correctAnswer: q.correctAnswer,
+    isCorrect: answers[q._id] === q.correctAnswer ? 'Yes' : 'No',
+  }));
+
 const QuizSession = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  
+
   const [quiz, setQuiz] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState({}); // { questionId: selectedOption }
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState(null);
+  const [isRevisionModalOpen, setIsRevisionModalOpen] = useState(false);
 
   const [timeLeft, setTimeLeft] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const submittingRef = useRef(false);
+
+  // Absolute deadline timestamp reference to prevent background tab timer throttling drift
+  const endTimeRef = useRef(null);
   const autoSubmittedRef = useRef(false);
-  
+
+  const handleExportResultsCSV = () => {
+    const rows = buildQuizResultRows(quiz, answers);
+    exportAsCSV(
+      rows,
+      ['questionNumber', 'question', 'yourAnswer', 'correctAnswer', 'isCorrect'],
+      `quiz-result-${quiz.title}`
+    );
+  };
+
+  const handleExportResultsJSON = () => {
+    exportAsJSON(
+      {
+        quizTitle: quiz.title,
+        score: result?.score,
+        totalQuestions: quiz.questions.length,
+        completedAt: new Date().toISOString(),
+        answers: buildQuizResultRows(quiz, answers),
+      },
+      `quiz-result-${quiz.title}`
+    );
+  };
+
+  const handleExportResultsPDF = () => {
+    const element = document.getElementById('quiz-results-container');
+    const opt = {
+      margin: 0.5,
+      filename: `quiz-result-${quiz.title}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+    html2pdf().from(element).set(opt).save();
+  };
+
   useEffect(() => {
     fetchQuiz();
   }, [id]);
@@ -40,7 +95,9 @@ const QuizSession = () => {
       const res = await API.get(`/quizzes/${id}`);
       const loadedQuiz = res.data.data;
       setQuiz(loadedQuiz);
-      setTimeLeft((loadedQuiz?.questions?.length || 0) * SECONDS_PER_QUESTION);
+      const totalSeconds = (loadedQuiz?.questions?.length || 0) * SECONDS_PER_QUESTION;
+      setTimeLeft(totalSeconds);
+      endTimeRef.current = Date.now() + totalSeconds * 1000;
       setLoading(false);
     } catch (err) {
       setError('Failed to load quiz details.');
@@ -49,11 +106,11 @@ const QuizSession = () => {
   };
 
   const handleOptionSelect = (questionId, option) => {
-    if (submitted || timeElapsed) return;
-    setAnswers({
-      ...answers,
-      [questionId]: option
-    });
+    if (submitted || timeElapsed || submitting) return;
+    setAnswers((prevAnswers) => ({
+      ...prevAnswers,
+      [questionId]: option,
+    }));
   };
 
   const handleNext = () => {
@@ -79,7 +136,7 @@ const QuizSession = () => {
       // Format answers for API
       const formattedAnswers = Object.entries(answers).map(([qId, selected]) => ({
         questionId: qId,
-        selectedAnswer: selected
+        selectedAnswer: selected,
       }));
 
       const res = await API.post(`/quizzes/${id}/submit`, { answers: formattedAnswers });
@@ -94,20 +151,35 @@ const QuizSession = () => {
     }
   }, [answers, id]);
 
-  // Countdown: tick once per second until the time limit is reached.
+  // Countdown using absolute timestamps and visibilitychange recalibration to fix tab-switching throttling (#518)
   useEffect(() => {
-    if (!quiz || submitted || timeLeft <= 0) return;
-    const interval = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [quiz, submitted, timeLeft]);
+    if (!quiz || submitted || !endTimeRef.current) return;
+
+    const updateTimer = () => {
+      const now = Date.now();
+      const remaining = Math.max(0, Math.ceil((endTimeRef.current - now) / 1000));
+      setTimeLeft(remaining);
+
+      if (remaining <= 0) {
+        clearInterval(interval);
+      }
+    };
+
+    const interval = setInterval(updateTimer, 250);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        updateTimer();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [quiz, submitted]);
 
   // When the countdown reaches zero, freeze input and submit automatically.
   useEffect(() => {
@@ -129,7 +201,12 @@ const QuizSession = () => {
     return (
       <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center">
         <p className="text-red-400 mb-4">{error || 'Quiz not found.'}</p>
-        <button onClick={() => navigate('/dashboard')} className="px-4 py-2 bg-indigo-600 rounded-lg">Return to Dashboard</button>
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="px-4 py-2 bg-indigo-600 rounded-lg"
+        >
+          Return to Dashboard
+        </button>
       </div>
     );
   }
@@ -205,14 +282,16 @@ const QuizSession = () => {
                   <button
                     key={index}
                     onClick={() => handleOptionSelect(currentQuestion._id, option)}
-                    disabled={submitted || timeElapsed}
+                    disabled={submitted || timeElapsed || submitting}
                     className={`w-full text-left p-4 rounded-lg border transition-all duration-200 flex items-center disabled:opacity-60 disabled:cursor-not-allowed ${
-                      isSelected 
-                        ? 'bg-indigo-600/20 border-indigo-500 text-indigo-100' 
+                      isSelected
+                        ? 'bg-indigo-600/20 border-indigo-500 text-indigo-100'
                         : 'bg-slate-700/50 border-slate-600 hover:border-indigo-400 hover:bg-slate-700 text-slate-200'
                     }`}
                   >
-                    <div className={`w-5 h-5 rounded-full border flex-shrink-0 mr-4 flex items-center justify-center ${isSelected ? 'border-indigo-400' : 'border-slate-400'}`}>
+                    <div
+                      className={`w-5 h-5 rounded-full border flex-shrink-0 mr-4 flex items-center justify-center ${isSelected ? 'border-indigo-400' : 'border-slate-400'}`}
+                    >
                       {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-indigo-400"></div>}
                     </div>
                     <span><MathRenderer text={option} /></span>
@@ -230,11 +309,13 @@ const QuizSession = () => {
               >
                 <FaArrowLeft className="mr-2" /> Previous
               </button>
-              
+
               {isLastQuestion ? (
                 <button
                   onClick={() => submitQuiz()}
-                  disabled={timeElapsed || Object.keys(answers).length < quiz.questions.length}
+                  disabled={
+                    submitting || timeElapsed || Object.keys(answers).length < quiz.questions.length
+                  }
                   className="flex items-center px-6 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold shadow-lg shadow-emerald-500/20 transition-all"
                 >
                   Submit Quiz <FaCheckCircle className="ml-2" />
@@ -252,19 +333,42 @@ const QuizSession = () => {
           </div>
         ) : (
           /* Results View */
-          <div className="bg-slate-800 rounded-xl p-8 shadow-xl border border-slate-700">
+          <div id="quiz-results-container" className="bg-slate-800 rounded-xl p-8 shadow-xl border border-slate-700">
             <div className="text-center mb-10">
               <div className="inline-flex items-center justify-center w-20 h-20 bg-emerald-500/10 rounded-full mb-4">
                 <FaTrophy className="text-4xl text-emerald-400" />
               </div>
               <h2 className="text-3xl font-bold text-white mb-2">Quiz Completed!</h2>
               <p className="text-slate-400 text-lg">
-                You scored <span className="text-emerald-400 font-bold text-2xl">{result?.score}</span> out of {quiz.questions.length}
+                You scored{' '}
+                <span className="text-emerald-400 font-bold text-2xl">{result?.score}</span> out of{' '}
+                {quiz.questions.length}
               </p>
+              <div className="flex items-center justify-center gap-3 mt-4">
+                <button
+                  onClick={handleExportResultsCSV}
+                  className="px-4 py-2 text-sm bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition-colors"
+                >
+                  Export as CSV
+                </button>
+                <button
+                  onClick={handleExportResultsJSON}
+                  className="px-4 py-2 text-sm bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition-colors"
+                >
+                  Export as JSON
+                </button>
+                <button
+                  onClick={handleExportResultsPDF}
+                  className="px-4 py-2 text-sm bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 rounded-lg font-medium transition-colors flex items-center gap-2"
+                >
+                  <FaFilePdf /> Download PDF Summary
+                </button>
+              </div>
             </div>
-
             <div className="space-y-6">
-              <h3 className="text-xl font-semibold border-b border-slate-700 pb-2 mb-4">Review Answers</h3>
+              <h3 className="text-xl font-semibold border-b border-slate-700 pb-2 mb-4">
+                Review Answers
+              </h3>
               {quiz.questions.map((q, idx) => {
                 const userAnswer = answers[q._id];
                 const isCorrect = userAnswer === q.correctAnswer;
@@ -275,14 +379,15 @@ const QuizSession = () => {
                     
                     <div className="space-y-2 mb-4">
                       {q.options.map((opt, oIdx) => {
-                        let btnClass = "w-full text-left p-3 rounded-md border text-sm flex items-center justify-between ";
-                        
+                        let btnClass =
+                          'w-full text-left p-3 rounded-md border text-sm flex items-center justify-between ';
+
                         if (opt === q.correctAnswer) {
-                          btnClass += "bg-emerald-500/20 border-emerald-500 text-emerald-100";
+                          btnClass += 'bg-emerald-500/20 border-emerald-500 text-emerald-100';
                         } else if (opt === userAnswer && !isCorrect) {
-                          btnClass += "bg-red-500/20 border-red-500 text-red-100";
+                          btnClass += 'bg-red-500/20 border-red-500 text-red-100';
                         } else {
-                          btnClass += "bg-slate-800 border-slate-700 text-slate-400 opacity-75";
+                          btnClass += 'bg-slate-800 border-slate-700 text-slate-400 opacity-75';
                         }
 
                         return (
@@ -304,15 +409,31 @@ const QuizSession = () => {
                 );
               })}
             </div>
-            
-            <div className="mt-8 text-center">
+
+            <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+              <button
+                onClick={() => setIsRevisionModalOpen(true)}
+                className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-lg font-semibold shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2 transition-all"
+              >
+                <FaBrain className="text-yellow-300" /> Generate AI Concept Revision Sheet
+              </button>
+
               <button
                 onClick={() => navigate('/dashboard')}
-                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 rounded-lg font-medium transition-colors"
+                className="w-full sm:w-auto px-6 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition-colors"
               >
                 Back to Dashboard
               </button>
             </div>
+
+            <RevisionSheetModal
+              isOpen={isRevisionModalOpen}
+              onClose={() => setIsRevisionModalOpen(false)}
+              quizAttemptId={result?.id || result?._id}
+              subjectId={quiz.subject?.id || quiz.subject}
+              topicId={quiz.topic?.id || quiz.topic}
+              topicName={quiz.topic?.name}
+            />
           </div>
         )}
       </div>
