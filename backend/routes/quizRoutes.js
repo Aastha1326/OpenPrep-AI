@@ -16,6 +16,7 @@ const {
   validateSubmitQuizAttempt,
   validateGenerateRevisionSheet,
 } = require('../middleware/validators');
+const { validateRequest, submitQuizSchema } = require('../middleware/validate');
 
 const router = express.Router();
 
@@ -380,6 +381,6 @@ router.get('/:id', protect, getQuizDetails);
  *               $ref: '#/components/schemas/Error'
  */
 
-router.post('/:id/submit', protect, validateSubmitQuizAttempt, submitQuizAttempt);
+router.post('/:id/submit', protect, validateRequest(submitQuizSchema), submitQuizAttempt);
 
 module.exports = router;
