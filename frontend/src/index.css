@@ -345,3 +345,29 @@ html.dark .bg-vintage-paper {
     cursor: auto;
   }
 }
+
+/* High-Contrast KaTeX LaTeX Formula overrides for Dark Mode */
+.dark .katex {
+  color: #f8fafc !important;
+  text-shadow: 0 0 0.5px rgba(255, 255, 255, 0.1);
+}
+
+.dark .katex-display {
+  color: #f8fafc !important;
+}
+
+.dark .katex .katex-html {
+  color: #f8fafc !important;
+}
+
+.dark .katex .mathnormal, 
+.dark .katex .mathrm, 
+.dark .katex .semibold, 
+.dark .katex .bold {
+  font-weight: 500;
+}
+
+.math-renderer {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
