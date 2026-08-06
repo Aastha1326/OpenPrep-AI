@@ -6,6 +6,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import CustomCursor from './components/CustomCursor';
 import ScrollToTop from './components/ScrollToTop';
 import PageLoader from './components/PageLoader';
+import SessionTimeoutModal from './components/SessionTimeoutModal';
 import './App.css';
 
 const Landing = lazy(() => import('./pages/Landing'));
@@ -29,6 +30,7 @@ function App() {
     <>
       <CustomCursor />
       <ScrollToTop />
+      <SessionTimeoutModal />
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<Landing />} />
