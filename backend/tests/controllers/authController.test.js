@@ -1,6 +1,7 @@
 const request = require('supertest');
 const express = require('express');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const authRoutes = require('../../routes/authRoutes');
 const errorHandler = require('../../middleware/error');
 const User = require('../../models/User');
@@ -576,6 +577,151 @@ describe('Auth Controller - Integration Tests', () => {
         .post('/api/auth/refresh-token')
         .send({ refreshToken: secondToken });
       expect(secondReplay.status).toBe(401);
+    });
+  });
+
+  // =========================================================================
+  // POST /api/auth/logout
+  // =========================================================================
+  describe('POST /api/auth/logout', () => {
+    it('should clear the refreshToken httpOnly cookie on logout', async () => {
+      await createVerifiedUser({ email: 'logout@example.com' });
+
+      // Login to bootstrap a refresh token (also sets the httpOnly cookie)
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'logout@example.com', password: 'StrongPass1!' });
+      expect(loginRes.status).toBe(200);
+
+      const refreshToken = loginRes.body.refreshToken;
+      expect(refreshToken).toBeDefined();
+
+      const res = await request(app)
+        .post('/api/auth/logout')
+        .send({ refreshToken });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.message).toBe('Logged out successfully');
+
+      // Response must include a Set-Cookie header that expires the cookie
+      const setCookie = res.headers['set-cookie'];
+      expect(Array.isArray(setCookie)).toBe(true);
+      const clearCookieHeader = setCookie.find((c) => c.startsWith('refreshToken='));
+      expect(clearCookieHeader).toBeDefined();
+      expect(clearCookieHeader).toContain('Expires=Thu, 01 Jan 1970');
+      expect(clearCookieHeader).toContain('Path=/');
+      expect(clearCookieHeader).toContain('HttpOnly');
+    });
+
+    it('should invalidate the refresh token in the database after logout', async () => {
+      await createVerifiedUser({ email: 'logout-invalid@example.com' });
+
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'logout-invalid@example.com', password: 'StrongPass1!' });
+      expect(loginRes.status).toBe(200);
+
+      const refreshToken = loginRes.body.refreshToken;
+
+      const logoutRes = await request(app)
+        .post('/api/auth/logout')
+        .send({ refreshToken });
+      expect(logoutRes.status).toBe(200);
+
+      // Logged-out token must no longer be accepted for rotation
+      const refreshRes = await request(app)
+        .post('/api/auth/refresh-token')
+        .send({ refreshToken });
+      expect(refreshRes.status).toBe(401);
+      expect(refreshRes.body.success).toBe(false);
+      expect(refreshRes.body.error).toContain('Invalid or expired');
+    });
+
+    it('should return 200 and clear the cookie even without a refresh token', async () => {
+      const res = await request(app).post('/api/auth/logout').send({});
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+
+      const setCookie = res.headers['set-cookie'];
+      expect(Array.isArray(setCookie)).toBe(true);
+      expect(setCookie.some((c) => c.startsWith('refreshToken='))).toBe(true);
+    });
+  });
+});
+
+describe('Auth Settings - Integration Tests', () => {
+  let settingsUser;
+  let settingsToken;
+
+  beforeAll(async () => {
+    settingsUser = await createVerifiedUser({
+      email: 'settings@example.com',
+      name: 'Settings User',
+    });
+    settingsToken = jwt.sign({ id: settingsUser.id, type: 'access' }, process.env.JWT_SECRET);
+  });
+
+  // =========================================================================
+  // GET /api/auth/me — should surface leaderboardVisible
+  // =========================================================================
+  describe('GET /api/auth/me', () => {
+    it('should include leaderboardVisible in the returned user', async () => {
+      const res = await request(app)
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${settingsToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.user).toHaveProperty('leaderboardVisible', true);
+    });
+  });
+
+  // =========================================================================
+  // PATCH /api/auth/settings
+  // =========================================================================
+  describe('PATCH /api/auth/settings', () => {
+    it('should update leaderboardVisible to false (anonymous mode)', async () => {
+      const res = await request(app)
+        .patch('/api/auth/settings')
+        .set('Authorization', `Bearer ${settingsToken}`)
+        .send({ leaderboardVisible: false });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.user).toHaveProperty('leaderboardVisible', false);
+
+      const reloaded = await User.findByPk(settingsUser.id);
+      expect(reloaded.leaderboardVisible).toBe(false);
+    });
+
+    it('should update leaderboardVisible back to true', async () => {
+      const res = await request(app)
+        .patch('/api/auth/settings')
+        .set('Authorization', `Bearer ${settingsToken}`)
+        .send({ leaderboardVisible: true });
+
+      expect(res.status).toBe(200);
+      expect(res.body.user).toHaveProperty('leaderboardVisible', true);
+    });
+
+    it('should return 401 without a token', async () => {
+      const res = await request(app)
+        .patch('/api/auth/settings')
+        .send({ leaderboardVisible: false });
+
+      expect(res.status).toBe(401);
+    });
+
+    it('should return 400 when leaderboardVisible is not a boolean', async () => {
+      const res = await request(app)
+        .patch('/api/auth/settings')
+        .set('Authorization', `Bearer ${settingsToken}`)
+        .send({ leaderboardVisible: 'no' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
     });
   });
 });

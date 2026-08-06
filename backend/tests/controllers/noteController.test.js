@@ -441,4 +441,62 @@ describe('Note Controller - Integration Tests', () => {
       expect(res.status).toBe(401);
     });
   });
+
+  // =========================================================================
+  // POST /api/notes/voice — Upload and process voice note
+  // =========================================================================
+  describe('POST /api/notes/voice', () => {
+    const testWavBuffer = Buffer.from(
+      'RIFF\x24\x00\x00\x00WAVEfmt \x10\x00\x00\x00\x01\x00\x01\x00\x22\x56\x00\x00\x22\x56\x00\x00\x01\x00\x08\x00data\x00\x00\x00\x00'
+    );
+
+    it('should upload a WAV audio note, transcribe and summarize it, returning 201', async () => {
+      const res = await request(app)
+        .post('/api/notes/voice')
+        .set('Authorization', `Bearer ${authToken}`)
+        .field('title', 'Voice Lecture 1')
+        .field('subjectId', testSubject.id.toString())
+        .attach('file', testWavBuffer, 'lecture.wav');
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.title).toBe('Voice Lecture 1');
+      expect(res.body.data.fileType).toBe('audio');
+      expect(res.body.data.fileUrl).toContain('/uploads/');
+      expect(res.body.data.content).toBeDefined(); // transcription
+      expect(res.body.data.aiSummary).toBeDefined();
+      expect(res.body.data.aiSummary.summary).toBeDefined();
+
+      if (res.body.data.fileUrl) {
+        uploadedFiles.push(
+          path.join(__dirname, '../../', res.body.data.fileUrl)
+        );
+      }
+    });
+
+    it('should fail if no file is uploaded', async () => {
+      const res = await request(app)
+        .post('/api/notes/voice')
+        .set('Authorization', `Bearer ${authToken}`)
+        .field('title', 'Voice Lecture 1')
+        .field('subjectId', testSubject.id.toString());
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toContain('upload an audio file');
+    });
+
+    it('should fail if subjectId is invalid', async () => {
+      const fakeSubjectId = '00000000-0000-0000-0000-000000000000';
+      const res = await request(app)
+        .post('/api/notes/voice')
+        .set('Authorization', `Bearer ${authToken}`)
+        .field('title', 'Voice Lecture 1')
+        .field('subjectId', fakeSubjectId)
+        .attach('file', testWavBuffer, 'lecture.wav');
+
+      expect(res.status).toBe(404);
+      expect(res.body.success).toBe(false);
+    });
+  });
 });

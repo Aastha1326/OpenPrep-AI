@@ -9,7 +9,8 @@
     "test": "vitest run --config vitest.config.unit.js",
     "test:unit": "vitest run --config vitest.config.unit.js",
     "test:integration": "vitest run",
-    "seed": "node scripts/seed.js"
+    "seed": "node scripts/seed.js",
+    "db:migrate:test": "node scripts/migrate.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.11.4",
@@ -29,7 +30,9 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.2.0",
     "node-cache": "^5.1.2",
+    "node-cron": "^3.0.3",
     "nodemailer": "^9.0.1",
+    "openprep-ai-root": "file:..",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "pdf-parse": "^1.1.1",
@@ -41,7 +44,7 @@
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^11.1.1",
-    "zod": "^3.23.8"
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "nodemon": "^3.1.0",

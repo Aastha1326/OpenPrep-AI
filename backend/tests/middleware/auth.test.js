@@ -62,6 +62,26 @@ describe('Auth Middleware - protect', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  it('should return 401 with Token expired message when token is expired', async () => {
+    const expiredToken = jwt.sign(
+      { id: uuidv4(), type: 'access' },
+      process.env.JWT_SECRET,
+      { expiresIn: '-1s' }
+    );
+    const { req, res, next } = createMockReqRes();
+    req.headers.authorization = `Bearer ${expiredToken}`;
+
+    await protect(req, res, next);
+
+    expect(res.statusCode).toBe(401);
+    expect(res.body).toEqual({
+      success: false,
+      message: 'Token expired',
+      error: 'Token expired',
+    });
+    expect(next).not.toHaveBeenCalled();
+  });
+
   it('should return 401 if token does not start with Bearer', async () => {
     const { req, res, next } = createMockReqRes();
     req.headers.authorization = 'Token sometoken';

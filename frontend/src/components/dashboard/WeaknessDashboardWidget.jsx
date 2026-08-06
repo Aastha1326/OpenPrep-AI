@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { AlertTriangle, TrendingDown, Target, RefreshCw, Sparkles, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, TrendingDown, Target, RefreshCw, Sparkles, CheckCircle2, ShieldAlert, FileText } from 'lucide-react';
 import API from '../../services/api';
 import VintagePaper from './VintagePaper';
+import RevisionSheetModal from './RevisionSheetModal';
 
 const WeaknessDashboardWidget = () => {
   const [loading, setLoading] = useState(true);
@@ -48,6 +49,8 @@ const WeaknessDashboardWidget = () => {
     }
   };
 
+  const [selectedTopicForRevision, setSelectedTopicForRevision] = useState(null);
+
   const weakTopics = data?.weakTopics || [];
   const recommendations = data?.aiAnalysis?.recommendations || [];
 
@@ -57,14 +60,22 @@ const WeaknessDashboardWidget = () => {
         <h2 className="text-xl font-bold font-playfair text-neutral-900 flex items-center gap-2">
           <ShieldAlert className="w-5 h-5 text-red-700" /> AI Weakness & Adaptive Focus
         </h2>
-        <button
-          onClick={handleAdaptiveReschedule}
-          disabled={rescheduling}
-          className="px-3 py-1 bg-gradient-to-r from-amber-700 to-amber-900 text-amber-50 text-xs font-bold rounded shadow hover:shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${rescheduling ? 'animate-spin' : ''}`} />
-          Boost Study Hours
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSelectedTopicForRevision({ topicName: 'Overall Weak Topics' })}
+            className="px-3 py-1 bg-gradient-to-r from-purple-800 to-indigo-900 text-amber-50 text-xs font-bold rounded shadow hover:shadow-md transition-all flex items-center gap-1.5"
+          >
+            <FileText className="w-3.5 h-3.5 text-yellow-400" /> Generate Revision Sheet
+          </button>
+          <button
+            onClick={handleAdaptiveReschedule}
+            disabled={rescheduling}
+            className="px-3 py-1 bg-gradient-to-r from-amber-700 to-amber-900 text-amber-50 text-xs font-bold rounded shadow hover:shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${rescheduling ? 'animate-spin' : ''}`} />
+            Boost Study Hours
+          </button>
+        </div>
       </div>
 
       {rescheduleMessage && (
@@ -95,13 +106,14 @@ const WeaknessDashboardWidget = () => {
             ) : (
               <div className="flex flex-wrap gap-2">
                 {weakTopics.map((topic, i) => (
-                  <span
+                  <button
                     key={topic.id || i}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-red-100 border border-red-300 text-red-900 font-bold text-xs shadow-sm"
+                    onClick={() => setSelectedTopicForRevision({ topicId: topic.id, topicName: topic.name, subjectId: topic.subject })}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-red-100 border border-red-300 text-red-900 hover:bg-red-200 font-bold text-xs shadow-sm transition-all"
                   >
                     <AlertTriangle className="w-3 h-3 text-red-700" />
                     {topic.name}
-                  </span>
+                  </button>
                 ))}
               </div>
             )}
@@ -140,6 +152,14 @@ const WeaknessDashboardWidget = () => {
 
         </div>
       )}
+
+      <RevisionSheetModal
+        isOpen={!!selectedTopicForRevision}
+        onClose={() => setSelectedTopicForRevision(null)}
+        subjectId={selectedTopicForRevision?.subjectId}
+        topicId={selectedTopicForRevision?.topicId}
+        topicName={selectedTopicForRevision?.topicName}
+      />
     </VintagePaper>
   );
 };

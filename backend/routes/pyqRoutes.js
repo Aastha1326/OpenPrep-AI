@@ -1,5 +1,12 @@
 const express = require('express');
-const { uploadAndAnalyzePYQ, getPYQs, getPYQDetails, getPYQAnalysis, deletePYQ } = require('../controllers/pyqController');
+const {
+  uploadAndAnalyzePYQ,
+  getPYQs,
+  getPYQDetails,
+  getPYQAnalysis,
+  deletePYQ,
+  getPYQTrends,
+} = require('../controllers/pyqController');
 const { protect } = require('../middleware/auth');
 const { strictAiLimiter } = require('../middleware/rateLimiter');
 const { checkQuota } = require('../middleware/quotaMiddleware');
@@ -10,7 +17,7 @@ const cacheMiddleware = require('../middleware/cache');
 const clearCache = require('../middleware/clearCache');
 
 const router = express.Router();
-
+router.get('/trends', protect, getPYQTrends);
 /**
  * @swagger
  * tags:
@@ -85,7 +92,16 @@ const router = express.Router();
  *               $ref: '#/components/schemas/Error'
  */
 
-router.post('/upload', protect, strictAiLimiter, checkQuota, upload.single('file'), validateUploadPYQ, clearCache('pyqs:*'), uploadAndAnalyzePYQ);
+router.post(
+  '/upload',
+  protect,
+  strictAiLimiter,
+  checkQuota,
+  upload.single('file'),
+  validateUploadPYQ,
+  clearCache('pyqs:*'),
+  uploadAndAnalyzePYQ
+);
 
 /**
  * @swagger
@@ -118,7 +134,12 @@ router.post('/upload', protect, strictAiLimiter, checkQuota, upload.single('file
  *               $ref: '#/components/schemas/Error'
  */
 
-router.get('/', protect, cacheMiddleware(req => `pyqs:${req.user.id}:${req.originalUrl}`), getPYQs);
+router.get(
+  '/',
+  protect,
+  cacheMiddleware((req) => `pyqs:${req.user.id}:${req.originalUrl}`),
+  getPYQs
+);
 
 /**
  * @swagger
@@ -163,7 +184,12 @@ router.get('/', protect, cacheMiddleware(req => `pyqs:${req.user.id}:${req.origi
  *               $ref: '#/components/schemas/Error'
  */
 
-router.get('/:id', protect, cacheMiddleware(req => `pyqs:${req.user.id}:${req.originalUrl}`), getPYQDetails);
+router.get(
+  '/:id',
+  protect,
+  cacheMiddleware((req) => `pyqs:${req.user.id}:${req.originalUrl}`),
+  getPYQDetails
+);
 
 /**
  * @swagger
@@ -214,7 +240,14 @@ router.get('/:id', protect, cacheMiddleware(req => `pyqs:${req.user.id}:${req.or
  *               $ref: '#/components/schemas/Error'
  */
 
-router.post('/:id/analyze', protect, strictAiLimiter, checkQuota, clearCache('pyqs:*'), getPYQAnalysis);
+router.post(
+  '/:id/analyze',
+  protect,
+  strictAiLimiter,
+  checkQuota,
+  clearCache('pyqs:*'),
+  getPYQAnalysis
+);
 
 /**
  * @swagger

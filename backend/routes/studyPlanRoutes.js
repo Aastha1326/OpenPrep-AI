@@ -3,10 +3,12 @@ const {
   generateAIPlan,
   getActivePlan,
   toggleTaskCompletion,
+  moveTaskDate,
   getPlans,
   getWeaknessAnalysis,
   rescheduleAdaptivePlan,
   rescheduleOverdueTasks,
+  exportStudyPlanIcs,
 } = require('../controllers/studyPlanController');
 const { protect } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
@@ -14,9 +16,8 @@ const { checkQuota } = require('../middleware/quotaMiddleware');
 const {
   validateGenerateAIPlan,
   validateToggleTask,
+  validateMoveTaskDate,
 } = require('../middleware/validators');
-const { validateRequest, createStudyPlanSchema } = require('../middleware/validate');
-
 const router = express.Router();
 
 /**
@@ -95,7 +96,8 @@ const router = express.Router();
  *               $ref: '#/components/schemas/Error'
  */
 
-router.post('/generate-ai', protect, aiLimiter, checkQuota, validateRequest(createStudyPlanSchema), generateAIPlan);
+router.post('/generate-ai', protect, aiLimiter, checkQuota, validateGenerateAIPlan, generateAIPlan);
+router.get('/:id/export-ics', protect, exportStudyPlanIcs);
 
 /**
  * @swagger
@@ -335,6 +337,56 @@ router.post('/reschedule-adaptive', protect, rescheduleAdaptivePlan);
  */
 
 router.put('/:planId/tasks/:taskId', protect, validateToggleTask, toggleTaskCompletion);
+router.put('/:planId/tasks/:taskId/date', protect, validateMoveTaskDate, moveTaskDate);
+
+/**
+ * @swagger
+ * /api/study-plans/{id}/reschedule:
+ *   post:
+ *     summary: Reschedule overdue tasks for a study plan
+ *     tags: [Study Plans]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Study plan ID
+ *     responses:
+ *       200:
+ *         description: Overdue tasks rescheduled successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/StudyPlan'
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Study plan not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       429:
+ *         description: Rate limit exceeded
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.post('/:id/reschedule', protect, aiLimiter, checkQuota, rescheduleOverdueTasks);
 
 module.exports = router;

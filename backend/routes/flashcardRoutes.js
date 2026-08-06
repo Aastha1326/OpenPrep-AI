@@ -1,26 +1,27 @@
 const express = require('express');
 const {
   generateAIFlashcards,
+  generateFlashcardsFromNote,
+  autoTagFlashcard,
   createFlashcard,
   getFlashcards,
   reviewFlashcard,
   deleteFlashcard,
   exportFlashcards,
   importFlashcards,
-} = require('../controllers/flashcardController');
-const { protect } = require('../middleware/auth');
+} = require('../controllers/flashcardController');const { protect } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
 const { checkQuota } = require('../middleware/quotaMiddleware');
 const flashcardUpload = require('../middleware/flashcardUpload');
 const {
   validateGenerateAIFlashcards,
+  validateGenerateFlashcardsFromNote,
+  validateAutoTagFlashcard,
   validateCreateFlashcard,
   validateReviewFlashcard,
   validateExportFlashcards,
   validateImportFlashcards,
-} = require('../middleware/validators');
-
-const router = express.Router();
+} = require('../middleware/validators');const router = express.Router();
 
 /**
  * @swagger
@@ -102,8 +103,106 @@ const router = express.Router();
  */
 
 // Static routes first (must come before /:id to avoid route shadowing)
-router.post('/generate-ai', protect, aiLimiter, checkQuota, validateGenerateAIFlashcards, generateAIFlashcards);
+router.post(
+  '/generate-ai',
+  protect,
+  aiLimiter,
+  checkQuota,
+  validateGenerateAIFlashcards,
+  generateAIFlashcards
+);
 
+/**
+ * @swagger
+ * /api/flashcards/generate-from-note:
+ *   post:
+ *     summary: Generate AI flashcard preview directly from note text content
+ *     tags: [Flashcards]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - noteId
+ *             properties:
+ *               noteId:
+ *                 type: string
+ *                 format: uuid
+ *                 example: "123e4567-e89b-12d3-a456-426614174000"
+ *               count:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 50
+ *                 default: 5
+ *                 example: 5
+ *     responses:
+ *       200:
+ *         description: Flashcards generated successfully (preview mode, not saved)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 count:
+ *                   type: integer
+ *                   example: 5
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       front:
+ *                         type: string
+ *                         example: "What is a derivative?"
+ *                       back:
+ *                         type: string
+ *                         example: "Rate of change of a function"
+ *       400:
+ *         description: Validation error or empty note content
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Note not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       429:
+ *         description: Rate limit exceeded
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       503:
+ *         description: AI service unavailable
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.post(
+  '/generate-from-note',
+  protect,
+  aiLimiter,
+  checkQuota,
+  validateGenerateFlashcardsFromNote,
+  generateFlashcardsFromNote
+);
 /**
  * @swagger
  * /api/flashcards/export:
@@ -207,7 +306,53 @@ router.get('/export', protect, validateExportFlashcards, exportFlashcards);
  *               $ref: '#/components/schemas/Error'
  */
 
-router.post('/import', protect, flashcardUpload.single('file'), validateImportFlashcards, importFlashcards);
+router.post(
+  '/import',
+  protect,
+  flashcardUpload.single('file'),
+  validateImportFlashcards,
+  importFlashcards
+);
+
+/**
+ * @swagger
+ * /api/flashcards/forecast:
+ *   get:
+ *     summary: Retrieve scheduled card review counts aggregated over next 30 days
+ *     tags: [Flashcards]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 30-day review workload forecast retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       date:
+ *                         type: string
+ *                         format: date
+ *                         example: "2026-08-05"
+ *                       count:
+ *                         type: integer
+ *                         example: 12
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.get('/forecast', protect, getReviewForecast);
 
 /**
  * @swagger
