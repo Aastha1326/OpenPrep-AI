@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Flame, Play, FileText, Calendar, TrendingUp, Award, BookOpen,
   Target, CheckCircle, Clock, AlertCircle, RefreshCw, Lightbulb,
-  LogOut, X,
+  LogOut, X, Download
 } from 'lucide-react';
 import API from '../services/api';
 import {
@@ -190,6 +190,21 @@ const Dashboard = () => {
     }
   };
 
+  const handleExport = async (timeframe) => {
+    try {
+      const response = await API.get(`/progress/export?timeframe=${timeframe}`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `analytics-${timeframe}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+    } catch (err) {
+      setComingSoon('Export failed. Please try again.');
+    }
+  };
+
   // ── Note Modal State ──
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isStudyPlanOpen, setIsStudyPlanOpen] = useState(false);
@@ -299,6 +314,17 @@ const Dashboard = () => {
             transition={{ duration: 0.5, delay: 0.3 }}
             className="flex items-center space-x-6 mt-6 md:mt-0"
           >
+            <div className="relative group z-50">
+              <button className="bg-neutral-800 text-gold-foil border border-yellow-700/50 hover:bg-neutral-700 px-4 py-2 rounded-sm shadow-[0_4px_15px_rgba(0,0,0,0.5)] flex items-center gap-2 font-playfair font-bold text-sm tracking-wide">
+                <Download className="w-4 h-4" /> Export Analytics
+              </button>
+              <div className="absolute right-0 top-full mt-2 w-40 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+                <button onClick={() => handleExport('7days')} className="w-full text-left block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200">Last 7 Days</button>
+                <button onClick={() => handleExport('30days')} className="w-full text-left block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200">Last 30 Days</button>
+                <button onClick={() => handleExport('all')} className="w-full text-left block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200">All Time</button>
+              </div>
+            </div>
+
             <ThemeToggle className="mr-2" />
             <div className="flex flex-col items-center">
               <div className="relative">

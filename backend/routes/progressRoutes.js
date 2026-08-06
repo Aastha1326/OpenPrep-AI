@@ -19,4 +19,6 @@ router.post('/track', protect, trackStudyTime);
 router.put('/topic/:id', protect, updateTopicProgress);
 router.get('/activity', protect, getActivityFeed);
 
+router.get('/export', protect, exportAnalytics);
+
 module.exports = router;
