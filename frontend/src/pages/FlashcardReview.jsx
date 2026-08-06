@@ -147,6 +147,8 @@ const FlashcardReview = () => {
   const [submitting, setSubmitting] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const submittingRef = useRef(false);
+  const reviewCardIdRef = useRef(null);
+  const isMountedRef = useRef(true);
   const sessionStatsRef = useRef(sessionStats);
 
   // Cancel speech synthesis and reset the speaking flag when the card or
@@ -179,6 +181,13 @@ const FlashcardReview = () => {
     }
   }, [savedSession]);
 
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   const currentCard = cards[currentIndex];
   const isSessionComplete = !loading && cards.length > 0 && currentIndex >= cards.length;
   const noCardsDue = !loading && cards.length === 0;
@@ -187,6 +196,7 @@ const FlashcardReview = () => {
     if (!currentCard || submittingRef.current) return;
 
     submittingRef.current = true;
+    reviewCardIdRef.current = currentCard.id;
     setSubmitting(true);
     setSaveError(null);
 
@@ -194,6 +204,13 @@ const FlashcardReview = () => {
       // Persist the rating server-side before advancing, with retry so a
       // transient network failure doesn't silently lose the card's progress.
       await putWithRetry(`/flashcards/${currentCard.id}/review`, { quality });
+
+      // Ignore stale resolutions: never apply an update after the component
+      // unmounted or when a different card is now being reviewed. Out-of-order
+      // network responses must not overwrite newer SM-2 intervals.
+      if (!isMountedRef.current || reviewCardIdRef.current !== currentCard.id) {
+        return;
+      }
 
       const nextIndex = currentIndex + 1;
       const nextStats = {
@@ -207,11 +224,13 @@ const FlashcardReview = () => {
       setIsFlipped(false);
       persistSession({ cards, currentIndex: nextIndex, sessionStats: nextStats });
     } catch (err) {
+      if (!isMountedRef.current) return;
       console.error("Failed to update flashcard", err);
       setSaveError('Could not save this rating. Check your connection and try again.');
     } finally {
       submittingRef.current = false;
-      setSubmitting(false);
+      reviewCardIdRef.current = null;
+      if (isMountedRef.current) setSubmitting(false);
     }
   }, [cards, currentIndex, currentCard]);
 

@@ -1,5 +1,6 @@
 const { Op } = require('sequelize');
 const { v4: uuidv4 } = require('uuid');
+const { sequelize } = require('../config/db');
 const Quiz = require('../models/Quiz');
 const QuizAttempt = require('../models/QuizAttempt');
 const Subject = require('../models/Subject');
@@ -9,6 +10,11 @@ const ActivityLog = require('../models/ActivityLog');
 const Progress = require('../models/Progress');
 const geminiService = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
+const { runCalibration } = require('../services/difficultyCalibrator');
+
+// Window (ms) during which duplicate quiz submissions for the same quiz are ignored.
+// Prevents double-click on "Submit Quiz" from creating duplicate attempt records.
+const DUPLICATE_SUBMIT_WINDOW_MS = 5000;
 
 // @desc    Generate AI Quiz
 // @route   POST /api/quizzes/generate-ai
@@ -35,8 +41,7 @@ exports.generateAIQuiz = async (req, res, next) => {
     if (notes && notes.length > 0) {
       notesText = notes
         .map((n) => n.content || '')
-        .join('\n')
-        .substring(0, 5000);
+        .join('\n');
     }
 
     // Call Gemini Service
@@ -187,54 +192,101 @@ exports.submitQuizAttempt = async (req, res, next) => {
       });
     }
 
-    // Evaluate answers
-    let correctCount = 0;
-    const evaluatedAnswers = questionsList.map((q) => {
-      const userAns = answers.find((ans) => String(ans.questionId) === String(q._id || q.id));
-      const selected = userAns && userAns.selectedAnswer !== undefined ? userAns.selectedAnswer : -1;
-      const isCorrect = selected === q.correctAnswer;
-      if (isCorrect) correctCount++;
-
-      return {
-        questionId: q._id || q.id,
-        selectedAnswer: selected,
-        isCorrect,
-      };
-    });
-
-    const totalQuestions = questionsList.length;
-    const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
-
-    // Determine weak vs strong areas based on score (<50% Weak, 50-80% Medium, >80% Strong)
-    const weakTopics = [];
-    const strongTopics = [];
-    if (quiz.topic) {
-      const topicObj = await Topic.findByPk(quiz.topic);
-      if (topicObj) {
-        if (score < 50) {
-          weakTopics.push(quiz.topic);
-          topicObj.status = 'Weak';
-        } else if (score > 80) {
-          strongTopics.push(quiz.topic);
-          topicObj.status = 'Strong';
-        } else {
-          topicObj.status = 'Medium';
-        }
-        await topicObj.save();
+    // Atomically check for duplicate submissions and persist the attempt.
+    // READ COMMITTED is required so that, after waiting for the row lock, the
+    // duplicate check sees the committed attempt of a concurrent request.
+    const result = await sequelize.transaction(
+      { isolationLevel: 'READ COMMITTED' },
+      async (transaction) => {
+      const lockedQuiz = await Quiz.findOne({
+        where: { id: quiz.id },
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
+      if (!lockedQuiz) {
+        return { error: 'Quiz not found' };
       }
+
+      // Ignore duplicate submissions for the same quiz within the 5-second window
+      const existingAttempt = await QuizAttempt.findOne({
+        where: {
+          user: req.user.id,
+          quiz: quiz.id,
+          createdAt: { [Op.gte]: new Date(Date.now() - DUPLICATE_SUBMIT_WINDOW_MS) },
+        },
+        transaction,
+      });
+      if (existingAttempt) {
+        return { attempt: existingAttempt, duplicate: true };
+      }
+
+      // Evaluate answers
+      let correctCount = 0;
+      const evaluatedAnswers = questionsList.map((q) => {
+        const userAns = answers.find((ans) => String(ans.questionId) === String(q._id || q.id));
+        const selected = userAns && userAns.selectedAnswer !== undefined ? userAns.selectedAnswer : -1;
+        const isCorrect = selected === q.correctAnswer;
+        if (isCorrect) correctCount++;
+
+        return {
+          questionId: q._id || q.id,
+          selectedAnswer: selected,
+          isCorrect,
+        };
+      });
+
+      const totalQuestions = questionsList.length;
+      const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
+
+      // Determine weak vs strong areas based on score (<50% Weak, 50-80% Medium, >80% Strong)
+      const weakTopics = [];
+      const strongTopics = [];
+      if (quiz.topic) {
+        const topicObj = await Topic.findByPk(quiz.topic, { transaction });
+        if (topicObj) {
+          if (score < 50) {
+            weakTopics.push(quiz.topic);
+            topicObj.status = 'Weak';
+          } else if (score > 80) {
+            strongTopics.push(quiz.topic);
+            topicObj.status = 'Strong';
+          } else {
+            topicObj.status = 'Medium';
+          }
+          await topicObj.save({ transaction });
+        }
+      }
+
+      // Save Attempt
+      const attempt = await QuizAttempt.create(
+        {
+          user: req.user.id,
+          quiz: quiz.id,
+          score,
+          totalQuestions,
+          answers: evaluatedAnswers,
+          timeSpent: timeSpent || 0,
+          weakTopics,
+          strongTopics,
+        },
+        { transaction }
+      );
+
+      return { attempt, duplicate: false, score };
+      }
+    );
+
+    if (result.error) {
+      return res.status(404).json({ success: false, error: result.error });
     }
 
-    // Save Attempt
-    const attempt = await QuizAttempt.create({
-      user: req.user.id,
-      quiz: quiz.id,
-      score,
-      totalQuestions,
-      answers: evaluatedAnswers,
-      timeSpent: timeSpent || 0,
-      weakTopics,
-      strongTopics,
-    });
+    const { attempt, duplicate, score } = result;
+
+    // Duplicate submission detected — return the original attempt without
+    // re-running side effects (progress, activity log, weakness aggregation).
+    if (duplicate) {
+      return res.status(200).json({ success: true, data: attempt, duplicate: true });
+    }
 
     // Trigger AI weakness aggregation and adaptive planner rescheduling in background
     const weaknessAggregatorService = require('../services/weaknessAggregatorService');
@@ -333,6 +385,142 @@ exports.getAttemptHistory = async (req, res, next) => {
       totalPages: Math.ceil(total / limit),
       data: populatedAttempts,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Generate AI Revision Sheet for weak concepts from quiz history
+// @route   POST /api/quizzes/generate-revision-sheet or POST /api/quiz/generate-revision-sheet
+// @access  Private
+exports.generateRevisionSheet = async (req, res, next) => {
+  try {
+    const { quizAttemptId, mistookQuestions: payloadQuestions, subjectId, topicId, saveToNotes = true } = req.body;
+
+    let mistookQuestions = payloadQuestions || [];
+    let targetSubjectName = 'General Subject';
+    let targetTopicName = 'Weak Topics';
+    let matchedSubjectId = subjectId || null;
+    let matchedTopicId = topicId || null;
+
+    if (quizAttemptId) {
+      const attempt = await QuizAttempt.findOne({
+        where: { id: quizAttemptId, user: req.user.id },
+        include: [
+          {
+            model: Quiz,
+            as: 'quizRef',
+            include: [
+              { model: Subject, as: 'subjectRef' },
+              { model: Topic, as: 'topicRef' },
+            ],
+          },
+        ],
+      });
+
+      if (attempt) {
+        if (attempt.quizRef) {
+          matchedSubjectId = matchedSubjectId || attempt.quizRef.subject;
+          matchedTopicId = matchedTopicId || attempt.quizRef.topic;
+
+          if (attempt.quizRef.subjectRef) targetSubjectName = attempt.quizRef.subjectRef.name;
+          if (attempt.quizRef.topicRef) targetTopicName = attempt.quizRef.topicRef.name;
+
+          const quizQuestions = attempt.quizRef.questions || [];
+          const userAnswers = attempt.answers || [];
+
+          mistookQuestions = quizQuestions
+            .filter((q) => {
+              const ans = userAnswers.find((a) => String(a.questionId) === String(q._id || q.id));
+              return ans && !ans.isCorrect;
+            })
+            .map((q) => {
+              const userAns = userAnswers.find((a) => String(a.questionId) === String(q._id || q.id));
+              return {
+                questionText: q.questionText,
+                options: q.options,
+                correctAnswer: q.correctAnswer,
+                explanation: q.explanation,
+                userSelectedAnswer: userAns ? userAns.selectedAnswer : -1,
+              };
+            });
+        }
+      }
+    }
+
+    if (subjectId && targetSubjectName === 'General Subject') {
+      const sub = await Subject.findByPk(subjectId);
+      if (sub) targetSubjectName = sub.name;
+    }
+
+    if (topicId && targetTopicName === 'Weak Topics') {
+      const top = await Topic.findByPk(topicId);
+      if (top) targetTopicName = top.name;
+    }
+
+    // Call Gemini Service
+    const revisionSheet = await geminiService.generateRevisionSheet(
+      mistookQuestions,
+      targetSubjectName,
+      targetTopicName,
+      req.query.refresh === 'true'
+    );
+
+    let savedNote = null;
+    if (saveToNotes && matchedSubjectId) {
+      savedNote = await Note.create({
+        title: revisionSheet.title || `AI Revision Sheet: ${targetTopicName}`,
+        content: revisionSheet.summaryMarkdown,
+        subject: matchedSubjectId,
+        topic: matchedTopicId,
+        category: 'Summary',
+        user: req.user.id,
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      data: {
+        title: revisionSheet.title,
+        summaryMarkdown: revisionSheet.summaryMarkdown,
+        savedNote,
+      },
+    });
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({
+        success: false,
+        error: error.message,
+      });
+    }
+    next(error);
+  }
+};
+
+// @desc    Run difficulty calibration report
+// @route   GET /api/quizzes/admin/calibration-report
+// @access  Private/Admin
+exports.getCalibrationReport = async (req, res, next) => {
+  try {
+    // Check if user is admin if role exists
+    if (req.user && req.user.role && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Not authorized as admin' });
+    }
+
+    const report = await runCalibration();
+    
+    if (report.success) {
+      res.status(200).json({ success: true, data: report });
+    } else {
+      res.status(500).json({ success: false, error: report.error });
+    }
   } catch (error) {
     next(error);
   }

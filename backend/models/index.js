@@ -16,7 +16,7 @@ const Feedback = require('./Feedback');
 const ActivityLog = require('./ActivityLog');
 const UsageQuota = require('./UsageQuota');
 const Achievement = require('./Achievement');
-
+const FocusSession = require('./FocusSession');
 // Define Associations
 
 // User associations
@@ -101,8 +101,10 @@ ActivityLog.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 // Achievement associations
 Achievement.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 
-module.exports = {
-  sequelize,
+// FocusSession associations
+FocusSession.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
+module.exports = {  sequelize,
   User,
   Exam,
   Subject,
@@ -116,6 +118,7 @@ module.exports = {
   Progress,
   Feedback,
   ActivityLog,
-  UsageQuota,
+UsageQuota,
   Achievement,
+  FocusSession,
 };

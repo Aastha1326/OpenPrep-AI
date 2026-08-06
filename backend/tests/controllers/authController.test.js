@@ -1,6 +1,7 @@
 const request = require('supertest');
 const express = require('express');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const authRoutes = require('../../routes/authRoutes');
 const errorHandler = require('../../middleware/error');
 const User = require('../../models/User');

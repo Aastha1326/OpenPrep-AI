@@ -21,7 +21,6 @@ const {
   normalizeSyllabusPayload,
 } = require('../services/syllabusParserService');
 
-
 // ==========================================
 // EXAMS CONTROLLER
 // ==========================================
@@ -42,7 +41,6 @@ exports.createExam = async (req, res, next) => {
     next(error);
   }
 };
-
 
 exports.getExams = async (req, res, next) => {
   try {
@@ -90,7 +88,10 @@ exports.deleteExam = async (req, res, next) => {
     let topicIds = [];
     if (subjectIds.length > 0) {
       // Collect all topics for these subjects
-      const topics = await Topic.findAll({ where: { subject: { [Op.in]: subjectIds } }, transaction: t });
+      const topics = await Topic.findAll({
+        where: { subject: { [Op.in]: subjectIds } },
+        transaction: t,
+      });
       topicIds = topics.map((top) => top.id);
     }
 
@@ -118,11 +119,15 @@ exports.deleteExam = async (req, res, next) => {
     await StudyPlan.destroy({ where: { exam: exam.id }, transaction: t });
 
     if (subjectIds.length > 0) {
-      await PYQ.destroy({ where: { [Op.or]: [{ exam: exam.id }, { subject: { [Op.in]: subjectIds } }] }, transaction: t });
+      await PYQ.destroy({
+        where: { [Op.or]: [{ exam: exam.id }, { subject: { [Op.in]: subjectIds } }] },
+        transaction: t,
+        individualHooks: true,
+      });
       await Note.destroy({ where: { subject: { [Op.in]: subjectIds } }, transaction: t });
       await Flashcard.destroy({ where: { subject: { [Op.in]: subjectIds } }, transaction: t });
     } else {
-      await PYQ.destroy({ where: { exam: exam.id }, transaction: t });
+      await PYQ.destroy({ where: { exam: exam.id }, transaction: t, individualHooks: true });
     }
 
     const progressOrConditions = [];
@@ -138,7 +143,7 @@ exports.deleteExam = async (req, res, next) => {
       await Topic.destroy({ where: { subject: { [Op.in]: subjectIds } }, transaction: t });
     }
     await Subject.destroy({ where: { exam: exam.id }, transaction: t });
-    
+
     // 4. Delete the exam itself
     await exam.destroy({ transaction: t });
 
@@ -192,26 +197,35 @@ exports.createCompositeBundle = async (req, res, next) => {
     }
 
     // Create the master composite Exam
-    const exam = await Exam.create({
-      name,
-      description,
-      date,
-      isBundle: true,
-      targetExamType: targetExamType || 'Custom',
-      user: req.user.id,
-    }, { transaction: t });
+    const exam = await Exam.create(
+      {
+        name,
+        description,
+        date,
+        isBundle: true,
+        targetExamType: targetExamType || 'Custom',
+        user: req.user.id,
+      },
+      { transaction: t }
+    );
 
     // Create subjects with percentage weightages if provided
     const createdSubjects = [];
     if (Array.isArray(subjects) && subjects.length > 0) {
       for (const sub of subjects) {
-        const newSub = await Subject.create({
-          name: sub.name,
-          description: sub.description || '',
-          weightage: sub.weightage !== undefined ? parseFloat(sub.weightage) : Math.round(100 / subjects.length),
-          exam: exam.id,
-          user: req.user.id,
-        }, { transaction: t });
+        const newSub = await Subject.create(
+          {
+            name: sub.name,
+            description: sub.description || '',
+            weightage:
+              sub.weightage !== undefined
+                ? parseFloat(sub.weightage)
+                : Math.round(100 / subjects.length),
+            exam: exam.id,
+            user: req.user.id,
+          },
+          { transaction: t }
+        );
         createdSubjects.push(newSub);
       }
     }
@@ -274,7 +288,6 @@ exports.updateSubjectWeightages = async (req, res, next) => {
   }
 };
 
-
 exports.getSubjects = async (req, res, next) => {
   try {
     const { examId } = req.query;
@@ -336,7 +349,7 @@ exports.deleteSubject = async (req, res, next) => {
     await Topic.destroy({ where: { subject: subject.id }, transaction: t });
 
     // 5. Delete PYQs for this subject
-    await PYQ.destroy({ where: { subject: subject.id }, transaction: t });
+    await PYQ.destroy({ where: { subject: subject.id }, transaction: t, individualHooks: true });
 
     // 6. Delete the subject itself
     await subject.destroy({ transaction: t });
@@ -471,7 +484,8 @@ exports.importSyllabus = async (req, res, next) => {
       cleanup = false;
       return res.status(400).json({
         success: false,
-        error: 'Unsupported file type. Please upload either a .pdf syllabus or a .json file matching the bulk import schema.',
+        error:
+          'Unsupported file type. Please upload either a .pdf syllabus or a .json file matching the bulk import schema.',
       });
     }
 
@@ -520,7 +534,10 @@ exports.importSyllabus = async (req, res, next) => {
 
       const createdSubjects = [];
       let totalTopics = 0;
-      const subjectWeightage = normalized.subjects.length > 0 ? Math.max(1, Math.round(100 / normalized.subjects.length)) : 0;
+      const subjectWeightage =
+        normalized.subjects.length > 0
+          ? Math.max(1, Math.round(100 / normalized.subjects.length))
+          : 0;
 
       for (const sub of normalized.subjects) {
         const subWeightage = Number(sub.weightage) || subjectWeightage;
@@ -536,7 +553,8 @@ exports.importSyllabus = async (req, res, next) => {
         );
 
         const createdTopics = [];
-        const topicWeightage = sub.topics.length > 0 ? Math.max(1, Math.round(100 / sub.topics.length)) : 0;
+        const topicWeightage =
+          sub.topics.length > 0 ? Math.max(1, Math.round(100 / sub.topics.length)) : 0;
         for (const topicName of sub.topics) {
           const topic = await Topic.create(
             {
@@ -598,7 +616,14 @@ exports.importSyllabus = async (req, res, next) => {
         },
         prefill,
         data: {
-          exam: { id: exam.id, name: exam.name, description: exam.description, date: exam.date, isBundle: exam.isBundle, targetExamType: exam.targetExamType },
+          exam: {
+            id: exam.id,
+            name: exam.name,
+            description: exam.description,
+            date: exam.date,
+            isBundle: exam.isBundle,
+            targetExamType: exam.targetExamType,
+          },
           subjects: createdSubjects,
         },
       });

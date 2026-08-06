@@ -1,11 +1,37 @@
 import { useRef, useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Download, Calendar as CalendarIcon, CheckCircle, Circle, AlertTriangle, ClockPlus, Filter, Plus, RefreshCw, AlertCircle } from 'lucide-react';
+import {
+  X,
+  Download,
+  Calendar as CalendarIcon,
+  CheckCircle,
+  Circle,
+  AlertTriangle,
+  ClockPlus,
+  Filter,
+  Plus,
+  RefreshCw,
+  AlertCircle,
+  CalendarDays,
+  GanttChartSquare,
+  List,
+} from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 import API from '../../services/api';
-
+import { toLocalDateString, formatDateOnly } from '../../utils/dateUtils';
+import StudyPlanGanttView from './StudyPlanGanttView';
 // Create Study Plan Form Component
-const CreateStudyPlanForm = ({ onClose, onSubmit, loading, error, formData, handleInputChange, minStartDate, minEndDate, exams }) => (
+const CreateStudyPlanForm = ({
+  onClose,
+  onSubmit,
+  loading,
+  error,
+  formData,
+  handleInputChange,
+  minStartDate,
+  minEndDate,
+  exams,
+}) => (
   <div className="max-w-xl mx-auto">
     <div className="flex items-center justify-between mb-6">
       <h3 className="text-2xl font-bold font-playfair text-[#3E2723]">Create Study Plan</h3>
@@ -25,6 +51,16 @@ const CreateStudyPlanForm = ({ onClose, onSubmit, loading, error, formData, hand
         </div>
       )}
 
+      {prefillExamName && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm rounded flex items-start gap-2">
+          <Sparkles className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>
+            Prefilled from imported syllabus: <span className="font-semibold">{prefillExamName}</span>. Adjust the
+            dates if needed.
+          </span>
+        </div>
+      )}
+
       <div>
         <label className="block text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
           Select Exam
@@ -40,7 +76,7 @@ const CreateStudyPlanForm = ({ onClose, onSubmit, loading, error, formData, hand
           ) : (
             exams.map((exam) => (
               <option key={exam.id} value={exam.id}>
-                {exam.name} ({exam.date ? new Date(exam.date).toLocaleDateString() : 'No date'})
+                {exam.name} ({exam.date ? formatDateOnly(exam.date) : 'No date'})
               </option>
             ))
           )}
@@ -145,15 +181,25 @@ const BumpTimeButton = ({ onClick, disabled = false }) => (
   </button>
 );
 
-const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated, onPlanUpdate }) => {
+const StudyPlanModal = ({
+  isOpen,
+  onClose,
+  activePlan,
+  onBumpTime,
+  onPlanCreated,
+  onPlanUpdate,
+}) => {
   const contentRef = useRef(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
   const [isRescheduling, setIsRescheduling] = useState(false);
   const [rescheduleMessage, setRescheduleMessage] = useState(null);
   const [showWeakOnly, setShowWeakOnly] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showTimeline, setShowTimeline] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [prefillConsumed, setPrefillConsumed] = useState(false);
   const [formData, setFormData] = useState({
     examId: '',
     startDate: '',
@@ -161,6 +207,8 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
     studyHoursPerDay: 3,
   });
   const [exams, setExams] = useState([]);
+
+  const createFormVisible = showCreateForm || !activePlan;
 
   const dailyGoals = useMemo(() => activePlan?.dailyGoals || [], [activePlan?.dailyGoals]);
 
@@ -184,14 +232,20 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
 
   // Fetch exams when create form is shown
   useEffect(() => {
-    if (showCreateForm && exams.length === 0) {
+    if (createFormVisible && exams.length === 0) {
       const fetchExams = async () => {
         try {
           const res = await API.get('/academic/exams');
           const fetchedExams = Array.isArray(res.data?.data) ? res.data.data : [];
           setExams(fetchedExams);
           if (fetchedExams.length > 0) {
-            setFormData((prev) => ({ ...prev, examId: fetchedExams[0].id }));
+            setFormData((prev) => {
+              // Keep a prefilled exam from the syllabus import if present
+              if (prev.examId && fetchedExams.some((e) => e.id === prev.examId)) {
+                return prev;
+              }
+              return { ...prev, examId: fetchedExams[0].id };
+            });
           }
         } catch (err) {
           console.error('Failed to load exams:', err);
@@ -199,7 +253,25 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
       };
       fetchExams();
     }
-  }, [showCreateForm, exams.length]);
+  }, [createFormVisible, exams.length]);
+
+  // Apply the syllabus import prefill to the create form once
+  useEffect(() => {
+    if (createFormVisible && syllabusPrefill && !prefillConsumed) {
+      const today = toLocalDateString(new Date());
+      const examDate =
+        syllabusPrefill.examDate && syllabusPrefill.examDate >= today
+          ? syllabusPrefill.examDate
+          : '';
+      setFormData((prev) => ({
+        ...prev,
+        examId: syllabusPrefill.examId || prev.examId,
+        startDate: today,
+        endDate: examDate || prev.endDate,
+      }));
+      setPrefillConsumed(true);
+    }
+  }, [createFormVisible, syllabusPrefill, prefillConsumed]);
 
   // Reset form when modal closes
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
@@ -208,35 +280,64 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
     if (!isOpen) {
       setShowCreateForm(false);
       setError(null);
+      setPrefillConsumed(false);
       setFormData({ examId: '', startDate: '', endDate: '', studyHoursPerDay: 3 });
     }
   }
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (!contentRef.current) return;
     setIsExporting(true);
 
-    const element = contentRef.current;
-    
-    const opt = {
-      margin: 10,
-      filename: 'My_Study_Plan.pdf',
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
+    try {
+      const { default: html2pdf } = await import('html2pdf.js');
 
-    html2pdf()
-      .set(opt)
-      .from(element)
-      .save()
-      .then(() => {
-        setIsExporting(false);
-      })
-      .catch(err => {
-        console.error('PDF export failed:', err);
-        setIsExporting(false);
+      const element = contentRef.current;
+
+      const opt = {
+        margin: 10,
+        filename: 'My_Study_Plan.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      };
+
+      await html2pdf().set(opt).from(element).save();
+    } catch (err) {
+      console.error('PDF export failed:', err);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportIcs = async () => {
+    if (!activePlan?.id) return;
+    setIsSyncingCalendar(true);
+
+    try {
+      const response = await API.get(`/study-plans/${activePlan.id}/export-ics`, {
+        responseType: 'blob',
       });
+
+      const blob = new Blob([response.data], { type: 'text/calendar;charset=utf-8' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `study-plan-${activePlan.id}.ics`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('iCal export failed:', err);
+      setRescheduleMessage({
+        type: 'error',
+        text: err.response?.data?.error || 'Failed to export calendar .ics file',
+      });
+      setTimeout(() => setRescheduleMessage(null), 4000);
+    } finally {
+      setIsSyncingCalendar(false);
+    }
   };
 
   const handleReschedule = async () => {
@@ -247,12 +348,12 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
 
     try {
       const response = await API.post(`/study-plans/${activePlan.id}/reschedule`, {
-        useAIRebalance: false
+        useAIRebalance: false,
       });
 
       setRescheduleMessage({
         type: 'success',
-        text: response.data.message || 'Study plan rescheduled successfully'
+        text: response.data.message || 'Study plan rescheduled successfully',
       });
 
       // Notify parent component to refresh the plan
@@ -265,7 +366,7 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
       console.error('Reschedule failed:', error);
       setRescheduleMessage({
         type: 'error',
-        text: error.response?.data?.error || 'Failed to reschedule study plan'
+        text: error.response?.data?.error || 'Failed to reschedule study plan',
       });
       setTimeout(() => setRescheduleMessage(null), 4000);
     } finally {
@@ -320,7 +421,7 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
     }
   };
 
-  const minStartDate = new Date().toISOString().split('T')[0];
+  const minStartDate = toLocalDateString(new Date());
   const minEndDate = formData.startDate || minStartDate;
 
   const showForm = showCreateForm || !activePlan;
@@ -358,14 +459,28 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
                   <h2 className="text-3xl font-bold font-playfair text-[#3E2723]">Study Plan</h2>
                   {totalWeakCount > 0 && (
                     <p className="text-xs text-[#8B4513]/70 mt-0.5">
-                      {totalWeakCount} weak topic{totalWeakCount === 1 ? '' : 's'} flagged — prioritize these!
+                      {totalWeakCount} weak topic{totalWeakCount === 1 ? '' : 's'} flagged —
+                      prioritize these!
                     </p>
                   )}
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-3">
-                {!showForm && (
+                {!showForm && activePlan && (
                   <>
+                    <button
+                      onClick={handleExportIcs}
+                      disabled={isSyncingCalendar}
+                      className="flex items-center space-x-2 bg-gradient-to-r from-emerald-700 to-emerald-900 text-white px-4 py-2 rounded-sm hover:from-emerald-600 hover:to-emerald-800 transition-colors disabled:opacity-50 cursor-pointer"
+                      title="Export calendar file for Google Calendar or Outlook (.ics)"
+                    >
+                      <CalendarDays
+                        className={`w-5 h-5 ${isSyncingCalendar ? 'animate-spin' : ''}`}
+                      />
+                      <span className="font-semibold">
+                        {isSyncingCalendar ? 'Exporting...' : 'Sync Calendar (.ics)'}
+                      </span>
+                    </button>
                     <button
                       onClick={handleReschedule}
                       disabled={isRescheduling}
@@ -373,7 +488,9 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
                       title="Reschedule overdue tasks"
                     >
                       <RefreshCw className={`w-5 h-5 ${isRescheduling ? 'animate-spin' : ''}`} />
-                      <span className="font-semibold">{isRescheduling ? 'Rescheduling...' : 'Reschedule Tasks'}</span>
+                      <span className="font-semibold">
+                        {isRescheduling ? 'Rescheduling...' : 'Reschedule Tasks'}
+                      </span>
                     </button>
                     <button
                       onClick={() => setShowCreateForm(true)}
@@ -394,12 +511,29 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
                       {showWeakOnly ? 'Showing Weak Only' : 'Filter Weak Topics'}
                     </button>
                     <button
+                      onClick={() => setShowTimeline((v) => !v)}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-sm text-sm font-semibold transition-colors cursor-pointer border ${
+                        showTimeline
+                          ? 'bg-indigo-700 text-white border-indigo-800'
+                          : 'bg-white/70 text-[#8B4513] border-[#8B4513]/30 hover:bg-white'
+                      }`}
+                    >
+                      {showTimeline ? (
+                        <List className="w-4 h-4" />
+                      ) : (
+                        <GanttChartSquare className="w-4 h-4" />
+                      )}
+                      {showTimeline ? 'List View' : 'Timeline View'}
+                    </button>{' '}
+                    <button
                       onClick={handleExportPDF}
                       disabled={isExporting}
                       className="flex items-center space-x-2 bg-gradient-to-r from-yellow-700 to-yellow-900 text-white px-4 py-2 rounded-sm hover:from-yellow-600 hover:to-yellow-800 transition-colors disabled:opacity-50 cursor-pointer"
                     >
                       <Download className="w-5 h-5" />
-                      <span className="font-semibold">{isExporting ? 'Exporting...' : 'Export to PDF'}</span>
+                      <span className="font-semibold">
+                        {isExporting ? 'Exporting...' : 'Export to PDF'}
+                      </span>
                     </button>
                   </>
                 )}
@@ -443,109 +577,139 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
                   minStartDate={minStartDate}
                   minEndDate={minEndDate}
                   exams={exams}
+                  prefillExamName={syllabusPrefill?.examName}
                 />
-              ) : (
-              <div ref={contentRef} className="bg-white/80 p-8 rounded-sm shadow-sm border border-[#8B4513]/10 max-w-3xl mx-auto" id="study-plan-content">
-                <div className="text-center mb-10">
-                  <h1 className="text-4xl font-bold font-playfair text-[#3E2723] mb-2 border-b-2 border-[#8B4513]/30 pb-4 inline-block">
-                    My Study Journey
-                  </h1>
-                  <p className="text-[#8B4513]/80 italic mt-2 text-lg">
-                    Generated for your success
-                  </p>
-                  {showWeakOnly && (
-                    <p className="mt-4 inline-block px-3 py-1 rounded-full bg-red-100 text-red-700 text-sm font-semibold border border-red-200">
-                      <AlertTriangle className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
-                      Weak topics view — focus mode enabled
-                    </p>
-                  )}
+              ) : showTimeline ? (
+                <div className="bg-white/80 p-6 rounded-sm shadow-sm border border-[#8B4513]/10">
+                  <StudyPlanGanttView activePlan={activePlan} onPlanUpdate={onPlanUpdate} />
                 </div>
-
-                <div className="space-y-8">
-                  {filteredDailyGoals && filteredDailyGoals.length > 0 ? (
-                    filteredDailyGoals.map((day, idx) => {
-                      const dateStr = day.date ? new Date(day.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : `Day ${idx + 1}`;
-                      const hasTasks = day.tasks && day.tasks.length > 0;
-                      const weakDayCount = (day.tasks || []).filter((t) => t.topic?.status === 'Weak').length;
-                      return (
-                        <div key={idx} className="bg-white rounded border border-[#8B4513]/20 overflow-hidden shadow-sm break-inside-avoid">
-                          <div className="bg-[#8B4513]/5 p-4 border-b border-[#8B4513]/20 flex items-center justify-between">
-                            <h3 className="text-xl font-bold font-playfair text-[#8B4513]">{dateStr}</h3>
-                            {weakDayCount > 0 && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-50 text-red-600 border border-red-200">
-                                <AlertTriangle className="w-3 h-3" />
-                                {weakDayCount} weak
-                              </span>
-                            )}
-                          </div>
-                          <div className="p-4 space-y-3">
-                            {hasTasks ? (
-                              day.tasks.map((task, tIdx) => {
-                                const isWeak = task.topic?.status === 'Weak';
-                                return (
-                                  <div
-                                    key={tIdx}
-                                    className={`flex items-start space-x-3 p-2 rounded transition-colors ${
-                                      isWeak ? 'bg-red-50/60 hover:bg-red-50 border border-red-100' : 'hover:bg-[#8B4513]/5'
-                                    }`}
-                                  >
-                                    {task.completed ? (
-                                      <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
-                                    ) : (
-                                      <Circle className={`w-5 h-5 mt-0.5 shrink-0 ${isWeak ? 'text-red-400' : 'text-[#8B4513]/40'}`} />
-                                    )}
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex flex-wrap items-center gap-y-1">
-                                        <p className="font-semibold text-neutral-800">
-                                          {task.title || task.topic?.name || 'Untitled Task'}
-                                        </p>
-                                        {isWeak && <WeakBadge />}
-                                      </div>
-                                      {(task.description || task.duration) && (
-                                        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-                                          {task.description && (
-                                            <p className="text-sm text-neutral-600">{task.description}</p>
-                                          )}
-                                          {task.duration && (
-                                            <span className="inline-flex items-center gap-1 text-xs text-neutral-500 font-medium">
-                                              <ClockPlus className="w-3 h-3" />
-                                              {task.duration} min
-                                            </span>
-                                          )}
-                                        </div>
-                                      )}
-                                      {isWeak && onBumpTime && (
-                                        <BumpTimeButton
-                                          onClick={() => onBumpTime(task.id || task._id, 30)}
+              ) : (
+                <div
+                  ref={contentRef}
+                  className="bg-white/80 p-8 rounded-sm shadow-sm border border-[#8B4513]/10 max-w-3xl mx-auto"
+                  id="study-plan-content"
+                >
+                  {' '}
+                  <div className="text-center mb-10">
+                    <h1 className="text-4xl font-bold font-playfair text-[#3E2723] mb-2 border-b-2 border-[#8B4513]/30 pb-4 inline-block">
+                      My Study Journey
+                    </h1>
+                    <p className="text-[#8B4513]/80 italic mt-2 text-lg">
+                      Generated for your success
+                    </p>
+                    {showWeakOnly && (
+                      <p className="mt-4 inline-block px-3 py-1 rounded-full bg-red-100 text-red-700 text-sm font-semibold border border-red-200">
+                        <AlertTriangle className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
+                        Weak topics view — focus mode enabled
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-8">
+                    {filteredDailyGoals && filteredDailyGoals.length > 0 ? (
+                      filteredDailyGoals.map((day, idx) => {
+                        const dateStr = day.date
+                          ? formatDateOnly(day.date, {
+                              weekday: 'long',
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                            })
+                          : `Day ${idx + 1}`;
+                        const hasTasks = day.tasks && day.tasks.length > 0;
+                        const weakDayCount = (day.tasks || []).filter(
+                          (t) => t.topic?.status === 'Weak'
+                        ).length;
+                        return (
+                          <div
+                            key={idx}
+                            className="bg-white rounded border border-[#8B4513]/20 overflow-hidden shadow-sm break-inside-avoid"
+                          >
+                            <div className="bg-[#8B4513]/5 p-4 border-b border-[#8B4513]/20 flex items-center justify-between">
+                              <h3 className="text-xl font-bold font-playfair text-[#8B4513]">
+                                {dateStr}
+                              </h3>
+                              {weakDayCount > 0 && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-50 text-red-600 border border-red-200">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  {weakDayCount} weak
+                                </span>
+                              )}
+                            </div>
+                            <div className="p-4 space-y-3">
+                              {hasTasks ? (
+                                day.tasks.map((task, tIdx) => {
+                                  const isWeak = task.topic?.status === 'Weak';
+                                  return (
+                                    <div
+                                      key={tIdx}
+                                      className={`flex items-start space-x-3 p-2 rounded transition-colors ${
+                                        isWeak
+                                          ? 'bg-red-50/60 hover:bg-red-50 border border-red-100'
+                                          : 'hover:bg-[#8B4513]/5'
+                                      }`}
+                                    >
+                                      {task.completed ? (
+                                        <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
+                                      ) : (
+                                        <Circle
+                                          className={`w-5 h-5 mt-0.5 shrink-0 ${isWeak ? 'text-red-400' : 'text-[#8B4513]/40'}`}
                                         />
                                       )}
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex flex-wrap items-center gap-y-1">
+                                          <p className="font-semibold text-neutral-800">
+                                            {task.title || task.topic?.name || 'Untitled Task'}
+                                          </p>
+                                          {isWeak && <WeakBadge />}
+                                        </div>
+                                        {(task.description || task.duration) && (
+                                          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                                            {task.description && (
+                                              <p className="text-sm text-neutral-600">
+                                                {task.description}
+                                              </p>
+                                            )}
+                                            {task.duration && (
+                                              <span className="inline-flex items-center gap-1 text-xs text-neutral-500 font-medium">
+                                                <ClockPlus className="w-3 h-3" />
+                                                {task.duration} min
+                                              </span>
+                                            )}
+                                          </div>
+                                        )}
+                                        {isWeak && onBumpTime && (
+                                          <BumpTimeButton
+                                            onClick={() => onBumpTime(task.id || task._id, 30)}
+                                          />
+                                        )}
+                                      </div>
                                     </div>
-                                  </div>
-                                );
-                              })
-                            ) : (
-                              <p className="text-neutral-500 italic">
-                                {showWeakOnly ? 'No weak topics scheduled for this day.' : 'No tasks scheduled for this day.'}
-                              </p>
-                            )}
+                                  );
+                                })
+                              ) : (
+                                <p className="text-neutral-500 italic">
+                                  {showWeakOnly
+                                    ? 'No weak topics scheduled for this day.'
+                                    : 'No tasks scheduled for this day.'}
+                                </p>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="text-center text-neutral-500 italic py-12">
-                      {showWeakOnly
-                        ? 'No weak topics found in your study plan. Great work!'
-                        : 'No study plan data available.'}
-                    </div>
-                  )}
+                        );
+                      })
+                    ) : (
+                      <div className="text-center text-neutral-500 italic py-12">
+                        {showWeakOnly
+                          ? 'No weak topics found in your study plan. Great work!'
+                          : 'No study plan data available.'}
+                      </div>
+                    )}
+                  </div>
+                  {/* PDF Footer spacer */}
+                  <div className="mt-12 pt-4 border-t border-[#8B4513]/20 text-center text-sm text-[#8B4513]/60 italic font-playfair">
+                    Stay consistent. The roots of education are bitter, but the fruit is sweet.
+                  </div>
                 </div>
-                
-                {/* PDF Footer spacer */}
-                <div className="mt-12 pt-4 border-t border-[#8B4513]/20 text-center text-sm text-[#8B4513]/60 italic font-playfair">
-                  Stay consistent. The roots of education are bitter, but the fruit is sweet.
-                </div>
-              </div>
               )}
             </div>
           </motion.div>

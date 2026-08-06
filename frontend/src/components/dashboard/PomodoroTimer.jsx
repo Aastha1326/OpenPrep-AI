@@ -13,7 +13,8 @@ const PomodoroTimer = () => {
   const [isSubjectDropdownOpen, setIsSubjectDropdownOpen] = useState(false);
   const [showToast, setShowToast] = useState(null);
   const [totalStudyHours, setTotalStudyHours] = useState(0);
-
+  const [pausedSeconds, setPausedSeconds] = useState(0);
+  const [interruptions, setInterruptions] = useState(0);
   // Fetch user's subjects on component mount
   useEffect(() => {
     const fetchSubjects = async () => {
@@ -48,10 +49,23 @@ const PomodoroTimer = () => {
     }
   };
 
+  const logFocusSession = useCallback(
+    async (activeSeconds) => {
+      try {
+        const payload = { activeSeconds, pausedSeconds, interruptions };
+        if (selectedSubject) payload.subjectId = selectedSubject.id;
+        await API.post('/progress/focus-session', payload);
+      } catch (error) {
+        console.error('Failed to log focus session:', error);
+      }
+    },
+    [pausedSeconds, interruptions, selectedSubject]
+  );
+
   const logStudyTime = useCallback(async () => {
     try {
       const studyHours = 0.42; // 25 minutes in hours
-      const description = selectedSubject 
+      const description = selectedSubject
         ? `Completed 25-min Pomodoro Study Session for ${selectedSubject.name}`
         : 'Completed 25-min Pomodoro Study Session';
 
@@ -65,9 +79,9 @@ const PomodoroTimer = () => {
       }
 
       const response = await API.post('/progress/track', payload);
-      
+
       setTotalStudyHours(response.data.data.totalStudyHours);
-      
+
       setShowToast({
         message: `Great work! +${studyHours.toFixed(2)}h logged. Total: ${response.data.data.totalStudyHours.toFixed(2)}h`,
         streak: Math.floor(response.data.data.totalStudyHours / 2), // Simple streak calculation
@@ -89,11 +103,13 @@ const PomodoroTimer = () => {
     if (isActive) {
       interval = setInterval(() => {
         setTimeLeft((time) => {
+          // paused-time accumulation only happens while inactive (see effect below)
           if (time <= 1) {
             setIsActive(false);
             setIsCompleted(true);
             playChime();
             logStudyTime(); // Auto-log study time on completion
+            logFocusSession(25 * 60 - pausedSeconds); // Log focus quality breakdown
             return 0;
           }
           return time - 1;
@@ -103,16 +119,28 @@ const PomodoroTimer = () => {
     return () => clearInterval(interval);
   }, [isActive]);
 
+  // Track paused duration whenever the timer is stopped mid-session
+  useEffect(() => {
+    let pauseInterval = null;
+    if (!isActive && !isCompleted && timeLeft < 25 * 60 && timeLeft > 0) {
+      pauseInterval = setInterval(() => {
+        setPausedSeconds((s) => s + 1);
+      }, 1000);
+    }
+    return () => clearInterval(pauseInterval);
+  }, [isActive, isCompleted, timeLeft]);
   const toggleTimer = () => {
     if (isCompleted) setIsCompleted(false);
+    if (isActive) setInterruptions((count) => count + 1); // user is pausing -> count it
     setIsActive(!isActive);
   };
   const resetTimer = () => {
     setIsActive(false);
     setIsCompleted(false);
     setTimeLeft(25 * 60);
+    setPausedSeconds(0);
+    setInterruptions(0);
   };
-
   const handleSubjectSelect = (subject) => {
     setSelectedSubject(subject);
     setIsSubjectDropdownOpen(false);
@@ -120,7 +148,7 @@ const PomodoroTimer = () => {
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
-  
+
   // Calculate progress for the circular ring (0 to 100)
   const progress = ((25 * 60 - timeLeft) / (25 * 60)) * 100;
 
@@ -129,15 +157,14 @@ const PomodoroTimer = () => {
       <div className="bg-gradient-to-br from-yellow-700 to-yellow-900 p-6 rounded-full shadow-[0_10px_20px_rgba(0,0,0,0.6),inset_0_2px_10px_rgba(255,255,255,0.2)] border-4 border-yellow-600 relative overflow-hidden flex flex-col items-center justify-center w-64 h-64 mx-auto group">
         {/* Inner Metallic Bezel */}
         <div className="absolute inset-2 rounded-full border-4 border-yellow-800 shadow-[inset_0_5px_15px_rgba(0,0,0,0.8)] pointer-events-none" />
-        
+
         {/* Dial background */}
         <div className="absolute inset-4 rounded-full bg-vintage-paper shadow-inner flex flex-col items-center justify-center">
-          
           {/* Decorative ticks */}
           <div className="absolute inset-0 rounded-full border-[10px] border-dashed border-neutral-400/30 pointer-events-none" />
 
           <Clock className="w-6 h-6 text-yellow-800 mb-2 opacity-50" />
-          
+
           <h3 className="font-playfair font-bold text-4xl text-neutral-900 dark:text-white tracking-wider">
             {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
           </h3>
@@ -155,7 +182,7 @@ const PomodoroTimer = () => {
                 {selectedSubject ? selectedSubject.name : 'Select Subject (Optional)'}
                 <ChevronDown className="w-3 h-3" />
               </button>
-              
+
               <AnimatePresence>
                 {isSubjectDropdownOpen && (
                   <motion.div
@@ -187,17 +214,21 @@ const PomodoroTimer = () => {
 
           {/* Controls */}
           <div className="flex space-x-4 mt-4 z-10">
-            <motion.button 
+            <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               onClick={toggleTimer}
               aria-label={isActive ? 'Pause timer' : 'Start timer'}
               className="w-10 h-10 rounded-full bg-yellow-700 text-yellow-50 flex items-center justify-center shadow-md border border-yellow-600"
             >
-              {isActive ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current" />}
+              {isActive ? (
+                <Pause className="w-4 h-4 fill-current" />
+              ) : (
+                <Play className="w-4 h-4 fill-current" />
+              )}
             </motion.button>
-            
-            <motion.button 
+
+            <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               onClick={resetTimer}
@@ -210,25 +241,24 @@ const PomodoroTimer = () => {
         </div>
 
         {/* Progress Indicator (SVG Circle) */}
-        <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 100 100">
-          <circle 
-            cx="50" cy="50" r="46" 
-            fill="none" 
-            stroke="rgba(0,0,0,0.1)" 
-            strokeWidth="4" 
-          />
-          <circle 
-            cx="50" cy="50" r="46" 
-            fill="none" 
-            stroke="#D4AF37" 
-            strokeWidth="4" 
+        <svg
+          className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none"
+          viewBox="0 0 100 100"
+        >
+          <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(0,0,0,0.1)" strokeWidth="4" />
+          <circle
+            cx="50"
+            cy="50"
+            r="46"
+            fill="none"
+            stroke="#D4AF37"
+            strokeWidth="4"
             strokeLinecap="round"
             strokeDasharray="289" /* 2 * PI * 46 ≈ 289 */
             strokeDashoffset={289 - (progress / 100) * 289}
             className="transition-all duration-1000 ease-linear"
           />
         </svg>
-
       </div>
 
       {/* Toast Notification */}
@@ -239,8 +269,8 @@ const PomodoroTimer = () => {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 50, scale: 0.9 }}
             className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-sm border shadow-[0_4px_20px_rgba(0,0,0,0.6)] flex items-center gap-3 ${
-              showToast.error 
-                ? 'bg-red-900 text-red-50 border-red-700/50' 
+              showToast.error
+                ? 'bg-red-900 text-red-50 border-red-700/50'
                 : 'bg-neutral-900 text-yellow-50 border-yellow-700/50'
             }`}
           >

@@ -57,6 +57,10 @@ const User = sequelize.define(
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
     },
+    streakFreezes: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
     studyHours: {
       type: DataTypes.FLOAT,
       defaultValue: 0,
@@ -64,6 +68,15 @@ const User = sequelize.define(
     avatar: {
       type: DataTypes.STRING,
       defaultValue: '',
+    },
+    leaderboardVisible: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+    },
+    receiveWeeklyDigest: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+      allowNull: false,
     },
     isEmailVerified: {
       type: DataTypes.BOOLEAN,

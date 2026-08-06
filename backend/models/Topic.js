@@ -47,6 +47,10 @@ const Topic = sequelize.define(
         name: 'topic_user_idx',
         fields: ['user'],
       },
+      {
+        name: 'topic_subject_name_idx',
+        fields: ['subject', 'name'],
+      },
     ],
   }
 );
