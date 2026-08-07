@@ -240,6 +240,11 @@ const validateUploadNote = [
   handleValidationErrors,
 ];
 
+const validateImportNotes = [
+  body('subjectId').isUUID(4).withMessage('Valid subject ID is required'),
+  body('topicId').optional().isUUID(4).withMessage('Valid topic ID is required'),
+  handleValidationErrors,
+];
 // ---------------------------------------------------------------------------
 // PYQ routes
 // ---------------------------------------------------------------------------
@@ -393,10 +398,10 @@ validateCreateFlashcard,  validateReviewFlashcard,
   validateGenerateAIQuiz,
   validateGenerateRevisionSheet,
   validateSubmitQuizAttempt,
-  // Note
+// Note
   validateUploadNote,
-  // PYQ
-  validateUploadPYQ,
+  validateImportNotes,
+  // PYQ  validateUploadPYQ,
 // Study Plan
   validateGenerateAIPlan,
   validateToggleTask,

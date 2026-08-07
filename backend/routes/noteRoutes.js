@@ -6,11 +6,13 @@ const {
   deleteNote,
   summarizeNote,
   uploadVoiceNote,
+  exportNotes,
+  importNotes,
 } = require('../controllers/noteController');
 const { protect } = require('../middleware/auth');
 const upload = require('../middleware/upload');
-const { validateUploadNote } = require('../middleware/validators');
-
+const { uploadMarkdown } = require('../middleware/upload');
+const { validateUploadNote, validateImportNotes } = require('../middleware/validators');
 const cacheMiddleware = require('../middleware/cache');
 const clearCache = require('../middleware/clearCache');
 
@@ -261,6 +263,16 @@ router.get(
   getNotes
 );
 
+router.get('/export', protect, exportNotes);
+
+router.post(
+  '/import',
+  protect,
+  uploadMarkdown.array('files', 20),
+  validateImportNotes,
+  clearCache('notes:*'),
+  importNotes
+);
 /**
  * @swagger
  * /api/notes/{id}/download:
