@@ -6,24 +6,35 @@ This document outlines solutions for common setup, build, and deployment issues 
 
 ## 🗄️ Database Connection Issues
 
-### Issue: `MongooseServerSelectionError: connect ECONNREFUSED`
-This occurs when the Node.js backend cannot connect to the MongoDB instance.
+### Issue: `SequelizeConnectionError: connect ECONNREFUSED`
+This occurs when the Node.js backend cannot connect to the PostgreSQL instance.
 
 #### Solutions
-1. **Ensure Local MongoDB is Running**:
+1. **Ensure PostgreSQL is Running**:
    * **Windows**: Open PowerShell as Administrator and run:
      ```powershell
-     net start MongoDB
+     net start postgresql-x64-18
+     # Or check the service name from: Get-Service postgresql*
      ```
    * **Linux/macOS**: Run:
      ```bash
-     sudo systemctl status mongod
+     sudo systemctl status postgresql
      # If stopped:
-     sudo systemctl start mongod
+     sudo systemctl start postgresql
      ```
 2. **Check the Connection String**:
-   * Verify the `MONGO_URI` value in `backend/.env`.
-   * If connecting to MongoDB Atlas, ensure you have whitelisted your IP address (`0.0.0.0/0` for dynamic cloud environments) in the Atlas Security settings.
+   * Verify the `DATABASE_URL` value in `backend/.env`. The default format is:
+     `postgres://postgres:postgres@localhost:5432/openprep`
+   * If connecting to a cloud provider (Neon, Render), ensure your IP is not blocked and SSL is enabled (`?sslmode=require`).
+3. **Verify Database Exists**:
+   * Connect to PostgreSQL and check that the `openprep` database exists:
+     ```bash
+     psql -U postgres -c "SELECT 1 FROM pg_database WHERE datname='openprep'"
+     ```
+   * If it does not exist, create it:
+     ```bash
+     psql -U postgres -c "CREATE DATABASE openprep"
+     ```
 
 ---
 
@@ -45,10 +56,10 @@ Occurs when the React frontend attempts to query the Express backend, but the ba
 ## 🐳 Docker Deployment Failures
 
 ### Issue: `port is already allocated` when running `docker-compose up`
-This occurs when port `5000` (backend), `5173` (frontend), or `27017` (MongoDB) is already in use by a local process on your machine.
+This occurs when port `5000` (backend), `5173` (frontend), or `5432` (PostgreSQL) is already in use by a local process on your machine.
 
 #### Solutions
-1. Stop any local Express servers, Vite development servers, or local MongoDB services running on those ports.
+1. Stop any local Express servers, Vite development servers, or local PostgreSQL services running on those ports.
 2. Alternatively, modify the port mappings in `docker-compose.yml` to use free ports (e.g., mapping backend to `5001:5000`).
 
 ---

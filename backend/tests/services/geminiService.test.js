@@ -1,4 +1,5 @@
 const geminiService = require('../../services/geminiService');
+const { validateResponse, RESPONSE_SCHEMAS } = geminiService;
 
 describe('Gemini Service - Mock Fallbacks', () => {
   beforeAll(() => {
@@ -185,6 +186,177 @@ describe('Gemini Service - Mock Fallbacks', () => {
         expect(rec).toHaveProperty('suggestion');
         expect(rec).toHaveProperty('priority');
         expect(validPriorities).toContain(rec.priority);
+      });
+    });
+  });
+
+  // =========================================================================
+  // validateResponse — nested item shape validation
+  // =========================================================================
+  describe('validateResponse (nested item validation)', () => {
+    describe('pyqAnalysis schema', () => {
+      const schema = RESPONSE_SCHEMAS.pyqAnalysis;
+
+      it('should accept a fully valid pyqAnalysis payload', () => {
+        const data = {
+          chapterWeightage: [{ chapterName: 'Algorithms', weightage: 40 }],
+          importantTopics: [{ topicName: 'Sorting', importance: 'High', frequency: 5 }],
+          repeatedQuestions: [{ questionText: 'What is X?', years: [2020, 2021] }],
+          trendAnalysis: 'The exam focuses on practical questions.',
+        };
+        expect(validateResponse(data, schema)).toBe(true);
+      });
+
+      it('should reject when importantTopics item has no topicName', () => {
+        const data = {
+          chapterWeightage: [{ chapterName: 'Algorithms', weightage: 40 }],
+          importantTopics: [{ importance: 'High', frequency: 5 }], // missing topicName
+          repeatedQuestions: [{ questionText: 'What is X?', years: [2020] }],
+          trendAnalysis: 'Trend text',
+        };
+        expect(validateResponse(data, schema)).toBe(false);
+      });
+
+      it('should reject when importantTopics item has wrong type for frequency', () => {
+        const data = {
+          chapterWeightage: [{ chapterName: 'Algorithms', weightage: 40 }],
+          importantTopics: [{ topicName: 'Sorting', importance: 'High', frequency: 'five' }], // string instead of number
+          repeatedQuestions: [{ questionText: 'What is X?', years: [2020] }],
+          trendAnalysis: 'Trend text',
+        };
+        expect(validateResponse(data, schema)).toBe(false);
+      });
+
+      it('should reject when chapterWeightage item has no weightage', () => {
+        const data = {
+          chapterWeightage: [{ chapterName: 'Algorithms' }], // missing weightage
+          importantTopics: [{ topicName: 'Sorting', importance: 'High', frequency: 5 }],
+          repeatedQuestions: [{ questionText: 'What is X?', years: [2020] }],
+          trendAnalysis: 'Trend text',
+        };
+        expect(validateResponse(data, schema)).toBe(false);
+      });
+
+      it('should reject when repeatedQuestions item has non-array years', () => {
+        const data = {
+          chapterWeightage: [{ chapterName: 'Algorithms', weightage: 40 }],
+          importantTopics: [{ topicName: 'Sorting', importance: 'High', frequency: 5 }],
+          repeatedQuestions: [{ questionText: 'What is X?', years: '2020,2021' }], // string instead of array
+          trendAnalysis: 'Trend text',
+        };
+        expect(validateResponse(data, schema)).toBe(false);
+      });
+
+      it('should reject null data', () => {
+        expect(validateResponse(null, schema)).toBe(false);
+      });
+
+      it('should reject when importantTopics is empty array', () => {
+        const data = {
+          chapterWeightage: [{ chapterName: 'Algorithms', weightage: 40 }],
+          importantTopics: [],
+          repeatedQuestions: [{ questionText: 'What is X?', years: [2020] }],
+          trendAnalysis: 'Trend text',
+        };
+        expect(validateResponse(data, schema)).toBe(false);
+      });
+    });
+
+    describe('quiz schema', () => {
+      const schema = RESPONSE_SCHEMAS.quiz;
+
+      it('should accept a fully valid quiz payload', () => {
+        const data = {
+          title: 'Sample Quiz',
+          questions: [
+            { questionText: 'What is 2+2?', options: ['1', '2', '3', '4'], correctAnswer: 3, explanation: '2+2=4' },
+          ],
+        };
+        expect(validateResponse(data, schema)).toBe(true);
+      });
+
+      it('should reject when a question has no correctAnswer', () => {
+        const data = {
+          title: 'Bad Quiz',
+          questions: [
+            { questionText: 'What is 2+2?', options: ['1', '2', '3', '4'], explanation: '2+2=4' }, // missing correctAnswer
+          ],
+        };
+        expect(validateResponse(data, schema)).toBe(false);
+      });
+
+      it('should reject when a question has non-array options', () => {
+        const data = {
+          title: 'Bad Quiz',
+          questions: [
+            { questionText: 'What is 2+2?', options: '1,2,3,4', correctAnswer: 3, explanation: '2+2=4' }, // string instead of array
+          ],
+        };
+        expect(validateResponse(data, schema)).toBe(false);
+      });
+    });
+
+    describe('performance schema', () => {
+      const schema = RESPONSE_SCHEMAS.performance;
+
+      it('should accept a fully valid performance payload', () => {
+        const data = {
+          weakSubjects: ['Math'],
+          recommendations: [
+            { subject: 'Math', topic: 'Algebra', suggestion: 'Practice more', priority: 'High' },
+          ],
+        };
+        expect(validateResponse(data, schema)).toBe(true);
+      });
+
+      it('should accept weakSubjects as array of strings', () => {
+        const data = {
+          weakSubjects: ['Math', 'Science'],
+          recommendations: [{ subject: 'Math', topic: 'Algebra', suggestion: 'Practice more', priority: 'High' }],
+        };
+        expect(validateResponse(data, schema)).toBe(true);
+      });
+
+      it('should reject when a recommendation has no subject', () => {
+        const data = {
+          weakSubjects: ['Math'],
+          recommendations: [
+            { topic: 'Algebra', suggestion: 'Practice more', priority: 'High' }, // missing subject
+          ],
+        };
+        expect(validateResponse(data, schema)).toBe(false);
+      });
+    });
+
+    describe('studyPlan schema (top-level array)', () => {
+      const schema = RESPONSE_SCHEMAS.studyPlan;
+
+      it('should accept a valid study plan array', () => {
+        const data = [
+          { date: '2026-06-01', tasks: [{ title: 'Study', duration: 60, topicName: 'Math' }] },
+        ];
+        expect(validateResponse(data, schema)).toBe(true);
+      });
+
+      it('should reject a study plan with missing date', () => {
+        const data = [
+          { tasks: [{ title: 'Study', duration: 60, topicName: 'Math' }] }, // missing date
+        ];
+        expect(validateResponse(data, schema)).toBe(false);
+      });
+    });
+
+    describe('flashcard schema (top-level array)', () => {
+      const schema = RESPONSE_SCHEMAS.flashcard;
+
+      it('should accept a valid flashcard array', () => {
+        const data = [{ front: 'Question?', back: 'Answer.' }];
+        expect(validateResponse(data, schema)).toBe(true);
+      });
+
+      it('should reject a flashcard with missing back', () => {
+        const data = [{ front: 'Question?' }]; // missing back
+        expect(validateResponse(data, schema)).toBe(false);
       });
     });
   });

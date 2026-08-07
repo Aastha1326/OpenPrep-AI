@@ -107,7 +107,7 @@ feat(quiz): add timer component to quiz interface
 When reporting a bug, please ensure you check existing issues first. If it's a new issue, include:
 
 * A clear summary title.
-* Preconditions and environment (OS, Browser, Node.js version, MongoDB version).
+* Preconditions and environment (OS, Browser, Node.js version, PostgreSQL version).
 * Steps to reproduce the issue.
 * Expected vs. actual behavior.
 * Screenshots, logs, or error stack traces if applicable.

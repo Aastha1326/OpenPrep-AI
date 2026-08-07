@@ -1,6 +1,7 @@
 const request = require('supertest');
 const express = require('express');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const authRoutes = require('../../routes/authRoutes');
 const errorHandler = require('../../middleware/error');
 const User = require('../../models/User');
@@ -531,6 +532,144 @@ describe('Auth Controller - Integration Tests', () => {
 
       expect(res.status).toBe(400);
       expect(res.body.success).toBe(false);
+    });
+
+    it('should invalidate the old refresh token after rotation (RTR)', async () => {
+      // Verifies Refresh Token Rotation: the used token must be removed
+      // from the DB so it cannot be replayed. This is a regression test
+      // for Issue #179 — old hashed tokens were not being removed.
+      const user = await createVerifiedUser({ email: 'rtrtest@example.com' });
+
+      // Login to bootstrap the first refresh token
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'rtrtest@example.com', password: 'StrongPass1!' });
+      expect(loginRes.status).toBe(200);
+
+      const firstToken = loginRes.body.refreshToken;
+
+      // First rotation — should succeed
+      const firstRotate = await request(app)
+        .post('/api/auth/refresh-token')
+        .send({ refreshToken: firstToken });
+      expect(firstRotate.status).toBe(200);
+
+      const secondToken = firstRotate.body.refreshToken;
+      expect(secondToken).not.toBe(firstToken);
+
+      // Try using the ORIGINAL (first) token again — must be rejected
+      const replayAttempt = await request(app)
+        .post('/api/auth/refresh-token')
+        .send({ refreshToken: firstToken });
+      expect(replayAttempt.status).toBe(401);
+      expect(replayAttempt.body.success).toBe(false);
+      expect(replayAttempt.body.error).toContain('Invalid or expired');
+
+      // Second rotation with the NEW token should still work
+      const secondRotate = await request(app)
+        .post('/api/auth/refresh-token')
+        .send({ refreshToken: secondToken });
+      expect(secondRotate.status).toBe(200);
+      expect(secondRotate.body.refreshToken).not.toBe(secondToken);
+
+      // Old second token should also be invalid now
+      const secondReplay = await request(app)
+        .post('/api/auth/refresh-token')
+        .send({ refreshToken: secondToken });
+      expect(secondReplay.status).toBe(401);
+    });
+  });
+
+  // =========================================================================
+  // PATCH /api/auth/settings
+  // =========================================================================
+  describe('PATCH /api/auth/settings', () => {
+    it('should update user general settings when authenticated', async () => {
+      const user = await createVerifiedUser({ email: 'settingsupdate@example.com' });
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'settingsupdate@example.com', password: 'StrongPass1!' });
+      const token = loginRes.body.token;
+
+      const res = await request(app)
+        .patch('/api/auth/settings')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ leaderboardVisible: false, receiveWeeklyDigest: false });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.user.leaderboardVisible).toBe(false);
+      expect(res.body.user.receiveWeeklyDigest).toBe(false);
+
+      const dbUser = await User.findByPk(user.id);
+      expect(dbUser.leaderboardVisible).toBe(false);
+      expect(dbUser.receiveWeeklyDigest).toBe(false);
+    });
+  });
+
+  // =========================================================================
+  // PUT /api/auth/sm2-settings
+  // =========================================================================
+  describe('PUT /api/auth/sm2-settings', () => {
+    it('should update user SM-2 parameters when authenticated', async () => {
+      const user = await createVerifiedUser({ email: 'sm2settings@example.com' });
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'sm2settings@example.com', password: 'StrongPass1!' });
+      const token = loginRes.body.token;
+
+      const res = await request(app)
+        .put('/api/auth/sm2-settings')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          sm2EasyFactorModifier: 1.25,
+          sm2IntervalModifier: 1.15,
+          sm2Step1Interval: 2,
+          sm2Step2Interval: 8
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.user.sm2EasyFactorModifier).toBe(1.25);
+      expect(res.body.user.sm2IntervalModifier).toBe(1.15);
+      expect(res.body.user.sm2Step1Interval).toBe(2);
+      expect(res.body.user.sm2Step2Interval).toBe(8);
+
+      const dbUser = await User.findByPk(user.id);
+      expect(dbUser.sm2EasyFactorModifier).toBe(1.25);
+    });
+  });
+
+  // =========================================================================
+  // POST /api/auth/sm2-settings/reset
+  // =========================================================================
+  describe('POST /api/auth/sm2-settings/reset', () => {
+    it('should reset user SM-2 parameters to default values when authenticated', async () => {
+      const user = await createVerifiedUser({
+        email: 'sm2reset@example.com',
+        sm2EasyFactorModifier: 1.5,
+        sm2IntervalModifier: 2.0,
+        sm2Step1Interval: 3,
+        sm2Step2Interval: 10
+      });
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'sm2reset@example.com', password: 'StrongPass1!' });
+      const token = loginRes.body.token;
+
+      const res = await request(app)
+        .post('/api/auth/sm2-settings/reset')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.user.sm2EasyFactorModifier).toBe(1.0);
+      expect(res.body.user.sm2IntervalModifier).toBe(1.0);
+      expect(res.body.user.sm2Step1Interval).toBe(1);
+      expect(res.body.user.sm2Step2Interval).toBe(6);
+
+      const dbUser = await User.findByPk(user.id);
+      expect(dbUser.sm2EasyFactorModifier).toBe(1.0);
     });
   });
 });

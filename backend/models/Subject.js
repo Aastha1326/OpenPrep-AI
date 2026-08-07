@@ -9,12 +9,6 @@ const Subject = sequelize.define(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
-    _id: {
-      type: DataTypes.VIRTUAL,
-      get() {
-        return this.id;
-      },
-    },
     name: {
       type: DataTypes.STRING,
       allowNull: false,
@@ -33,7 +27,12 @@ const Subject = sequelize.define(
       type: DataTypes.UUID,
       allowNull: false,
     },
+    weightage: {
+      type: DataTypes.FLOAT,
+      defaultValue: 0,
+    },
   },
+
   {
     timestamps: true,
     indexes: [
