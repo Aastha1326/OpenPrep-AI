@@ -52,11 +52,11 @@ import CreateNoteModal from '../components/dashboard/CreateNoteModal';
 import StudyPlanModal from '../components/dashboard/StudyPlanModal';
 import PyqAnalysisModal from '../components/dashboard/PyqAnalysisModal';
 import WeaknessDashboardWidget from '../components/dashboard/WeaknessDashboardWidget';
+import SubjectMasteryWidget from '../components/dashboard/SubjectMasteryWidget';
 import FocusEfficiencyWidget from '../components/dashboard/FocusEfficiencyWidget';
 import LeaderboardWidget from '../components/dashboard/LeaderboardWidget';
 import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
 import TargetExamOverviewWidget from '../components/dashboard/TargetExamOverviewWidget';
-import FocusEfficiencyWidget from '../components/dashboard/FocusEfficiencyWidget';
 import CompositeBundleModal from '../components/dashboard/CompositeBundleModal';
 import SyllabusImportModal from '../components/dashboard/SyllabusImportModal';
 import NotesWidget from '../components/dashboard/NotesWidget';
@@ -845,6 +845,11 @@ const Dashboard = () => {
         <div className="my-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
           <LeaderboardWidget />
           <WeaknessDashboardWidget />
+        </div>
+
+        {/* --- SUBJECT & CHAPTER MASTERY BADGES --- */}
+        <div className="my-6">
+          <SubjectMasteryWidget />
         </div>
 
         <div className="my-6">
