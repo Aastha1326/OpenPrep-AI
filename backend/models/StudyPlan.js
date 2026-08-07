@@ -9,12 +9,6 @@ const StudyPlan = sequelize.define(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
-    _id: {
-      type: DataTypes.VIRTUAL,
-      get() {
-        return this.id;
-      },
-    },
     exam: {
       type: DataTypes.UUID,
       allowNull: false,
@@ -32,6 +26,10 @@ const StudyPlan = sequelize.define(
       allowNull: false,
     },
     dailyGoals: {
+      type: DataTypes.JSONB,
+      defaultValue: [],
+    },
+    milestones: {
       type: DataTypes.JSONB,
       defaultValue: [],
     },

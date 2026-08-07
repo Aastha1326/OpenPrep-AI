@@ -51,8 +51,28 @@ export const fetchDueFlashcards = createAsyncThunk(
   }
 );
 
+export const reviewFlashcard = createAsyncThunk(
+  'dashboard/reviewFlashcard',
+  async ({ cardId, quality }, { rejectWithValue }) => {
+    try {
+      const response = await API.put(`/flashcards/${cardId}/review`, { quality });
+      return response.data.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.error || 'Failed to review flashcard');
+    }
+  }
+);
+
+// ── Helper: Initial theme detection ──
+const getInitialTheme = () => {
+  const saved = localStorage.getItem('openprep_theme') || localStorage.getItem('theme');
+  if (saved) return saved;
+  return 'system';
+};
+
 // ── Initial State ──
 const initialState = {
+  theme: getInitialTheme(),
   stats: null,
   weeklyChartData: [],
   recentActivity: [],
@@ -76,6 +96,21 @@ const dashboardSlice = createSlice({
   name: 'dashboard',
   initialState,
   reducers: {
+    toggleTheme: (state) => {
+      // Rotate through: system -> light -> dark -> system
+      let nextTheme = 'system';
+      if (state.theme === 'system') nextTheme = 'light';
+      else if (state.theme === 'light') nextTheme = 'dark';
+      
+      state.theme = nextTheme;
+      localStorage.setItem('openprep_theme', nextTheme);
+      localStorage.setItem('theme', nextTheme);
+    },
+    setTheme: (state, action) => {
+      state.theme = action.payload;
+      localStorage.setItem('openprep_theme', action.payload);
+      localStorage.setItem('theme', action.payload);
+    },
     clearErrors: (state) => {
       state.errorStats = null;
       state.errorSubjects = null;
@@ -142,9 +177,15 @@ const dashboardSlice = createSlice({
       .addCase(fetchDueFlashcards.rejected, (state, action) => {
         state.loadingFlashcards = false;
         state.errorFlashcards = action.payload;
+      })
+
+      // ── Review Flashcard ──
+      .addCase(reviewFlashcard.fulfilled, (state, action) => {
+        const reviewedId = action.meta.arg.cardId;
+        state.dueFlashcards = state.dueFlashcards.filter((c) => c.id !== reviewedId);
       });
   },
 });
 
-export const { clearErrors } = dashboardSlice.actions;
+export const { toggleTheme, setTheme, clearErrors } = dashboardSlice.actions;
 export default dashboardSlice.reducer;

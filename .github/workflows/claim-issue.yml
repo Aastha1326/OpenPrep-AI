@@ -1,0 +1,100 @@
+name: Claim Issue Workflow
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  claim-issue:
+    # Run only on issue comments, ignore pull request comments
+    if: ${{ !github.event.issue.pull_request }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Process /claim Command
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const commentBody = (context.payload.comment.body || '').trim().toLowerCase();
+            
+            // Check if comment contains /claim
+            if (!commentBody.includes('/claim')) {
+              console.log("Comment does not contain /claim command. Skipping.");
+              return;
+            }
+
+            const { owner, repo } = context.repo;
+            const issueNumber = context.payload.issue.number;
+            const commenter = context.payload.comment.user.login;
+            const isBot = context.payload.comment.user.type === 'Bot' || commenter.endsWith('[bot]');
+
+            if (isBot) {
+              console.log("Ignoring bot comment.");
+              return;
+            }
+
+            // Fetch the latest issue details from GitHub API
+            const { data: issue } = await github.rest.issues.get({
+              owner,
+              repo,
+              issue_number: issueNumber
+            });
+
+            // If issue is already closed, notify the user
+            if (issue.state === 'closed') {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                body: `Hi @${commenter}, this issue is closed and cannot be claimed.`
+              });
+              return;
+            }
+
+            const currentAssignees = issue.assignees || [];
+
+            // Case 1: Issue is already assigned
+            if (currentAssignees.length > 0) {
+              const isAlreadyAssignedToUser = currentAssignees.some(
+                assignee => assignee.login.toLowerCase() === commenter.toLowerCase()
+              );
+
+              if (isAlreadyAssignedToUser) {
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: issueNumber,
+                  body: `Hi @${commenter}, you are already assigned to this issue! Happy coding! 🚀`
+                });
+              } else {
+                const assignedNames = currentAssignees.map(a => `@${a.login}`).join(', ');
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: issueNumber,
+                  body: `Sorry @${commenter}, this issue is already claimed by ${assignedNames}. Please check out other open issues in the repository! 😊`
+                });
+              }
+              return;
+            }
+
+            // Case 2: Issue is unassigned -> Assign to first commenter who wrote /claim
+            console.log(`Assigning issue #${issueNumber} to @${commenter}...`);
+
+            await github.rest.issues.addAssignees({
+              owner,
+              repo,
+              issue_number: issueNumber,
+              assignees: [commenter]
+            });
+
+            // Post confirmation comment
+            const confirmationMessage = `🎉 Congratulations @${commenter}! You have successfully claimed this issue and it has been assigned to you.\n\n> 💡 **Tip**: Please review our [Contributing Guidelines](https://github.com/${owner}/${repo}/blob/main/CONTRIBUTING.md) before submitting a Pull Request. If you need any help, feel free to ask questions here in the comments! Happy coding! 🚀`;
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: issueNumber,
+              body: confirmationMessage
+            });

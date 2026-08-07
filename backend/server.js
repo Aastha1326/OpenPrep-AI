@@ -9,12 +9,26 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 const { connectDB } = require('./config/db');
 const errorHandler = require('./middleware/error');
-
+const { protect } = require('./middleware/auth');
+const fs = require('fs');
+const PYQ = require('./models/PYQ');
+const Note = require('./models/Note');
+const Achievement = require('./models/Achievement');
+const http = require('http');
+const { Server } = require('socket.io');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./config/swagger');
+const passport = require('./config/passport');
+const { getCorsMiddleware, getSocketCorsOrigin } = require('./middleware/corsHandler');
 // Validate required environment variables at startup
 if (!process.env.JWT_SECRET) {
   console.error('FATAL ERROR: JWT_SECRET is not defined in environment variables.');
   console.error('Set JWT_SECRET in your .env file or environment before starting the server.');
   process.exit(1);
+}
+
+if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_gemini_api_key_here') {
+  console.warn('WARNING: GEMINI_API_KEY is not set. AI endpoints will return mock data.');
 }
 
 // Import routes
@@ -27,18 +41,51 @@ const flashcardRoutes = require('./routes/flashcardRoutes');
 const noteRoutes = require('./routes/noteRoutes');
 const progressRoutes = require('./routes/progressRoutes');
 const communityRoutes = require('./routes/communityRoutes');
+const userRoutes = require('./routes/userRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const { initNotificationCron } = require('./services/notificationService');
+const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
+initNotificationCron();
+initDifficultyCalibratorCron();
 
 // Connect to Database
 connectDB();
 
+// Connect to Redis
+const redisService = require('./services/redisService');
+redisService.connect();
+
 const app = express();
 
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // Security Middlewares
-app.use(helmet());
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
-  credentials: true,
-}));
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'", 'https:', 'data:'],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+        upgradeInsecureRequests: [],
+      },
+    },
+    hsts: {
+      maxAge: 63072000, // 2 years
+      includeSubDomains: true,
+      preload: true,
+    },
+  })
+);
+app.use(getCorsMiddleware());
+app.use(passport.initialize());
 
 // Cookie parser (required for csurf cookie-based tokens)
 app.use(cookieParser());
@@ -46,6 +93,11 @@ app.use(cookieParser());
 // CSRF protection middleware
 const csrfProtection = csrf({ cookie: true });
 app.use(csrfProtection);
+
+// CSRF Token Endpoint for frontend clients
+app.get('/api/csrf-token', (req, res) => {
+  res.json({ csrfToken: req.csrfToken() });
+});
 
 // Response compression (skip binary uploads via default filter)
 app.use(compression());
@@ -65,10 +117,12 @@ const apiLimiter = rateLimit({
 });
 app.use('/api/', apiLimiter);
 
+// Serve avatar images publicly — profile pictures are displayed to other
+// users (e.g. in community features) and aren't sensitive like notes/PYQs.
+app.use('/uploads/avatars', express.static(path.join(__dirname, 'uploads/avatars')));
+
 // Set Static Folder for File Uploads (Protected)
-const { protect } = require('./middleware/auth');
-const Note = require('./models/Note');
-const PYQ = require('./models/PYQ');
+// protect, Note, PYQ already imported at top of file
 
 app.get('/uploads/:filename', protect, async (req, res, next) => {
   try {
@@ -109,21 +163,60 @@ app.use('/api/academic', academicRoutes);
 app.use('/api/pyqs', pyqRoutes);
 app.use('/api/study-plans', studyPlanRoutes);
 app.use('/api/quizzes', quizRoutes);
+app.use('/api/quiz', quizRoutes);
 app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/progress', progressRoutes);
 app.use('/api/community', communityRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Base Route
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to OpenPrep AI Backend REST API API Services' });
 });
 
+// Health Check Route
+app.get('/healthz', (req, res) => {
+  res.status(200).send('OK');
+});
+
+// Swagger UI Documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'OpenPrep AI API Documentation',
+  swaggerOptions: {
+    persistAuthorization: true,
+    displayRequestDuration: true,
+  },
+}));
+
 // Error Handler Middleware
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: getSocketCorsOrigin(),
+    methods: ['GET', 'POST'],
+    credentials: true,
+  },  // Longer timeouts tolerate throttled timers in backgrounded/idle browser
+  // tabs, so active lobby players aren't disconnected on a missed heartbeat.
+  pingTimeout: 60000,
+  pingInterval: 25000,
+});
+// Initialize socket handlers
+require('./sockets/battleHandler')(io);
+require('./sockets/chatHandler')(io);
+
+// Start weekly digest background scheduler
+const { startScheduler } = require('./services/weeklyDigestService');
+startScheduler();
+
+server.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
 });

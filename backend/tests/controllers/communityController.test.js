@@ -25,7 +25,7 @@ describe('Community Controller - Feedback List Pagination', () => {
       password: 'password123',
     });
 
-    authToken = jwt.sign({ id: testUser.id }, process.env.JWT_SECRET);
+    authToken = jwt.sign({ id: testUser.id, type: 'access' }, process.env.JWT_SECRET);
   });
 
   afterAll(() => {
@@ -338,6 +338,19 @@ describe('Community Controller - Feedback List Pagination', () => {
       expect(res.body.count).toBe(1);
       expect(res.body.total).toBe(1);
       expect(res.body.data[0].title).toBe('Open Bug');
+    });
+  });
+
+  describe('Redis Caching Integration', () => {
+    it('should serve GET /api/community/roadmap with 200 status', async () => {
+      const res = await request(app)
+        .get('/api/community/roadmap')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveProperty('milestones');
+      expect(res.body.data).toHaveProperty('communityFeatures');
     });
   });
 });
