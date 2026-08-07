@@ -124,5 +124,8 @@ jobs:
         run: npm run build
         working-directory: frontend
 
+      - name: Serve built frontend
+        run: npx http-server frontend/dist -p 8080 & npx wait-on http://127.0.0.1:8080
+
       - name: Audit with Lighthouse CI
-        run: npx @lhci/cli@0.14.x autorun
+        run: npx @lhci/cli@0.14.x autorun --config=./.lighthouserc.json
