@@ -31,7 +31,7 @@ gantt
 ### Phase 1: Version 1.0 — Core Platform (Active)
 **Objective**: Build the foundational web platform for exam prep and AI content generation.
 * **Authentication**: JWT validation, login/register forms, secure token caching.
-* **Academic Catalog**: Mongoose schemas to store Exams, Subjects, and Topics.
+* **Academic Catalog**: Sequelize models to store Exams, Subjects, and Topics.
 * **AI Study Plan Generator**: Integrates the Gemini API (`gemini-1.5-flash`) to generate structured lists of daily study tasks based on user exam dates and availability.
 * **AI Quiz Generator**: Generates MCQ sets for specific subjects/topics from note inputs or general syllabus fields.
 * **Dashboard**: Track study hours, streaks, and basic activity logs.
