@@ -63,6 +63,7 @@ import NotesWidget from '../components/dashboard/NotesWidget';
 import ThemeToggle from '../components/ThemeToggle';
 import BadgesList from '../components/BadgesList';
 import SM2SettingsModal from '../components/dashboard/SM2SettingsModal';
+import QuizSetupModal from '../components/dashboard/QuizSetupModal';
 
 import {
   fetchDashboardStats,
@@ -283,6 +284,7 @@ const Dashboard = () => {
   const [isBundleModalOpen, setIsBundleModalOpen] = useState(false);
   const [isSyllabusImportOpen, setIsSyllabusImportOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isQuizSetupOpen, setIsQuizSetupOpen] = useState(false);
   const [syllabusPrefill, setSyllabusPrefill] = useState(null);
   const [comingSoon, setComingSoon] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -425,7 +427,7 @@ const Dashboard = () => {
           icon={Play}
           label="Start Quiz"
           delay={0.1}
-          onClick={() => setComingSoon('Quiz feature coming soon!')}
+          onClick={() => setIsQuizSetupOpen(true)}
         />
         <GoldTabButton
           icon={FileText}
@@ -1074,6 +1076,17 @@ const Dashboard = () => {
         onPlanUpdate={() => dispatch(fetchActivePlan())}
         onPlanCreated={() => dispatch(fetchActivePlan())}
         onBumpTime={handleBumpStudyTime}
+      />
+
+      {/* --- QUIZ SETUP MODAL --- */}
+      <QuizSetupModal
+        isOpen={isQuizSetupOpen}
+        onClose={() => setIsQuizSetupOpen(false)}
+        onQuizGenerated={(quiz) => {
+          if (quiz?.id) {
+            navigate(`/quiz/${quiz.id}`);
+          }
+        }}
       />
 
       {/* --- PYQ ANALYSIS MODAL --- */}
