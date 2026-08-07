@@ -78,7 +78,7 @@ We write asynchronous, middleware-driven Express services in ES6 Node.js.
 | Database Models / Schemas | `PascalCase` | `User.js`, `ActivityLog.js` |
 | Database Fields | `camelCase` | `completionPercentage`, `createdAt` |
 | API Route Enpoints | `kebab-case` | `/api/study-plans`, `/api/flashcards` |
-| Environment Variables | `UPPER_SNAKE_CASE` | `MONGO_URI`, `JWT_SECRET` |
+| Environment Variables | `UPPER_SNAKE_CASE` | `DATABASE_URL`, `JWT_SECRET` |
 
 ---
 

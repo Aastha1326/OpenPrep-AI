@@ -30,6 +30,9 @@ lerna-debug.log*
 .tmp/
 tmp/
 
+# Uploaded runtime files
+backend/uploads/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

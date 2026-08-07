@@ -9,12 +9,6 @@ const Flashcard = sequelize.define(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
-    _id: {
-      type: DataTypes.VIRTUAL,
-      get() {
-        return this.id;
-      },
-    },
     user: {
       type: DataTypes.UUID,
       allowNull: false,
@@ -52,12 +46,19 @@ const Flashcard = sequelize.define(
       type: DataTypes.FLOAT,
       defaultValue: 2.5,
     },
-    nextReviewDate: {
+nextReviewDate: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
     },
-  },
-  {
+    tags: {
+      type: DataTypes.JSONB,
+      defaultValue: [],
+    },
+    difficulty: {
+      type: DataTypes.ENUM('Easy', 'Medium', 'Hard'),
+      allowNull: true,
+    },
+  },  {
     timestamps: true,
     indexes: [
       {

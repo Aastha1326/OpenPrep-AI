@@ -9,12 +9,6 @@ const Exam = sequelize.define(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
-    _id: {
-      type: DataTypes.VIRTUAL,
-      get() {
-        return this.id;
-      },
-    },
     name: {
       type: DataTypes.STRING,
       allowNull: false,
@@ -36,7 +30,16 @@ const Exam = sequelize.define(
       type: DataTypes.UUID,
       allowNull: false,
     },
+    isBundle: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
+    targetExamType: {
+      type: DataTypes.STRING,
+      defaultValue: 'Custom',
+    },
   },
+
   {
     timestamps: true,
     indexes: [

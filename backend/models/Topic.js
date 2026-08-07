@@ -9,12 +9,6 @@ const Topic = sequelize.define(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
-    _id: {
-      type: DataTypes.VIRTUAL,
-      get() {
-        return this.id;
-      },
-    },
     name: {
       type: DataTypes.STRING,
       allowNull: false,
@@ -52,6 +46,10 @@ const Topic = sequelize.define(
       {
         name: 'topic_user_idx',
         fields: ['user'],
+      },
+      {
+        name: 'topic_subject_name_idx',
+        fields: ['subject', 'name'],
       },
     ],
   }
