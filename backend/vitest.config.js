@@ -10,9 +10,9 @@ export default defineConfig({
     fileParallelism: false,
     testTimeout: 30000,
     hookTimeout: 30000,
-    coverage: {
+coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html'],
+      reporter: ['text', 'lcov', 'html'],
       include: [
         'controllers/**/*.js',
         'middleware/**/*.js',
@@ -25,6 +25,8 @@ export default defineConfig({
         'tests/',
         'coverage/',
       ],
-    },
-  },
+      thresholds: {
+        statements: 75,
+      },
+    },  },
 });
