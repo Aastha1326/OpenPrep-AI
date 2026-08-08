@@ -23,6 +23,7 @@ import {
   Settings,
   MessageSquare,
   Shield,
+  Globe,
 } from 'lucide-react';
 import API from '../services/api';
 import { toDateOnlyString } from '../utils/dateUtils';
@@ -63,7 +64,7 @@ import NotesWidget from '../components/dashboard/NotesWidget';
 import ThemeToggle from '../components/ThemeToggle';
 import BadgesList from '../components/BadgesList';
 import SM2SettingsModal from '../components/dashboard/SM2SettingsModal';
-import QuizSetupModal from '../components/dashboard/QuizSetupModal';
+import CommunityDecksModal from '../components/dashboard/CommunityDecksModal';
 
 import {
   fetchDashboardStats,
@@ -284,7 +285,7 @@ const Dashboard = () => {
   const [isBundleModalOpen, setIsBundleModalOpen] = useState(false);
   const [isSyllabusImportOpen, setIsSyllabusImportOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [isQuizSetupOpen, setIsQuizSetupOpen] = useState(false);
+  const [isCommunityDecksOpen, setIsCommunityDecksOpen] = useState(false);
   const [syllabusPrefill, setSyllabusPrefill] = useState(null);
   const [comingSoon, setComingSoon] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -458,6 +459,12 @@ const Dashboard = () => {
           label="Study Room"
           delay={0.45}
           onClick={() => navigate('/study-group')}
+        />
+        <GoldTabButton
+          icon={Globe}
+          label="Community Decks"
+          delay={0.48}
+          onClick={() => setIsCommunityDecksOpen(true)}
         />
         <button
           onClick={() => {
@@ -1120,6 +1127,16 @@ const Dashboard = () => {
           dispatch(fetchSubjectBreakdown());
         }}
         onGoToStudyPlan={handleGoToStudyPlanFromImport}
+      />
+
+      <CommunityDecksModal
+        isOpen={isCommunityDecksOpen}
+        onClose={() => setIsCommunityDecksOpen(false)}
+        onCloneSuccess={() => {
+          dispatch(fetchDashboardStats());
+          dispatch(fetchSubjectBreakdown());
+          dispatch(fetchDueFlashcards());
+        }}
       />
 
       {/* --- SM-2 SETTINGS MODAL --- */}

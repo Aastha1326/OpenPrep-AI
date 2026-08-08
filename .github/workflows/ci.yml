@@ -58,13 +58,18 @@ jobs:
         run: npm install --no-audit
         working-directory: backend
 
-      - name: Run Backend Tests
-        run: npm test
+- name: Run Backend Tests with Coverage
+        run: npm run test:coverage
         working-directory: backend
         env:
           DATABASE_URL_TEST: postgres://postgres@localhost:5432/postgres
           JWT_SECRET: 'testsecret'
 
+      - name: Upload Backend Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage
   test-frontend:
     runs-on: ubuntu-latest
     steps:
@@ -80,10 +85,15 @@ jobs:
         run: npm install --no-audit
         working-directory: frontend
 
-      - name: Run Frontend Tests
-        run: npm test
+- name: Run Frontend Tests with Coverage
+        run: npm run test:coverage
         working-directory: frontend
 
+      - name: Upload Frontend Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage
   build:
     runs-on: ubuntu-latest
     needs: [lint, test-backend, test-frontend]

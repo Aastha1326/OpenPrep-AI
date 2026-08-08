@@ -17,7 +17,7 @@ import VintagePaper from './VintagePaper';
 import AudioReader from '../AudioReader';
 import HighlightedText from '../HighlightedText';
 import GenerateFlashcardsFromNoteModal from './GenerateFlashcardsFromNoteModal';
-
+import ImportExportNotes from './ImportExportNotes';
 const RecordVoiceNoteModal = lazy(() => import('./RecordVoiceNoteModal'));
 
 const Shimmer = ({ className = '' }) => (
@@ -161,15 +161,17 @@ const NotesWidget = ({ limit = 5 }) => {
         <span className="flex items-center gap-2">
           <FileText className="w-6 h-6 text-yellow-700" /> AI Revision Summaries
         </span>
-        <button
-          type="button"
-          onClick={() => setIsRecordModalOpen(true)}
-          className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-700 hover:bg-amber-800 text-white text-xs font-bold rounded-sm shadow-sm transition-all"
-        >
-          <Mic className="w-3.5 h-3.5" /> Record Voice Note
-        </button>
-      </h2>
-      <p className="text-xs text-neutral-500 italic -mt-2 mb-4">
+<span className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsRecordModalOpen(true)}
+            className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-700 hover:bg-amber-800 text-white text-xs font-bold rounded-sm shadow-sm transition-all"
+          >
+            <Mic className="w-3.5 h-3.5" /> Record Voice Note
+          </button>
+          <ImportExportNotes onImported={loadNotes} />
+        </span>
+      </h2>      <p className="text-xs text-neutral-500 italic -mt-2 mb-4">
         Generate a revision summary for a note, or record voice notes to summarize automatically.
       </p>
 

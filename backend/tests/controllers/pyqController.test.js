@@ -436,4 +436,29 @@ describe('PYQ Controller - Integration Tests', () => {
       await maliciousPyq.destroy();
     });
   });
+
+  describe('GET /api/pyqs/forecast', () => {
+    it('should generate and return upcoming exam forecasting', async () => {
+      const res = await request(app)
+        .get('/api/pyqs/forecast')
+        .query({ subjectId: testSubject.id.toString() })
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveProperty('predictedDifficulty');
+      expect(res.body.data).toHaveProperty('expectedEasyPercent');
+      expect(res.body.data).toHaveProperty('topicTrends');
+      expect(res.body.data.topicTrends).toBeInstanceOf(Array);
+      expect(res.body.data).toHaveProperty('recommendedFocusAreas');
+    });
+
+    it('should return 400 if subjectId is missing', async () => {
+      const res = await request(app)
+        .get('/api/pyqs/forecast')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(400);
+    });
+  });
 });

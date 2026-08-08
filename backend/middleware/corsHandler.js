@@ -20,6 +20,12 @@ const buildAllowedOrigins = () => {
       origins.add(url.trim().replace(/\/$/, ''));
     });
   }
+  
+  if (process.env.FRONTEND_URL) {
+    process.env.FRONTEND_URL.split(',').forEach((url) => {
+      origins.add(url.trim().replace(/\/$/, ''));
+    });
+  }
 
   // Fallback to local dev server if no whitelist is specified
   if (origins.size === 0) {
