@@ -9,7 +9,12 @@ const {
   deleteFlashcard,
   exportFlashcards,
   importFlashcards,
-} = require('../controllers/flashcardController');const { protect } = require('../middleware/auth');
+  getReviewForecast,
+  shareFlashcardDeck,
+  getCommunityDecks,
+  cloneCommunityDeck,
+} = require('../controllers/flashcardController');
+const { protect } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
 const { checkQuota } = require('../middleware/quotaMiddleware');
 const flashcardUpload = require('../middleware/flashcardUpload');
@@ -582,6 +587,119 @@ router.put('/:id/review', protect, validateReviewFlashcard, reviewFlashcard);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
+
+/**
+ * @swagger
+ * /api/flashcards/community:
+ *   get:
+ *     summary: Get all community published public flashcard decks
+ *     tags: [Flashcards]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search query for name, description, or tags
+ *       - in: query
+ *         name: subject
+ *         schema:
+ *           type: string
+ *         description: Filter by subject category name
+ *       - in: query
+ *         name: exam
+ *         schema:
+ *           type: string
+ *         description: Filter by exam name
+ *       - in: query
+ *         name: rating
+ *         schema:
+ *           type: number
+ *         description: Filter by minimum rating
+ *     responses:
+ *       200:
+ *         description: Public flashcard decks retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ */
+router.get('/community', protect, getCommunityDecks);
+
+/**
+ * @swagger
+ * /api/flashcards/decks/{subjectId}/share:
+ *   put:
+ *     summary: Publish or unpublish a flashcard deck to the community marketplace
+ *     tags: [Flashcards]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: subjectId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Subject/Deck ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - isPublic
+ *             properties:
+ *               isPublic:
+ *                 type: boolean
+ *                 example: true
+ *     responses:
+ *       200:
+ *         description: Share state toggled successfully
+ */
+router.put('/decks/:subjectId/share', protect, shareFlashcardDeck);
+
+/**
+ * @swagger
+ * /api/flashcards/decks/{subjectId}/clone:
+ *   post:
+ *     summary: Clone a community flashcard deck to user's library
+ *     tags: [Flashcards]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: subjectId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Subject/Deck ID to clone
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               examId:
+ *                 type: string
+ *                 format: uuid
+ *                 description: Optional exam ID to clone the deck under
+ *     responses:
+ *       201:
+ *         description: Deck cloned successfully
+ */
+router.post('/decks/:subjectId/clone', protect, cloneCommunityDeck);
 
 router.delete('/:id', protect, deleteFlashcard);
 

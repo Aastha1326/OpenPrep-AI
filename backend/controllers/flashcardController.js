@@ -6,6 +6,8 @@ const Topic = require('../models/Topic');
 const Note = require('../models/Note');
 const ActivityLog = require('../models/ActivityLog');
 const Progress = require('../models/Progress');
+const User = require('../models/User');
+const Exam = require('../models/Exam');
 const geminiService = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
 const { default: Exporter } = require('anki-apkg-export');
@@ -661,6 +663,220 @@ exports.getReviewForecast = async (req, res, next) => {
     }));
 
     res.status(200).json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Toggle public sharing status on a flashcard deck (Subject)
+// @route   PUT /api/flashcards/decks/:subjectId/share
+// @access  Private
+exports.shareFlashcardDeck = async (req, res, next) => {
+  try {
+    const { subjectId } = req.params;
+    const { isPublic } = req.body;
+
+    const subject = await Subject.findOne({ where: { id: subjectId, user: req.user.id } });
+    if (!subject) {
+      return res.status(404).json({ success: false, error: 'Deck not found or access denied' });
+    }
+
+    if (isPublic) {
+      const cards = await Flashcard.findAll({ where: { subject: subjectId } });
+      if (!cards || cards.length === 0) {
+        return res.status(400).json({ success: false, error: 'Cannot share an empty flashcard deck' });
+      }
+
+      // Automatically generate summary tags and description via Gemini AI
+      const review = await geminiService.reviewFlashcardDeck(
+        subject.name,
+        cards.map(c => ({ front: c.front, back: c.back }))
+      );
+
+      subject.isPublic = true;
+      subject.tags = JSON.stringify(review.tags || []);
+      subject.description = review.description || subject.description;
+      subject.rating = 4.5; // Initial rating for new shared decks
+    } else {
+      subject.isPublic = false;
+    }
+
+    await subject.save();
+
+    await ActivityLog.create({
+      user: req.user.id,
+      activityType: 'flashcard_review',
+      description: `${isPublic ? 'Published' : 'Unpublished'} flashcard deck "${subject.name}" to community marketplace`,
+    });
+
+    res.status(200).json({ success: true, data: subject });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get all community published public flashcard decks
+// @route   GET /api/flashcards/community
+// @access  Private
+exports.getCommunityDecks = async (req, res, next) => {
+  try {
+    const { search, subject, exam, rating } = req.query;
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const offset = (page - 1) * limit;
+
+    const filter = { isPublic: true };
+
+    if (search) {
+      filter[Op.or] = [
+        { name: { [Op.like]: `%${search}%` } },
+        { description: { [Op.like]: `%${search}%` } },
+        { tags: { [Op.like]: `%${search}%` } },
+      ];
+    }
+
+    if (subject) {
+      filter.name = { [Op.like]: `%${subject}%` };
+    }
+
+    if (rating) {
+      filter.rating = { [Op.gte]: parseFloat(rating) };
+    }
+
+    const { count: total, rows: decks } = await Subject.findAndCountAll({
+      where: filter,
+      distinct: true,
+      include: [
+        { model: User, as: 'userRef', attributes: ['id', 'name'] },
+        { model: Exam, as: 'examRef', attributes: ['id', 'name'] },
+      ],
+      offset,
+      limit,
+      order: [['cloneCount', 'DESC'], ['rating', 'DESC']],
+    });
+
+    // If filtering by exam specifically after loading relationships
+    let filteredDecks = decks;
+    if (exam) {
+      filteredDecks = decks.filter(deck => 
+        (deck.examRef && deck.examRef.name.toLowerCase().includes(exam.toLowerCase())) ||
+        deck.exam === exam
+      );
+    }
+
+    const formattedDecks = [];
+    for (const deck of filteredDecks) {
+      const cardCount = await Flashcard.count({ where: { subject: deck.id } });
+      formattedDecks.push({
+        id: deck.id,
+        name: deck.name,
+        description: deck.description,
+        isPublic: deck.isPublic,
+        clonedFromId: deck.clonedFromId,
+        cloneCount: deck.cloneCount,
+        rating: deck.rating,
+        tags: deck.tags ? JSON.parse(deck.tags) : [],
+        cardCount,
+        ownerName: deck.userRef ? deck.userRef.name : 'Peer Student',
+        examName: deck.examRef ? deck.examRef.name : 'Competitive Exam',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      count: formattedDecks.length,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      data: formattedDecks,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Clone a community flashcard deck to user's library
+// @route   POST /api/flashcards/decks/:subjectId/clone
+// @access  Private
+exports.cloneCommunityDeck = async (req, res, next) => {
+  try {
+    const { subjectId } = req.params;
+
+    const sourceSubject = await Subject.findByPk(subjectId);
+    if (!sourceSubject || (!sourceSubject.isPublic && sourceSubject.user !== req.user.id)) {
+      return res.status(404).json({ success: false, error: 'Flashcard deck not found or not public' });
+    }
+
+    // Resolve user's exam to place cloned subject under
+    let targetExamId = req.body.examId;
+    if (!targetExamId) {
+      const activeExam = await Exam.findOne({ where: { user: req.user.id } });
+      if (activeExam) {
+        targetExamId = activeExam.id;
+      } else {
+        const defaultExam = await Exam.create({
+          user: req.user.id,
+          name: 'My Cloned Library',
+        });
+        targetExamId = defaultExam.id;
+      }
+    }
+
+    // Check if user already has a deck cloned from this source to avoid duplicates
+    const existingClone = await Subject.findOne({
+      where: {
+        user: req.user.id,
+        clonedFromId: subjectId,
+        exam: targetExamId,
+      }
+    });
+
+    if (existingClone) {
+      return res.status(400).json({
+        success: false,
+        error: 'You have already cloned this flashcard deck to your selected exam'
+      });
+    }
+
+    // Create target cloned Subject/Deck
+    const clonedSubject = await Subject.create({
+      name: sourceSubject.name,
+      description: sourceSubject.description,
+      exam: targetExamId,
+      user: req.user.id,
+      clonedFromId: sourceSubject.id,
+      tags: sourceSubject.tags,
+    });
+
+    // Copy all flashcards with default SM-2 values
+    const sourceCards = await Flashcard.findAll({ where: { subject: subjectId } });
+    if (sourceCards && sourceCards.length > 0) {
+      const cardsToInsert = sourceCards.map((card) => ({
+        user: req.user.id,
+        subject: clonedSubject.id,
+        topic: card.topic || null,
+        front: card.front,
+        back: card.back,
+        interval: 1,
+        repetitions: 0,
+        efactor: 2.5,
+        nextReviewDate: new Date(),
+      }));
+      await Flashcard.bulkCreate(cardsToInsert);
+    }
+
+    // Update clone count on the source deck
+    sourceSubject.cloneCount = (sourceSubject.cloneCount || 0) + 1;
+    await sourceSubject.save();
+
+    await ActivityLog.create({
+      user: req.user.id,
+      activityType: 'flashcard_review',
+      description: `Cloned peer flashcard deck "${sourceSubject.name}" to personal library`,
+    });
+
+    res.status(201).json({ success: true, data: clonedSubject });
   } catch (error) {
     next(error);
   }

@@ -670,6 +670,66 @@ exports.generateFlashcardTags = async (front, back, forceRefresh = false) => {
 };
 
 /**
+ * 4c. Review a whole flashcard deck to generate summary tags and description
+ */
+exports.reviewFlashcardDeck = async (subjectName, cards = [], forceRefresh = false) => {
+  if (!genAI) {
+    console.warn('Gemini API key not configured. Using Mock Data for Deck Review.');
+    return {
+      tags: ['Study Guide', 'Review', subjectName],
+      description: `Comprehensive study flashcards covering key concepts of ${subjectName}.`,
+      difficulty: 'Medium',
+    };
+  }
+
+  const cacheKey = hashKey('deck-review', `${subjectName}:${JSON.stringify(cards.slice(0, 10))}`);
+
+  if (!forceRefresh) {
+    const cached = responseCache.get(cacheKey);
+    if (cached) return cached;
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const cardsExcerpt = cards.slice(0, 25).map(c => `Q: ${c.front} | A: ${c.back}`).join('\n');
+    const prompt = `
+      You are an expert AI flashcard deck reviewer. Analyze the following flashcard deck details and content excerpt to generate metadata.
+      Deck Subject: "${subjectName}"
+      Total Cards Count: ${cards.length}
+      Excerpt of Cards:
+      """
+      ${cardsExcerpt}
+      """
+      
+      Generate:
+      1. A short, compelling 1-2 sentence description explaining what this deck teaches and who it is for.
+      2. A list of 2 to 4 concise tags (e.g. subtopics, specific subjects, exam prep).
+      3. An estimated overall difficulty level ("Easy", "Medium", "Hard").
+
+      Return the result STRICTLY as JSON:
+      {
+        "description": "string",
+        "tags": ["string", "string"],
+        "difficulty": "Easy" | "Medium" | "Hard"
+      }
+    `;
+
+    const result = await generateWithRetry(model, prompt);
+    const parsed = cleanJSON(result.response.text());
+
+    responseCache.set(cacheKey, parsed);
+    return parsed;
+  } catch (error) {
+    console.error('Gemini deck review failed:', error);
+    return {
+      tags: ['Study Guide', 'Review', subjectName],
+      description: `Comprehensive study flashcards covering key concepts of ${subjectName}.`,
+      difficulty: 'Medium',
+    };
+  }
+};
+
+/**
  * 5. Analyze Performance & Detect Weaknesses
  */
 exports.analyzePerformanceAndRecommend = async (attemptsSummary, forceRefresh = false) => {  if (!genAI) {
