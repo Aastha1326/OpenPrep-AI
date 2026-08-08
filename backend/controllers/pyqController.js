@@ -418,3 +418,53 @@ exports.getPYQTrends = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Get AI predicted difficulty and topic trends forecast for upcoming exams
+// @route   GET /api/pyqs/forecast
+// @access  Private
+exports.getUpcomingForecast = async (req, res, next) => {
+  try {
+    const { subjectId } = req.query;
+    if (!subjectId) {
+      return res.status(400).json({ success: false, error: 'subjectId is required' });
+    }
+
+    const subject = await Subject.findOne({ where: { id: subjectId, user: req.user.id } });
+    if (!subject) {
+      return res.status(404).json({ success: false, error: 'Subject not found' });
+    }
+
+    const pyqs = await PYQ.findAll({
+      where: { subject: subjectId, user: req.user.id },
+      order: [['year', 'ASC']],
+    });
+
+    const history = pyqs.map((p) => ({
+      year: p.year,
+      difficulty: p.difficulty,
+      chapters: p.chapters || [],
+      importantTopics: p.analysisResults?.importantTopics || [],
+    }));
+
+    if (history.length === 0) {
+      const topics = await Topic.findAll({ where: { subject: subjectId, user: req.user.id } });
+      history.push({
+        year: 'current syllabus state',
+        availableTopics: topics.map((t) => t.name),
+      });
+    }
+
+    const forecast = await geminiService.predictUpcomingExamTrends(
+      subject.name,
+      history,
+      req.query.refresh === 'true'
+    );
+
+    res.status(200).json({
+      success: true,
+      data: forecast,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

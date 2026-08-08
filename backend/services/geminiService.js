@@ -227,6 +227,18 @@ flashcard: {
     keyConcepts: 'array',
     examTips: 'array',
   },
+  pyqForecasting: {
+    predictedDifficulty: 'string',
+    expectedEasyPercent: 'number',
+    expectedMediumPercent: 'number',
+    expectedHardPercent: 'number',
+    topicTrends: {
+      type: 'array',
+      itemSchema: { topicName: 'string', expectedProbability: 'number', trendStatus: 'string' },
+    },
+    recommendedFocusAreas: 'array',
+    revisionStrategy: 'string',
+  },
 };
 
 /**
@@ -1243,5 +1255,85 @@ exports.transcribeAndSummarizeAudio = async (fileBuffer, mimeType, subjectName) 
       keyConcepts: [],
       examTips: [],
     };
+  }
+};
+
+const getMockUpcomingTrends = (subjectName) => {
+  return {
+    predictedDifficulty: 'Medium',
+    expectedEasyPercent: 30,
+    expectedMediumPercent: 50,
+    expectedHardPercent: 20,
+    topicTrends: [
+      { topicName: `${subjectName} Core Foundations`, expectedProbability: 92, trendStatus: 'High Probability in 2026' },
+      { topicName: 'Advanced Practice Applications', expectedProbability: 80, trendStatus: 'Rising Weightage' },
+      { topicName: 'Theoretical Methods', expectedProbability: 60, trendStatus: 'Stable Weightage' },
+      { topicName: 'Historical Case Studies', expectedProbability: 25, trendStatus: 'Declining Weightage' },
+    ],
+    recommendedFocusAreas: [
+      'Focus heavily on fundamental concepts and repeated high-probability subtopics.',
+      'Solve previous year papers from the last 5 years under exam conditions.',
+      'Revise weak and medium-status chapters first.',
+    ],
+    revisionStrategy: 'Practice active recall and spaced repetition for formulas and terms daily.',
+  };
+};
+
+exports.predictUpcomingExamTrends = async (subjectName, history, forceRefresh = false) => {
+  if (!genAI) {
+    console.warn('Gemini API key not configured. Using Mock Data for PYQ Forecasting.');
+    return getMockUpcomingTrends(subjectName);
+  }
+
+  const cacheKey = hashKey('pyq-forecast', `${subjectName}:${JSON.stringify(history)}`);
+
+  if (!forceRefresh) {
+    const cached = responseCache.get(cacheKey);
+    if (cached) return cached;
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const prompt = `
+      You are an expert academic advisor. Analyze the past exam history for the subject "${subjectName}" and predict the upcoming exam trends.
+      
+      Here is the historical metadata and chapter/topic distribution of past papers:
+      ${JSON.stringify(history, null, 2)}
+      
+      Generate a predictive forecast for the upcoming exam in JSON format.
+      Return the result STRICTLY as JSON with these keys:
+      {
+        "predictedDifficulty": "Easy" | "Medium" | "Hard",
+        "expectedEasyPercent": number,
+        "expectedMediumPercent": number,
+        "expectedHardPercent": number,
+        "topicTrends": [
+          {
+            "topicName": "string",
+            "expectedProbability": number,
+            "trendStatus": "Rising Weightage" | "High Probability in 2026" | "Stable Weightage" | "Declining Weightage"
+          }
+        ],
+        "recommendedFocusAreas": ["string", "string"],
+        "revisionStrategy": "string"
+      }
+    `;
+
+    const result = await generateWithRetry(model, prompt);
+    const parsed = cleanJSON(result.response.text());
+
+    if (!validateResponse(parsed, RESPONSE_SCHEMAS.pyqForecasting)) {
+      console.error('PYQ forecasting response validation failed');
+      return getMockUpcomingTrends(subjectName);
+    }
+
+    responseCache.set(cacheKey, parsed);
+    return parsed;
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError || error instanceof GeminiServerError) {
+      throw error;
+    }
+    console.error('Gemini PYQ Forecasting failed:', error);
+    return getMockUpcomingTrends(subjectName);
   }
 };
