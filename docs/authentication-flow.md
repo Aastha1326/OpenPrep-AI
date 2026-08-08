@@ -9,10 +9,12 @@ This document details the security and authentication flows implemented in **Ope
 OpenPrep AI uses a **dual-token authentication strategy** with short-lived access tokens and long-lived refresh tokens.
 
 ### Access Token (JWT)
-* **Hashing Algorithm**: `HMAC-SHA256` via the `jsonwebtoken` package.
-* **Token Lifetime**: 15 minutes (configured via `JWT_EXPIRE` env variable).
-* **Storage Location**: Client `localStorage` under the key `token`.
-* **Payload Structure**:
+
+- **Hashing Algorithm**: `HMAC-SHA256` via the `jsonwebtoken` package.
+- **Token Lifetime**: 15 minutes (configured via `JWT_EXPIRE` env variable).
+- **Storage Location**: Client `localStorage` under the key `token`.
+- **Payload Structure**:
+
 ```json
 {
   "id": "60d0fe4f5311236168a109a1",
@@ -22,11 +24,12 @@ OpenPrep AI uses a **dual-token authentication strategy** with short-lived acces
 ```
 
 ### Refresh Token (Crypto-Random)
-* **Generation**: `crypto.randomBytes(32).toString('hex')` — 64-character hex string.
-* **Storage**: SHA-256 hash stored in the User record's `refreshTokens` array (supports multi-device login).
-* **Token Lifetime**: 7 days.
-* **Rotation**: Every refresh invalidates the old token and issues a new pair.
-* **Invalidation**: Password reset clears all existing refresh tokens.
+
+- **Generation**: `crypto.randomBytes(32).toString('hex')` — 64-character hex string.
+- **Storage**: SHA-256 hash stored in the User record's `refreshTokens` array (supports multi-device login).
+- **Token Lifetime**: 7 days.
+- **Rotation**: Every refresh invalidates the old token and issues a new pair.
+- **Invalidation**: Password reset clears all existing refresh tokens.
 
 ---
 
@@ -41,7 +44,7 @@ sequenceDiagram
     participant React as React Frontend
     participant Express as Express Backend
     participant DB as PostgreSQL
-    
+
     Student->>React: Enters Name, Email, Password
     React->>Express: POST /api/auth/register (payload)
     Note over Express: Validate email format & password complexity
@@ -70,7 +73,7 @@ sequenceDiagram
     participant React as React Frontend
     participant Express as Express Backend
     participant DB as PostgreSQL
-    
+
     Student->>React: Clicks verification link from email
     React->>Express: POST /api/auth/verify-email/:token
     Express->>Express: Hash token with SHA-256
@@ -98,7 +101,7 @@ sequenceDiagram
     participant React as React Frontend
     participant Express as Express Backend
     participant DB as PostgreSQL
-    
+
     Student->>React: Enters Email & Password
     React->>Express: POST /api/auth/login (payload)
     Express->>DB: Query User where email = input (select: +password)
@@ -132,6 +135,7 @@ sequenceDiagram
 ## 🛡️ Route Protection Flow (API & UI)
 
 ### 1. API Route Guards (Backend)
+
 Private Express routes are chained through the `protect` middleware:
 
 ```javascript
@@ -152,16 +156,19 @@ graph TD
 ```
 
 ### 2. UI Route Guards (Frontend)
-Private pages are shielded from guest access using [ProtectedRoute.jsx](file:///c:/Users/Nishit/OneDrive/Desktop/ALL%20Projects/OPENPREP%20AI/OpenPrep-AI/frontend/src/components/ProtectedRoute.jsx).
+
+Private pages are shielded from guest access using [ProtectedRoute.jsx](../frontend/src/components/ProtectedRoute.jsx).
+
 1. Upon browser load/refresh, the client dispatches the `loadUser` async thunk.
 2. If `localStorage.getItem('token')` is set:
-   * It sends a `GET /api/auth/me` request with the token.
-   * If the request is successful, the Redux store is populated with `user` data and `isAuthenticated` becomes `true`.
-   * If the request fails (e.g., token expired), the client should use the refresh token (`localStorage.getItem('refreshToken')`) to call `POST /api/auth/refresh-token` before retrying.
-   * If both tokens are expired, it clears local storage, resets Redux state, and redirects to `/login`.
+   - It sends a `GET /api/auth/me` request with the token.
+   - If the request is successful, the Redux store is populated with `user` data and `isAuthenticated` becomes `true`.
+   - If the request fails (e.g., token expired), the client should use the refresh token (`localStorage.getItem('refreshToken')`) to call `POST /api/auth/refresh-token` before retrying.
+   - If both tokens are expired, it clears local storage, resets Redux state, and redirects to `/login`.
 3. If no token is found, accessing protected paths redirects immediately to `/login`.
 
 ### 3. Token Refresh Flow
+
 ```mermaid
 sequenceDiagram
     autonumber
