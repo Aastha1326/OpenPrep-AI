@@ -17,7 +17,7 @@ const cacheMiddleware = require('../middleware/cache');
 const clearCache = require('../middleware/clearCache');
 
 const router = express.Router();
-router.get('/trends', protect, getPYQTrends);
+router.get('/trends', protect, cacheMiddleware((req) => `pyqs:${req.user.id}:${req.originalUrl}`), getPYQTrends);
 /**
  * @swagger
  * tags:
