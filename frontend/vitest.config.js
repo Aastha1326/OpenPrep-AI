@@ -10,5 +10,18 @@ export default defineConfig({
     testTimeout: 10000,
     css: false,
     include: ['src/**/*.test.{js,jsx}'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov', 'html'],
+      include: ['src/**/*.{js,jsx}'],
+      exclude: [
+        'src/**/*.test.{js,jsx}',
+        'src/test-setup.js',
+        'src/main.jsx',
+      ],
+      thresholds: {
+        statements: 75,
+      },
+    },
   },
 });
