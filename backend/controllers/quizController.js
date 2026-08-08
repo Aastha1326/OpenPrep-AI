@@ -16,6 +16,32 @@ const { runCalibration } = require('../services/difficultyCalibrator');
 // Prevents double-click on "Submit Quiz" from creating duplicate attempt records.
 const DUPLICATE_SUBMIT_WINDOW_MS = 5000;
 
+// Extract the questions the student answered incorrectly from a loaded quiz
+// attempt, together with the attempt's quiz topic/subject metadata.
+function extractMistookQuestions(attempt) {
+  const quizRef = attempt && attempt.quizRef;
+  if (!quizRef) return [];
+
+  const quizQuestions = quizRef.questions || [];
+  const userAnswers = attempt.answers || [];
+
+  return quizQuestions
+    .filter((q) => {
+      const ans = userAnswers.find((a) => String(a.questionId) === String(q._id || q.id));
+      return ans && !ans.isCorrect;
+    })
+    .map((q) => {
+      const userAns = userAnswers.find((a) => String(a.questionId) === String(q._id || q.id));
+      return {
+        questionText: q.questionText,
+        options: q.options,
+        correctAnswer: q.correctAnswer,
+        explanation: q.explanation,
+        userSelectedAnswer: userAns ? userAns.selectedAnswer : -1,
+      };
+    });
+}
+
 // @desc    Generate AI Quiz
 // @route   POST /api/quizzes/generate-ai
 // @access  Private
@@ -329,7 +355,7 @@ exports.submitQuizAttempt = async (req, res, next) => {
       user: req.user.id,
       activityType: 'quiz_attempt',
       description: `Completed practice quiz: "${quiz.title}" with score ${score}%`,
-    }, { transaction: t });
+    });
 
     res.status(201).json({
       success: true,
@@ -426,24 +452,7 @@ exports.generateRevisionSheet = async (req, res, next) => {
           if (attempt.quizRef.subjectRef) targetSubjectName = attempt.quizRef.subjectRef.name;
           if (attempt.quizRef.topicRef) targetTopicName = attempt.quizRef.topicRef.name;
 
-          const quizQuestions = attempt.quizRef.questions || [];
-          const userAnswers = attempt.answers || [];
-
-          mistookQuestions = quizQuestions
-            .filter((q) => {
-              const ans = userAnswers.find((a) => String(a.questionId) === String(q._id || q.id));
-              return ans && !ans.isCorrect;
-            })
-            .map((q) => {
-              const userAns = userAnswers.find((a) => String(a.questionId) === String(q._id || q.id));
-              return {
-                questionText: q.questionText,
-                options: q.options,
-                correctAnswer: q.correctAnswer,
-                explanation: q.explanation,
-                userSelectedAnswer: userAns ? userAns.selectedAnswer : -1,
-              };
-            });
+          mistookQuestions = extractMistookQuestions(attempt);
         }
       }
     }
@@ -483,6 +492,110 @@ exports.generateRevisionSheet = async (req, res, next) => {
       data: {
         title: revisionSheet.title,
         summaryMarkdown: revisionSheet.summaryMarkdown,
+        savedNote,
+      },
+    });
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({
+        success: false,
+        error: error.message,
+      });
+    }
+    next(error);
+  }
+};
+
+// @desc    Generate AI Remediation Plan for weak concepts from failed quiz questions
+// @route   POST /api/quizzes/generate-remediation-plan
+// @access  Private
+exports.generateRemediationPlan = async (req, res, next) => {
+  try {
+    const { quizAttemptId, saveToNotes = true } = req.body;
+
+    let mistookQuestions = req.body.mistookQuestions || [];
+    let targetSubjectName = 'General Subject';
+    let targetTopicName = 'Weak Concepts';
+    let matchedSubjectId = req.body.subjectId || null;
+    let matchedTopicId = req.body.topicId || null;
+
+    if (quizAttemptId) {
+      const attempt = await QuizAttempt.findOne({
+        where: { id: quizAttemptId, user: req.user.id },
+        include: [
+          {
+            model: Quiz,
+            as: 'quizRef',
+            include: [
+              { model: Subject, as: 'subjectRef' },
+              { model: Topic, as: 'topicRef' },
+            ],
+          },
+        ],
+      });
+
+      if (attempt && attempt.quizRef) {
+        matchedSubjectId = matchedSubjectId || attempt.quizRef.subject;
+        matchedTopicId = matchedTopicId || attempt.quizRef.topic;
+
+        if (attempt.quizRef.subjectRef) targetSubjectName = attempt.quizRef.subjectRef.name;
+        if (attempt.quizRef.topicRef) targetTopicName = attempt.quizRef.topicRef.name;
+
+        mistookQuestions = extractMistookQuestions(attempt);
+      }
+    }
+
+    if (req.body.subjectId && targetSubjectName === 'General Subject') {
+      const sub = await Subject.findByPk(req.body.subjectId);
+      if (sub) targetSubjectName = sub.name;
+    }
+
+    if (req.body.topicId && targetTopicName === 'Weak Concepts') {
+      const top = await Topic.findByPk(req.body.topicId);
+      if (top) targetTopicName = top.name;
+    }
+
+    if (mistookQuestions.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No failed questions found. Generate a remediation plan after reviewing a quiz with mistakes.',
+      });
+    }
+
+    // Call Gemini Service to structure the 3-day remediation micro-modules
+    const remediationPlan = await geminiService.generateRemediationPlan(
+      mistookQuestions,
+      targetSubjectName,
+      targetTopicName,
+      req.body.weakTopics || [],
+      req.query.refresh === 'true'
+    );
+
+    let savedNote = null;
+    if (saveToNotes && matchedSubjectId) {
+      savedNote = await Note.create({
+        title: remediationPlan.title || `3-Day AI Remediation Plan: ${targetTopicName}`,
+        content: remediationPlan.summaryMarkdown,
+        subject: matchedSubjectId,
+        topic: matchedTopicId,
+        category: 'Summary',
+        user: req.user.id,
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      data: {
+        title: remediationPlan.title,
+        summaryMarkdown: remediationPlan.summaryMarkdown,
+        plan: remediationPlan.plan,
         savedNote,
       },
     });
