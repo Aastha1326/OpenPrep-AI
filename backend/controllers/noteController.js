@@ -1,8 +1,9 @@
 const fs = require('fs');
 const path = require('path');
+const archiver = require('archiver');
+const sanitizeHtml = require('sanitize-html');
 const { Op } = require('sequelize');
-const Note = require('../models/Note');
-const Subject = require('../models/Subject');
+const Note = require('../models/Note');const Subject = require('../models/Subject');
 const Topic = require('../models/Topic');
 const ActivityLog = require('../models/ActivityLog');
 const User = require('../models/User');
@@ -15,10 +16,116 @@ const escapeRegex = (string) => {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 };
 
-// @desc    Upload Note
-// @route   POST /api/notes
+// @desc    Export all of the authenticated user's notes as JSON or a Markdown ZIP
+// @route   GET /api/notes/export
 // @access  Private
-exports.uploadNote = async (req, res, next) => {
+exports.exportNotes = async (req, res, next) => {
+  try {
+    const format = req.query.format === 'zip' ? 'zip' : 'json';
+
+    const notes = await Note.findAll({
+      where: { user: req.user.id },
+      include: [{ model: Subject, as: 'subjectRef', attributes: ['name'] }],
+      order: [['createdAt', 'DESC']],
+    });
+
+    if (format === 'json') {
+      const data = notes.map((n) => ({
+        title: n.title,
+        content: n.content,
+        subject: n.subjectRef?.name || null,
+        category: n.category,
+        createdAt: n.createdAt,
+      }));
+      res.setHeader('Content-Disposition', 'attachment; filename="openprep-notes.json"');
+      return res.status(200).json({ success: true, data });
+    }
+
+    // ZIP export — one .md file per note with a small metadata header
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', 'attachment; filename="openprep-notes.zip"');
+
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.on('error', (err) => next(err));
+    archive.pipe(res);
+
+    notes.forEach((note, index) => {
+      const safeTitle = note.title.replace(/[^a-z0-9-_ ]/gi, '').trim() || `note-${index + 1}`;
+      const frontMatter = [
+        '---',
+        `title: ${note.title}`,
+        `subject: ${note.subjectRef?.name || ''}`,
+        `category: ${note.category}`,
+        `createdAt: ${note.createdAt.toISOString()}`,
+        '---',
+        '',
+      ].join('\n');
+      archive.append(`${frontMatter}${note.content || ''}`, { name: `${safeTitle}.md` });
+    });
+
+    await archive.finalize();
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Import one or more Markdown files as new notes
+// @route   POST /api/notes/import
+// @access  Private
+exports.importNotes = async (req, res, next) => {
+  try {
+    const { subjectId, topicId } = req.body;
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ success: false, error: 'Please upload at least one .md file' });
+    }
+
+    const subject = await Subject.findByPk(subjectId);
+    if (!subject) {
+      return res.status(404).json({ success: false, error: 'Subject not found' });
+    }
+
+    const createdNotes = [];
+
+    for (const file of req.files) {
+      const rawText = file.buffer.toString('utf8');
+      const headingMatch = rawText.match(/^#\s+(.+)$/m);
+      const title = (headingMatch ? headingMatch[1] : path.parse(file.originalname).name).slice(0, 100);
+
+      // Strip any HTML/script payloads hiding inside the imported Markdown
+      const safeContent = sanitizeHtml(rawText, {
+        allowedTags: sanitizeHtml.defaults.allowedTags.concat(['h1', 'h2', 'h3']),
+        allowedAttributes: {},
+      });
+
+      const note = await Note.create({
+        title: title || 'Imported Note',
+        content: safeContent,
+        subject: subjectId,
+        topic: topicId || null,
+        fileType: 'text',
+        category: 'Other',
+        user: req.user.id,
+      });
+
+      createdNotes.push(note);
+    }
+
+    await ActivityLog.create({
+      user: req.user.id,
+      activityType: 'note_upload',
+      description: `Imported ${createdNotes.length} note(s) from Markdown`,
+    });
+
+    res.status(201).json({ success: true, count: createdNotes.length, data: createdNotes });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Summarize a note using AI (Gemini) and cache the result
+// @route   POST /api/notes/:id/summarize
+// @access  Privateexports.uploadNote = async (req, res, next) => {
   try {
     const { title, content, subjectId, topicId, isPublic, category } = req.body;
 
