@@ -64,3 +64,30 @@ Heavy business logic and external LLM APIs are kept out of controllers and isola
 * **Model Selection**: Uses `gemini-1.5-flash` for high-speed, cost-effective prompt completions.
 * **JSON Integrity**: Integrates strict JSON formatting constraints in prompts, utilizing helper parsers to clean Markdown backticks and safely parse response arrays or nested objects.
 * **Mock Failbacks**: Implements local mock data generators. If the `GEMINI_API_KEY` is not present, the service logs a warning and returns pre-structured mock objects so developers can test the application offline.
+
+---
+
+## 🔌 Real-Time Layer: Socket.IO (`sockets/`)
+
+Alongside the REST API, the backend runs a Socket.IO server on the same HTTP server instance (`server.js`) to power live multiplayer Battle Arena matches and study group chat:
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server as server.js
+    participant Battle as battleHandler.js
+    participant Chat as chatHandler.js
+
+    Client->>Server: WebSocket connection (default namespace)
+    Server->>Battle: io.on('connection', socket)
+    Server->>Chat: io.on('connection', socket)
+    Client->>Battle: create-room / join-room
+    Battle-->>Client: room_update, presence_update
+    Client->>Battle: submit_answer
+    Battle-->>Client: score_update
+```
+
+* **`sockets/battleHandler.js`** — manages Battle Arena rooms, ready states, and live score updates. Room state is held in-memory, keyed by room ID.
+* **`sockets/chatHandler.js`** — manages study group chat rooms, messages, and typing indicators.
+
+For the full list of event names and payload schemas for both handlers, along with a detailed match lifecycle diagram, see **[docs/socket-events.md](./socket-events.md)**.
