@@ -65,6 +65,42 @@ describe('CORS Whitelist Enforcement Integration Tests', () => {
     });
   });
 
+  describe('When FRONTEND_URL is defined', () => {
+    beforeAll(() => {
+      process.env.FRONTEND_URL = 'https://myfrontend.com, http://mytestfrontend.com';
+    });
+
+    afterAll(() => {
+      delete process.env.FRONTEND_URL;
+    });
+
+    it('should allow requests matching whitelisted domains in FRONTEND_URL', async () => {
+      const res1 = await request(app)
+        .get('/test-cors')
+        .set('Origin', 'https://myfrontend.com');
+      
+      expect(res1.status).toBe(200);
+      expect(res1.body.success).toBe(true);
+
+      const res2 = await request(app)
+        .get('/test-cors')
+        .set('Origin', 'http://mytestfrontend.com');
+      
+      expect(res2.status).toBe(200);
+      expect(res2.body.success).toBe(true);
+    });
+
+    it('should block requests from non-whitelisted domains with 403 Forbidden', async () => {
+      const res = await request(app)
+        .get('/test-cors')
+        .set('Origin', 'http://malicioussite.com');
+      
+      expect(res.status).toBe(403);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toBe('Not allowed by CORS');
+    });
+  });
+
   describe('When CLIENT_URL is undefined (defaults to localhost dev)', () => {
     beforeAll(() => {
       delete process.env.CLIENT_URL;

@@ -440,3 +440,26 @@ exports.uploadVoiceNote = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Update Note
+// @route   PUT /api/notes/:id
+// @access  Private
+exports.updateNote = async (req, res, next) => {
+  try {
+    const { title, content, isPublic, category } = req.body;
+    const note = await Note.findOne({ where: { id: req.params.id, user: req.user.id } });
+    if (!note) {
+      return res.status(404).json({ success: false, error: 'Note not found or access denied' });
+    }
+
+    if (title !== undefined) note.title = title;
+    if (content !== undefined) note.content = content;
+    if (isPublic !== undefined) note.isPublic = isPublic === 'true' || isPublic === true;
+    if (category !== undefined) note.category = category;
+
+    await note.save();
+    res.status(200).json({ success: true, data: note });
+  } catch (error) {
+    next(error);
+  }
+};
