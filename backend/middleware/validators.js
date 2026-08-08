@@ -275,9 +275,13 @@ const validateUploadPYQ = [
     .withMessage('Difficulty must be "Easy", "Medium", or "Hard"'),
   handleValidationErrors,
 ];
+
+const validateGetPYQClusters = [
+  param('subjectId').isUUID(4).withMessage('Valid subject ID is required'),
+  handleValidationErrors,
+];
 // ---------------------------------------------------------------------------
-// Study Plan routes
-// ---------------------------------------------------------------------------
+// Study Plan routes// ---------------------------------------------------------------------------
 const validateGenerateAIPlan = [
   body('examId').isUUID(4).withMessage('Valid exam ID is required'),
   body('startDate')
@@ -416,8 +420,9 @@ validateGenerateAIFlashcards,
 // Note
   validateUploadNote,
   validateImportNotes,
-  // PYQ  validateUploadPYQ,
-// Study Plan
+// PYQ
+  validateUploadPYQ,
+  validateGetPYQClusters,// Study Plan
   validateGenerateAIPlan,
   validateToggleTask,
   validateMoveTaskDate,// Progress
