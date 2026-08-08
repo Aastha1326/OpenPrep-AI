@@ -6,6 +6,7 @@ const {
   deleteNote,
   summarizeNote,
   uploadVoiceNote,
+  updateNote,
 } = require('../controllers/noteController');
 const { protect } = require('../middleware/auth');
 const upload = require('../middleware/upload');
@@ -402,6 +403,43 @@ router.post('/:id/summarize', protect, summarizeNote);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
+
+/**
+ * @swagger
+ * /api/notes/{id}:
+ *   put:
+ *     summary: Update an existing note
+ *     tags: [Notes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Note ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               content:
+ *                 type: string
+ *               isPublic:
+ *                 type: boolean
+ *               category:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Note updated successfully
+ */
+router.put('/:id', protect, clearCache('notes:*'), updateNote);
 
 router.delete('/:id', protect, clearCache('notes:*'), deleteNote);
 
