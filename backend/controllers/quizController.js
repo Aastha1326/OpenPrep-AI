@@ -329,7 +329,7 @@ exports.submitQuizAttempt = async (req, res, next) => {
       user: req.user.id,
       activityType: 'quiz_attempt',
       description: `Completed practice quiz: "${quiz.title}" with score ${score}%`,
-    });
+    }, { transaction: t });
 
     res.status(201).json({
       success: true,

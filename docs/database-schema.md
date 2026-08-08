@@ -18,22 +18,22 @@ erDiagram
     USER ||--o{ FLASHCARD : owns
     USER ||--o{ PROGRESS : owns
     USER ||--o{ ACTIVITY_LOG : triggers
-    
+
     SUBJECT }|--|| ACADEMIC_EXAM : belongs_to
     TOPIC }|--|| SUBJECT : belongs_to
-    
+
     PYQ }|--|| ACADEMIC_EXAM : links_to
     PYQ }|--|| SUBJECT : links_to
-    
+
     STUDY_PLAN }|--|| ACADEMIC_EXAM : schedules
     STUDY_PLAN ||--o{ DAILY_GOAL : contains
     DAILY_GOAL ||--o{ TASK : contains
     TASK }|--|| TOPIC : references
-    
+
     QUIZ }|--|| SUBJECT : categorizes
     QUIZ }|--|| TOPIC : categorizes
     QUIZ ||--o{ QUESTION : contains
-    
+
     PROGRESS }|--|| SUBJECT : tracks
     PROGRESS }|--|| TOPIC : tracks
 ```
@@ -45,10 +45,12 @@ erDiagram
 Here are the detailed schemas for each database model/table:
 
 ### 1. User
+
 Represents students, contributors, or admins using the platform.
 
-* **File Location**: [User.js](file:///c:/Users/Nishit/OneDrive/Desktop/ALL%20Projects/OPENPREP%20AI/OpenPrep-AI/backend/models/User.js)
-* **Structure**:
+- **File Location**: [User.js](../backend/models/User.js)
+- **Structure**:
+
 ```javascript
 {
   name: { type: String, required: true },
@@ -66,10 +68,12 @@ Represents students, contributors, or admins using the platform.
 ```
 
 ### 2. Subject
+
 Academic subjects associated with specific exams.
 
-* **File Location**: [Subject.js](file:///c:/Users/Nishit/OneDrive/Desktop/ALL%20Projects/OPENPREP%20AI/OpenPrep-AI/backend/models/Subject.js)
-* **Structure**:
+- **File Location**: [Subject.js](../backend/models/Subject.js)
+- **Structure**:
+
 ```javascript
 {
   name: { type: String, required: true, trim: true },
@@ -81,10 +85,12 @@ Academic subjects associated with specific exams.
 ```
 
 ### 3. Topic
+
 Discrete study chapters or units belonging to subjects, with user-assigned or AI-assigned confidence ratings.
 
-* **File Location**: [Topic.js](file:///c:/Users/Nishit/OneDrive/Desktop/ALL%20Projects/OPENPREP%20AI/OpenPrep-AI/backend/models/Topic.js)
-* **Structure**:
+- **File Location**: [Topic.js](../backend/models/Topic.js)
+- **Structure**:
+
 ```javascript
 {
   name: { type: String, required: true, trim: true },
@@ -98,10 +104,12 @@ Discrete study chapters or units belonging to subjects, with user-assigned or AI
 ```
 
 ### 4. PYQ (Previous Year Questions)
+
 Metadata and analytical results derived from uploaded PYQ PDF files.
 
-* **File Location**: [PYQ.js](file:///c:/Users/Nishit/OneDrive/Desktop/ALL%20Projects/OPENPREP%20AI/OpenPrep-AI/backend/models/PYQ.js)
-* **Structure**:
+- **File Location**: [PYQ.js](../backend/models/PYQ.js)
+- **Structure**:
+
 ```javascript
 {
   title: { type: String, required: true },
@@ -128,10 +136,12 @@ Metadata and analytical results derived from uploaded PYQ PDF files.
 ```
 
 ### 5. StudyPlan
+
 Active custom planners matching user study schedules.
 
-* **File Location**: [StudyPlan.js](file:///c:/Users/Nishit/OneDrive/Desktop/ALL%20Projects/OPENPREP%20AI/OpenPrep-AI/backend/models/StudyPlan.js)
-* **Structure**:
+- **File Location**: [StudyPlan.js](../backend/models/StudyPlan.js)
+- **Structure**:
+
 ```javascript
 {
   exam: { type: Schema.Types.ObjectId, ref: 'Exam', required: true },
@@ -157,10 +167,12 @@ Active custom planners matching user study schedules.
 ```
 
 ### 6. Quiz
+
 MCQ test collections.
 
-* **File Location**: [Quiz.js](file:///c:/Users/Nishit/OneDrive/Desktop/ALL%20Projects/OPENPREP%20AI/OpenPrep-AI/backend/models/Quiz.js)
-* **Structure**:
+- **File Location**: [Quiz.js](../backend/models/Quiz.js)
+- **Structure**:
+
 ```javascript
 {
   title: { type: String, required: true },
@@ -181,10 +193,12 @@ MCQ test collections.
 ```
 
 ### 7. Flashcard
+
 Spaced repetition cards containing intervals and quality parameters.
 
-* **File Location**: [Flashcard.js](file:///c:/Users/Nishit/OneDrive/Desktop/ALL%20Projects/OPENPREP%20AI/OpenPrep-AI/backend/models/Flashcard.js)
-* **Structure**:
+- **File Location**: [Flashcard.js](../backend/models/Flashcard.js)
+- **Structure**:
+
 ```javascript
 {
   user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
@@ -202,10 +216,12 @@ Spaced repetition cards containing intervals and quality parameters.
 ```
 
 ### 8. Progress
+
 Syllabus progression analytics.
 
-* **File Location**: [Progress.js](file:///c:/Users/Nishit/OneDrive/Desktop/ALL%20Projects/OPENPREP%20AI/OpenPrep-AI/backend/models/Progress.js)
-* **Structure**:
+- **File Location**: [Progress.js](../backend/models/Progress.js)
+- **Structure**:
+
 ```javascript
 {
   user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
@@ -226,17 +242,19 @@ Syllabus progression analytics.
 ```
 
 ### 9. ActivityLog
+
 Central audit collection tracking student platform engagements.
 
-* **File Location**: [ActivityLog.js](file:///c:/Users/Nishit/OneDrive/Desktop/ALL%20Projects/OPENPREP%20AI/OpenPrep-AI/backend/models/ActivityLog.js)
-* **Structure**:
+- **File Location**: [ActivityLog.js](../backend/models/ActivityLog.js)
+- **Structure**:
+
 ```javascript
 {
   user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  activityType: { 
-    type: String, 
+  activityType: {
+    type: String,
     enum: ['quiz_attempt', 'pyq_upload', 'flashcard_review', 'study_plan_create', 'note_upload'],
-    required: true 
+    required: true
   },
   description: { type: String, required: true },
   timestamp: { type: Date, default: Date.now },

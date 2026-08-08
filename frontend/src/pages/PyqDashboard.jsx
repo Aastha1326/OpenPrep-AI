@@ -81,6 +81,38 @@ const [uploadSubjectId, setUploadSubjectId] = useState('');
   const [isTimeout, setIsTimeout] = useState(false);
   const [trendActiveIndex, setTrendActiveIndex] = useState(-1);
 
+  const [activeInsightTab, setActiveInsightTab] = useState('paper');
+  const [forecastData, setForecastData] = useState(null);
+  const [loadingForecast, setLoadingForecast] = useState(false);
+  const [forecastError, setForecastError] = useState(null);
+
+  const fetchForecast = async (forceRefresh = false) => {
+    if (!selectedSubjectId) return;
+    setLoadingForecast(true);
+    setForecastError(null);
+    try {
+      const res = await API.get('/pyqs/forecast', {
+        params: { subjectId: selectedSubjectId, refresh: forceRefresh === true },
+      });
+      if (res.data?.success) {
+        setForecastData(res.data.data);
+      }
+    } catch (err) {
+      console.error('Failed to load forecasting:', err);
+      setForecastError('Could not load forecasting data.');
+    } finally {
+      setLoadingForecast(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedSubjectId) {
+      fetchForecast();
+    } else {
+      setForecastData(null);
+    }
+  }, [selectedSubjectId]);
+
   // Fetch subjects on mount
   useEffect(() => {
     const fetchSubjects = async () => {
@@ -555,138 +587,301 @@ formData.append('year', year);
         </div>
 
         {/* --- VISUALIZATION & INSIGHTS SECTION --- */}
-        {selectedPyq && (
-          <div className="space-y-8">
-            
-            {/* Row 1: Pie Chart & AI Trend Card */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              
-              {/* Recharts Chapter Weightage Pie Chart */}
-              <VintagePaper className="shadow-[0_10px_25px_rgba(0,0,0,0.5)]">
-                <h3 className="text-xl font-bold font-playfair text-neutral-900 mb-4 border-b border-neutral-400 pb-2 flex items-center gap-2">
-                  <PieChartIcon className="w-5 h-5 text-amber-800" /> Chapter Weightage Breakdown
-                </h3>
-                <div className="h-64 w-full" style={{ minHeight: '260px' }}>
-                  {pieChartData.length === 0 ? (
-                    <div className="flex items-center justify-center h-full text-xs text-neutral-500 italic">
-                      No chapter weightage data available for this paper.
+        {selectedSubjectId && (
+          <div className="space-y-8 mt-12 pt-8 border-t border-black/10">
+            {/* Tab Selector */}
+            <div className="flex gap-4 border-b border-neutral-300 pb-2">
+              <button
+                type="button"
+                onClick={() => setActiveInsightTab('paper')}
+                disabled={!selectedPyq}
+                className={`px-4 py-2 text-sm font-bold font-playfair transition-all border-b-2 ${
+                  activeInsightTab === 'paper'
+                    ? 'border-amber-800 text-amber-900 font-bold'
+                    : 'border-transparent text-neutral-500 hover:text-neutral-800 disabled:opacity-40'
+                }`}
+              >
+                Paper Insights
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveInsightTab('forecast')}
+                className={`px-4 py-2 text-sm font-bold font-playfair transition-all border-b-2 ${
+                  activeInsightTab === 'forecast'
+                    ? 'border-amber-800 text-amber-900 font-bold'
+                    : 'border-transparent text-neutral-500 hover:text-neutral-800'
+                }`}
+              >
+                AI Upcoming Forecast
+              </button>
+            </div>
+
+            {activeInsightTab === 'paper' && selectedPyq && (
+              <div className="space-y-8">
+                {/* Row 1: Pie Chart & AI Trend Card */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Recharts Chapter Weightage Pie Chart */}
+                  <VintagePaper className="shadow-[0_10px_25px_rgba(0,0,0,0.5)]">
+                    <h3 className="text-xl font-bold font-playfair text-neutral-900 mb-4 border-b border-neutral-400 pb-2 flex items-center gap-2">
+                      <PieChartIcon className="w-5 h-5 text-amber-800" /> Chapter Weightage Breakdown
+                    </h3>
+                    <div className="h-64 w-full" style={{ minHeight: '260px' }}>
+                      {pieChartData.length === 0 ? (
+                        <div className="flex items-center justify-center h-full text-xs text-neutral-500 italic">
+                          No chapter weightage data available for this paper.
+                        </div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={pieChartData}
+                              cx="50%"
+                              cy="50%"
+                              labelLine={false}
+                              outerRadius={80}
+                              fill="#8884d8"
+                              dataKey="value"
+                              label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                            >
+                              {pieChartData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <PieTooltip formatter={(val) => [`${val}% Weightage`, 'Chapter']} />
+                            <Legend wrapperStyle={{ fontSize: '11px', fontFamily: 'Inter' }} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      )}
                     </div>
-                  ) : (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={pieChartData}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="value"
-                          label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                        >
-                          {pieChartData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <PieTooltip formatter={(val) => [`${val}% Weightage`, 'Chapter']} />
-                        <Legend wrapperStyle={{ fontSize: '11px', fontFamily: 'Inter' }} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  )}
+                  </VintagePaper>
+
+                  {/* AI Exam Trend Card */}
+                  <VintagePaper className="shadow-[0_10px_25px_rgba(0,0,0,0.5)] flex flex-col">
+                    <h3 className="text-xl font-bold font-playfair text-neutral-900 mb-4 border-b border-neutral-400 pb-2 flex items-center gap-2">
+                      <TrendingUp className="w-5 h-5 text-indigo-700" /> AI Exam Trend Summary
+                    </h3>
+                    <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-sm flex-1 font-inter text-neutral-800 text-sm leading-relaxed space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="font-medium text-amber-900 italic">
+                          Analysis for: <span className="font-bold font-playfair underline">{selectedPyq.title}</span> ({selectedPyq.year})
+                        </p>
+                        <AudioReader
+                          text={trendAnalysis}
+                          className="shrink-0"
+                          onSentenceChange={setTrendActiveIndex}
+                        />
+                      </div>
+                      <HighlightedText
+                        text={trendAnalysis}
+                        activeIndex={trendActiveIndex}
+                        className="whitespace-pre-line text-neutral-700"
+                      />
+                    </div>
+                  </VintagePaper>
                 </div>
-              </VintagePaper>
 
-              {/* AI Exam Trend Card */}
-              <VintagePaper className="shadow-[0_10px_25px_rgba(0,0,0,0.5)] flex flex-col">
-                <h3 className="text-xl font-bold font-playfair text-neutral-900 mb-4 border-b border-neutral-400 pb-2 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-indigo-700" /> AI Exam Trend Summary
-                </h3>
-                <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-sm flex-1 font-inter text-neutral-800 text-sm leading-relaxed space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="font-medium text-amber-900 italic">
-                      Analysis for: <span className="font-bold font-playfair underline">{selectedPyq.title}</span> ({selectedPyq.year})
-                    </p>
-                    <AudioReader
-                      text={trendAnalysis}
-                      className="shrink-0"
-                      onSentenceChange={setTrendActiveIndex}
-                    />
-                  </div>
-                  <HighlightedText
-                    text={trendAnalysis}
-                    activeIndex={trendActiveIndex}
-                    className="whitespace-pre-line text-neutral-700"
-                  />
-                </div>
-              </VintagePaper>
-            </div>
+                {/* Row 2: Important Topics & Repeated Questions Table */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Important Topics with Frequency Badges */}
+                  <VintagePaper className="shadow-[0_10px_25px_rgba(0,0,0,0.5)]">
+                    <h3 className="text-xl font-bold font-playfair text-neutral-900 mb-4 border-b border-neutral-400 pb-2 flex items-center gap-2">
+                      <Award className="w-5 h-5 text-amber-800" /> Important Topics & Frequency
+                    </h3>
 
-            {/* Row 2: Important Topics & Repeated Questions Table */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              
-              {/* Important Topics with Frequency Badges */}
-              <VintagePaper className="shadow-[0_10px_25px_rgba(0,0,0,0.5)]">
-                <h3 className="text-xl font-bold font-playfair text-neutral-900 mb-4 border-b border-neutral-400 pb-2 flex items-center gap-2">
-                  <Award className="w-5 h-5 text-amber-800" /> Important Topics & Frequency
-                </h3>
+                    {importantTopics.length === 0 ? (
+                      <p className="text-xs text-neutral-500 italic py-4">No topic frequency data extracted.</p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs text-neutral-800">
+                          <thead className="bg-neutral-200/80 font-bold uppercase tracking-wider">
+                            <tr>
+                              <th className="p-2.5">Topic Name</th>
+                              <th className="p-2.5">Importance</th>
+                              <th className="p-2.5 text-right">Frequency</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-neutral-300">
+                            {importantTopics.map((item, idx) => (
+                              <tr key={idx} className="hover:bg-amber-100/40">
+                                <td className="p-2.5 font-semibold text-neutral-900">{item.topicName}</td>
+                                <td className="p-2.5">
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                    item.importance?.toLowerCase() === 'high'
+                                      ? 'bg-red-100 text-red-800 border border-red-300'
+                                      : item.importance?.toLowerCase() === 'medium'
+                                      ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                      : 'bg-green-100 text-green-800 border border-green-300'
+                                  }`}>
+                                    {item.importance || 'Medium'}
+                                  </span>
+                                </td>
+                                <td className="p-2.5 text-right font-bold text-amber-900">
+                                  {item.frequency ? `${item.frequency}x` : 'N/A'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </VintagePaper>
 
-                {importantTopics.length === 0 ? (
-                  <p className="text-xs text-neutral-500 italic py-4">No topic frequency data extracted.</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs text-neutral-800">
-                      <thead className="bg-neutral-200/80 font-bold uppercase tracking-wider">
-                        <tr>
-                          <th className="p-2.5">Topic Name</th>
-                          <th className="p-2.5">Importance</th>
-                          <th className="p-2.5 text-right">Frequency</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-neutral-300">
-                        {importantTopics.map((item, idx) => (
-                          <tr key={idx} className="hover:bg-amber-100/40">
-                            <td className="p-2.5 font-semibold text-neutral-900">{item.topicName}</td>
-                            <td className="p-2.5">
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                item.importance?.toLowerCase() === 'high'
-                                  ? 'bg-red-100 text-red-800 border border-red-300'
-                                  : item.importance?.toLowerCase() === 'medium'
-                                  ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                                  : 'bg-green-100 text-green-800 border border-green-300'
-                              }`}>
-                                {item.importance || 'Medium'}
-                              </span>
-                            </td>
-                            <td className="p-2.5 text-right font-bold text-amber-900">
-                              {item.frequency ? `${item.frequency}x` : 'N/A'}
-                            </td>
-                          </tr>
+                  {/* Repeated Questions */}
+                  <VintagePaper className="shadow-[0_10px_25px_rgba(0,0,0,0.5)]">
+                    <h3 className="text-xl font-bold font-playfair text-neutral-900 mb-4 border-b border-neutral-400 pb-2 flex items-center gap-2">
+                      <HelpCircle className="w-5 h-5 text-amber-800" /> Frequently Repeated Questions
+                    </h3>
+
+                    {repeatedQuestions.length === 0 ? (
+                      <p className="text-xs text-neutral-500 italic py-4">No repeated question patterns detected.</p>
+                    ) : (
+                      <div className="space-y-3 max-h-72 overflow-y-auto">
+                        {repeatedQuestions.map((rq, idx) => (
+                          <RepeatedQuestionCard key={idx} rq={rq} />
                         ))}
-                      </tbody>
-                    </table>
+                      </div>
+                    )}
+                  </VintagePaper>
+                </div>
+              </div>
+            )}
+
+            {activeInsightTab === 'forecast' && (
+              <div className="space-y-8">
+                {loadingForecast ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-neutral-500 gap-2">
+                    <RefreshCw className="w-8 h-8 animate-spin text-amber-800" />
+                    <p className="text-sm italic">Analyzing past paper trends and calculating probability curves...</p>
                   </div>
-                )}
-              </VintagePaper>
-
-              {/* Repeated Questions */}
-              <VintagePaper className="shadow-[0_10px_25px_rgba(0,0,0,0.5)]">
-                <h3 className="text-xl font-bold font-playfair text-neutral-900 mb-4 border-b border-neutral-400 pb-2 flex items-center gap-2">
-                  <HelpCircle className="w-5 h-5 text-amber-800" /> Frequently Repeated Questions
-                </h3>
-
-                {repeatedQuestions.length === 0 ? (
-                  <p className="text-xs text-neutral-500 italic py-4">No repeated question patterns detected.</p>
+                ) : forecastError ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-center text-red-700">
+                    <AlertCircle className="w-8 h-8 mb-2" />
+                    <p>{forecastError}</p>
+                    <button
+                      type="button"
+                      onClick={() => fetchForecast()}
+                      className="mt-3 text-amber-800 hover:text-amber-900 font-semibold text-xs underline"
+                    >
+                      Try Again
+                    </button>
+                  </div>
+                ) : !forecastData ? (
+                  <p className="text-sm text-neutral-500 italic text-center py-16">
+                    No forecast data available. Upload some PYQs to let Gemini forecast upcoming exams.
+                  </p>
                 ) : (
-                  <div className="space-y-3 max-h-72 overflow-y-auto">
-                    {repeatedQuestions.map((rq, idx) => (
-                      <RepeatedQuestionCard key={idx} rq={rq} />
-                    ))}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Expected Difficulty Card */}
+                    <VintagePaper className="shadow-[0_10px_25px_rgba(0,0,0,0.5)] flex flex-col justify-between">
+                      <div>
+                        <h3 className="text-xl font-bold font-playfair text-neutral-900 mb-4 border-b border-neutral-400 pb-2 flex items-center gap-2">
+                          <PieChartIcon className="w-5 h-5 text-amber-800" /> Expected Difficulty
+                        </h3>
+                        <div className="mb-6 p-4 bg-amber-50/60 border border-amber-200 rounded flex items-center justify-between">
+                          <div>
+                            <span className="text-[10px] font-bold text-neutral-500 uppercase">Predicted Upcoming Difficulty</span>
+                            <p className="text-2xl font-black font-playfair text-amber-900 mt-1 uppercase">
+                              {forecastData.predictedDifficulty}
+                            </p>
+                          </div>
+                          <span className={`px-3 py-1 rounded-full text-xs font-black uppercase ${
+                            forecastData.predictedDifficulty?.toLowerCase() === 'hard'
+                              ? 'bg-red-100 text-red-800 border border-red-300'
+                              : forecastData.predictedDifficulty?.toLowerCase() === 'medium'
+                              ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                              : 'bg-green-100 text-green-800 border border-green-300'
+                          }`}>
+                            AI Estimate
+                          </span>
+                        </div>
+
+                        {/* Distribution Bars */}
+                        <div className="space-y-4">
+                          <div>
+                            <div className="flex justify-between text-xs font-bold text-neutral-700 mb-1">
+                              <span>Expected Easy Questions</span>
+                              <span>{forecastData.expectedEasyPercent}%</span>
+                            </div>
+                            <div className="w-full bg-neutral-200 h-2.5 rounded-full overflow-hidden">
+                              <div className="bg-green-600 h-full transition-all duration-500" style={{ width: `${forecastData.expectedEasyPercent}%` }} />
+                            </div>
+                          </div>
+                          <div>
+                            <div className="flex justify-between text-xs font-bold text-neutral-700 mb-1">
+                              <span>Expected Medium Questions</span>
+                              <span>{forecastData.expectedMediumPercent}%</span>
+                            </div>
+                            <div className="w-full bg-neutral-200 h-2.5 rounded-full overflow-hidden">
+                              <div className="bg-amber-500 h-full transition-all duration-500" style={{ width: `${forecastData.expectedMediumPercent}%` }} />
+                            </div>
+                          </div>
+                          <div>
+                            <div className="flex justify-between text-xs font-bold text-neutral-700 mb-1">
+                              <span>Expected Hard Questions</span>
+                              <span>{forecastData.expectedHardPercent}%</span>
+                            </div>
+                            <div className="w-full bg-neutral-200 h-2.5 rounded-full overflow-hidden">
+                              <div className="bg-red-600 h-full transition-all duration-500" style={{ width: `${forecastData.expectedHardPercent}%` }} />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Strategic revision advice */}
+                      <div className="mt-8 pt-4 border-t border-neutral-300">
+                        <span className="text-[10px] font-bold text-neutral-500 uppercase block mb-1">Revision Strategy Advisor</span>
+                        <p className="text-xs text-neutral-600 font-serif leading-relaxed italic">
+                          &ldquo;{forecastData.revisionStrategy}&rdquo;
+                        </p>
+                      </div>
+                    </VintagePaper>
+
+                    {/* Expected Topic Probabilities and Badges */}
+                    <VintagePaper className="shadow-[0_10px_25px_rgba(0,0,0,0.5)]">
+                      <h3 className="text-xl font-bold font-playfair text-neutral-900 mb-4 border-b border-neutral-400 pb-2 flex items-center justify-between gap-2">
+                        <span className="flex items-center gap-2">
+                          <TrendingUp className="w-5 h-5 text-indigo-700" /> Expected Weightage & Trends
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => fetchForecast(true)}
+                          disabled={loadingForecast}
+                          className="p-1.5 hover:bg-neutral-200 rounded text-neutral-600 hover:text-neutral-900 transition-colors"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                        </button>
+                      </h3>
+                      <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                        {forecastData.topicTrends?.map((trend, idx) => (
+                          <div key={idx} className="p-3 bg-white border border-neutral-200 rounded hover:shadow-sm transition-all flex items-center justify-between gap-4">
+                            <div>
+                              <p className="font-bold text-xs text-neutral-900">{trend.topicName}</p>
+                              <span className={`inline-block mt-1.5 px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border ${
+                                trend.trendStatus === 'Rising Weightage'
+                                  ? 'bg-red-50 text-red-700 border-red-200'
+                                  : trend.trendStatus === 'High Probability in 2026'
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                  : trend.trendStatus === 'Stable Weightage'
+                                  ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              }`}>
+                                {trend.trendStatus}
+                              </span>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="text-[9px] font-bold text-neutral-400 block uppercase">Probability</span>
+                              <span className="text-sm font-black font-playfair text-amber-900">{trend.expectedProbability}%</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </VintagePaper>
                   </div>
                 )}
-              </VintagePaper>
-            </div>
-          </div>
-        )}
+              </div>
+            )}
+        </div>
+      )}
       </div>
     </LeatherBoard>
   );

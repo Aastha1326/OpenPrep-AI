@@ -301,6 +301,11 @@ const validateUploadNote = [
   handleValidationErrors,
 ];
 
+const validateImportNotes = [
+  body('subjectId').isUUID(4).withMessage('Valid subject ID is required'),
+  body('topicId').optional().isUUID(4).withMessage('Valid topic ID is required'),
+  handleValidationErrors,
+];
 // ---------------------------------------------------------------------------
 // PYQ routes
 // ---------------------------------------------------------------------------
@@ -443,6 +448,7 @@ module.exports = {
   validateExplainQuestion,
   // Note
   validateUploadNote,
+  validateImportNotes,
   // PYQ
   validateUploadPYQ,
   // Study Plan

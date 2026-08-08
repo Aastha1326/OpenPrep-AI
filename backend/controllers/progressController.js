@@ -7,6 +7,39 @@ const QuizAttempt = require('../models/QuizAttempt');
 const Subject = require('../models/Subject');
 const Exam = require('../models/Exam');
 const FocusSession = require('../models/FocusSession');
+const Flashcard = require('../models/Flashcard');
+
+// ── Mastery tier thresholds (shared with the dashboard UI) ──
+// Beginner: < 50% | Intermediate: 50-79% | Master: 80%+
+const MASTERY_TIER_BEGINNER = 50;
+const MASTERY_TIER_MASTER = 80;
+// A flashcard is considered "mastered" once its SM-2 interval reaches 21+ days
+const FLASHCARD_MASTERY_INTERVAL_DAYS = 21;
+
+/**
+ * Map a mastery percentage (0-100) to a tier label.
+ * @param {number} pct
+ * @returns {'Beginner'|'Intermediate'|'Master'}
+ */
+function masteryTier(pct) {
+  if (pct >= MASTERY_TIER_MASTER) return 'Master';
+  if (pct >= MASTERY_TIER_BEGINNER) return 'Intermediate';
+  return 'Beginner';
+}
+
+/**
+ * Combine quiz accuracy and flashcard retention into a single mastery score.
+ * When both signals exist they are weighted 60/40; otherwise the available
+ * signal is used alone. Returns 0 when no signal exists.
+ */
+function combineMastery(quizAccuracy, flashcardRetention) {
+  if (quizAccuracy != null && flashcardRetention != null) {
+    return Math.round(quizAccuracy * 0.6 + flashcardRetention * 0.4);
+  }
+  if (quizAccuracy != null) return Math.round(quizAccuracy);
+  if (flashcardRetention != null) return Math.round(flashcardRetention);
+  return 0;
+}
 // @desc    Get dashboard metrics & activity feed
 // @route   GET /api/progress/dashboard
 // @access  Private
@@ -151,6 +184,149 @@ exports.getSubjectBreakdown = async (req, res, next) => {
       }));
 
     res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get subject & chapter mastery levels (quiz accuracy + flashcard retention)
+// @route   GET /api/progress/mastery
+// @access  Private
+exports.getMasteryLevels = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+
+    // Fetch all data needed for the calculation in parallel
+    const [subjects, topics, progressRecords, flashcards] = await Promise.all([
+      Subject.findAll({ where: { user: userId } }),
+      Topic.findAll({ where: { user: userId } }),
+      Progress.findAll({ where: { user: userId } }),
+      Flashcard.findAll({
+        where: { user: userId },
+        attributes: ['id', 'subject', 'topic', 'interval'],
+        raw: true,
+      }),
+    ]);
+
+    const topicsBySubject = new Map();
+    topics.forEach((t) => {
+      if (!topicsBySubject.has(t.subject)) topicsBySubject.set(t.subject, []);
+      topicsBySubject.get(t.subject).push(t);
+    });
+
+    // Index progress quiz scores per topic & per subject
+    const quizScoresByTopic = new Map();
+    const quizScoresBySubject = new Map();
+    progressRecords.forEach((p) => {
+      const scores = Array.isArray(p.quizScores)
+        ? p.quizScores.filter((qs) => typeof qs?.score === 'number').map((qs) => qs.score)
+        : [];
+      if (scores.length === 0) return;
+
+      if (p.topic) {
+        const acc = quizScoresByTopic.get(p.topic) || [];
+        acc.push(...scores);
+        quizScoresByTopic.set(p.topic, acc);
+      }
+      if (p.subject) {
+        const acc = quizScoresBySubject.get(p.subject) || [];
+        acc.push(...scores);
+        quizScoresBySubject.set(p.subject, acc);
+      }
+    });
+
+    // Index flashcard retention per topic & per subject
+    const flashcardsByTopic = new Map();
+    const flashcardsBySubject = new Map();
+    flashcards.forEach((f) => {
+      if (f.topic) {
+        const acc = flashcardsByTopic.get(f.topic) || [];
+        acc.push(f);
+        flashcardsByTopic.set(f.topic, acc);
+      }
+      if (f.subject) {
+        const acc = flashcardsBySubject.get(f.subject) || [];
+        acc.push(f);
+        flashcardsBySubject.set(f.subject, acc);
+      }
+    });
+
+    const avg = (arr) => (arr.length > 0 ? arr.reduce((s, v) => s + v, 0) / arr.length : null);
+    const retentionPct = (cards) => {
+      if (!cards || cards.length === 0) return null;
+      const mastered = cards.filter((c) => c.interval >= FLASHCARD_MASTERY_INTERVAL_DAYS).length;
+      return (mastered / cards.length) * 100;
+    };
+
+    // Per-chapter mastery
+    const chapterMastery = new Map();
+    topics.forEach((topic) => {
+      const quizAccuracy = avg(quizScoresByTopic.get(topic.id) || []);
+      const flashcardRetention = retentionPct(flashcardsByTopic.get(topic.id));
+      const masteryPercentage = combineMastery(quizAccuracy, flashcardRetention);
+      chapterMastery.set(topic.id, {
+        id: topic.id,
+        name: topic.name,
+        masteryPercentage,
+        tier: masteryTier(masteryPercentage),
+      });
+    });
+
+    // Per-subject mastery = weighted average of its chapters (by topic weightage)
+    const subjectsMastery = subjects.map((subject) => {
+      const subjectTopics = topicsBySubject.get(subject.id) || [];
+      const chapters = subjectTopics
+        .map((t) => chapterMastery.get(t.id))
+        .filter(Boolean);
+
+      let masteryPercentage;
+      if (chapters.length > 0) {
+        const totalWeight = subjectTopics.reduce((s, t) => s + (t.weightage || 0), 0);
+        if (totalWeight > 0) {
+          masteryPercentage = Math.round(
+            chapters.reduce(
+              (s, ch, i) => s + ch.masteryPercentage * (subjectTopics[i].weightage || 0),
+              0
+            ) / totalWeight
+          );
+        } else {
+          masteryPercentage = Math.round(
+            chapters.reduce((s, ch) => s + ch.masteryPercentage, 0) / chapters.length
+          );
+        }
+      } else {
+        // No chapters recorded — fall back to direct subject-level signals
+        const quizAccuracy = avg(quizScoresBySubject.get(subject.id) || []);
+        const flashcardRetention = retentionPct(flashcardsBySubject.get(subject.id));
+        masteryPercentage = combineMastery(quizAccuracy, flashcardRetention);
+      }
+
+      return {
+        id: subject.id,
+        name: subject.name,
+        masteryPercentage,
+        tier: masteryTier(masteryPercentage),
+        chapters,
+      };
+    });
+
+    // Overall mastery = average across subjects
+    const overallMastery =
+      subjectsMastery.length > 0
+        ? Math.round(
+            subjectsMastery.reduce((s, sub) => s + sub.masteryPercentage, 0) /
+              subjectsMastery.length
+          )
+        : 0;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        overallMastery,
+        overallTier: masteryTier(overallMastery),
+        subjects: subjectsMastery,
+      },
+    });
   } catch (error) {
     next(error);
   }

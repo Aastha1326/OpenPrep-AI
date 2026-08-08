@@ -8,6 +8,7 @@ import CustomCursor from './components/CustomCursor';
 import ScrollToTop from './components/ScrollToTop';
 import MobileNavDrawer from './components/MobileNavDrawer';
 import PageLoader from './components/PageLoader';
+import SessionTimeoutModal from './components/SessionTimeoutModal';
 import './App.css';
 
 const Landing = lazy(() => import('./pages/Landing'));

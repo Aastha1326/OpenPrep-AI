@@ -23,6 +23,7 @@ import {
   Settings,
   MessageSquare,
   Shield,
+  Globe,
 } from 'lucide-react';
 import API from '../services/api';
 import { toDateOnlyString } from '../utils/dateUtils';
@@ -52,6 +53,7 @@ import CreateNoteModal from '../components/dashboard/CreateNoteModal';
 import StudyPlanModal from '../components/dashboard/StudyPlanModal';
 import PyqAnalysisModal from '../components/dashboard/PyqAnalysisModal';
 import WeaknessDashboardWidget from '../components/dashboard/WeaknessDashboardWidget';
+import SubjectMasteryWidget from '../components/dashboard/SubjectMasteryWidget';
 import FocusEfficiencyWidget from '../components/dashboard/FocusEfficiencyWidget';
 import LeaderboardWidget from '../components/dashboard/LeaderboardWidget';
 import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
@@ -62,6 +64,7 @@ import NotesWidget from '../components/dashboard/NotesWidget';
 import ThemeToggle from '../components/ThemeToggle';
 import BadgesList from '../components/BadgesList';
 import SM2SettingsModal from '../components/dashboard/SM2SettingsModal';
+import CommunityDecksModal from '../components/dashboard/CommunityDecksModal';
 
 import {
   fetchDashboardStats,
@@ -282,6 +285,7 @@ const Dashboard = () => {
   const [isBundleModalOpen, setIsBundleModalOpen] = useState(false);
   const [isSyllabusImportOpen, setIsSyllabusImportOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isCommunityDecksOpen, setIsCommunityDecksOpen] = useState(false);
   const [syllabusPrefill, setSyllabusPrefill] = useState(null);
   const [comingSoon, setComingSoon] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -456,6 +460,12 @@ const Dashboard = () => {
           delay={0.45}
           onClick={() => navigate('/study-group')}
         />
+        <GoldTabButton
+          icon={Globe}
+          label="Community Decks"
+          delay={0.48}
+          onClick={() => setIsCommunityDecksOpen(true)}
+        />
         <button
           onClick={() => {
             setIsNoteModalOpen(true);
@@ -507,6 +517,17 @@ const Dashboard = () => {
             transition={{ duration: 0.5, delay: 0.3 }}
             className="flex items-center space-x-6 mt-2 md:mt-0 shrink-0"
           >
+            <div className="relative group z-50">
+              <button className="bg-neutral-800 text-gold-foil border border-yellow-700/50 hover:bg-neutral-700 px-4 py-2 rounded-sm shadow-[0_4px_15px_rgba(0,0,0,0.5)] flex items-center gap-2 font-playfair font-bold text-sm tracking-wide">
+                <Download className="w-4 h-4" /> Export Analytics
+              </button>
+              <div className="absolute right-0 top-full mt-2 w-40 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+                <button onClick={() => handleExport('7days')} className="w-full text-left block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200">Last 7 Days</button>
+                <button onClick={() => handleExport('30days')} className="w-full text-left block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200">Last 30 Days</button>
+                <button onClick={() => handleExport('all')} className="w-full text-left block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200">All Time</button>
+              </div>
+            </div>
+
             <ThemeToggle className="mr-2" />
             <button
               onClick={() => setIsSettingsModalOpen(true)}
@@ -834,6 +855,11 @@ const Dashboard = () => {
           <WeaknessDashboardWidget />
         </div>
 
+        {/* --- SUBJECT & CHAPTER MASTERY BADGES --- */}
+        <div className="my-6">
+          <SubjectMasteryWidget />
+        </div>
+
         <div className="my-6">
           <FocusEfficiencyWidget />
         </div>
@@ -1089,6 +1115,16 @@ const Dashboard = () => {
           dispatch(fetchSubjectBreakdown());
         }}
         onGoToStudyPlan={handleGoToStudyPlanFromImport}
+      />
+
+      <CommunityDecksModal
+        isOpen={isCommunityDecksOpen}
+        onClose={() => setIsCommunityDecksOpen(false)}
+        onCloneSuccess={() => {
+          dispatch(fetchDashboardStats());
+          dispatch(fetchSubjectBreakdown());
+          dispatch(fetchDueFlashcards());
+        }}
       />
 
       {/* --- SM-2 SETTINGS MODAL --- */}

@@ -6,6 +6,7 @@ const {
   getPYQAnalysis,
   deletePYQ,
   getPYQTrends,
+  getUpcomingForecast,
 } = require('../controllers/pyqController');
 const { protect } = require('../middleware/auth');
 const { strictAiLimiter } = require('../middleware/rateLimiter');
@@ -17,6 +18,34 @@ const cacheMiddleware = require('../middleware/cache');
 const clearCache = require('../middleware/clearCache');
 
 const router = express.Router();
+
+/**
+ * @swagger
+ * /api/pyqs/forecast:
+ *   get:
+ *     summary: Get AI predicted difficulty and topic trends forecast for upcoming exams
+ *     tags: [PYQ Analysis]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: subjectId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Subject ID to generate forecast for
+ *       - in: query
+ *         name: refresh
+ *         schema:
+ *           type: boolean
+ *         description: Force refresh AI prediction cache
+ *     responses:
+ *       200:
+ *         description: Upcoming forecast generated successfully
+ */
+router.get('/forecast', protect, getUpcomingForecast);
+
 router.get('/trends', protect, getPYQTrends);
 /**
  * @swagger

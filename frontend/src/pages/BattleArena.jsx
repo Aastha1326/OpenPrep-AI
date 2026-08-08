@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { socket } from '../services/socket';
 import { FaPlay, FaCheck, FaUsers, FaCopy, FaCrown, FaWifi, FaLock, FaUnlock } from 'react-icons/fa';
+import { motion, AnimatePresence } from 'framer-motion';
+import { triggerConfetti } from '../utils/confetti';
 
 const MOCK_QUESTIONS = [
   { id: 'q1', text: 'What is the powerhouse of the cell?', options: ['Nucleus', 'Mitochondria', 'Ribosome', 'Endoplasmic Reticulum'], correct: 'Mitochondria' },
@@ -55,6 +57,13 @@ const BattleArena = () => {
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const [streak, setStreak] = useState(0);
+
+  useEffect(() => {
+    if (status === 'finished') {
+      triggerConfetti();
+    }
+  }, [status]);
 
   const joinedRef = useRef(false);
   const roomIdRef = useRef('');
@@ -281,6 +290,18 @@ const BattleArena = () => {
 
     const currentQuestion = MOCK_QUESTIONS[currentQuestionIndex];
     const isCorrect = option === currentQuestion.correct;
+    
+    if (isCorrect) {
+      setStreak((prev) => {
+        const next = prev + 1;
+        if (next > 0 && next % 5 === 0) {
+          triggerConfetti();
+        }
+        return next;
+      });
+    } else {
+      setStreak(0);
+    }
     
     socket.emit('submit_answer', { roomId, isCorrect, points: 10 });
     
@@ -530,15 +551,27 @@ const BattleArena = () => {
           <p className="text-slate-400 text-lg mb-8">Winner: <span className="text-yellow-400 font-bold">{winner?.username}</span></p>
 
           <div className="bg-slate-900 rounded-xl overflow-hidden mb-8">
-            {leaderboard.map((player, index) => (
-              <div key={player.id} className={`flex justify-between items-center p-4 border-b border-slate-800 ${player.id === socket.id ? 'bg-indigo-900/30' : ''}`}>
-                <div className="flex items-center">
-                  <span className={`w-8 font-bold ${index === 0 ? 'text-yellow-400' : 'text-slate-500'}`}>#{index + 1}</span>
-                  <span className="font-medium text-lg">{player.username} {player.id === socket.id && '(You)'}</span>
-                </div>
-                <span className="font-bold text-xl text-emerald-400">{player.score} pts</span>
-              </div>
-            ))}
+            <AnimatePresence>
+              {leaderboard.map((player, index) => (
+                <motion.div
+                  layout
+                  key={player.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  className={`flex justify-between items-center p-4 border-b border-slate-800 ${player.id === socket.id ? 'bg-indigo-900/30' : ''}`}
+                >
+                  <div className="flex items-center">
+                    <span className={`w-8 font-bold ${index === 0 ? 'text-yellow-400' : 'text-slate-500'}`}>#{index + 1}</span>
+                    <span className="font-medium text-lg flex items-center gap-2">
+                      {index === 0 && <FaCrown className="text-yellow-400 text-sm" />}
+                      {player.username} {player.id === socket.id && '(You)'}
+                    </span>
+                  </div>
+                  <span className="font-bold text-xl text-emerald-400">{player.score} pts</span>
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </div>
 
           <button
@@ -562,12 +595,23 @@ const BattleArena = () => {
       {/* Top Bar / Leaderboard */}
       <div className="bg-slate-800 border-b border-slate-700 p-4 sticky top-0 z-10 flex overflow-x-auto gap-4 scrollbar-hide items-center px-6">
         <span className="text-slate-400 font-medium mr-4 flex-shrink-0">Live Scores:</span>
-        {leaderboard.map((player) => (
-          <div key={player.id} className="flex items-center bg-slate-900 px-4 py-2 rounded-full border border-slate-700 flex-shrink-0">
-            <span className="font-medium text-sm mr-2">{player.username}</span>
-            <span className="text-emerald-400 font-bold">{player.score}</span>
-          </div>
-        ))}
+        <AnimatePresence>
+          {leaderboard.map((player, idx) => (
+            <motion.div
+              layout
+              key={player.id}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              className="flex items-center bg-slate-900 px-4 py-2 rounded-full border border-slate-700 flex-shrink-0"
+            >
+              {idx === 0 && <FaCrown className="text-yellow-400 mr-1.5 text-xs animate-bounce" />}
+              <span className="font-medium text-sm mr-2">{player.username}</span>
+              <span className="text-emerald-400 font-bold">{player.score}</span>
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
 
       {/* Live typing / answering indicator */}

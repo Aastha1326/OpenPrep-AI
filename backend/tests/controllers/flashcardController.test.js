@@ -403,4 +403,76 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
       expect(res.body.data.efactor).toBeCloseTo(2.65, 2);
     });
   });
+
+  describe('Community Deck Sharing & Cloning', () => {
+    it('should toggle sharing public status and call Gemini AI to review the deck', async () => {
+      // Create some cards to make the deck non-empty
+      await Flashcard.create({
+        user: testUser.id,
+        subject: testSubject.id,
+        front: 'Trig Question',
+        back: 'Trig Answer',
+      });
+
+      const res = await request(app)
+        .put(`/api/flashcards/decks/${testSubject.id}/share`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ isPublic: true });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.isPublic).toBe(true);
+      expect(res.body.data.tags).toBeDefined();
+      expect(res.body.data.description).toBeDefined();
+    });
+
+    it('should retrieve community public decks', async () => {
+      const res = await request(app)
+        .get('/api/flashcards/community')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toBeInstanceOf(Array);
+      expect(res.body.data.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should clone a community deck into user\'s personal library and increment cloneCount', async () => {
+      // Create another user to clone from to represent a peer clone
+      const otherUser = await User.create({
+        name: 'Peer Student',
+        email: 'peer@student.com',
+        password: 'Password123!',
+      });
+      const otherExam = await Exam.create({
+        name: 'Peer Exam',
+        user: otherUser.id,
+      });
+      const otherSubject = await Subject.create({
+        name: 'Physics I',
+        description: 'Basic Physics',
+        exam: otherExam.id,
+        user: otherUser.id,
+        isPublic: true,
+      });
+      await Flashcard.create({
+        user: otherUser.id,
+        subject: otherSubject.id,
+        front: 'F = ma?',
+        back: 'Force = mass * acceleration',
+      });
+
+      const res = await request(app)
+        .post(`/api/flashcards/decks/${otherSubject.id}/clone`)
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.clonedFromId).toBe(otherSubject.id);
+
+      // Verify the source deck clone count incremented
+      await otherSubject.reload();
+      expect(otherSubject.cloneCount).toBe(1);
+    });
+  });
 });

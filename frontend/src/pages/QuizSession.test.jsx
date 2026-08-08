@@ -296,4 +296,20 @@ describe('QuizSession', () => {
       expect(await screen.findByText('AI service unavailable')).toBeInTheDocument();
     });
   });
+
+  test('shows an empty-state notice and no submit button when the quiz has zero questions', async () => {
+    const emptyQuiz = {
+      id: 'q-empty',
+      title: 'Empty Quiz',
+      questions: [],
+    };
+
+    API.get.mockResolvedValue({ data: { data: emptyQuiz } });
+    renderQuiz();
+
+    expect(await screen.findByText('No Questions Available')).toBeInTheDocument();
+    expect(screen.getByText(/has no questions to answer/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Submit Quiz/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/NaN/i)).not.toBeInTheDocument();
+  });
 });

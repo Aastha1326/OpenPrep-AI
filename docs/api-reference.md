@@ -843,3 +843,61 @@ This document catalogs the REST API endpoints available in the **OpenPrep AI** b
   }
 }
 ```
+
+### 2. Get Subject & Chapter Mastery Levels
+
+- **Method**: `GET`
+- **Path**: `/progress/mastery`
+- **Headers**: `Authorization: Bearer <token>`
+- **Description**: Computes real-time subject and chapter (topic) mastery percentages by blending quiz accuracy and flashcard retention, and maps each to a tier badge.
+- **Mastery Formula**:
+  - **Quiz accuracy**: average of all quiz attempt scores (0-100) recorded for the subject/chapter.
+  - **Flashcard retention**: percentage of flashcards whose SM-2 interval has reached 21+ days (considered "mastered").
+  - **Combined**: `0.6 × quiz accuracy + 0.4 × flashcard retention` when both signals exist; otherwise the available signal is used alone.
+  - **Subject mastery**: weighted average of its chapters (by topic weightage), falling back to direct subject-level signals when no chapters exist.
+- **Tier Mapping**:
+  - `Beginner` — mastery < 50% (Red)
+  - `Intermediate` — mastery 50–79% (Yellow)
+  - `Master` — mastery 80%+ (Green)
+- **Success Response (200 OK)**:
+
+```json
+{
+  "success": true,
+  "data": {
+    "overallMastery": 72,
+    "overallTier": "Intermediate",
+    "subjects": [
+      {
+        "id": "3f2a...",
+        "name": "Mathematics",
+        "masteryPercentage": 85,
+        "tier": "Master",
+        "chapters": [
+          {
+            "id": "9c1b...",
+            "name": "Algebra",
+            "masteryPercentage": 90,
+            "tier": "Master"
+          },
+          {
+            "id": "7d4e...",
+            "name": "Geometry",
+            "masteryPercentage": 60,
+            "tier": "Intermediate"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+- **Error Response (401 Unauthorized)**:
+
+```json
+{
+  "success": false,
+  "error": "Not authorized, no token"
+}
+```

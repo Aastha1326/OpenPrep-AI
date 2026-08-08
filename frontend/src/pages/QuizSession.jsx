@@ -220,6 +220,27 @@ const QuizSession = () => {
     );
   }
 
+  // Empty quiz guard: a quiz with zero questions (e.g. a filter returning no
+  // matches) must not render a question, enable submission, or compute a
+  // percentage. Show a friendly empty-state notice instead.
+  if (quiz.questions.length === 0) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-4 text-center">
+        <FaTimesCircle className="text-4xl text-amber-400 mb-4" />
+        <h2 className="text-2xl font-bold text-white mb-2">No Questions Available</h2>
+        <p className="text-slate-300 mb-6">
+          This quiz has no questions to answer. Try adjusting your filters or generating a new quiz.
+        </p>
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg font-semibold transition-colors"
+        >
+          Return to Dashboard
+        </button>
+      </div>
+    );
+  }
+
   const currentQuestion = quiz.questions[currentQuestionIndex];
   const isLastQuestion = currentQuestionIndex === quiz.questions.length - 1;
   const timeElapsed = timeLeft === 0 && !submitted;

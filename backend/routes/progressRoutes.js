@@ -2,6 +2,7 @@ const express = require('express');
 const {
   getDashboardStats,
   getSubjectBreakdown,
+  getMasteryLevels,
   getCompositeBundleOverview,
   getStudyHours,
   trackStudyTime,
@@ -198,6 +199,75 @@ router.get('/dashboard', protect, getDashboardStats);
  */
 
 router.get('/subjects', protect, getSubjectBreakdown);
+
+/**
+ * @swagger
+ * /api/progress/mastery:
+ *   get:
+ *     summary: Get subject & chapter mastery levels computed from quiz accuracy and flashcard retention
+ *     tags: [Progress]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Mastery levels with tier badges
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     overallMastery:
+ *                       type: number
+ *                       example: 72
+ *                     overallTier:
+ *                       type: string
+ *                       enum: [Beginner, Intermediate, Master]
+ *                       example: Intermediate
+ *                     subjects:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                             format: uuid
+ *                           name:
+ *                             type: string
+ *                           masteryPercentage:
+ *                             type: number
+ *                           tier:
+ *                             type: string
+ *                             enum: [Beginner, Intermediate, Master]
+ *                           chapters:
+ *                             type: array
+ *                             items:
+ *                               type: object
+ *                               properties:
+ *                                 id:
+ *                                   type: string
+ *                                   format: uuid
+ *                                 name:
+ *                                   type: string
+ *                                 masteryPercentage:
+ *                                   type: number
+ *                                 tier:
+ *                                   type: string
+ *                                   enum: [Beginner, Intermediate, Master]
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+
+router.get('/mastery', protect, getMasteryLevels);
 
 /**
  * @swagger
