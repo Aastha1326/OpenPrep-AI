@@ -8,8 +8,16 @@ import {
   FaArrowLeft,
   FaBrain,
   FaFilePdf,
+  FaBookmark,
+  FaRegBookmark,
 } from 'react-icons/fa';
-import API from '../services/api';
+
+const REVIEW_FILTERS = [
+  { key: 'all', label: 'All Questions' },
+  { key: 'incorrect', label: 'Incorrect Only' },
+  { key: 'bookmarked', label: 'Bookmarked' },
+  { key: 'correct', label: 'Correct' },
+];import API from '../services/api';
 import MathRenderer from '../components/common/MathRenderer';
 import { createQuizTelemetryQueue } from '../utils/quizTelemetry';
 const SECONDS_PER_QUESTION = 60;
@@ -41,8 +49,10 @@ const QuizSession = () => {
   const [answers, setAnswers] = useState({}); // { questionId: selectedOption }
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState(null);
-  const [isRevisionModalOpen, setIsRevisionModalOpen] = useState(false);
-
+const [isRevisionModalOpen, setIsRevisionModalOpen] = useState(false);
+  const [reviewFilter, setReviewFilter] = useState('all');
+  const [bookmarkedIds, setBookmarkedIds] = useState(new Set());
+  const filterTabRefs = useRef([]);
   const [timeLeft, setTimeLeft] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
@@ -214,6 +224,49 @@ const submitQuiz = useCallback(async () => {
     submitQuiz();
   }, [quiz, submitted, timeLeft, submitQuiz]);
 
+  // Load previously saved bookmarks once results are shown, so Review Mode
+  // reflects bookmarks made in earlier visits to this quiz's results.
+  useEffect(() => {
+    if (!submitted) return;
+    const loadBookmarks = async () => {
+      try {
+        const res = await API.get(`/quizzes/${id}/bookmarks`);
+        setBookmarkedIds(new Set(res.data?.data || []));
+      } catch (err) {
+        console.error('Failed to load bookmarks:', err);
+      }
+    };
+    loadBookmarks();
+  }, [submitted, id]);
+
+  const handleToggleBookmark = async (questionId) => {
+    const wasBookmarked = bookmarkedIds.has(questionId);
+    setBookmarkedIds((prev) => {
+      const next = new Set(prev);
+      wasBookmarked ? next.delete(questionId) : next.add(questionId);
+      return next;
+    });
+    try {
+      await API.post(`/quizzes/${id}/bookmarks/toggle`, { questionId });
+    } catch (err) {
+      console.error('Failed to toggle bookmark:', err);
+      setBookmarkedIds((prev) => {
+        const next = new Set(prev);
+        wasBookmarked ? next.add(questionId) : next.delete(questionId);
+        return next;
+      });
+    }
+  };
+
+  // Roving-tabindex arrow-key navigation across the review filter tabs
+  const handleFilterKeyDown = (event, index) => {
+    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+    event.preventDefault();
+    const direction = event.key === 'ArrowRight' ? 1 : -1;
+    const nextIndex = (index + direction + REVIEW_FILTERS.length) % REVIEW_FILTERS.length;
+    setReviewFilter(REVIEW_FILTERS[nextIndex].key);
+    filterTabRefs.current[nextIndex]?.focus();
+  };
   // Reliably flush buffered telemetry on tab close / navigation using
   // navigator.sendBeacon (fires-and-forgets even as the page unloads),
   // plus a best-effort flush on unmount.
@@ -280,11 +333,27 @@ const submitQuiz = useCallback(async () => {
     );
   }
 
-  const currentQuestion = quiz.questions[currentQuestionIndex];
+const currentQuestion = quiz.questions[currentQuestionIndex];
   const isLastQuestion = currentQuestionIndex === quiz.questions.length - 1;
   const timeElapsed = timeLeft === 0 && !submitted;
   const lowTime = timeLeft > 0 && timeLeft <= 30;
 
+  const reviewCounts = { all: quiz.questions.length, correct: 0, incorrect: 0, bookmarked: 0 };
+  quiz.questions.forEach((q) => {
+    if (answers[q._id] === q.correctAnswer) reviewCounts.correct += 1;
+    else reviewCounts.incorrect += 1;
+    if (bookmarkedIds.has(q._id)) reviewCounts.bookmarked += 1;
+  });
+
+  const filteredQuestions = quiz.questions
+    .map((q, idx) => ({ q, idx }))
+    .filter(({ q }) => {
+      const isCorrect = answers[q._id] === q.correctAnswer;
+      if (reviewFilter === 'incorrect') return !isCorrect;
+      if (reviewFilter === 'correct') return isCorrect;
+      if (reviewFilter === 'bookmarked') return bookmarkedIds.has(q._id);
+      return true;
+    });
   return (
     <div className="min-h-screen bg-slate-900 text-white font-sans py-10 px-4 md:px-20">
       {timeElapsed && !submitted && (
@@ -434,18 +503,59 @@ const submitQuiz = useCallback(async () => {
                 </button>
               </div>
             </div>
-            <div className="space-y-6">
+<div className="space-y-6">
               <h3 className="text-xl font-semibold border-b border-slate-700 pb-2 mb-4">
                 Review Answers
               </h3>
-              {quiz.questions.map((q, idx) => {
+
+              <div role="tablist" aria-label="Filter review questions" className="flex flex-wrap gap-2 mb-6">
+                {REVIEW_FILTERS.map((f, i) => (
+                  <button
+                    key={f.key}
+                    role="tab"
+                    id={`review-tab-${f.key}`}
+                    aria-selected={reviewFilter === f.key}
+                    aria-controls="quiz-review-list"
+                    tabIndex={reviewFilter === f.key ? 0 : -1}
+                    ref={(el) => (filterTabRefs.current[i] = el)}
+                    onClick={() => setReviewFilter(f.key)}
+                    onKeyDown={(e) => handleFilterKeyDown(e, i)}
+                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                      reviewFilter === f.key
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    {f.label} <span className="ml-1 text-xs opacity-75">({reviewCounts[f.key]})</span>
+                  </button>
+                ))}
+              </div>
+
+              {filteredQuestions.length === 0 && (
+                <p className="text-sm text-slate-400 italic text-center py-6">
+                  No questions match this filter.
+                </p>
+              )}
+
+              {filteredQuestions.map(({ q, idx }) => {
                 const userAnswer = answers[q._id];
                 const isCorrect = userAnswer === q.correctAnswer;
+                const isBookmarked = bookmarkedIds.has(q._id);
 
                 return (
-                  <div key={q._id} className="p-5 bg-slate-900/50 rounded-lg border border-slate-700">
-                    <p className="font-medium text-slate-200 mb-3"><span className="text-slate-400 mr-2">{idx + 1}.</span><MathRenderer text={q.questionText} /></p>
-                    
+                  <div key={q._id} id="quiz-review-list" className="p-5 bg-slate-900/50 rounded-lg border border-slate-700">
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <p className="font-medium text-slate-200"><span className="text-slate-400 mr-2">{idx + 1}.</span><MathRenderer text={q.questionText} /></p>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleBookmark(q._id)}
+                        aria-pressed={isBookmarked}
+                        aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark this question'}
+                        className="flex-shrink-0 text-lg text-amber-400 hover:text-amber-300"
+                      >
+                        {isBookmarked ? <FaBookmark /> : <FaRegBookmark />}
+                      </button>
+                    </div>                    
                     <div className="space-y-2 mb-4">
                       {q.options.map((opt, oIdx) => {
                         let btnClass =

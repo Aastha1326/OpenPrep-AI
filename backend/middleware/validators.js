@@ -225,6 +225,11 @@ const validateGenerateRevisionSheet = [
   handleValidationErrors,
 ];
 
+const validateToggleQuizBookmark = [
+  body('questionId').notEmpty().withMessage('questionId is required'),
+  handleValidationErrors,
+];
+
 const validateSubmitQuizAttempt = [
   body('answers')
     .isArray({ min: 1 })
@@ -417,6 +422,7 @@ validateGenerateAIFlashcards,
   validateGenerateAIQuiz,
   validateGenerateRevisionSheet,
   validateSubmitQuizAttempt,
+  validateToggleQuizBookmark,
 // Note
   validateUploadNote,
   validateImportNotes,
