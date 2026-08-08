@@ -31,6 +31,26 @@ const Subject = sequelize.define(
       type: DataTypes.FLOAT,
       defaultValue: 0,
     },
+    isPublic: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
+    clonedFromId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
+    cloneCount: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+    rating: {
+      type: DataTypes.FLOAT,
+      defaultValue: 0.0,
+    },
+    tags: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
   },
 
   {

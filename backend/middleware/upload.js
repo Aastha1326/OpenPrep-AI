@@ -163,6 +163,21 @@ const upload = multer({
   },
 });
 
+// Separate in-memory multer instance for Markdown note imports — these files
+// are parsed straight into Note records and never need to touch disk.
+const uploadMarkdown = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024, files: 20 }, // 2MB per file, 20 files max
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ext === '.md' || ext === '.markdown') {
+      return cb(null, true);
+    }
+    return cb(createFileValidationError());
+  },
+});
+
 // Expose helper for unit testing while keeping the multer instance as default
 module.exports = upload;
 module.exports.verifyMagicBytes = verifyMagicBytes;
+module.exports.uploadMarkdown = uploadMarkdown;
