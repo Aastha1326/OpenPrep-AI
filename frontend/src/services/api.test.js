@@ -101,4 +101,37 @@ describe('API Service Response Interceptor', () => {
     axiosPostSpy.mockRestore();
     apiSpy.mockRestore();
   });
+
+  test('should resolve gracefully and show error toast for background tasks on failed refresh', async () => {
+    localStorage.setItem('refreshToken', 'valid-refresh-token');
+
+    const originalRequest = {
+      url: '/notes',
+      headers: {},
+      isBackground: true,
+    };
+
+    const error401 = {
+      config: originalRequest,
+      response: { status: 401, data: { error: 'Token expired' } },
+    };
+
+    // Force axios.post for refresh token to fail
+    const axiosPostSpy = vi.spyOn(axios, 'post').mockRejectedValueOnce(new Error('Refresh failed'));
+
+    const responseErrorInterceptor = API.interceptors.response.handlers[0].rejected;
+
+    const res = await responseErrorInterceptor(error401);
+
+    // The promise should resolve to prevent unhandled rejection, returning error information
+    expect(res).toBeDefined();
+    expect(res.data).toBeDefined();
+    expect(res.data.success).toBe(false);
+
+    // Verify toast is injected into the DOM
+    const toastContainer = document.getElementById('security-toast-container');
+    expect(toastContainer).toBeInTheDocument();
+
+    axiosPostSpy.mockRestore();
+  });
 });

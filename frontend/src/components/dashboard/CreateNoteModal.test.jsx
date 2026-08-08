@@ -6,7 +6,8 @@ const mockPost = vi.fn();
 vi.mock('../../services/api', () => ({
   default: {
     post: (...args) => mockPost(...args),
-    get: vi.fn(() => Promise.resolve({ data: { data: [] } })),
+    put: vi.fn(() => Promise.resolve({ data: { success: true } })),
+    get: vi.fn(() => Promise.resolve({ data: { success: true, data: [{ id: 'sub-123', name: 'Chemistry' }] } })),
   },
 }));
 
