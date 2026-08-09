@@ -210,6 +210,34 @@ const validateGenerateRevisionSheet = [
   handleValidationErrors,
 ];
 
+const validateGenerateRemediationPlan = [
+  body('quizAttemptId')
+    .optional()
+    .isUUID()
+    .withMessage('quizAttemptId must be a valid UUID'),
+  body('subjectId')
+    .optional()
+    .isUUID()
+    .withMessage('subjectId must be a valid UUID'),
+  body('topicId')
+    .optional()
+    .isUUID()
+    .withMessage('topicId must be a valid UUID'),
+  body('mistookQuestions')
+    .optional()
+    .isArray()
+    .withMessage('mistookQuestions must be an array'),
+  body('weakTopics')
+    .optional()
+    .isArray()
+    .withMessage('weakTopics must be an array'),
+  body('saveToNotes')
+    .optional()
+    .isBoolean()
+    .withMessage('saveToNotes must be a boolean'),
+  handleValidationErrors,
+];
+
 const validateSubmitQuizAttempt = [
   body('answers')
     .isArray({ min: 1 })
@@ -397,6 +425,7 @@ validateCreateFlashcard,  validateReviewFlashcard,
   validateImportFlashcards,  // Quiz
   validateGenerateAIQuiz,
   validateGenerateRevisionSheet,
+  validateGenerateRemediationPlan,
   validateSubmitQuizAttempt,
 // Note
   validateUploadNote,

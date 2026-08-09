@@ -11,6 +11,10 @@ import {
 } from 'react-icons/fa';
 import API from '../services/api';
 import MathRenderer from '../components/common/MathRenderer';
+import { exportAsCSV, exportAsJSON } from '../utils/exportUtils';
+import html2pdf from 'html2pdf.js';
+import RevisionSheetModal from '../components/dashboard/RevisionSheetModal';
+import RemediationPlanModal from '../components/dashboard/RemediationPlanModal';
 
 const SECONDS_PER_QUESTION = 60;
 
@@ -42,6 +46,7 @@ const QuizSession = () => {
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState(null);
   const [isRevisionModalOpen, setIsRevisionModalOpen] = useState(false);
+  const [isRemediationModalOpen, setIsRemediationModalOpen] = useState(false);
 
   const [timeLeft, setTimeLeft] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -432,6 +437,15 @@ const QuizSession = () => {
             </div>
 
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+              {result?.score < 80 && (
+                <button
+                  onClick={() => setIsRemediationModalOpen(true)}
+                  className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 rounded-lg font-semibold shadow-lg shadow-orange-500/20 flex items-center justify-center gap-2 transition-all"
+                >
+                  <FaBrain className="text-yellow-200" /> Generate 3-Day Remediation Plan
+                </button>
+              )}
+
               <button
                 onClick={() => setIsRevisionModalOpen(true)}
                 className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-lg font-semibold shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2 transition-all"
@@ -446,6 +460,15 @@ const QuizSession = () => {
                 Back to Dashboard
               </button>
             </div>
+
+            <RemediationPlanModal
+              isOpen={isRemediationModalOpen}
+              onClose={() => setIsRemediationModalOpen(false)}
+              quizAttemptId={result?.id || result?._id}
+              subjectId={quiz.subject?.id || quiz.subject}
+              topicId={quiz.topic?.id || quiz.topic}
+              topicName={quiz.topic?.name}
+            />
 
             <RevisionSheetModal
               isOpen={isRevisionModalOpen}
