@@ -917,53 +917,8 @@ formData.append('year', year);
                 )}
               </div>
             )}
-
-            {activeInsightTab === 'duplicates' && (
-              <VintagePaper className="shadow-[0_10px_25px_rgba(0,0,0,0.5)]">
-                <h3 className="text-xl font-bold font-playfair text-neutral-900 mb-4 border-b border-neutral-400 pb-2 flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-2">
-                    <Copy className="w-5 h-5 text-amber-800" /> Repeated Questions Across Years
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => fetchClusters(true)}
-                    disabled={loadingClusters}
-                    className="p-1.5 hover:bg-neutral-200 rounded text-neutral-600 hover:text-neutral-900 transition-colors"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                  </button>
-                </h3>
-
-                {loadingClusters ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-neutral-500 gap-2">
-                    <RefreshCw className="w-8 h-8 animate-spin text-amber-800" />
-                    <p className="text-sm italic">Comparing question embeddings across exam years...</p>
-                  </div>
-                ) : clusterError ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-center text-red-700">
-                    <AlertCircle className="w-8 h-8 mb-2" />
-                    <p>{clusterError}</p>
-                    <button
-                      type="button"
-                      onClick={() => fetchClusters()}
-                      className="mt-3 text-amber-800 hover:text-amber-900 font-semibold text-xs underline"
-                    >
-                      Try Again
-                    </button>
-                  </div>
-                ) : clusterData.length === 0 ? (
-                  <p className="text-sm text-neutral-500 italic text-center py-16">
-                    No cross-year duplicate questions detected yet. Upload and analyze PYQs from multiple years to find repeats.
-                  </p>
-                ) : (
-                  <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-                    {clusterData.map((cluster, idx) => (
-                      <RepeatedQuestionCard key={idx} rq={cluster} />
-                    ))}
-                  </div>
-                )}
-              </VintagePaper>
-            )}
+        </div>
+      )}
       </div>
     </LeatherBoard>
   );

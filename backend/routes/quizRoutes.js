@@ -6,6 +6,7 @@ const {
   submitQuizAttempt,
   getAttemptHistory,
   generateRevisionSheet,
+  generateRemediationPlan,
   getCalibrationReport,
   submitTelemetryBatch,
   getQuizBookmarks,
@@ -18,7 +19,7 @@ const {
   validateGenerateAIQuiz,
   validateSubmitQuizAttempt,
   validateGenerateRevisionSheet,
-  validateToggleQuizBookmark,
+  validateGenerateRemediationPlan,
 } = require('../middleware/validators');
 const { validateRequest, submitQuizSchema } = require('../middleware/validate');
 
@@ -160,6 +161,52 @@ router.post(
   checkQuota,
   validateGenerateRevisionSheet,
   generateRevisionSheet
+);
+
+/**
+ * @swagger
+ * /api/quizzes/generate-remediation-plan:
+ *   post:
+ *     summary: Generate a 3-day AI remediation plan for weak concepts from failed quiz questions
+ *     tags: [Quizzes]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               quizAttemptId:
+ *                 type: string
+ *                 format: uuid
+ *               mistookQuestions:
+ *                 type: array
+ *               weakTopics:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               saveToNotes:
+ *                 type: boolean
+ *                 default: true
+ *     responses:
+ *       201:
+ *         description: Remediation plan generated successfully
+ *       400:
+ *         description: No failed questions found
+ *       401:
+ *         description: Not authenticated
+ *       429:
+ *         description: Rate limit exceeded
+ */
+router.post(
+  '/generate-remediation-plan',
+  protect,
+  aiLimiter,
+  checkQuota,
+  validateGenerateRemediationPlan,
+  generateRemediationPlan
 );
 
 /**

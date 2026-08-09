@@ -306,6 +306,21 @@ flashcard: {
     recommendedFocusAreas: 'array',
     revisionStrategy: 'string',
   },
+  remediationPlan: {
+    title: 'string',
+    summaryMarkdown: 'string',
+    plan: {
+      type: 'array',
+      itemSchema: {
+        day: 'number',
+        date: 'string',
+        focusTopics: 'array',
+        objectives: 'array',
+        tasks: 'array',
+        estimatedMinutes: 'number',
+      },
+    },
+  },
 };
 
 /**
@@ -1121,6 +1136,93 @@ exports.generateRevisionSheet = async (
 };
 
 /**
+ * Generates a structured 3-day AI remediation plan (micro-modules) for the
+ * weak concepts behind the student's failed quiz questions.
+ *
+ * @param {Array}  mistookQuestions  Incorrect questions from a quiz attempt.
+ * @param {string} subjectName       Subject name the quiz belongs to.
+ * @param {string} topicName         Topic name the quiz belongs to.
+ * @param {Array}  weakTopics        Optional additional weak topic names.
+ * @param {boolean} forceRefresh     Skip the response cache when true.
+ * @returns {Promise<{title: string, summaryMarkdown: string, plan: Array}>}
+ */
+exports.generateRemediationPlan = async (
+  mistookQuestions = [],
+  subjectName = 'General Subject',
+  topicName = 'Weak Concepts',
+  weakTopics = [],
+  forceRefresh = false
+) => {
+  if (!genAI) {
+    console.warn('Gemini API key not configured. Using Mock Data for Remediation Plan.');
+    return { _mock: true, ...getMockRemediationPlan(subjectName, topicName, mistookQuestions, weakTopics) };
+  }
+
+  const cacheKey = hashKey(
+    'remediationPlan',
+    `${subjectName}:${topicName}:${JSON.stringify(mistookQuestions)}:${JSON.stringify(weakTopics)}`
+  );
+
+  if (!forceRefresh) {
+    const cached = responseCache.get(cacheKey);
+    if (cached) return cached;
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const prompt = `
+      You are an expert academic tutor and adaptive study planner.
+      The student recently attempted a practice quiz on "${subjectName} - ${topicName}" and made mistakes on the following question(s):
+      ${JSON.stringify(mistookQuestions, null, 2)}
+
+      Additional weak topics flagged for this student:
+      ${JSON.stringify(weakTopics, null, 2)}
+
+      Analyze these incorrect questions to extract the key underlying weak concepts, core formulas, critical facts, and common pitfalls.
+      Create a targeted 3-day remediation plan of structured micro-modules that builds the student's understanding of every weak concept.
+
+      Requirements:
+      - Exactly 3 days. Day 1 rebuilds fundamentals, Day 2 applies concepts with practice, Day 3 consolidates with mixed review and a self-check.
+      - Each day contains 2-4 focused tasks with a concrete title, duration in minutes, and a type (e.g. "concept", "practice", "revision", "self-check").
+      - Include focusTopics, clear objectives, and an estimatedMinutes total per day.
+      - Dates must be consecutive YYYY-MM-DD strings starting from tomorrow.
+
+      Your response MUST be a JSON object with this exact structure:
+      {
+        "title": "string (e.g. 3-Day AI Remediation Plan: Topic Name)",
+        "summaryMarkdown": "string (A rich GitHub-Flavored Markdown text containing # Title, ## Weak Concepts Diagnosed, ## Day 1..3 summaries with objectives and tasks)",
+        "plan": [
+          {
+            "day": "number (1, 2 or 3)",
+            "date": "string (YYYY-MM-DD)",
+            "focusTopics": ["string"],
+            "objectives": ["string"],
+            "tasks": [ { "title": "string", "durationMinutes": "number", "type": "string" } ],
+            "estimatedMinutes": "number"
+          }
+        ]
+      }
+    `;
+
+    const result = await generateWithRetry(model, prompt);
+    const parsed = cleanJSON(result.response.text());
+
+    if (!parsed || !validateResponse(parsed, RESPONSE_SCHEMAS.remediationPlan)) {
+      return getMockRemediationPlan(subjectName, topicName, mistookQuestions, weakTopics);
+    }
+
+    responseCache.set(cacheKey, parsed);
+    return parsed;
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError || error instanceof GeminiServerError) {
+      throw error;
+    }
+    console.error('Gemini remediation plan generation failed:', error);
+    return getMockRemediationPlan(subjectName, topicName, mistookQuestions, weakTopics);
+  }
+};
+
+/**
  * Condenses notes into a digest for flashcard/quiz generation. See
  * buildNotesDigestFromChunks for the chunking behavior.
  */
@@ -1292,6 +1394,37 @@ function getMockRevisionSheet(subjectName, topicName, mistookQuestions = []) {
   return {
     title: `AI Concept Revision Sheet: ${topicName || subjectName || 'Weak Concepts'}`,
     summaryMarkdown: `# AI Concept Revision Sheet: ${subjectName} - ${topicName}\n\n## Core Concepts & Formulas\n- Review key theoretical foundations and definitions.\n\n## Key Takeaways\n- Focus on understanding mistakes made in practice questions.\n\n## Pitfalls to Avoid\n- Watch out for common calculation and conceptual traps.\n`,
+  };
+}
+
+function getMockRemediationPlan(subjectName, topicName, mistookQuestions = [], weakTopics = []) {
+  const failedCount = Array.isArray(mistookQuestions) ? mistookQuestions.length : 0;
+  const dayLabels = ['Rebuild the Foundations', 'Apply & Practice', 'Consolidate & Self-Check'];
+  const plan = dayLabels.map((label, idx) => {
+    const date = new Date(Date.now() + (idx + 1) * 24 * 60 * 60 * 1000);
+    return {
+      day: idx + 1,
+      date: toLocalDateString(date),
+      focusTopics: weakTopics.length > 0 ? weakTopics.slice(0, 3) : [topicName || 'Weak Concepts'],
+      objectives: [
+        `Master the core concepts behind "${label}" for ${topicName || 'the weak topics'}`,
+        `Resolve the common pitfalls behind the ${failedCount > 0 ? `${failedCount} failed question(s)` : 'failed questions'}`,
+      ],
+      tasks: [
+        { title: `Concept micro-module: ${label}`, durationMinutes: 45, type: 'concept' },
+        { title: 'Work through corrected examples from missed questions', durationMinutes: 40, type: 'practice' },
+        ...(idx === 2
+          ? [{ title: 'Self-check mini quiz & review wrong answers', durationMinutes: 30, type: 'self-check' }]
+          : [{ title: 'Quick-fire review of key formulas', durationMinutes: 20, type: 'revision' }]),
+      ],
+      estimatedMinutes: idx === 2 ? 115 : 105,
+    };
+  });
+
+  return {
+    title: `3-Day AI Remediation Plan: ${topicName || subjectName || 'Weak Concepts'}`,
+    summaryMarkdown: `# 3-Day AI Remediation Plan: ${subjectName} - ${topicName}\n\n## Weak Concepts Diagnosed\n- Review the following weak concepts tied to the failed questions.\n\n## Day 1: Rebuild the Foundations\n- Core concept micro-modules with worked examples.\n\n## Day 2: Apply & Practice\n- Targeted practice on the exact question types that were missed.\n\n## Day 3: Consolidate & Self-Check\n- Mixed review plus a self-check to confirm mastery.\n`,
+    plan,
   };
 }
 

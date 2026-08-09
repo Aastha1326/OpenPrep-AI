@@ -225,8 +225,31 @@ const validateGenerateRevisionSheet = [
   handleValidationErrors,
 ];
 
-const validateToggleQuizBookmark = [
-  body('questionId').notEmpty().withMessage('questionId is required'),
+const validateGenerateRemediationPlan = [
+  body('quizAttemptId')
+    .optional()
+    .isUUID()
+    .withMessage('quizAttemptId must be a valid UUID'),
+  body('subjectId')
+    .optional()
+    .isUUID()
+    .withMessage('subjectId must be a valid UUID'),
+  body('topicId')
+    .optional()
+    .isUUID()
+    .withMessage('topicId must be a valid UUID'),
+  body('mistookQuestions')
+    .optional()
+    .isArray()
+    .withMessage('mistookQuestions must be an array'),
+  body('weakTopics')
+    .optional()
+    .isArray()
+    .withMessage('weakTopics must be an array'),
+  body('saveToNotes')
+    .optional()
+    .isBoolean()
+    .withMessage('saveToNotes must be a boolean'),
   handleValidationErrors,
 ];
 
@@ -421,6 +444,7 @@ validateGenerateAIFlashcards,
   validateImportFlashcards,  // Quiz
   validateGenerateAIQuiz,
   validateGenerateRevisionSheet,
+  validateGenerateRemediationPlan,
   validateSubmitQuizAttempt,
   validateToggleQuizBookmark,
 // Note
