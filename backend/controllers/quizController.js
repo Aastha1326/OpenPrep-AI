@@ -1,5 +1,6 @@
 const { Op } = require('sequelize');
 const { v4: uuidv4 } = require('uuid');
+const PDFDocument = require('pdfkit');
 const { sequelize } = require('../config/db');
 const Quiz = require('../models/Quiz');
 const QuizAttempt = require('../models/QuizAttempt');
@@ -747,6 +748,197 @@ exports.toggleQuizBookmark = async (req, res, next) => {
 
     await QuizBookmark.create({ user: req.user.id, quiz: quiz.id, questionId });
     res.status(201).json({ success: true, bookmarked: true });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get detailed quiz performance report card as PDF
+// @route   GET /api/quizzes/attempts/:attemptId/pdf
+// @access  Private
+exports.getQuizAttemptReportPDF = async (req, res, next) => {
+  try {
+    const attempt = await QuizAttempt.findOne({
+      where: { id: req.params.attemptId, user: req.user.id },
+    });
+    if (!attempt) {
+      return res.status(404).json({ success: false, error: 'Quiz attempt not found' });
+    }
+
+    const quiz = await Quiz.findByPk(attempt.quiz);
+    if (!quiz) {
+      return res.status(404).json({ success: false, error: 'Quiz not found' });
+    }
+
+    const subject = await Subject.findByPk(quiz.subject);
+
+    // Calculate topic breakdown
+    const topicBreakdown = {};
+    const questionsList = quiz.questions || [];
+    for (const q of questionsList) {
+      const userAns = (attempt.answers || []).find(
+        (ans) => String(ans.questionId) === String(q._id || q.id)
+      );
+      const isCorrect = userAns ? userAns.isCorrect : false;
+      const tName = q.topicName || 'General';
+      if (!topicBreakdown[tName]) {
+        topicBreakdown[tName] = { total: 0, correct: 0 };
+      }
+      topicBreakdown[tName].total++;
+      if (isCorrect) {
+        topicBreakdown[tName].correct++;
+      }
+    }
+
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    const filename = `quiz_report_${attempt.id}.pdf`;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    doc.pipe(res);
+
+    // 1. Header Banner
+    doc.rect(0, 0, 595.28, 120).fill('#1a365d'); // Dark Navy
+
+    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(24).text('Quiz Performance Report', 50, 40);
+    doc.font('Helvetica').fontSize(11).text('OpenPrep AI • Smart Diagnostic System', 50, 70);
+
+    // Metadata Block (Right aligned in banner)
+    doc.fillColor('#ffffff').fontSize(10);
+    doc.text(`Attempt ID: ${attempt.id.substring(0, 8)}...`, 380, 40, { align: 'right', width: 165 });
+    doc.text(`Date: ${new Date(attempt.createdAt).toLocaleDateString()}`, 380, 55, { align: 'right', width: 165 });
+    doc.text(`Time Spent: ${Math.floor(attempt.timeSpent / 60)}m ${attempt.timeSpent % 60}s`, 380, 70, { align: 'right', width: 165 });
+
+    doc.y = 150;
+
+    // 2. Stats Dashboard Cards
+    // Score Card
+    doc.rect(50, 150, 150, 80).fill('#edf2f7');
+    doc.fillColor('#2d3748').font('Helvetica-Bold').fontSize(28).text(`${attempt.score}%`, 50, 175, { width: 150, align: 'center' });
+    doc.fillColor('#718096').font('Helvetica').fontSize(9).text('SCORE PERCENTAGE', 50, 160, { width: 150, align: 'center' });
+
+    // Accuracy Card
+    doc.rect(222, 150, 150, 80).fill('#edf2f7');
+    const correctCount = (attempt.answers || []).filter((a) => a.isCorrect).length;
+    doc.fillColor('#2d3748').font('Helvetica-Bold').fontSize(28).text(`${correctCount}/${attempt.totalQuestions}`, 222, 175, { width: 150, align: 'center' });
+    doc.fillColor('#718096').font('Helvetica').fontSize(9).text('QUESTIONS CORRECT', 222, 160, { width: 150, align: 'center' });
+
+    // Accuracy Gauge Box
+    doc.rect(395, 150, 150, 80).fill('#edf2f7');
+    doc.fillColor('#718096').font('Helvetica').fontSize(9).text('PERFORMANCE STATUS', 395, 160, { width: 150, align: 'center' });
+    const statusStr = attempt.score >= 80 ? 'EXCELLENT' : (attempt.score >= 50 ? 'MEDIUM' : 'REQUIRES FOCUS');
+    const statusColor = attempt.score >= 80 ? '#38a169' : (attempt.score >= 50 ? '#dd6b20' : '#e53e3e');
+    doc.fillColor(statusColor).font('Helvetica-Bold').fontSize(14).text(statusStr, 395, 175, { width: 150, align: 'center' });
+    
+    // Draw horizontal progress indicator bar
+    doc.fillColor('#e2e8f0').rect(420, 200, 100, 8).fill();
+    doc.fillColor(statusColor).rect(420, 200, (attempt.score / 100) * 100, 8).fill();
+
+    // 3. Subject and Topic Title
+    doc.y = 260;
+    doc.fillColor('#1a365d').font('Helvetica-Bold').fontSize(16).text(quiz.title, 50, doc.y);
+    if (subject) {
+      doc.fillColor('#4a5568').font('Helvetica').fontSize(11).text(`Subject: ${subject.name}`, 50, doc.y + 20);
+      doc.y += 35;
+    } else {
+      doc.y += 20;
+    }
+
+    // 4. Topic Breakdown Table
+    doc.fillColor('#1a365d').font('Helvetica-Bold').fontSize(12).text('Topic Breakdown & Analytics', 50, doc.y, { underline: true });
+    doc.moveDown(0.4);
+
+    const tableStartY = doc.y;
+    doc.fillColor('#2d3748').font('Helvetica-Bold').fontSize(9);
+    doc.text('Topic Name', 50, tableStartY, { width: 220 });
+    doc.text('Questions', 280, tableStartY, { width: 80, align: 'center' });
+    doc.text('Correct', 370, tableStartY, { width: 80, align: 'center' });
+    doc.text('Accuracy', 460, tableStartY, { width: 85, align: 'center' });
+    doc.moveDown(0.3);
+    
+    doc.strokeColor('#cbd5e0').lineWidth(1).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
+    doc.moveDown(0.4);
+
+    doc.font('Helvetica').fontSize(9).fillColor('#4a5568');
+    Object.entries(topicBreakdown).forEach(([topicName, data]) => {
+      const rowY = doc.y;
+      const acc = Math.round((data.correct / data.total) * 100);
+      doc.text(topicName, 50, rowY, { width: 220 });
+      doc.text(String(data.total), 280, rowY, { width: 80, align: 'center' });
+      doc.text(String(data.correct), 370, rowY, { width: 80, align: 'center' });
+      doc.text(`${acc}%`, 460, rowY, { width: 85, align: 'center' });
+      doc.moveDown(0.4);
+    });
+
+    doc.moveDown(1.5);
+
+    // 5. Question Analysis Section
+    doc.fillColor('#1a365d').font('Helvetica-Bold').fontSize(12).text('Question-by-Question Diagnostic Review', { underline: true });
+    doc.moveDown(0.6);
+
+    questionsList.forEach((q, idx) => {
+      if (doc.y > 600) {
+        doc.addPage();
+      }
+
+      const qNum = idx + 1;
+      const userAns = (attempt.answers || []).find(
+        (ans) => String(ans.questionId) === String(q._id || q.id)
+      );
+      const isCorrect = userAns ? userAns.isCorrect : false;
+
+      const cardStartY = doc.y;
+      
+      // Draw status line indicator
+      const barColor = isCorrect ? '#38a169' : '#e53e3e';
+      doc.save().rect(50, cardStartY, 4, 80).fill(barColor).restore();
+
+      // Question Title
+      doc.fillColor(isCorrect ? '#2f855a' : '#c53030').font('Helvetica-Bold').fontSize(10);
+      doc.text(`Question ${qNum} • ${isCorrect ? 'Correct' : 'Incorrect'}`, 65, cardStartY + 8);
+      
+      doc.fillColor('#2d3748').font('Helvetica').fontSize(9);
+      doc.text(q.questionText || '', 65, doc.y + 6, { width: 460 });
+      doc.moveDown(0.4);
+
+      const options = q.options || [];
+      options.forEach((optStr, optIdx) => {
+        const isUserSelection = userAns && userAns.selectedAnswer === optIdx;
+        const isCorrectOption = q.correctAnswer === optIdx;
+        
+        let prefix = '   [ ] ';
+        let optionColor = '#4a5568';
+        let optionFont = 'Helvetica';
+
+        if (isCorrectOption) {
+          prefix = '   [✓] ';
+          optionColor = '#38a169';
+          optionFont = 'Helvetica-Bold';
+        } else if (isUserSelection && !isCorrect) {
+          prefix = '   [✗] ';
+          optionColor = '#e53e3e';
+          optionFont = 'Helvetica-Bold';
+        }
+
+        doc.fillColor(optionColor).font(optionFont).fontSize(8.5);
+        doc.text(`${prefix}${optStr}`, 65, doc.y, { width: 460 });
+        doc.moveDown(0.25);
+      });
+
+      if (q.explanation) {
+        doc.moveDown(0.3);
+        doc.fillColor('#718096').font('Helvetica-Oblique').fontSize(8);
+        doc.text(`Explanation: ${q.explanation}`, 65, doc.y, { width: 460 });
+      }
+
+      doc.moveDown(1.5);
+    });
+
+    // Footer
+    doc.fillColor('#a0aec0').font('Helvetica').fontSize(8).text('Generated by OpenPrep AI Analytical Diagnostic Engine', { align: 'center' });
+
+    doc.end();
   } catch (error) {
     next(error);
   }
