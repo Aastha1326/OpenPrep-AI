@@ -34,6 +34,13 @@ const formatTime = (seconds) => {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 };
 
+const resolveUserAnswerIndex = (question, rawAnswer) => {
+  if (rawAnswer === undefined || rawAnswer === null) return null;
+  if (typeof rawAnswer === 'number') return rawAnswer;
+  const idx = question.options.indexOf(rawAnswer);
+  return idx === -1 ? null : idx;
+};
+
 const buildQuizResultRows = (quiz, answers) =>
   quiz.questions.map((q, idx) => ({
     questionNumber: idx + 1,
@@ -100,7 +107,7 @@ const QuizSession = () => {
       filename: `quiz-result-${quiz.title}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
     };
     html2pdf().from(element).set(opt).save();
   };
@@ -437,7 +444,9 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
                     >
                       {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-indigo-400"></div>}
                     </div>
-                    <span><MathRenderer text={option} /></span>
+                    <span>
+                      <MathRenderer text={option} />
+                    </span>
                   </button>
                 );
               })}
@@ -476,7 +485,10 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
           </div>
         ) : (
           /* Results View */
-          <div id="quiz-results-container" className="bg-slate-800 rounded-xl p-8 shadow-xl border border-slate-700">
+          <div
+            id="quiz-results-container"
+            className="bg-slate-800 rounded-xl p-8 shadow-xl border border-slate-700"
+          >
             <div className="text-center mb-10">
               <div className="inline-flex items-center justify-center w-20 h-20 bg-emerald-500/10 rounded-full mb-4">
                 <FaTrophy className="text-4xl text-emerald-400" />
@@ -576,9 +588,15 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
 
                         return (
                           <div key={oIdx} className={btnClass}>
-                            <span><MathRenderer text={opt} /></span>
-                            {opt === q.correctAnswer && <FaCheckCircle className="text-emerald-400" />}
-                            {opt === userAnswer && !isCorrect && <FaTimesCircle className="text-red-400" />}
+                            <span>
+                              <MathRenderer text={opt} />
+                            </span>
+                            {opt === q.correctAnswer && (
+                              <FaCheckCircle className="text-emerald-400" />
+                            )}
+                            {opt === userAnswer && !isCorrect && (
+                              <FaTimesCircle className="text-red-400" />
+                            )}
                           </div>
                         );
                       })}
@@ -586,9 +604,22 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
 
                     {q.explanation && (
                       <div className="bg-indigo-900/30 p-3 rounded border border-indigo-500/30">
-                        <p className="text-sm text-indigo-200"><span className="font-semibold">Explanation:</span> <MathRenderer text={q.explanation} /></p>
+                        <p className="text-sm text-indigo-200">
+                          <span className="font-semibold">Explanation:</span>{' '}
+                          <MathRenderer text={q.explanation} />
+                        </p>
                       </div>
                     )}
+
+                    <QuestionExplanation
+                      question={q.questionText}
+                      options={q.options}
+                      correctAnswer={q.correctAnswer}
+                      userAnswer={resolveUserAnswerIndex(q, userAnswer)}
+                      explanation={q.explanation || ''}
+                      subjectName={quiz.subject?.name || ''}
+                      topicName={quiz.topic?.name || ''}
+                    />
                   </div>
                 );
               })}

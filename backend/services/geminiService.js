@@ -66,6 +66,22 @@ const hashKey = (prefix, str) => {
 };
 
 /**
+ * Resolve an option reference (numeric index or option text) into a numeric
+ * index, or null when the reference cannot be resolved. Quiz questions store
+ * correctAnswer / userAnswer inconsistently across the app (sometimes as an
+ * index, sometimes as the option text), so the explain endpoint accepts both.
+ */
+const resolveOptionIndex = (value, options) => {
+  if (!Array.isArray(options)) return null;
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number') {
+    return Number.isInteger(value) && value >= 0 && value < options.length ? value : null;
+  }
+  const idx = options.indexOf(value);
+  return idx === -1 ? null : idx;
+};
+
+/**
  * Timeout wrapper using Promise.race (safe for SDK versions that lack AbortSignal support).
  * @google/generative-ai ^0.11.4 does NOT support AbortSignal via requestOptions.
  *
@@ -269,14 +285,15 @@ const RESPONSE_SCHEMAS = {
       },
     },
   },
-flashcard: {
+  flashcard: {
     _type: 'array',
-    _itemSchema: { front: 'string', back: 'string' }
+    _itemSchema: { front: 'string', back: 'string' },
   },
   flashcardTagging: {
     tags: 'array',
-    difficulty: 'string'
-  },  performance: {
+    difficulty: 'string',
+  },
+  performance: {
     weakSubjects: 'array', // array of primitive strings — no itemSchema needed
     recommendations: {
       type: 'array',
@@ -293,6 +310,9 @@ flashcard: {
     summary: 'string',
     keyConcepts: 'array',
     examTips: 'array',
+  },
+  questionExplanation: {
+    markdown: 'string',
   },
   pyqForecasting: {
     predictedDifficulty: 'string',
@@ -860,7 +880,8 @@ exports.generateEmbedding = async (text, forceRefresh = false) => {
 /**
  * 5. Analyze Performance & Detect Weaknesses
  */
-exports.analyzePerformanceAndRecommend = async (attemptsSummary, forceRefresh = false) => {  if (!genAI) {
+exports.analyzePerformanceAndRecommend = async (attemptsSummary, forceRefresh = false) => {
+  if (!genAI) {
     console.warn('Gemini API key not configured. Using Mock Recommendations.');
     return { _mock: true, ...getMockRecommendations() };
   }
