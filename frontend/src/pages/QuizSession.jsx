@@ -8,16 +8,37 @@ import {
   FaArrowLeft,
   FaBrain,
   FaFilePdf,
+  FaBookmark,
+  FaRegBookmark,
 } from 'react-icons/fa';
 import API from '../services/api';
 import MathRenderer from '../components/common/MathRenderer';
+import { exportAsCSV, exportAsJSON } from '../utils/exportUtils';
+import html2pdf from 'html2pdf.js';
+import RevisionSheetModal from '../components/dashboard/RevisionSheetModal';
+import RemediationPlanModal from '../components/dashboard/RemediationPlanModal';
 
+const REVIEW_FILTERS = [
+  { key: 'all', label: 'All Questions' },
+  { key: 'incorrect', label: 'Incorrect Only' },
+  { key: 'bookmarked', label: 'Bookmarked' },
+  { key: 'correct', label: 'Correct' },
+];import API from '../services/api';
+import MathRenderer from '../components/common/MathRenderer';
+import { createQuizTelemetryQueue } from '../utils/quizTelemetry';
 const SECONDS_PER_QUESTION = 60;
 
 const formatTime = (seconds) => {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+};
+
+const resolveUserAnswerIndex = (question, rawAnswer) => {
+  if (rawAnswer === undefined || rawAnswer === null) return null;
+  if (typeof rawAnswer === 'number') return rawAnswer;
+  const idx = question.options.indexOf(rawAnswer);
+  return idx === -1 ? null : idx;
 };
 
 const buildQuizResultRows = (quiz, answers) =>
@@ -42,16 +63,21 @@ const QuizSession = () => {
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState(null);
   const [isRevisionModalOpen, setIsRevisionModalOpen] = useState(false);
+  const [isRemediationModalOpen, setIsRemediationModalOpen] = useState(false);
 
   const [timeLeft, setTimeLeft] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const submittingRef = useRef(false);
 
-  // Absolute deadline timestamp reference to prevent background tab timer throttling drift
+// Absolute deadline timestamp reference to prevent background tab timer throttling drift
   const endTimeRef = useRef(null);
   const autoSubmittedRef = useRef(false);
 
+  // Client-side telemetry buffer: batches question timing/option-selection
+  // events instead of sending an HTTP request per interaction.
+  const telemetryRef = useRef(null);
+  const questionEnteredAtRef = useRef(Date.now());
   const handleExportResultsCSV = () => {
     const rows = buildQuizResultRows(quiz, answers);
     exportAsCSV(
@@ -81,7 +107,7 @@ const QuizSession = () => {
       filename: `quiz-result-${quiz.title}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
     };
     html2pdf().from(element).set(opt).save();
   };
@@ -90,7 +116,7 @@ const QuizSession = () => {
     fetchQuiz();
   }, [id]);
 
-  const fetchQuiz = async () => {
+const fetchQuiz = async () => {
     try {
       const res = await API.get(`/quizzes/${id}`);
       const loadedQuiz = res.data.data;
@@ -99,23 +125,41 @@ const QuizSession = () => {
       setTimeLeft(totalSeconds);
       endTimeRef.current = Date.now() + totalSeconds * 1000;
       setLoading(false);
+
+      telemetryRef.current = createQuizTelemetryQueue(id);
+      telemetryRef.current.startAutoFlush();
+      questionEnteredAtRef.current = Date.now();
     } catch (err) {
       setError('Failed to load quiz details.');
       setLoading(false);
     }
   };
-
-  const handleOptionSelect = (questionId, option) => {
+const handleOptionSelect = (questionId, option) => {
     if (submitted || timeElapsed || submitting) return;
     setAnswers((prevAnswers) => ({
       ...prevAnswers,
       [questionId]: option,
     }));
+    telemetryRef.current?.enqueue('option_select', {
+      questionId,
+      questionIndex: currentQuestionIndex,
+      selectedOption: option,
+    });
+  };
+
+  const recordQuestionView = () => {
+    telemetryRef.current?.enqueue('question_view', {
+      questionId: quiz.questions[currentQuestionIndex]?._id,
+      questionIndex: currentQuestionIndex,
+      timeSpentMs: Date.now() - questionEnteredAtRef.current,
+    });
+    questionEnteredAtRef.current = Date.now();
   };
 
   const handleNext = () => {
     if (timeElapsed) return;
     if (currentQuestionIndex < quiz.questions.length - 1) {
+      recordQuestionView();
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     }
   };
@@ -123,11 +167,11 @@ const QuizSession = () => {
   const handlePrevious = () => {
     if (timeElapsed) return;
     if (currentQuestionIndex > 0) {
+      recordQuestionView();
       setCurrentQuestionIndex(currentQuestionIndex - 1);
     }
   };
-
-  const submitQuiz = useCallback(async () => {
+const submitQuiz = useCallback(async () => {
     if (submittingRef.current) return;
     submittingRef.current = true;
     setSubmitting(true);
@@ -139,6 +183,10 @@ const QuizSession = () => {
         selectedAnswer: selected,
       }));
 
+      telemetryRef.current?.enqueue('quiz_submit', { questionIndex: currentQuestionIndex });
+      telemetryRef.current?.stopAutoFlush();
+      telemetryRef.current?.flush();
+
       const res = await API.post(`/quizzes/${id}/submit`, { answers: formattedAnswers });
       setResult(res.data.data);
       setSubmitted(true);
@@ -149,8 +197,7 @@ const QuizSession = () => {
       submittingRef.current = false;
       setSubmitting(false);
     }
-  }, [answers, id]);
-
+  }, [answers, id, currentQuestionIndex]);
   // Countdown using absolute timestamps and visibilitychange recalibration to fix tab-switching throttling (#518)
   useEffect(() => {
     if (!quiz || submitted || !endTimeRef.current) return;
@@ -181,7 +228,7 @@ const QuizSession = () => {
     };
   }, [quiz, submitted]);
 
-  // When the countdown reaches zero, freeze input and submit automatically.
+// When the countdown reaches zero, freeze input and submit automatically.
   useEffect(() => {
     if (!quiz || submitted || timeLeft !== 0) return;
     if (autoSubmittedRef.current) return;
@@ -189,6 +236,72 @@ const QuizSession = () => {
     submitQuiz();
   }, [quiz, submitted, timeLeft, submitQuiz]);
 
+  // Load previously saved bookmarks once results are shown, so Review Mode
+  // reflects bookmarks made in earlier visits to this quiz's results.
+  useEffect(() => {
+    if (!submitted) return;
+    const loadBookmarks = async () => {
+      try {
+        const res = await API.get(`/quizzes/${id}/bookmarks`);
+        setBookmarkedIds(new Set(res.data?.data || []));
+      } catch (err) {
+        console.error('Failed to load bookmarks:', err);
+      }
+    };
+    loadBookmarks();
+  }, [submitted, id]);
+
+  const handleToggleBookmark = async (questionId) => {
+    const wasBookmarked = bookmarkedIds.has(questionId);
+    setBookmarkedIds((prev) => {
+      const next = new Set(prev);
+      wasBookmarked ? next.delete(questionId) : next.add(questionId);
+      return next;
+    });
+    try {
+      await API.post(`/quizzes/${id}/bookmarks/toggle`, { questionId });
+    } catch (err) {
+      console.error('Failed to toggle bookmark:', err);
+      setBookmarkedIds((prev) => {
+        const next = new Set(prev);
+        wasBookmarked ? next.add(questionId) : next.delete(questionId);
+        return next;
+      });
+    }
+  };
+
+  // Roving-tabindex arrow-key navigation across the review filter tabs
+  const handleFilterKeyDown = (event, index) => {
+    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+    event.preventDefault();
+    const direction = event.key === 'ArrowRight' ? 1 : -1;
+    const nextIndex = (index + direction + REVIEW_FILTERS.length) % REVIEW_FILTERS.length;
+    setReviewFilter(REVIEW_FILTERS[nextIndex].key);
+    filterTabRefs.current[nextIndex]?.focus();
+  };
+  // Reliably flush buffered telemetry on tab close / navigation using
+  // navigator.sendBeacon (fires-and-forgets even as the page unloads),
+  // plus a best-effort flush on unmount.
+  useEffect(() => {
+    const flushOnExit = () => {
+      telemetryRef.current?.flush({ useBeacon: true });
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushOnExit();
+      }
+    };
+
+    window.addEventListener('beforeunload', flushOnExit);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', flushOnExit);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      telemetryRef.current?.stopAutoFlush();
+      telemetryRef.current?.flush();
+    };
+  }, []);
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">
@@ -232,21 +345,27 @@ const QuizSession = () => {
     );
   }
 
-  const currentQuestion = quiz.questions[currentQuestionIndex];
+const currentQuestion = quiz.questions[currentQuestionIndex];
   const isLastQuestion = currentQuestionIndex === quiz.questions.length - 1;
   const timeElapsed = timeLeft === 0 && !submitted;
   const lowTime = timeLeft > 0 && timeLeft <= 30;
 
-  const languageClassName = quiz?.language === 'hindi' || quiz?.language === 'hinglish'
-    ? 'font-noto-sans-devanagari'
-    : quiz?.language === 'tamil'
-      ? 'font-tamil'
-      : quiz?.language === 'telugu'
-        ? 'font-telugu'
-        : quiz?.language === 'marathi'
-          ? 'font-marathi'
-          : 'font-sans';
+  const reviewCounts = { all: quiz.questions.length, correct: 0, incorrect: 0, bookmarked: 0 };
+  quiz.questions.forEach((q) => {
+    if (answers[q._id] === q.correctAnswer) reviewCounts.correct += 1;
+    else reviewCounts.incorrect += 1;
+    if (bookmarkedIds.has(q._id)) reviewCounts.bookmarked += 1;
+  });
 
+  const filteredQuestions = quiz.questions
+    .map((q, idx) => ({ q, idx }))
+    .filter(({ q }) => {
+      const isCorrect = answers[q._id] === q.correctAnswer;
+      if (reviewFilter === 'incorrect') return !isCorrect;
+      if (reviewFilter === 'correct') return isCorrect;
+      if (reviewFilter === 'bookmarked') return bookmarkedIds.has(q._id);
+      return true;
+    });
   return (
     <div className={`min-h-screen bg-slate-900 text-white ${languageClassName} py-10 px-4 md:px-20`}>
       {timeElapsed && !submitted && (
@@ -325,7 +444,9 @@ const QuizSession = () => {
                     >
                       {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-indigo-400"></div>}
                     </div>
-                    <span className="break-words whitespace-pre-wrap"><MathRenderer text={option} /></span>
+                    <span>
+                      <MathRenderer text={option} />
+                    </span>
                   </button>
                 );
               })}
@@ -364,7 +485,10 @@ const QuizSession = () => {
           </div>
         ) : (
           /* Results View */
-          <div id="quiz-results-container" className="bg-slate-800 rounded-xl p-8 shadow-xl border border-slate-700">
+          <div
+            id="quiz-results-container"
+            className="bg-slate-800 rounded-xl p-8 shadow-xl border border-slate-700"
+          >
             <div className="text-center mb-10">
               <div className="inline-flex items-center justify-center w-20 h-20 bg-emerald-500/10 rounded-full mb-4">
                 <FaTrophy className="text-4xl text-emerald-400" />
@@ -396,18 +520,59 @@ const QuizSession = () => {
                 </button>
               </div>
             </div>
-            <div className="space-y-6">
+<div className="space-y-6">
               <h3 className="text-xl font-semibold border-b border-slate-700 pb-2 mb-4">
                 Review Answers
               </h3>
-              {quiz.questions.map((q, idx) => {
+
+              <div role="tablist" aria-label="Filter review questions" className="flex flex-wrap gap-2 mb-6">
+                {REVIEW_FILTERS.map((f, i) => (
+                  <button
+                    key={f.key}
+                    role="tab"
+                    id={`review-tab-${f.key}`}
+                    aria-selected={reviewFilter === f.key}
+                    aria-controls="quiz-review-list"
+                    tabIndex={reviewFilter === f.key ? 0 : -1}
+                    ref={(el) => (filterTabRefs.current[i] = el)}
+                    onClick={() => setReviewFilter(f.key)}
+                    onKeyDown={(e) => handleFilterKeyDown(e, i)}
+                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                      reviewFilter === f.key
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    {f.label} <span className="ml-1 text-xs opacity-75">({reviewCounts[f.key]})</span>
+                  </button>
+                ))}
+              </div>
+
+              {filteredQuestions.length === 0 && (
+                <p className="text-sm text-slate-400 italic text-center py-6">
+                  No questions match this filter.
+                </p>
+              )}
+
+              {filteredQuestions.map(({ q, idx }) => {
                 const userAnswer = answers[q._id];
                 const isCorrect = userAnswer === q.correctAnswer;
+                const isBookmarked = bookmarkedIds.has(q._id);
 
                 return (
-                  <div key={q._id} className="p-5 bg-slate-900/50 rounded-lg border border-slate-700">
-                    <p className="font-medium text-slate-200 mb-3 break-words whitespace-pre-wrap"><span className="text-slate-400 mr-2">{idx + 1}.</span><MathRenderer text={q.questionText} /></p>
-                    
+                  <div key={q._id} id="quiz-review-list" className="p-5 bg-slate-900/50 rounded-lg border border-slate-700">
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <p className="font-medium text-slate-200"><span className="text-slate-400 mr-2">{idx + 1}.</span><MathRenderer text={q.questionText} /></p>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleBookmark(q._id)}
+                        aria-pressed={isBookmarked}
+                        aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark this question'}
+                        className="flex-shrink-0 text-lg text-amber-400 hover:text-amber-300"
+                      >
+                        {isBookmarked ? <FaBookmark /> : <FaRegBookmark />}
+                      </button>
+                    </div>                    
                     <div className="space-y-2 mb-4">
                       {q.options.map((opt, oIdx) => {
                         let btnClass =
@@ -423,9 +588,15 @@ const QuizSession = () => {
 
                         return (
                           <div key={oIdx} className={btnClass}>
-                            <span className="break-words whitespace-pre-wrap"><MathRenderer text={opt} /></span>
-                            {opt === q.correctAnswer && <FaCheckCircle className="text-emerald-400" />}
-                            {opt === userAnswer && !isCorrect && <FaTimesCircle className="text-red-400" />}
+                            <span>
+                              <MathRenderer text={opt} />
+                            </span>
+                            {opt === q.correctAnswer && (
+                              <FaCheckCircle className="text-emerald-400" />
+                            )}
+                            {opt === userAnswer && !isCorrect && (
+                              <FaTimesCircle className="text-red-400" />
+                            )}
                           </div>
                         );
                       })}
@@ -433,15 +604,37 @@ const QuizSession = () => {
 
                     {q.explanation && (
                       <div className="bg-indigo-900/30 p-3 rounded border border-indigo-500/30">
-                        <p className="text-sm text-indigo-200 break-words whitespace-pre-wrap"><span className="font-semibold">Explanation:</span> <MathRenderer text={q.explanation} /></p>
+                        <p className="text-sm text-indigo-200">
+                          <span className="font-semibold">Explanation:</span>{' '}
+                          <MathRenderer text={q.explanation} />
+                        </p>
                       </div>
                     )}
+
+                    <QuestionExplanation
+                      question={q.questionText}
+                      options={q.options}
+                      correctAnswer={q.correctAnswer}
+                      userAnswer={resolveUserAnswerIndex(q, userAnswer)}
+                      explanation={q.explanation || ''}
+                      subjectName={quiz.subject?.name || ''}
+                      topicName={quiz.topic?.name || ''}
+                    />
                   </div>
                 );
               })}
             </div>
 
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+              {result?.score < 80 && (
+                <button
+                  onClick={() => setIsRemediationModalOpen(true)}
+                  className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 rounded-lg font-semibold shadow-lg shadow-orange-500/20 flex items-center justify-center gap-2 transition-all"
+                >
+                  <FaBrain className="text-yellow-200" /> Generate 3-Day Remediation Plan
+                </button>
+              )}
+
               <button
                 onClick={() => setIsRevisionModalOpen(true)}
                 className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-lg font-semibold shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2 transition-all"
@@ -456,6 +649,15 @@ const QuizSession = () => {
                 Back to Dashboard
               </button>
             </div>
+
+            <RemediationPlanModal
+              isOpen={isRemediationModalOpen}
+              onClose={() => setIsRemediationModalOpen(false)}
+              quizAttemptId={result?.id || result?._id}
+              subjectId={quiz.subject?.id || quiz.subject}
+              topicId={quiz.topic?.id || quiz.topic}
+              topicName={quiz.topic?.name}
+            />
 
             <RevisionSheetModal
               isOpen={isRevisionModalOpen}

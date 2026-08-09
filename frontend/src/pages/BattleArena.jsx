@@ -54,6 +54,7 @@ const BattleArena = () => {
   const [accessPending, setAccessPending] = useState(false);
   const [pendingRoomId, setPendingRoomId] = useState('');
   const [inviteLink, setInviteLink] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
@@ -211,7 +212,7 @@ const BattleArena = () => {
     });
   }, [routeRoomId, user?.name]);
 
-  const joinRoom = (targetRoomId, { createMode = false, enteredPassword = '' } = {}) => {
+  const joinRoom = (targetRoomId, { enteredPassword = '' } = {}) => {
     const normalizedRoomId = (targetRoomId || '').trim().toUpperCase();
     if (!normalizedRoomId) return;
 
@@ -226,8 +227,7 @@ const BattleArena = () => {
       password: enteredPassword,
     };
 
-    const eventName = createMode ? 'create-room' : 'join-room';
-    socket.emit(eventName, payload, (response) => {
+    socket.emit('join-room', payload, (response) => {
       setAccessPending(false);
       if (response?.success) {
         const nextRoomName = response.room?.name || payload.roomName;
@@ -255,18 +255,44 @@ const BattleArena = () => {
 
   const handleJoin = (e) => {
     e.preventDefault();
-    joinRoom(roomId, { createMode: false, enteredPassword: password });
+    joinRoom(roomId, { enteredPassword: password });
   };
 
   const handleCreateRoom = () => {
-    const newRoomId = Math.random().toString(36).substring(2, 8).toUpperCase();
-    setRoomId(newRoomId);
-    roomNameRef.current = roomName || 'Battle Room';
-    joinRoom(newRoomId, { createMode: true, enteredPassword: isPrivate ? password : '' });
+    setAccessError('');
+    setAccessPending(true);
+
+    const payload = {
+      roomName: (roomName || 'Battle Room').trim() || 'Battle Room',
+      username: user?.name || 'Anonymous',
+      password: isPrivate ? password : '',
+    };
+
+    socket.emit('create-room', payload, (response) => {
+      setAccessPending(false);
+      if (response?.success) {
+        const nextRoomId = response.room?.id || response.roomId;
+        const nextRoomName = response.room?.name || payload.roomName;
+        setRoomId(nextRoomId);
+        setRoomName(nextRoomName);
+        roomIdRef.current = nextRoomId;
+        passwordRef.current = payload.password;
+        roomNameRef.current = nextRoomName;
+        setIsPrivate(Boolean(response.room?.password));
+        setInviteLink(`${window.location.origin}/battle/join/${nextRoomId}`);
+        joinedRef.current = true;
+        setJoined(true);
+        setShowCreateModal(false);
+        setPendingRoomId('');
+        setAccessError('');
+      } else {
+        setAccessError(response?.message || 'Unable to create the room.');
+      }
+    });
   };
 
   const handlePasswordSubmit = () => {
-    joinRoom(pendingRoomId, { createMode: false, enteredPassword: password });
+    joinRoom(pendingRoomId, { enteredPassword: password });
   };
 
   const handleCopyLink = async () => {
@@ -352,42 +378,7 @@ const BattleArena = () => {
               </button>
             </div>
           ) : (
-            <div className="space-y-4 mb-6">
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Room Name</label>
-                <input
-                  type="text"
-                  value={roomName}
-                  onChange={(e) => {
-                    const nextValue = e.target.value;
-                    setRoomName(nextValue);
-                    roomNameRef.current = nextValue;
-                  }}
-                  placeholder="My Battle Room"
-                  className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-              <div className="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2">
-                <label className="text-sm font-medium text-slate-300">Private Room</label>
-                <input
-                  type="checkbox"
-                  checked={isPrivate}
-                  onChange={(e) => setIsPrivate(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-indigo-500 focus:ring-indigo-500"
-                />
-              </div>
-              {isPrivate && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Password</label>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter room password"
-                    className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-              )}
+            <>
               <form onSubmit={handleJoin} className="space-y-3">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1">Room Code</label>
@@ -407,21 +398,93 @@ const BattleArena = () => {
                   Join Lobby <FaPlay className="ml-2 text-sm" />
                 </button>
               </form>
-            </div>
+
+              <div className="relative flex py-4 items-center">
+                <div className="flex-grow border-t border-slate-600"></div>
+                <span className="flex-shrink-0 mx-4 text-slate-500 text-sm font-medium">OR</span>
+                <div className="flex-grow border-t border-slate-600"></div>
+              </div>
+
+              <button
+                onClick={() => {
+                  setAccessError('');
+                  setShowCreateModal(true);
+                }}
+                className="w-full bg-slate-700 hover:bg-slate-600 text-white font-medium py-3 rounded-lg border border-slate-500 transition-colors"
+              >
+                Create New Lobby
+              </button>
+            </>
           )}
 
-          <div className="relative flex py-4 items-center">
-            <div className="flex-grow border-t border-slate-600"></div>
-            <span className="flex-shrink-0 mx-4 text-slate-500 text-sm font-medium">OR</span>
-            <div className="flex-grow border-t border-slate-600"></div>
-          </div>
-
-          <button
-            onClick={handleCreateRoom}
-            className="w-full bg-slate-700 hover:bg-slate-600 text-white font-medium py-3 rounded-lg border border-slate-500 transition-colors"
-          >
-            Create New Lobby
-          </button>
+          <AnimatePresence>
+            {showCreateModal && (
+              <motion.div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setShowCreateModal(false)}
+              >
+                <motion.div
+                  className="bg-slate-800 w-full max-w-md rounded-xl border border-slate-700 shadow-2xl p-6"
+                  initial={{ scale: 0.9, y: 20 }}
+                  animate={{ scale: 1, y: 0 }}
+                  exit={{ scale: 0.9, y: 20 }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <h2 className="text-xl font-bold text-white mb-4">Create a New Lobby</h2>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-1">Room Name</label>
+                      <input
+                        type="text"
+                        value={roomName}
+                        onChange={(e) => setRoomName(e.target.value)}
+                        placeholder="My Battle Room"
+                        className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2">
+                      <label className="text-sm font-medium text-slate-300">Private Room</label>
+                      <input
+                        type="checkbox"
+                        checked={isPrivate}
+                        onChange={(e) => setIsPrivate(e.target.checked)}
+                        className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-indigo-500 focus:ring-indigo-500"
+                      />
+                    </div>
+                    {isPrivate && (
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-1">Password</label>
+                        <input
+                          type="password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="Enter room password"
+                          className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                    )}
+                    {accessError && <p className="text-sm text-red-400">{accessError}</p>}
+                    <button
+                      onClick={handleCreateRoom}
+                      disabled={accessPending}
+                      className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center disabled:opacity-50"
+                    >
+                      {accessPending ? 'Creating...' : 'Create Room'}
+                    </button>
+                    <button
+                      onClick={() => setShowCreateModal(false)}
+                      className="w-full bg-slate-700 hover:bg-slate-600 text-slate-300 font-medium py-2.5 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     );
