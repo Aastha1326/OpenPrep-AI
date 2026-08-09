@@ -367,7 +367,7 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
       return true;
     });
   return (
-    <div className="min-h-screen bg-slate-900 text-white font-sans py-10 px-4 md:px-20">
+    <div className={`min-h-screen bg-slate-900 text-white ${languageClassName} py-10 px-4 md:px-20`}>
       {timeElapsed && !submitted && (
         <div
           role="alert"
@@ -421,7 +421,7 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
         {/* Quiz Content */}
         {!submitted ? (
           <div className="bg-slate-800 rounded-xl p-6 md:p-8 shadow-xl border border-slate-700">
-            <h2 className="text-xl font-semibold mb-6 leading-relaxed">
+            <h2 className="text-xl font-semibold mb-6 leading-relaxed break-words whitespace-pre-wrap">
               <MathRenderer text={currentQuestion.questionText} />
             </h2>
 

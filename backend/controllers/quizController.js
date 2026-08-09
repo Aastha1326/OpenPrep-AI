@@ -48,7 +48,8 @@ function extractMistookQuestions(attempt) {
 // @access  Private
 exports.generateAIQuiz = async (req, res, next) => {
   try {
-    const { subjectId, topicId, count } = req.body;
+    const { subjectId, topicId, count, language } = req.body;
+    const normalizedLanguage = normalizeQuizLanguage(language);
 
     const subject = await Subject.findByPk(subjectId);
     if (!subject) {
@@ -72,7 +73,14 @@ exports.generateAIQuiz = async (req, res, next) => {
     }
 
     // Call Gemini Service
-    const aiQuiz = await geminiService.generateQuiz(subject.name, topicName, notesText, count || 5, req.query.refresh === 'true');
+    const aiQuiz = await geminiService.generateQuiz(
+      subject.name,
+      topicName,
+      notesText,
+      count || 5,
+      req.query.refresh === 'true',
+      normalizedLanguage
+    );
 
     // Assign unique question IDs (similar to Mongoose subdocument ids)
     const questionsWithIds = aiQuiz.questions.map((q) => ({
@@ -89,6 +97,7 @@ exports.generateAIQuiz = async (req, res, next) => {
       topic: topicId || null,
       questions: questionsWithIds,
       type: 'AI_Generated',
+      language: normalizedLanguage,
       createdBy: req.user.id,
     });
 
