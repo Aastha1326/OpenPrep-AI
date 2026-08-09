@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
-  FileText, Upload, AlertCircle, RefreshCw, CheckCircle, PieChart as PieChartIcon,
-  TrendingUp, Award, HelpCircle, Layers, Calendar, Filter, ArrowLeft, ArrowUpRight
-} from 'lucide-react';
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+FileText, Upload, AlertCircle, RefreshCw, CheckCircle, PieChart as PieChartIcon,
+  TrendingUp, Award, HelpCircle, Layers, Calendar, Filter, ArrowLeft, ArrowUpRight, Copy
+} from 'lucide-react';import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as PieTooltip, Legend
 } from 'recharts';
@@ -81,11 +80,39 @@ const [uploadSubjectId, setUploadSubjectId] = useState('');
   const [isTimeout, setIsTimeout] = useState(false);
   const [trendActiveIndex, setTrendActiveIndex] = useState(-1);
 
-  const [activeInsightTab, setActiveInsightTab] = useState('paper');
+const [activeInsightTab, setActiveInsightTab] = useState('paper');
   const [forecastData, setForecastData] = useState(null);
   const [loadingForecast, setLoadingForecast] = useState(false);
   const [forecastError, setForecastError] = useState(null);
 
+  const [clusterData, setClusterData] = useState([]);
+  const [loadingClusters, setLoadingClusters] = useState(false);
+  const [clusterError, setClusterError] = useState(null);
+
+  const fetchClusters = async (forceRefresh = false) => {
+    if (!selectedSubjectId) return;
+    setLoadingClusters(true);
+    setClusterError(null);
+    try {
+      const res = await API.get(`/pyqs/clusters/${selectedSubjectId}`, {
+        params: { refresh: forceRefresh === true },
+      });
+      if (res.data?.success) {
+        setClusterData(res.data.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to load duplicate question clusters:', err);
+      setClusterError(err?.response?.data?.error || 'Could not detect duplicate questions.');
+    } finally {
+      setLoadingClusters(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeInsightTab === 'duplicates' && selectedSubjectId) {
+      fetchClusters();
+    }
+  }, [activeInsightTab, selectedSubjectId]);
   const fetchForecast = async (forceRefresh = false) => {
     if (!selectedSubjectId) return;
     setLoadingForecast(true);
@@ -603,7 +630,7 @@ formData.append('year', year);
               >
                 Paper Insights
               </button>
-              <button
+<button
                 type="button"
                 onClick={() => setActiveInsightTab('forecast')}
                 className={`px-4 py-2 text-sm font-bold font-playfair transition-all border-b-2 ${
@@ -614,8 +641,18 @@ formData.append('year', year);
               >
                 AI Upcoming Forecast
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveInsightTab('duplicates')}
+                className={`px-4 py-2 text-sm font-bold font-playfair transition-all border-b-2 ${
+                  activeInsightTab === 'duplicates'
+                    ? 'border-amber-800 text-amber-900 font-bold'
+                    : 'border-transparent text-neutral-500 hover:text-neutral-800'
+                }`}
+              >
+                Duplicate Detection
+              </button>
             </div>
-
             {activeInsightTab === 'paper' && selectedPyq && (
               <div className="space-y-8">
                 {/* Row 1: Pie Chart & AI Trend Card */}
@@ -876,7 +913,7 @@ formData.append('year', year);
                         ))}
                       </div>
                     </VintagePaper>
-                  </div>
+</div>
                 )}
               </div>
             )}

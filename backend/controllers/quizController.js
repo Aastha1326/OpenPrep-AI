@@ -8,13 +8,40 @@ const Topic = require('../models/Topic');
 const Note = require('../models/Note');
 const ActivityLog = require('../models/ActivityLog');
 const Progress = require('../models/Progress');
-const geminiService = require('../services/geminiService');
+const QuizTelemetryEvent = require('../models/QuizTelemetryEvent');
+const QuizBookmark = require('../models/QuizBookmark');const geminiService = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
 const { runCalibration } = require('../services/difficultyCalibrator');
 
 // Window (ms) during which duplicate quiz submissions for the same quiz are ignored.
 // Prevents double-click on "Submit Quiz" from creating duplicate attempt records.
 const DUPLICATE_SUBMIT_WINDOW_MS = 5000;
+
+// Extract the questions the student answered incorrectly from a loaded quiz
+// attempt, together with the attempt's quiz topic/subject metadata.
+function extractMistookQuestions(attempt) {
+  const quizRef = attempt && attempt.quizRef;
+  if (!quizRef) return [];
+
+  const quizQuestions = quizRef.questions || [];
+  const userAnswers = attempt.answers || [];
+
+  return quizQuestions
+    .filter((q) => {
+      const ans = userAnswers.find((a) => String(a.questionId) === String(q._id || q.id));
+      return ans && !ans.isCorrect;
+    })
+    .map((q) => {
+      const userAns = userAnswers.find((a) => String(a.questionId) === String(q._id || q.id));
+      return {
+        questionText: q.questionText,
+        options: q.options,
+        correctAnswer: q.correctAnswer,
+        explanation: q.explanation,
+        userSelectedAnswer: userAns ? userAns.selectedAnswer : -1,
+      };
+    });
+}
 
 // @desc    Generate AI Quiz
 // @route   POST /api/quizzes/generate-ai
@@ -329,7 +356,7 @@ exports.submitQuizAttempt = async (req, res, next) => {
       user: req.user.id,
       activityType: 'quiz_attempt',
       description: `Completed practice quiz: "${quiz.title}" with score ${score}%`,
-    }, { transaction: t });
+    });
 
     res.status(201).json({
       success: true,
@@ -426,24 +453,7 @@ exports.generateRevisionSheet = async (req, res, next) => {
           if (attempt.quizRef.subjectRef) targetSubjectName = attempt.quizRef.subjectRef.name;
           if (attempt.quizRef.topicRef) targetTopicName = attempt.quizRef.topicRef.name;
 
-          const quizQuestions = attempt.quizRef.questions || [];
-          const userAnswers = attempt.answers || [];
-
-          mistookQuestions = quizQuestions
-            .filter((q) => {
-              const ans = userAnswers.find((a) => String(a.questionId) === String(q._id || q.id));
-              return ans && !ans.isCorrect;
-            })
-            .map((q) => {
-              const userAns = userAnswers.find((a) => String(a.questionId) === String(q._id || q.id));
-              return {
-                questionText: q.questionText,
-                options: q.options,
-                correctAnswer: q.correctAnswer,
-                explanation: q.explanation,
-                userSelectedAnswer: userAns ? userAns.selectedAnswer : -1,
-              };
-            });
+          mistookQuestions = extractMistookQuestions(attempt);
         }
       }
     }
@@ -504,6 +514,110 @@ exports.generateRevisionSheet = async (req, res, next) => {
   }
 };
 
+// @desc    Generate AI Remediation Plan for weak concepts from failed quiz questions
+// @route   POST /api/quizzes/generate-remediation-plan
+// @access  Private
+exports.generateRemediationPlan = async (req, res, next) => {
+  try {
+    const { quizAttemptId, saveToNotes = true } = req.body;
+
+    let mistookQuestions = req.body.mistookQuestions || [];
+    let targetSubjectName = 'General Subject';
+    let targetTopicName = 'Weak Concepts';
+    let matchedSubjectId = req.body.subjectId || null;
+    let matchedTopicId = req.body.topicId || null;
+
+    if (quizAttemptId) {
+      const attempt = await QuizAttempt.findOne({
+        where: { id: quizAttemptId, user: req.user.id },
+        include: [
+          {
+            model: Quiz,
+            as: 'quizRef',
+            include: [
+              { model: Subject, as: 'subjectRef' },
+              { model: Topic, as: 'topicRef' },
+            ],
+          },
+        ],
+      });
+
+      if (attempt && attempt.quizRef) {
+        matchedSubjectId = matchedSubjectId || attempt.quizRef.subject;
+        matchedTopicId = matchedTopicId || attempt.quizRef.topic;
+
+        if (attempt.quizRef.subjectRef) targetSubjectName = attempt.quizRef.subjectRef.name;
+        if (attempt.quizRef.topicRef) targetTopicName = attempt.quizRef.topicRef.name;
+
+        mistookQuestions = extractMistookQuestions(attempt);
+      }
+    }
+
+    if (req.body.subjectId && targetSubjectName === 'General Subject') {
+      const sub = await Subject.findByPk(req.body.subjectId);
+      if (sub) targetSubjectName = sub.name;
+    }
+
+    if (req.body.topicId && targetTopicName === 'Weak Concepts') {
+      const top = await Topic.findByPk(req.body.topicId);
+      if (top) targetTopicName = top.name;
+    }
+
+    if (mistookQuestions.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No failed questions found. Generate a remediation plan after reviewing a quiz with mistakes.',
+      });
+    }
+
+    // Call Gemini Service to structure the 3-day remediation micro-modules
+    const remediationPlan = await geminiService.generateRemediationPlan(
+      mistookQuestions,
+      targetSubjectName,
+      targetTopicName,
+      req.body.weakTopics || [],
+      req.query.refresh === 'true'
+    );
+
+    let savedNote = null;
+    if (saveToNotes && matchedSubjectId) {
+      savedNote = await Note.create({
+        title: remediationPlan.title || `3-Day AI Remediation Plan: ${targetTopicName}`,
+        content: remediationPlan.summaryMarkdown,
+        subject: matchedSubjectId,
+        topic: matchedTopicId,
+        category: 'Summary',
+        user: req.user.id,
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      data: {
+        title: remediationPlan.title,
+        summaryMarkdown: remediationPlan.summaryMarkdown,
+        plan: remediationPlan.plan,
+        savedNote,
+      },
+    });
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({
+        success: false,
+        error: error.message,
+      });
+    }
+    next(error);
+  }
+};
+
 // @desc    Run difficulty calibration report
 // @route   GET /api/quizzes/admin/calibration-report
 // @access  Private/Admin
@@ -514,13 +628,116 @@ exports.getCalibrationReport = async (req, res, next) => {
       return res.status(403).json({ success: false, error: 'Not authorized as admin' });
     }
 
-    const report = await runCalibration();
+const report = await runCalibration();
     
     if (report.success) {
       res.status(200).json({ success: true, data: report });
     } else {
       res.status(500).json({ success: false, error: report.error });
     }
+  } catch (error) {
+    next(error);
+  }
+};
+
+const TELEMETRY_EVENT_TYPES = ['question_view', 'option_select', 'flag_toggle', 'quiz_submit', 'quiz_exit'];
+const MAX_TELEMETRY_EVENTS_PER_BATCH = 200;
+
+// @desc    Ingest a batch of client-buffered quiz telemetry events (question
+//          views, option selections, flag toggles) in a single request,
+//          instead of one HTTP call per interaction.
+// @route   POST /api/quiz/telemetry/batch
+// @access  Private (Bearer header, or body.token for sendBeacon calls)
+exports.submitTelemetryBatch = async (req, res, next) => {
+  try {
+    const { events } = req.body;
+
+    if (!Array.isArray(events) || events.length === 0) {
+      return res.status(400).json({ success: false, error: 'events must be a non-empty array' });
+    }
+
+    const records = events.slice(0, MAX_TELEMETRY_EVENTS_PER_BATCH).reduce((acc, evt) => {
+      if (!evt || !TELEMETRY_EVENT_TYPES.includes(evt.eventType)) return acc;
+      acc.push({
+        user: req.user.id,
+        quiz: evt.quizId || null,
+        eventType: evt.eventType,
+        questionIndex: Number.isInteger(evt.questionIndex) ? evt.questionIndex : null,
+        payload: {
+          questionId: evt.questionId || null,
+          selectedOption: evt.selectedOption ?? null,
+          timeSpentMs: evt.timeSpentMs ?? null,
+        },
+        clientTimestamp: evt.clientTimestamp ? new Date(evt.clientTimestamp) : new Date(),
+      });
+      return acc;
+    }, []);
+
+    if (records.length === 0) {
+      return res.status(400).json({ success: false, error: 'No valid telemetry events found in the batch' });
+    }
+
+    await QuizTelemetryEvent.bulkCreate(records);
+
+    // One log line per HTTP request covering many buffered client events —
+    // confirms batching is reducing per-interaction network traffic.
+    console.log(`[Quiz Telemetry] Batched ${records.length} event(s) from user ${req.user.id} in a single request`);
+
+    res.status(201).json({ success: true, received: records.length });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get the current user's bookmarked question IDs for a quiz
+// @route   GET /api/quizzes/:id/bookmarks
+// @access  Private
+exports.getQuizBookmarks = async (req, res, next) => {
+  try {
+    const quiz = await Quiz.findOne({ where: { id: req.params.id, createdBy: req.user.id } });
+    if (!quiz) {
+      return res.status(404).json({ success: false, error: 'Quiz not found' });
+    }
+
+    const bookmarks = await QuizBookmark.findAll({
+      where: { user: req.user.id, quiz: quiz.id },
+      attributes: ['questionId'],
+    });
+
+    res.status(200).json({ success: true, data: bookmarks.map((b) => b.questionId) });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Toggle bookmark on a single quiz question (used by Review Mode)
+// @route   POST /api/quizzes/:id/bookmarks/toggle
+// @access  Private
+exports.toggleQuizBookmark = async (req, res, next) => {
+  try {
+    const { questionId } = req.body;
+
+    const quiz = await Quiz.findOne({ where: { id: req.params.id, createdBy: req.user.id } });
+    if (!quiz) {
+      return res.status(404).json({ success: false, error: 'Quiz not found' });
+    }
+
+    const questionExists = (quiz.questions || []).some((q) => String(q._id || q.id) === String(questionId));
+    if (!questionExists) {
+      return res.status(400).json({ success: false, error: 'Question not found in this quiz' });
+    }
+
+    const existing = await QuizBookmark.findOne({
+      where: { user: req.user.id, quiz: quiz.id, questionId },
+    });
+
+    if (existing) {
+      await existing.destroy();
+      return res.status(200).json({ success: true, bookmarked: false });
+    }
+
+    await QuizBookmark.create({ user: req.user.id, quiz: quiz.id, questionId });
+    res.status(201).json({ success: true, bookmarked: true });
   } catch (error) {
     next(error);
   }

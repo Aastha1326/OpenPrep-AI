@@ -1,6 +1,14 @@
-const { createRoomState, roomRequiresPassword, isPasswordValid } = require('./battleRoomAccess');
+const {
+  createRoomState,
+  roomRequiresPassword,
+  isPasswordValid,
+  generateRoomCode,
+  validateRoomCode,
+} = require('./battleRoomAccess');
 
 const rooms = {};
+
+const MAX_ROOM_CODE_ATTEMPTS = 5;
 
 const isAllReady = (room) => {
   const playerKeys = Object.keys(room.players);
@@ -21,20 +29,21 @@ const tryStartBattle = (io, roomId) => {
   });
 };
 
-const addPlayerToRoom = ({ io, socket, roomId, username, roomName, password }) => {
-  if (!rooms[roomId]) {
-    rooms[roomId] = createRoomState({ roomId, roomName, password });
-  }
+const normalizeRoomCode = (code) => (code || '').trim().toUpperCase();
 
-  if (password) {
-    rooms[roomId].password = password;
+const allocateRoomCode = () => {
+  for (let i = 0; i < MAX_ROOM_CODE_ATTEMPTS; i += 1) {
+    const code = generateRoomCode();
+    if (!rooms[code]) return code;
   }
+  return null;
+};
 
-  if (roomName) {
-    rooms[roomId].name = roomName;
-  }
+const addPlayerToRoom = ({ io, socket, roomId, username }) => {
+  const room = rooms[roomId];
+  if (!room) return null;
 
-  rooms[roomId].players[socket.id] = {
+  room.players[socket.id] = {
     username: username || 'Anonymous',
     score: 0,
     isReady: false,
@@ -42,8 +51,8 @@ const addPlayerToRoom = ({ io, socket, roomId, username, roomName, password }) =
   };
 
   io.to(roomId).emit('room_update', {
-    players: rooms[roomId].players,
-    status: rooms[roomId].status,
+    players: room.players,
+    status: room.status,
   });
 
   io.to(roomId).emit('presence_update', {
@@ -52,47 +61,53 @@ const addPlayerToRoom = ({ io, socket, roomId, username, roomName, password }) =
     online: true,
   });
 
-  return rooms[roomId];
+  return room;
 };
 
 module.exports = (io) => {
   io.on('connection', (socket) => {
     console.log(`Socket connected: ${socket.id}`);
 
-    const handleJoinAttempt = (payload, callback) => {
-      const roomId = (payload?.roomId || '').toUpperCase();
+    const handleCreateRoom = (payload, callback) => {
+      const suppliedCode = normalizeRoomCode(payload?.roomId);
       const username = payload?.username || 'Anonymous';
-      const roomName = payload?.roomName || 'Battle Room';
-      const enteredPassword = payload?.password || '';
+      const roomName = (payload?.roomName || 'Battle Room').trim() || 'Battle Room';
+      const password = payload?.password || '';
 
-      if (!roomId) {
-        if (callback) {
-          callback({ success: false, message: 'A room code is required.' });
-        }
-        return;
-      }
-
-      const existingRoom = rooms[roomId];
-      if (existingRoom && roomRequiresPassword(existingRoom) && !isPasswordValid(existingRoom, enteredPassword)) {
+      if (suppliedCode && rooms[suppliedCode]) {
         if (callback) {
           callback({
             success: false,
-            requiresPassword: true,
-            message: 'Incorrect password',
+            message: `Room code ${suppliedCode} is already in use. Try joining it instead.`,
           });
         }
         return;
       }
 
+      if (suppliedCode && !validateRoomCode(suppliedCode)) {
+        if (callback) {
+          callback({
+            success: false,
+            message: 'Room code must be exactly 6 letters or numbers.',
+          });
+        }
+        return;
+      }
+
+      const roomId = suppliedCode || allocateRoomCode();
+      if (!roomId) {
+        if (callback) {
+          callback({
+            success: false,
+            message: 'Could not allocate a room code. Please try again.',
+          });
+        }
+        return;
+      }
+
+      rooms[roomId] = createRoomState({ roomId, roomName, password });
       socket.join(roomId);
-      const room = addPlayerToRoom({
-        io,
-        socket,
-        roomId,
-        username,
-        roomName,
-        password: enteredPassword,
-      });
+      const room = addPlayerToRoom({ io, socket, roomId, username });
 
       if (callback) {
         callback({
@@ -107,26 +122,77 @@ module.exports = (io) => {
         });
       }
 
+      console.log(`User ${username} created room ${roomId}`);
+    };
+
+    const handleJoinRoom = (payload, callback) => {
+      const roomId = normalizeRoomCode(payload?.roomId);
+      const username = payload?.username || 'Anonymous';
+      const enteredPassword = payload?.password || '';
+
+      if (!roomId) {
+        if (callback) {
+          callback({ success: false, message: 'A room code is required.' });
+        }
+        return;
+      }
+
+      const room = rooms[roomId];
+      if (!room) {
+        if (callback) {
+          callback({
+            success: false,
+            message: `Room ${roomId} not found. Check the code and try again.`,
+          });
+        }
+        return;
+      }
+
+      if (roomRequiresPassword(room) && !isPasswordValid(room, enteredPassword)) {
+        if (callback) {
+          callback({
+            success: false,
+            requiresPassword: true,
+            message: 'Incorrect password',
+          });
+        }
+        return;
+      }
+
+      socket.join(roomId);
+      const joinedRoom = addPlayerToRoom({ io, socket, roomId, username });
+
+      if (callback) {
+        callback({
+          success: true,
+          roomId,
+          room: {
+            id: joinedRoom.id,
+            name: joinedRoom.name,
+            password: joinedRoom.password,
+          },
+          isPrivate: roomRequiresPassword(joinedRoom),
+        });
+      }
+
       console.log(`User ${username} joined room ${roomId}`);
     };
 
     socket.on('create-room', (payload, callback) => {
-      handleJoinAttempt({ ...payload, password: payload?.password || '' }, callback);
+      handleCreateRoom(payload, callback);
     });
 
     socket.on('join-room', (payload, callback) => {
-      handleJoinAttempt(payload, callback);
+      handleJoinRoom(payload, callback);
     });
 
     socket.on('join_room', (payload, callback) => {
-      const normalizedPayload = typeof payload === 'string'
-        ? { roomId: payload, username: 'Anonymous' }
-        : payload;
-      handleJoinAttempt(normalizedPayload, callback);
+      const normalizedPayload =
+        typeof payload === 'string' ? { roomId: payload, username: 'Anonymous' } : payload;
+      handleJoinRoom(normalizedPayload, callback);
     });
 
-
-       // Re-sync a client's view of the room (e.g. after the tab regains focus)
+    // Re-sync a client's view of the room (e.g. after the tab regains focus)
     socket.on('request_sync', ({ roomId }) => {
       const room = rooms[roomId];
       if (!room) return;
@@ -198,6 +264,32 @@ module.exports = (io) => {
           players: rooms[roomId].players,
         });
       }
+    });
+
+    socket.on('leave-room', ({ roomId }) => {
+      const room = rooms[roomId];
+      const player = room && room.players[socket.id];
+      if (!room || !player) return;
+
+      delete room.players[socket.id];
+      socket.leave(roomId);
+
+      if (Object.keys(room.players).length === 0) {
+        delete rooms[roomId];
+      } else {
+        io.to(roomId).emit('presence_update', {
+          socketId: socket.id,
+          username: player.username,
+          online: false,
+        });
+        io.to(roomId).emit('player_left', { username: player.username });
+        io.to(roomId).emit('room_update', {
+          players: room.players,
+          status: room.status,
+        });
+      }
+
+      console.log(`User ${player.username} left room ${roomId}`);
     });
 
     socket.on('disconnect', () => {
