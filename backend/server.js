@@ -198,7 +198,26 @@ app.get('/', (req, res) => {
   res.json({ message: 'Welcome to OpenPrep AI Backend REST API API Services' });
 });
 
-// Health Check Route
+// Health Check Routes
+app.get(['/api/v1/health', '/api/health'], async (req, res) => {
+  try {
+    const { sequelize } = require('./config/db');
+    await sequelize.authenticate();
+    res.status(200).json({
+      status: 'ok',
+      db: 'connected',
+      uptime: process.uptime(),
+      memoryUsage: process.memoryUsage(),
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      db: 'disconnected',
+      error: error.message,
+    });
+  }
+});
+
 app.get('/healthz', (req, res) => {
   res.status(200).send('OK');
 });
@@ -245,3 +264,42 @@ startScheduler();
 server.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
 });
+
+// Graceful Shutdown Logic
+const gracefulShutdown = (signal) => {
+  console.log(`Received ${signal}. Starting graceful shutdown...`);
+
+  // Force exit timeout (10 seconds maximum connection drain)
+  const forceExitTimeout = setTimeout(() => {
+    console.error('Graceful shutdown timed out. Forcing database connection termination and server exit.');
+    process.exit(1);
+  }, 10000);
+
+  server.close(async () => {
+    console.log('HTTP connections drained. Closing resource pools...');
+    clearTimeout(forceExitTimeout);
+
+    try {
+      const { sequelize } = require('./config/db');
+      await sequelize.close();
+      console.log('Sequelize PostgreSQL connection pool closed.');
+    } catch (dbErr) {
+      console.error('Error closing database pool:', dbErr.message);
+    }
+
+    try {
+      const redisService = require('./services/redisService');
+      if (redisService.client) {
+        await redisService.client.quit();
+        console.log('Redis client connection closed.');
+      }
+    } catch (redisErr) {
+      console.error('Error closing Redis connection:', redisErr.message);
+    }
+
+    process.exit(0);
+  });
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
