@@ -100,16 +100,23 @@ const QuizSession = () => {
     );
   };
 
-  const handleExportResultsPDF = () => {
-    const element = document.getElementById('quiz-results-container');
-    const opt = {
-      margin: 0.5,
-      filename: `quiz-result-${quiz.title}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
-    };
-    html2pdf().from(element).set(opt).save();
+  const handleDownloadPDFReport = async () => {
+    try {
+      const response = await API.get(`/quizzes/attempts/${result.id}/pdf`, {
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `quiz-report-${result.id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      console.error('Failed to download PDF report:', err);
+      alert('Failed to generate and download PDF report. Please try again.');
+    }
   };
 
   useEffect(() => {
@@ -512,12 +519,12 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
                 >
                   Export as JSON
                 </button>
-                <button
-                  onClick={handleExportResultsPDF}
-                  className="px-4 py-2 text-sm bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 rounded-lg font-medium transition-colors flex items-center gap-2"
-                >
-                  <FaFilePdf /> Download PDF Summary
-                </button>
+                 <button
+                   onClick={handleDownloadPDFReport}
+                   className="px-4 py-2 text-sm bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 rounded-lg font-medium transition-colors flex items-center gap-2"
+                 >
+                   <FaFilePdf /> Download PDF Report
+                 </button>
               </div>
             </div>
 <div className="space-y-6">

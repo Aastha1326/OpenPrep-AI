@@ -11,6 +11,7 @@ const {
   submitTelemetryBatch,
   getQuizBookmarks,
   toggleQuizBookmark,
+  getQuizAttemptReportPDF,
 } = require('../controllers/quizController');
 const { protect } = require('../middleware/auth');
 const telemetryAuth = require('../middleware/telemetryAuth');const { aiLimiter } = require('../middleware/rateLimiter');
@@ -324,6 +325,7 @@ router.get('/', protect, getQuizzes);
  */
 
 router.get('/attempts/history', protect, getAttemptHistory);
+router.get('/attempts/:attemptId/pdf', protect, getQuizAttemptReportPDF);
 
 /**
  * @swagger
