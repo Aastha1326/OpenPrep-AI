@@ -57,6 +57,10 @@ const QuizAttempt = sequelize.define(
         name: 'quizattempt_user_quiz_idx',
         fields: ['user', 'quiz'],
       },
+      {
+        name: 'quizattempt_user_created_idx',
+        fields: ['user', 'createdAt'],
+      },
     ],
   }
 );
