@@ -110,7 +110,12 @@ html.dark .glass-panel {
   color: #F8FAFC;
 }
 
-/* High Contrast Mode Overrides - Fixes missing content & ensures crisp visibility */
+
+
+
+
+/*High Contrast Mode Overrides - Fixes missing content & Ensures crisp visibility */
+
 .high-contrast,
 html.high-contrast,
 .dark.high-contrast,
@@ -386,4 +391,133 @@ html.dark .bg-vintage-paper {
 .math-renderer {
   word-wrap: break-word;
   overflow-wrap: break-word;
+}
+/* OLED Theme - Landing Page */
+html.oled .min-h-screen {
+  background-color: #000000 !important;
+  color: #f8fafc !important;
+}
+
+html.oled .bg-\[\#FDFBF7\] {
+  background-color: #000000 !important;
+}
+
+html.oled .bg-\[\#fdfbf7\] {
+  background-color: #000000 !important;
+}
+
+/* ───────── OLED THEME PRESET ───────── */
+
+html.oled {
+  background: #000000 !important;
+  color-scheme: dark;
+}
+
+html.oled body {
+  background: #000000 !important;
+  color: #f8fafc !important;
+}
+
+/* Main page surfaces */
+html.oled .min-h-screen {
+  background: #000000 !important;
+  color: #f8fafc !important;
+}
+
+html.oled header,
+html.oled section,
+html.oled footer {
+  background-color: #000000 !important;
+}
+
+/* Cards */
+html.oled .bg-white,
+html.oled .bg-slate-50,
+html.oled .bg-slate-800,
+html.oled .bg-slate-950 {
+  background-color: #050505 !important;
+}
+
+/* Cream/vintage surfaces */
+html.oled .bg-\[\#FDFBF7\] {
+  background-color: #000000 !important;
+}
+
+html.oled .bg-\[\#F5E6CA\] {
+  background-color: #050505 !important;
+}
+
+/* Borders */
+html.oled .border-black\/5,
+html.oled .border-black\/10,
+html.oled .border-slate-300,
+html.oled .border-slate-700 {
+  border-color: #27272a !important;
+}
+
+/* Normal text */
+html.oled .text-slate-900,
+html.oled .text-slate-800,
+html.oled .text-slate-700 {
+  color: #f8fafc !important;
+}
+
+html.oled .text-slate-600,
+html.oled .text-slate-500 {
+  color: #a1a1aa !important;
+}
+
+/* Keep gold/orange branding */
+html.oled .text-amber-800,
+html.oled .text-amber-900 {
+  color: #fbbf24 !important;
+}
+
+/* OLED cards */
+html.oled .glass-panel,
+html.oled .glass-card {
+  background: #050505 !important;
+  border-color: #27272a !important;
+  box-shadow: none !important;
+}
+
+/* Remove decorative light glows */
+html.oled .bg-amber-400\/10,
+html.oled .bg-indigo-400\/10 {
+  opacity: 0.03 !important;
+}
+
+/* =========================================================
+   LIGHT THEME CONTRAST FIX
+   Do not affect Dark / OLED themes
+   ========================================================= */
+
+html:not(.dark) {
+  --foreground: #1f2937;
+}
+
+/* Hero heading - make white text visible in Light mode */
+html:not(.dark) h1 .text-white,
+html:not(.dark) h1.text-white,
+html:not(.dark) h2 .text-white,
+html:not(.dark) h2.text-white {
+  color: #1f2937 !important;
+}
+/* Hero description */
+html:not(.dark) h1 + p,
+html:not(.dark) .hero p {
+  color: #64748b !important;
+}
+
+/* Navbar brand */
+html:not(.dark) nav .text-white,
+html:not(.dark) header .text-white {
+  color: #1f2937 !important;
+}
+
+/* Keep button text white */
+html:not(.dark) button .text-white,
+html:not(.dark) a.bg-orange-600,
+html:not(.dark) a.bg-orange-700 {
+  color: #ffffff !important;
 }

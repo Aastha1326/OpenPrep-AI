@@ -58,9 +58,17 @@ export const ThemeProvider = ({ children }) => {
     const root = window.document.documentElement;
     if (theme === 'dark') {
       root.classList.add('dark');
+      root.classList.remove('oled');
+
+    } else if (theme === 'oled') {
+      root.classList.add('dark');
+      root.classList.add('oled');
     } else if (theme === 'light') {
       root.classList.remove('dark');
+      root.classList.remove('oled');
     } else if (theme === 'system') {
+      root.classList.remove('oled');
+
       const isSystemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
       if (isSystemDark) {
         root.classList.add('dark');
