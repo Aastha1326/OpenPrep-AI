@@ -115,6 +115,17 @@ app.use(compression());
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
+// Mount Redis-backed distributed rate limiters
+const { authRateLimiter, aiRateLimiter, standardGetRateLimiter } = require('./middleware/redisRateLimiter');
+app.use('/api/auth', authRateLimiter);
+app.use('/api/ai', aiRateLimiter);
+app.use('/api', (req, res, next) => {
+  if (req.method === 'GET' && !req.path.startsWith('/auth') && !req.path.startsWith('/ai')) {
+    return standardGetRateLimiter(req, res, next);
+  }
+  next();
+});
+
 // General API rate limiter: 100 requests per 15 minutes per IP
 // Auth routes have tighter per-route limits defined in authRoutes.js
 const apiLimiter = rateLimit({
