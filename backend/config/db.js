@@ -6,10 +6,26 @@ const sequelize = new Sequelize(
     dialect: 'postgres',
     logging: process.env.NODE_ENV === 'development' ? console.log : false,
     pool: {
-      max: 5,
-      min: 0,
-      acquire: 30000,
-      idle: 10000
+      max: parseInt(process.env.DB_POOL_MAX, 10) || 20,
+      min: parseInt(process.env.DB_POOL_MIN, 10) || 5,
+      acquire: parseInt(process.env.DB_POOL_ACQUIRE, 10) || 30000,
+      idle: parseInt(process.env.DB_POOL_IDLE, 10) || 10000
+    },
+    dialectOptions: {
+      statement_timeout: parseInt(process.env.DB_STATEMENT_TIMEOUT, 10) || 5000,
+      idle_in_transaction_session_timeout: parseInt(process.env.DB_IDLE_IN_TRANSACTION_TIMEOUT, 10) || 5000
+    },
+    retry: {
+      match: [
+        /SequelizeConnectionError/,
+        /SequelizeConnectionRefusedError/,
+        /SequelizeHostNotFoundError/,
+        /SequelizeHostNotReachableError/,
+        /SequelizeInvalidConnectionError/,
+        /SequelizeConnectionTimedOutError/,
+        /TimeoutError/
+      ],
+      max: 3
     }
   }
 );
