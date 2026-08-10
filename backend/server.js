@@ -215,6 +215,10 @@ app.get('/uploads/:filename', protect, async (req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/academic', academicRoutes);
 app.use('/api/pyqs', pyqRoutes);
+app.use('/api/community', communityRoutes);
+app.use('/api/study', fatigueRoutes);
+app.use('/api/documents', pdfRoutes);
+app.use('/api/sync', syncRoutes);
 app.use('/api/study-plans', studyPlanRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/quiz', quizRoutes);
