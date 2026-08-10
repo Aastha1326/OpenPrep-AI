@@ -31,6 +31,9 @@ const flashcardRoutes = require('./routes/flashcardRoutes');
 const noteRoutes = require('./routes/noteRoutes');
 const progressRoutes = require('./routes/progressRoutes');
 const communityRoutes = require('./routes/communityRoutes');
+const fatigueRoutes = require('./routes/fatigueRoutes');
+const pdfRoutes = require('./routes/pdfRoutes');
+const syncRoutes = require('./routes/syncRoutes');
 
 // Connect to Database
 connectDB();
@@ -119,12 +122,15 @@ app.get('/uploads/:filename', protect, async (req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/academic', academicRoutes);
 app.use('/api/pyqs', pyqRoutes);
+app.use('/api/community', communityRoutes);
+app.use('/api/study', fatigueRoutes);
+app.use('/api/documents', pdfRoutes);
+app.use('/api/sync', syncRoutes);
 app.use('/api/study-plans', studyPlanRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/progress', progressRoutes);
-app.use('/api/community', communityRoutes);
 
 // Base Route
 app.get('/', (req, res) => {
