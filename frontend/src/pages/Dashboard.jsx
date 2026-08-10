@@ -22,6 +22,9 @@ import FlashcardWidget from '../components/dashboard/FlashcardWidget';
 import PinnedTasks from '../components/dashboard/PinnedTasks';
 import CreateNoteModal from '../components/dashboard/CreateNoteModal';
 import StudyPlanModal from '../components/dashboard/StudyPlanModal';
+import Whiteboard from '../components/dashboard/Whiteboard';
+import FatigueMonitor from '../components/dashboard/FatigueMonitor';
+import UploadMaterial from '../components/dashboard/UploadMaterial';
 import ThemeToggle from '../components/ThemeToggle';
 
 import {
@@ -193,7 +196,10 @@ const Dashboard = () => {
   // ── Note Modal State ──
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isStudyPlanOpen, setIsStudyPlanOpen] = useState(false);
+  const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [comingSoon, setComingSoon] = useState(null);
+  const [sessionStartTime] = useState(Date.now());
 
   useEffect(() => {
     if (comingSoon) {
@@ -265,6 +271,8 @@ const Dashboard = () => {
         <GoldTabButton icon={FileText} label="Analyze PYQ" delay={0.2} onClick={() => setComingSoon('PYQ Analysis coming soon!')} />
         <GoldTabButton icon={Calendar} label="Study Plan" delay={0.3} onClick={() => setIsStudyPlanOpen(true)} />
         <GoldTabButton icon={TrendingUp} label="Reports" delay={0.4} onClick={() => setComingSoon('Reports coming soon!')} />
+        <GoldTabButton icon={Lightbulb} label="Whiteboard" delay={0.5} onClick={() => setIsWhiteboardOpen(true)} />
+        <GoldTabButton icon={BookOpen} label="Auto-Deck" delay={0.6} onClick={() => setIsUploadOpen(true)} />
         <button 
           onClick={() => setIsNoteModalOpen(true)}
           className="bg-neutral-800 text-yellow-500 border border-yellow-700/50 hover:bg-neutral-700 p-2 rounded-r-lg shadow-lg flex items-center justify-center relative group"
@@ -678,6 +686,16 @@ const Dashboard = () => {
         onClose={() => setIsStudyPlanOpen(false)}
         activePlan={activePlan}
       />
+
+      {/* --- FATIGUE MONITOR --- */}
+      <FatigueMonitor sessionStartTime={sessionStartTime} />
+
+      {/* --- UPLOAD MATERIAL --- */}
+      <AnimatePresence>
+        {isUploadOpen && (
+          <UploadMaterial onClose={() => setIsUploadOpen(false)} />
+        )}
+      </AnimatePresence>
 
       {/* --- COMING SOON TOAST --- */}
       <AnimatePresence>
