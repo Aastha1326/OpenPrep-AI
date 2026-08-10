@@ -40,8 +40,8 @@ describe('Quiz Controller - Integration Tests', () => {
       password: 'password123',
     });
 
-    authToken = jwt.sign({ id: testUser.id }, process.env.JWT_SECRET);
-    otherAuthToken = jwt.sign({ id: testUser2.id }, process.env.JWT_SECRET);
+    authToken = jwt.sign({ id: testUser.id, type: 'access' }, process.env.JWT_SECRET);
+    otherAuthToken = jwt.sign({ id: testUser2.id, type: 'access' }, process.env.JWT_SECRET);
 
     const examForSubject = await Exam.create({
       name: 'Quiz Test Exam',
@@ -172,15 +172,18 @@ describe('Quiz Controller - Integration Tests', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.id).toBe(testQuiz.id.toString());
+      expect(res.body.data.id || res.body.data._id).toBe(testQuiz.id.toString());
       expect(res.body.data.title).toBe('Test Quiz');
     });
   });
 
   describe('POST /api/quizzes/:id/submit — IDOR Protection', () => {
-    const validAnswers = [{ questionId: '00000000-0000-0000-0000-000000000001', selectedAnswer: 0 }];
-
     it("should return 404 when another user tries to submit on someone else's quiz (IDOR protection)", async () => {
+      const validAnswers = (testQuiz.questions || []).map((q) => ({
+        questionId: String(q._id || q.id || q.questionId),
+        selectedAnswer: 0,
+      }));
+
       const res = await request(app)
         .post(`/api/quizzes/${testQuiz.id}/submit`)
         .set('Authorization', `Bearer ${otherAuthToken}`)
@@ -207,6 +210,185 @@ describe('Quiz Controller - Integration Tests', () => {
       expect(res.body.data).toHaveProperty('score');
       expect(res.body.data.score).toBe(100);
       expect(res.body.data.user).toBe(testUser.id.toString());
+    });
+
+    it('should return the existing attempt when the same quiz is resubmitted within the 5-second window (double-click prevention)', async () => {
+      const realAnswers = (testQuiz.questions || []).map((q, idx) => ({
+        questionId: String(q.id || q._id || q.questionId || `00000000-0000-0000-0000-00000000000${idx + 1}`),
+        selectedAnswer: q.correctAnswer !== undefined ? q.correctAnswer : 0,
+      }));
+
+      // First submission creates the attempt
+      const firstRes = await request(app)
+        .post(`/api/quizzes/${testQuiz.id}/submit`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ answers: realAnswers, timeSpent: 30 });
+      expect(firstRes.status).toBe(201);
+
+      // Immediate second submission must NOT create a duplicate
+      const secondRes = await request(app)
+        .post(`/api/quizzes/${testQuiz.id}/submit`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ answers: realAnswers, timeSpent: 30 });
+
+      expect(secondRes.status).toBe(200);
+      expect(secondRes.body.success).toBe(true);
+      expect(secondRes.body.duplicate).toBe(true);
+      expect(secondRes.body.data.id).toBe(firstRes.body.data.id);
+
+      const attemptCount = await QuizAttempt.count({
+        where: { user: testUser.id, quiz: testQuiz.id },
+      });
+      expect(attemptCount).toBe(1);
+    });
+
+    it('should drop a retried submission carrying the same submissionId after the DB 5s window has passed (NodeCache idempotency)', async () => {
+      const realAnswers = (testQuiz.questions || []).map((q, idx) => ({
+        questionId: String(q.id || q._id || q.questionId || `00000000-0000-0000-0000-00000000000${idx + 1}`),
+        selectedAnswer: q.correctAnswer !== undefined ? q.correctAnswer : 0,
+      }));
+
+      const submissionId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+
+      // First submission creates the attempt and remembers the submission UUID
+      const firstRes = await request(app)
+        .post(`/api/quizzes/${testQuiz.id}/submit`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ answers: realAnswers, timeSpent: 30, submissionId });
+      expect(firstRes.status).toBe(201);
+
+      // Backdate the attempt beyond the pre-existing 5s DB duplicate window so
+      // the DB check can no longer deduplicate the retry — only the 10s
+      // submissionId NodeCache can still drop it. This test fails if the
+      // NodeCache idempotency mechanism is removed.
+      await QuizAttempt.update(
+        { createdAt: new Date(Date.now() - 7000) },
+        { where: { id: firstRes.body.data.id } }
+      );
+
+      // Retry with the same UUID within the 10-second window must still be dropped
+      const secondRes = await request(app)
+        .post(`/api/quizzes/${testQuiz.id}/submit`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ answers: realAnswers, timeSpent: 30, submissionId });
+
+      expect(secondRes.status).toBe(200);
+      expect(secondRes.body.success).toBe(true);
+      expect(secondRes.body.duplicate).toBe(true);
+      expect(secondRes.body.data.id).toBe(firstRes.body.data.id);
+
+      const attemptCount = await QuizAttempt.count({
+        where: { user: testUser.id, quiz: testQuiz.id },
+      });
+      expect(attemptCount).toBe(1);
+    });
+
+    it('should allow a new attempt with the same submissionId once the 10s cache TTL expires', async () => {
+      const realAnswers = (testQuiz.questions || []).map((q, idx) => ({
+        questionId: String(q.id || q._id || q.questionId || `00000000-0000-0000-0000-00000000000${idx + 1}`),
+        selectedAnswer: q.correctAnswer !== undefined ? q.correctAnswer : 0,
+      }));
+
+      const submissionId = 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff';
+
+      const firstRes = await request(app)
+        .post(`/api/quizzes/${testQuiz.id}/submit`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ answers: realAnswers, timeSpent: 30, submissionId });
+      expect(firstRes.status).toBe(201);
+
+      // Move the attempt outside the 5s DB duplicate window so the DB check
+      // cannot block the retry either.
+      await QuizAttempt.update(
+        { createdAt: new Date(Date.now() - 7000) },
+        { where: { id: firstRes.body.data.id } }
+      );
+
+      // Simulate >10s passing: NodeCache decides TTL expiry via Date.now()
+      // (node-cache source: data.t !== 0 && data.t < Date.now()). Only Date is
+      // faked — supertest/sequelize async behavior is untouched.
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(Date.now() + 11000);
+      try {
+        const secondRes = await request(app)
+          .post(`/api/quizzes/${testQuiz.id}/submit`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({ answers: realAnswers, timeSpent: 30, submissionId });
+
+        expect(secondRes.status).toBe(201);
+        expect(secondRes.body.success).toBe(true);
+        expect(secondRes.body.data.id).not.toBe(firstRes.body.data.id);
+
+        const attemptCount = await QuizAttempt.count({
+          where: { user: testUser.id, quiz: testQuiz.id },
+        });
+        expect(attemptCount).toBe(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('should not create duplicate attempts when the same quiz is submitted concurrently (rapid double-click)', async () => {
+      const realAnswers = (testQuiz.questions || []).map((q, idx) => ({
+        questionId: String(q.id || q._id || q.questionId || `00000000-0000-0000-0000-00000000000${idx + 1}`),
+        selectedAnswer: q.correctAnswer !== undefined ? q.correctAnswer : 0,
+      }));
+
+      const [res1, res2] = await Promise.all([
+        request(app)
+          .post(`/api/quizzes/${testQuiz.id}/submit`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({ answers: realAnswers, timeSpent: 30 }),
+        request(app)
+          .post(`/api/quizzes/${testQuiz.id}/submit`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({ answers: realAnswers, timeSpent: 30 }),
+      ]);
+
+      // Exactly one attempt must be persisted
+      const attemptCount = await QuizAttempt.count({
+        where: { user: testUser.id, quiz: testQuiz.id },
+      });
+      expect(attemptCount).toBe(1);
+
+      // One request creates (201), the other is deduplicated (200 + duplicate flag)
+      const statuses = [res1.status, res2.status].sort();
+      expect(statuses).toEqual([200, 201]);
+      const dupRes = res1.status === 200 ? res1 : res2;
+      expect(dupRes.body.duplicate).toBe(true);
+    });
+
+    it('should allow a new attempt after the 5-second dedup window has passed', async () => {
+      const realAnswers = (testQuiz.questions || []).map((q, idx) => ({
+        questionId: String(q.id || q._id || q.questionId || `00000000-0000-0000-0000-00000000000${idx + 1}`),
+        selectedAnswer: q.correctAnswer !== undefined ? q.correctAnswer : 0,
+      }));
+
+      const firstRes = await request(app)
+        .post(`/api/quizzes/${testQuiz.id}/submit`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ answers: realAnswers, timeSpent: 30 });
+      expect(firstRes.status).toBe(201);
+
+      // Simulate the previous attempt being older than the dedup window
+      await QuizAttempt.update(
+        { createdAt: new Date(Date.now() - 10000) },
+        { where: { id: firstRes.body.data.id } }
+      );
+
+      const secondRes = await request(app)
+        .post(`/api/quizzes/${testQuiz.id}/submit`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ answers: realAnswers, timeSpent: 30 });
+
+      expect(secondRes.status).toBe(201);
+      expect(secondRes.body.success).toBe(true);
+      expect(secondRes.body.data.id).not.toBe(firstRes.body.data.id);
+
+      const attemptCount = await QuizAttempt.count({
+        where: { user: testUser.id, quiz: testQuiz.id },
+      });
+      expect(attemptCount).toBe(2);
     });
 
     afterEach(async () => {

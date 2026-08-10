@@ -46,13 +46,23 @@ const Flashcard = sequelize.define(
       type: DataTypes.FLOAT,
       defaultValue: 2.5,
     },
-    nextReviewDate: {
+nextReviewDate: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
     },
-  },
-  {
-    timestamps: true,
+    tags: {
+      type: DataTypes.JSONB,
+      defaultValue: [],
+    },
+difficulty: {
+      type: DataTypes.ENUM('Easy', 'Medium', 'Hard'),
+      allowNull: true,
+    },
+    hint: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+  },  {    timestamps: true,
     indexes: [
       {
         name: 'flashcard_user_idx',

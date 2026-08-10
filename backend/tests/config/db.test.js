@@ -73,6 +73,7 @@ describe('Database Configuration - Model Registration', () => {
       const { Exam } = require('../../models');
       const names = getIndexNames(Exam);
       expect(names).toContain('exam_user_idx');
+      expect(names).toContain('exam_user_created_idx');
     });
 
     it('Subject should have indexes on exam and user', () => {
@@ -95,6 +96,9 @@ describe('Database Configuration - Model Registration', () => {
       expect(names).toContain('pyq_exam_idx');
       expect(names).toContain('pyq_subject_idx');
       expect(names).toContain('pyq_user_exam_idx');
+      expect(names).toContain('pyq_exam_year_subject_idx');
+      expect(names).toContain('pyq_user_exam_created_idx');
+      expect(names).toContain('pyq_user_subject_year_idx');
     });
 
     it('StudyPlan should have indexes on user and exam', () => {
@@ -103,6 +107,7 @@ describe('Database Configuration - Model Registration', () => {
       expect(names).toContain('studyplan_user_idx');
       expect(names).toContain('studyplan_exam_idx');
       expect(names).toContain('studyplan_user_exam_idx');
+      expect(names).toContain('studyplan_user_exam_created_idx');
     });
 
     it('Quiz should have indexes on subject and topic', () => {
@@ -118,6 +123,7 @@ describe('Database Configuration - Model Registration', () => {
       expect(names).toContain('quizattempt_user_idx');
       expect(names).toContain('quizattempt_quiz_idx');
       expect(names).toContain('quizattempt_user_quiz_idx');
+      expect(names).toContain('quizattempt_user_created_idx');
     });
 
     it('Note should have indexes on user, subject, topic, and user+subject', () => {
@@ -145,6 +151,7 @@ describe('Database Configuration - Model Registration', () => {
       expect(names).toContain('progress_subject_idx');
       expect(names).toContain('progress_topic_idx');
       expect(names).toContain('progress_user_subject_idx');
+      expect(names).toContain('progress_user_updated_idx');
     });
 
     it('Feedback should have index on user', () => {
