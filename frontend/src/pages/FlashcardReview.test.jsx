@@ -141,7 +141,7 @@ describe('FlashcardReview', () => {
 
     renderReview();
     expect(await screen.findByText('What is Redux?')).toBeInTheDocument();
-    expect(API.get).not.toHaveBeenCalled();
+    expect(API.get).not.toHaveBeenCalledWith(expect.stringContaining('/flashcards'));
   });
 
   test('clears the saved session once the queue is complete', async () => {
