@@ -8,16 +8,22 @@ const ThemeToggle = ({ className = '' }) => {
     <div className={`flex items-center gap-2 ${className}`}>
       <button
         onClick={toggleTheme}
-        className="p-2 rounded-lg bg-amber-100/50 hover:bg-amber-100 dark:bg-slate-800 dark:hover:bg-slate-700/80 transition"
+        className={`p-2 rounded-lg transition ${
+          theme === 'oled'
+            ? 'bg-zinc-900 text-yellow-400 hover:bg-zinc-800'
+            : 'bg-amber-100/50 hover:bg-amber-100 dark:bg-slate-800 dark:hover:bg-slate-700/80'
+        }`}
         aria-label="Toggle theme"
         title={`Toggle Theme (Current: ${theme})`}
       >
         {theme === 'dark' ? (
-          <Moon className="h-5 w-5 text-amber-400" />
+          <Moon className="h-5 w-5" />
+        ) : theme === 'oled' ? (
+          <Moon className="h-5 w-5 text-yellow-400" />
         ) : theme === 'light' ? (
-          <Sun className="h-5 w-5 text-amber-900" />
+          <Sun className="h-5 w-5" />
         ) : (
-          <Monitor className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+          <Monitor className="h-5 w-5" />
         )}
       </button>
 
