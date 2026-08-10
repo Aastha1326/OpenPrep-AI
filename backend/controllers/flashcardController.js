@@ -378,9 +378,9 @@ exports.reviewFlashcard = async (req, res, next) => {
     efactor = efactor + deltaEF * easyFactorModifier;
     if (efactor < 1.3) efactor = 1.3;
 
-    card.interval = result.interval;
-    card.repetitions = result.repetitions;
-    card.efactor = result.efactor;
+    card.interval = interval;
+    card.repetitions = repetitions;
+    card.efactor = efactor;
 
     // Set next review date from now
     card.nextReviewDate = new Date(Date.now() + card.interval * 24 * 60 * 60 * 1000);
@@ -412,7 +412,11 @@ exports.reviewFlashcard = async (req, res, next) => {
       await progress.save();
     }
 
-    res.status(200).json({ success: true, data: card });
+    const xpService = require('../services/xpService');
+    const xpEarned = quality >= 4 ? 80 : 40;
+    const progression = await xpService.addXP(req.user, xpEarned);
+
+    res.status(200).json({ success: true, data: card, progression });
   } catch (error) {
     next(error);
   }
