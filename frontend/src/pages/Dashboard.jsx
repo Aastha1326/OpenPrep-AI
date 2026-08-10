@@ -20,6 +20,9 @@ import GoldTabButton from '../components/dashboard/GoldTabButton';
 import PomodoroTimer from '../components/dashboard/PomodoroTimer';
 import FlashcardWidget from '../components/dashboard/FlashcardWidget';
 import PinnedTasks from '../components/dashboard/PinnedTasks';
+import FatigueMonitor from '../components/dashboard/FatigueMonitor';
+import UploadMaterial from '../components/dashboard/UploadMaterial';
+import SkillTree from '../components/dashboard/SkillTree';
 import CreateNoteModal from '../components/dashboard/CreateNoteModal';
 import StudyPlanModal from '../components/dashboard/StudyPlanModal';
 import ThemeToggle from '../components/ThemeToggle';
@@ -193,6 +196,9 @@ const Dashboard = () => {
   // ── Note Modal State ──
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isStudyPlanOpen, setIsStudyPlanOpen] = useState(false);
+  const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isSkillTreeOpen, setIsSkillTreeOpen] = useState(false);
   const [comingSoon, setComingSoon] = useState(null);
 
   useEffect(() => {
@@ -278,47 +284,29 @@ const Dashboard = () => {
 
       <div className="pl-4 md:pl-16 pr-4 lg:pr-8 py-8 space-y-12">
         {/* --- HERO SECTION --- */}
-        <div className="flex flex-col md:flex-row justify-between items-end border-b border-black/20 pb-8">
-          <motion.div
+        <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
-            className="flex-1"
-          >
-            <h1 className="text-5xl md:text-6xl font-bold text-gold-foil mb-2 font-playfair tracking-tight">
-              Welcome back{user?.name ? `, ${user.name}` : ', Scholar'}.
+            className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10"
+        >
+          <div>
+            <h1 className="text-3xl font-playfair font-bold text-stone-800 dark:text-stone-100 mb-2">
+              Welcome back, <span className="text-amber-600 dark:text-amber-500">{user?.name?.split(' ')[0] || 'Scholar'}</span>
             </h1>
-            <p className="text-amber-100/70 text-lg italic font-playfair">
-              &ldquo;The roots of education are bitter, but the fruit is sweet.&rdquo; – Aristotle
-            </p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-            className="flex items-center space-x-6 mt-6 md:mt-0"
-          >
-            <ThemeToggle className="mr-2" />
-            <div className="flex flex-col items-center">
-              <div className="relative">
-                <Flame className="w-12 h-12 text-orange-500 animate-pulse-glow" fill="currentColor" />
-                <div className="absolute inset-0 blur-md bg-orange-500/30 rounded-full" />
-              </div>
-              <span className="text-gold-foil font-bold text-2xl">{streakDays} Day</span>
-              <span className="text-amber-200/50 text-xs uppercase tracking-widest">Streak</span>
-            </div>
-
+            <p className="text-stone-600 dark:text-stone-400">Continue your journey to mastery.</p>
+          </div>
+          <div className="flex gap-4">
             <button
-              onClick={handleLogout}
-              className="bg-gradient-to-br from-red-700 to-red-900 text-red-50 px-4 py-3 rounded-sm border border-red-500/50 shadow-[0_4px_15px_rgba(0,0,0,0.5)] hover:shadow-[0_6px_20px_rgba(220,50,50,0.3)] transition-all flex items-center gap-2 group"
-              aria-label="Log out"
+              onClick={() => setIsSkillTreeOpen(true)}
+              className="bg-stone-800 text-amber-500 px-4 py-2 rounded-lg font-bold hover:bg-stone-700 transition shadow-lg border border-amber-900/30 flex items-center gap-2"
             >
-              <LogOut className="w-5 h-5 group-hover:text-white" />
-              <span className="font-playfair font-bold text-sm tracking-wide group-hover:text-white hidden sm:inline">Logout</span>
+              <Zap className="w-5 h-5" />
+              Skill Tree
             </button>
-          </motion.div>
-        </div>
+            <ThemeToggle />
+          </div>
+        </motion.div>
 
         {/* --- STATISTICS OVERVIEW --- */}
         {errorStats && !loadingStats ? (
@@ -671,6 +659,20 @@ const Dashboard = () => {
         onClose={() => setIsNoteModalOpen(false)} 
         onNoteCreated={() => setIsNoteModalOpen(false)}
       />
+
+      {/* --- UPLOAD MATERIAL --- */}
+      <AnimatePresence>
+        {isUploadOpen && (
+          <UploadMaterial onClose={() => setIsUploadOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* --- SKILL TREE --- */}
+      <AnimatePresence>
+        {isSkillTreeOpen && (
+          <SkillTree onClose={() => setIsSkillTreeOpen(false)} />
+        )}
+      </AnimatePresence>
 
       {/* --- STUDY PLAN MODAL --- */}
       <StudyPlanModal
