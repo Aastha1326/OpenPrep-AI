@@ -1,5 +1,5 @@
 const express = require('express');
-const { explainQuestion } = require('../controllers/aiController');
+const { explainQuestion, chatWithAssistant } = require('../controllers/aiController');
 const { protect } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
 const { checkQuota } = require('../middleware/quotaMiddleware');
@@ -131,6 +131,14 @@ router.post(
   checkQuota,
   validateExplainQuestion,
   explainQuestion
+);
+
+router.post(
+  '/chat',
+  protect,
+  aiLimiter,
+  checkQuota,
+  chatWithAssistant
 );
 
 module.exports = router;

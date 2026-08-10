@@ -58,4 +58,21 @@ test.describe('OpenPrep AI Core User Journeys', () => {
     await expect(page.locator('text=PYQ Intelligence')).toBeVisible();
     await expect(page.locator('text=Study Plan')).toBeVisible();
   });
+
+  test('should navigate to AI Study Assistant and render voice query options', async ({ page }) => {
+    // 1. Perform login
+    await page.goto('/login');
+    await page.fill('#login-email', 'student@openprep.ai');
+    await page.fill('#login-password', 'Password123');
+    await page.click('button[type="submit"]');
+    await page.waitForURL('**/dashboard');
+
+    // 2. Click AI Study Assistant quick link
+    await page.click('text=AI Study Assistant');
+    await page.waitForURL('**/ai-assistant');
+
+    // 3. Verify page content
+    await expect(page.locator('text=AI Study Mentor')).toBeVisible();
+    await expect(page.locator('placeholder=Speak or type your concept question here...')).toBeVisible();
+  });
 });

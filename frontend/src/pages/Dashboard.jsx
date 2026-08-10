@@ -27,6 +27,7 @@ import {
   Globe,
   Youtube,
   Brain,
+  Bot,
 } from 'lucide-react';import API from '../services/api';
 import { toDateOnlyString } from '../utils/dateUtils';
 import SkillTree from '../components/dashboard/SkillTree';
@@ -479,6 +480,12 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           label="Community Decks"
           delay={0.48}
           onClick={() => setIsCommunityDecksOpen(true)}
+        />
+        <GoldTabButton
+          icon={Bot}
+          label="AI Study Assistant"
+          delay={0.5}
+          onClick={() => navigate('/ai-assistant')}
         />
         <button
           onClick={() => {
