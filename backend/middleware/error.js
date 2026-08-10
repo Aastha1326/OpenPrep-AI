@@ -1,6 +1,7 @@
 const errorHandler = (err, req, res, next) => {
   let error = { ...err };
   error.message = err.message;
+  error.statusCode = err.statusCode || err.status;
 
   // Log to console for developer
   console.error(err);
@@ -39,6 +40,11 @@ const errorHandler = (err, req, res, next) => {
 
   // Multer file size limit error
   if (err.name === 'MulterError') {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({
+        message: 'File too large. Maximum file size is 15MB.',
+      });
+    }
     error = new Error(err.message);
     error.statusCode = 400;
   }
@@ -46,6 +52,28 @@ const errorHandler = (err, req, res, next) => {
   // Custom file type validation error
   if (err.name === 'FileValidationError') {
     error.statusCode = 400;
+  }
+
+  // JWT Errors
+  if (err.name === 'TokenExpiredError') {
+    return res.status(401).json({
+      success: false,
+      message: 'Token expired',
+      error: 'Token expired',
+    });
+  }
+  if (err.name === 'JsonWebTokenError') {
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid token',
+      error: 'Not authorized to access this route',
+    });
+  }
+
+  // Timeout error handling
+  if (err.statusCode === 408 || err.message?.includes('timed out')) {
+    error.statusCode = 408;
+    error.message = err.message || 'Request processing timed out. Please try again with a smaller file.';
   }
 
   res.status(error.statusCode || 500).json({
