@@ -133,6 +133,14 @@ const User = sequelize.define(
       type: DataTypes.BOOLEAN,
       defaultValue: true,
     },
+    pushSubscription: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+    },
+    dailyReminderTime: {
+      type: DataTypes.STRING,
+      defaultValue: '09:00',
+    },
     xp: {
       type: DataTypes.INTEGER,
       defaultValue: 0,
