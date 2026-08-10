@@ -6,11 +6,11 @@ const {
   moveTaskDate,
   getPlans,
   getWeaknessAnalysis,
-  rescheduleAdaptivePlan,
+rescheduleAdaptivePlan,
   rescheduleOverdueTasks,
   exportStudyPlanIcs,
-} = require('../controllers/studyPlanController');
-const { protect } = require('../middleware/auth');
+  rebalanceStudyPlan,
+} = require('../controllers/studyPlanController');const { protect } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
 const { checkQuota } = require('../middleware/quotaMiddleware');
 const {
@@ -388,5 +388,55 @@ router.put('/:planId/tasks/:taskId/date', protect, validateMoveTaskDate, moveTas
  *               $ref: '#/components/schemas/Error'
  */
 router.post('/:id/reschedule', protect, aiLimiter, checkQuota, rescheduleOverdueTasks);
+
+/**
+ * @swagger
+ * /api/study-plans/rebalance:
+ *   post:
+ *     summary: Predict syllabus completion date and evenly rebalance pending tasks across remaining study days
+ *     tags: [Study Plans]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               examId:
+ *                 type: string
+ *                 format: uuid
+ *     responses:
+ *       200:
+ *         description: Forecast computed and pending tasks rebalanced (if any)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/StudyPlan'
+ *                 forecast:
+ *                   type: object
+ *                 rebalanced:
+ *                   type: boolean
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: No active study plan found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.post('/rebalance', protect, rebalanceStudyPlan);
 
 module.exports = router;
