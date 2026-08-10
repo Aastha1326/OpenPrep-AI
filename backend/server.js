@@ -7,6 +7,8 @@ const cookieParser = require('cookie-parser');
 const csrf = require('csurf');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const http = require('http');
+const { Server } = require('socket.io');
 const { connectDB } = require('./config/db');
 const errorHandler = require('./middleware/error');
 
@@ -140,7 +142,36 @@ app.get('/healthz', (req, res) => {
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
+const server = http.createServer(app);
 
-app.listen(PORT, () => {
+// Initialize Socket.io
+const io = new Server(server, {
+  cors: {
+    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    methods: ['GET', 'POST']
+  }
+});
+
+io.on('connection', (socket) => {
+  console.log('User connected to socket:', socket.id);
+
+  socket.on('join-whiteboard', (roomId) => {
+    socket.join(`whiteboard-${roomId}`);
+  });
+
+  socket.on('draw-line', (data) => {
+    socket.to(`whiteboard-${data.roomId}`).emit('draw-line', data);
+  });
+
+  socket.on('clear-board', (roomId) => {
+    socket.to(`whiteboard-${roomId}`).emit('clear-board');
+  });
+
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+  });
+});
+
+server.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
 });
