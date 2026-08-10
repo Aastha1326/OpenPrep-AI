@@ -15,9 +15,10 @@ const Progress = require('./Progress');
 const Feedback = require('./Feedback');
 const ActivityLog = require('./ActivityLog');
 const UsageQuota = require('./UsageQuota');
-
-// Define Associations
-
+const Achievement = require('./Achievement');
+const FocusSession = require('./FocusSession');
+const QuizTelemetryEvent = require('./QuizTelemetryEvent');
+const QuizBookmark = require('./QuizBookmark');
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -31,6 +32,7 @@ User.hasMany(Flashcard, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Progress, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Feedback, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(ActivityLog, { foreignKey: 'user', onDelete: 'CASCADE' });
+User.hasMany(Achievement, { foreignKey: 'userId', as: 'achievements', onDelete: 'CASCADE' });
 
 // Exam associations
 Exam.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
@@ -96,9 +98,23 @@ Feedback.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 // ActivityLog associations
 ActivityLog.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 
-module.exports = {
-  sequelize,
-  User,
+// Achievement associations
+Achievement.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+// FocusSession associations
+FocusSession.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
+// QuizTelemetryEvent associations
+QuizTelemetryEvent.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+User.hasMany(QuizTelemetryEvent, { foreignKey: 'user', onDelete: 'CASCADE' });
+
+// QuizBookmark associations
+QuizBookmark.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+QuizBookmark.belongsTo(Quiz, { foreignKey: 'quiz', as: 'quizRef' });
+User.hasMany(QuizBookmark, { foreignKey: 'user', onDelete: 'CASCADE' });
+Quiz.hasMany(QuizBookmark, { foreignKey: 'quiz', onDelete: 'CASCADE' });
+
+module.exports = {  sequelize,  User,
   Exam,
   Subject,
   Topic,
@@ -111,5 +127,9 @@ module.exports = {
   Progress,
   Feedback,
   ActivityLog,
-  UsageQuota,
+UsageQuota,
+Achievement,
+  FocusSession,
+  QuizTelemetryEvent,
+  QuizBookmark,
 };

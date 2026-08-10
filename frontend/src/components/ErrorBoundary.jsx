@@ -1,5 +1,5 @@
 import { Component } from 'react';
-import { Link } from 'react-router-dom';
+
 import { AlertTriangle, RotateCcw, Home } from 'lucide-react';
 
 class ErrorBoundary extends Component {
@@ -54,13 +54,13 @@ class ErrorBoundary extends Component {
                 <RotateCcw className="h-4 w-4" />
                 Try Again
               </button>
-              <Link
-                to="/"
+              <a
+                href="/"
                 className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-white border border-stone-300 hover:bg-slate-50 text-stone-700 font-semibold rounded-sm transition-colors text-sm"
               >
                 <Home className="h-4 w-4" />
                 Go Home
-              </Link>
+              </a>
             </div>
           </div>
         </div>

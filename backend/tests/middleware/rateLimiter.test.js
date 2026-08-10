@@ -214,7 +214,7 @@ describe('Rate Limiter - Mounted on Routes', () => {
     process.env.JWT_SECRET = 'test_jwt_secret_for_rate_limiter_int';
     const jwt = require('jsonwebtoken');
     const { v4: uuidv4 } = require('uuid');
-    jwtToken = jwt.sign({ id: uuidv4() }, process.env.JWT_SECRET);
+    jwtToken = jwt.sign({ id: uuidv4(), type: 'access' }, process.env.JWT_SECRET);
   });
 
   afterAll(() => {
@@ -292,5 +292,65 @@ describe('Rate Limiter - Mounted on Routes', () => {
 
     expect(res.status).toBe(401);
     expect(res.body.success).toBe(false);
+  });
+});
+
+describe('Rate Limiter Middleware - authEmailLimiter (3 req/15 min)', () => {
+  let app;
+
+  beforeEach(() => {
+    process.env.NODE_ENV = 'development';
+    
+    // Clear cache to get fresh instance
+    delete require.cache[require.resolve('../../middleware/rateLimiter')];
+    const { authEmailLimiter: freshLimiter } = require('../../middleware/rateLimiter');
+
+    app = express();
+    app.use(express.json());
+    app.post('/api/auth/forgot-password', freshLimiter, (req, res) => {
+      res.status(200).json({ success: true, message: 'email sent' });
+    });
+    app.post('/api/auth/resend-verification', freshLimiter, (req, res) => {
+      res.status(200).json({ success: true, message: 'email sent' });
+    });
+    app.use(errorHandler);
+  });
+
+  afterEach(() => {
+    process.env.NODE_ENV = 'test';
+  });
+
+  it('should allow up to 3 requests within the limit', async () => {
+    const results = await sendNRequests(app, 'POST', '/api/auth/forgot-password', 3);
+    const allOk = results.every((r) => r.status === 200);
+    expect(allOk).toBe(true);
+  });
+
+  it('should return 429 and standard error response when limit is exceeded', async () => {
+    const results = await sendNRequests(app, 'POST', '/api/auth/forgot-password', 4);
+    
+    const okCount = results.filter((r) => r.status === 200).length;
+    const blockCount = results.filter((r) => r.status === 429).length;
+
+    expect(okCount).toBe(3);
+    expect(blockCount).toBe(1);
+
+    const blocked = results.find((r) => r.status === 429);
+    expect(blocked.body.success).toBe(false);
+    expect(blocked.body.error).toBe('Too many requests. Please try again after 15 minutes.');
+  });
+
+  it('should enforce rate limits on resend-verification endpoint', async () => {
+    const results = await sendNRequests(app, 'POST', '/api/auth/resend-verification', 4);
+    
+    const okCount = results.filter((r) => r.status === 200).length;
+    const blockCount = results.filter((r) => r.status === 429).length;
+
+    expect(okCount).toBe(3);
+    expect(blockCount).toBe(1);
+
+    const blocked = results.find((r) => r.status === 429);
+    expect(blocked.body.success).toBe(false);
+    expect(blocked.body.error).toBe('Too many requests. Please try again after 15 minutes.');
   });
 });
