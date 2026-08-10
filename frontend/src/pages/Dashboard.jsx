@@ -56,6 +56,7 @@ import PyqAnalysisModal from '../components/dashboard/PyqAnalysisModal';
 import WeaknessDashboardWidget from '../components/dashboard/WeaknessDashboardWidget';
 import SubjectMasteryWidget from '../components/dashboard/SubjectMasteryWidget';
 import FocusEfficiencyWidget from '../components/dashboard/FocusEfficiencyWidget';
+import ActivityHeatmap from '../components/dashboard/ActivityHeatmap';
 import LeaderboardWidget from '../components/dashboard/LeaderboardWidget';
 import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
 import TargetExamOverviewWidget from '../components/dashboard/TargetExamOverviewWidget';
@@ -66,6 +67,7 @@ import ThemeToggle from '../components/ThemeToggle';
 import BadgesList from '../components/BadgesList';
 import SM2SettingsModal from '../components/dashboard/SM2SettingsModal';
 import CommunityDecksModal from '../components/dashboard/CommunityDecksModal';
+import QuizSetupModal from '../components/dashboard/QuizSetupModal';
 import GenerateFlashcardsFromYouTubeModal from '../components/dashboard/GenerateFlashcardsFromYouTubeModal';
 import {
   fetchDashboardStats,
@@ -262,7 +264,9 @@ const Dashboard = () => {
 
   // ── Note & PYQ Modal State ──
 const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
-  const [isYoutubeFlashcardModalOpen, setIsYoutubeFlashcardModalOpen] = useState(false);  const [isStudyPlanOpen, setIsStudyPlanOpen] = useState(false);
+  const [isQuizSetupOpen, setIsQuizSetupOpen] = useState(false);
+  const [isYoutubeFlashcardModalOpen, setIsYoutubeFlashcardModalOpen] = useState(false);
+  const [isStudyPlanOpen, setIsStudyPlanOpen] = useState(false);
   const [isPyqModalOpen, setIsPyqModalOpen] = useState(false);
   const [isBundleModalOpen, setIsBundleModalOpen] = useState(false);
   const [isSyllabusImportOpen, setIsSyllabusImportOpen] = useState(false);
@@ -457,7 +461,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
         </button>
       </div>
 
-      <div className="pl-4 md:pl-16 pr-4 lg:pr-8 py-8 space-y-12">
+      <div className="pl-4 md:pl-16 pr-4 lg:pr-8 pt-16 sm:pt-8 pb-8 space-y-12">
         {/* --- HERO SECTION --- */}
         <div className="flex flex-col md:flex-row justify-between items-start border-b border-black/20 pb-8 gap-6">
           <motion.div
@@ -857,6 +861,9 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
 
         <div className="my-6">
           <FocusEfficiencyWidget />
+        </div>
+        <div className="my-6">
+          <ActivityHeatmap />
         </div>
         <div className="my-6">
           <BadgesList achievements={user?.achievements || []} />

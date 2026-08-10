@@ -171,6 +171,7 @@ const submitQuizSchema = z.object({
   ).min(1, 'Answers must be a non-empty array'),
   
   timeSpent: z.number().min(0, 'timeSpent must be a non-negative number no greater than 86400 (24 hours)').max(86400, 'timeSpent must be a non-negative number no greater than 86400 (24 hours)').optional(),
+  submissionId: z.string().uuid('submissionId must be a valid UUID').optional(),
 });
 
 module.exports = {

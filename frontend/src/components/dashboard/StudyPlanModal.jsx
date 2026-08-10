@@ -12,11 +12,11 @@ import {
   Plus,
   RefreshCw,
   AlertCircle,
-  CalendarDays,
+CalendarDays,
   GanttChartSquare,
   List,
-} from 'lucide-react';
-import html2pdf from 'html2pdf.js';
+  Gauge,
+} from 'lucide-react';import html2pdf from 'html2pdf.js';
 import API from '../../services/api';
 import { toLocalDateString, formatDateOnly } from '../../utils/dateUtils';
 import StudyPlanGanttView from './StudyPlanGanttView';
@@ -31,6 +31,7 @@ const CreateStudyPlanForm = ({
   minStartDate,
   minEndDate,
   exams,
+  prefillExamName,
 }) => (
   <div className="max-w-xl mx-auto">
     <div className="flex items-center justify-between mb-6">
@@ -188,12 +189,13 @@ const StudyPlanModal = ({
   onBumpTime,
   onPlanCreated,
   onPlanUpdate,
+  syllabusPrefill,
 }) => {
   const contentRef = useRef(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
-  const [isRescheduling, setIsRescheduling] = useState(false);
-  const [rescheduleMessage, setRescheduleMessage] = useState(null);
+const [isRescheduling, setIsRescheduling] = useState(false);
+  const [isRebalancing, setIsRebalancing] = useState(false);  const [rescheduleMessage, setRescheduleMessage] = useState(null);
   const [showWeakOnly, setShowWeakOnly] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
@@ -220,7 +222,7 @@ const StudyPlanModal = ({
     }));
   }, [dailyGoals, showWeakOnly]);
 
-  const totalWeakCount = useMemo(() => {
+const totalWeakCount = useMemo(() => {
     let count = 0;
     dailyGoals.forEach((day) => {
       (day.tasks || []).forEach((task) => {
@@ -230,6 +232,7 @@ const StudyPlanModal = ({
     return count;
   }, [dailyGoals]);
 
+  const completionForecast = activePlan?.completionForecast || null;
   // Fetch exams when create form is shown
   useEffect(() => {
     if (createFormVisible && exams.length === 0) {
@@ -362,7 +365,7 @@ const StudyPlanModal = ({
       }
 
       setTimeout(() => setRescheduleMessage(null), 4000);
-    } catch (error) {
+} catch (error) {
       console.error('Reschedule failed:', error);
       setRescheduleMessage({
         type: 'error',
@@ -374,8 +377,41 @@ const StudyPlanModal = ({
     }
   };
 
-  const handleInputChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+  const handleRebalance = async () => {
+    if (!activePlan?.id) return;
+
+    setIsRebalancing(true);
+    setRescheduleMessage(null);
+
+    try {
+      const response = await API.post('/study-plans/rebalance', {
+        examId: activePlan.exam?.id,
+      });
+
+      setRescheduleMessage({
+        type: 'success',
+        text: response.data.message || 'Study plan rebalanced successfully',
+      });
+
+      // Notify parent component to refresh the plan
+      if (onPlanUpdate) {
+        onPlanUpdate();
+      }
+
+      setTimeout(() => setRescheduleMessage(null), 4000);
+    } catch (error) {
+      console.error('Rebalance failed:', error);
+      setRescheduleMessage({
+        type: 'error',
+        text: error.response?.data?.error || 'Failed to rebalance study plan',
+      });
+      setTimeout(() => setRescheduleMessage(null), 4000);
+    } finally {
+      setIsRebalancing(false);
+    }
+  };
+
+  const handleInputChange = (field, value) => {    setFormData((prev) => ({ ...prev, [field]: value }));
     if (field === 'startDate' && value) {
       // Ensure endDate is not before startDate
       setFormData((prev) => {
@@ -487,15 +523,29 @@ const StudyPlanModal = ({
                       className="flex items-center space-x-2 bg-gradient-to-r from-blue-700 to-blue-900 text-white px-4 py-2 rounded-sm hover:from-blue-600 hover:to-blue-800 transition-colors disabled:opacity-50 cursor-pointer"
                       title="Reschedule overdue tasks"
                     >
-                      <RefreshCw className={`w-5 h-5 ${isRescheduling ? 'animate-spin' : ''}`} />
+<RefreshCw className={`w-5 h-5 ${isRescheduling ? 'animate-spin' : ''}`} />
                       <span className="font-semibold">
                         {isRescheduling ? 'Rescheduling...' : 'Reschedule Tasks'}
                       </span>
                     </button>
                     <button
-                      onClick={() => setShowCreateForm(true)}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-sm text-sm font-semibold transition-colors cursor-pointer border bg-white/70 text-[#8B4513] border-[#8B4513]/30 hover:bg-white"
+                      onClick={handleRebalance}
+                      disabled={isRebalancing}
+                      className={`flex items-center space-x-2 px-4 py-2 rounded-sm text-white transition-colors disabled:opacity-50 cursor-pointer ${
+                        completionForecast?.atRisk
+                          ? 'bg-gradient-to-r from-red-600 to-red-800 hover:from-red-500 hover:to-red-700'
+                          : 'bg-gradient-to-r from-purple-700 to-purple-900 hover:from-purple-600 hover:to-purple-800'
+                      }`}
+                      title="Evenly redistribute pending tasks across the remaining study days"
                     >
+                      <Gauge className={`w-5 h-5 ${isRebalancing ? 'animate-spin' : ''}`} />
+                      <span className="font-semibold">
+                        {isRebalancing ? 'Rebalancing...' : 'Rebalance Schedule'}
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => setShowCreateForm(true)}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-sm text-sm font-semibold transition-colors cursor-pointer border bg-white/70 text-[#8B4513] border-[#8B4513]/30 hover:bg-white"                    >
                       <Plus className="w-4 h-4" />
                       New Plan
                     </button>
@@ -543,11 +593,35 @@ const StudyPlanModal = ({
                 >
                   <X className="w-6 h-6" />
                 </button>
-              </div>
+</div>
             </div>
 
-            {/* Reschedule Message Toast */}
-            <AnimatePresence>
+            {/* Syllabus Completion Risk Banner */}
+            {!showForm && activePlan && completionForecast?.atRisk && (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-6 py-3 bg-red-50 border-b border-red-200 text-red-800">
+                <div className="flex items-start sm:items-center gap-2 text-sm">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 sm:mt-0" />
+                  <span>
+                    At your current pace, the syllabus is projected to finish on{' '}
+                    <span className="font-semibold">
+                      {formatDateOnly(completionForecast.projectedCompletionDate)}
+                    </span>{' '}
+                    — after your exam on{' '}
+                    <span className="font-semibold">{formatDateOnly(completionForecast.examDate)}</span>.
+                    A schedule rebalance is recommended.
+                  </span>
+                </div>
+                <button
+                  onClick={handleRebalance}
+                  disabled={isRebalancing}
+                  className="shrink-0 px-3 py-1.5 rounded-sm text-xs font-semibold bg-red-700 text-white hover:bg-red-800 transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  {isRebalancing ? 'Rebalancing...' : 'Rebalance Now'}
+                </button>
+              </div>
+            )}
+
+            {/* Reschedule Message Toast */}            <AnimatePresence>
               {rescheduleMessage && (
                 <motion.div
                   initial={{ opacity: 0, y: -20 }}

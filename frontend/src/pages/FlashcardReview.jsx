@@ -192,6 +192,18 @@ const FlashcardReview = () => {
   const isSessionComplete = !loading && cards.length > 0 && currentIndex >= cards.length;
   const noCardsDue = !loading && cards.length === 0;
 
+  const lastFlipTimeRef = useRef(0);
+
+  const handleCardFlip = useCallback((e) => {
+    const now = Date.now();
+    if (now - lastFlipTimeRef.current < 250) {
+      if (e && e.preventDefault) e.preventDefault();
+      return;
+    }
+    lastFlipTimeRef.current = now;
+    setIsFlipped((prev) => !prev);
+  }, []);
+
   const handleReview = useCallback(async (quality) => {
     if (!currentCard || submittingRef.current) return;
 
@@ -443,7 +455,7 @@ const FlashcardReview = () => {
       </div>
 
       {/* Flashcard Area */}
-      <div className="w-full max-w-3xl flex-1 flex flex-col items-center justify-start perspective-1000 mb-20">
+      <div className="w-full max-w-3xl flex-1 flex flex-col items-center justify-start perspective-1000 mb-20 select-none touch-action-manipulation">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentCard.id}
@@ -452,13 +464,28 @@ const FlashcardReview = () => {
             animate={{ opacity: 1, y: 0, rotateY: isFlipped ? 180 : 0 }}
             exit={{ opacity: 0, x: -100, transition: { duration: 0.2 } }}
             transition={{ duration: 0.6, type: 'spring', stiffness: 200, damping: 20 }}
-            style={{ transformStyle: 'preserve-3d' }}
-            onClick={() => !isFlipped && setIsFlipped(true)}
+            style={{
+              transformStyle: 'preserve-3d',
+              WebkitTransformStyle: 'preserve-3d',
+              willChange: 'transform',
+              WebkitTapHighlightColor: 'transparent',
+              touchAction: 'manipulation',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+            }}
+            onClick={() => !isFlipped && handleCardFlip()}
           >
             {/* Front */}
             <div
               className={`absolute inset-0 bg-white dark:bg-slate-800 shadow-xl border border-neutral-200 dark:border-slate-700 rounded-2xl p-8 flex flex-col justify-center items-center backface-hidden ${isFlipped ? 'pointer-events-none' : ''}`}
-              style={{ backfaceVisibility: 'hidden' }}
+              style={{
+                backfaceVisibility: 'hidden',
+                WebkitBackfaceVisibility: 'hidden',
+                WebkitTapHighlightColor: 'transparent',
+                transformStyle: 'preserve-3d',
+                WebkitTransformStyle: 'preserve-3d',
+                isolation: 'isolate',
+              }}
             >
               <div className="absolute top-4 left-6 flex items-center gap-2 text-xs font-bold text-neutral-400 uppercase tracking-widest">
                 <span className="w-2 h-2 rounded-full bg-blue-500"></span>
@@ -499,7 +526,16 @@ const FlashcardReview = () => {
             {/* Back */}
             <div
               className={`absolute inset-0 bg-primary-50 dark:bg-primary-900/10 shadow-xl border border-primary-200 dark:border-primary-800/50 rounded-2xl p-8 flex flex-col items-center overflow-y-auto backface-hidden ${!isFlipped ? 'pointer-events-none' : ''}`}
-              style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+              style={{
+                backfaceVisibility: 'hidden',
+                WebkitBackfaceVisibility: 'hidden',
+                WebkitTapHighlightColor: 'transparent',
+                transformStyle: 'preserve-3d',
+                WebkitTransformStyle: 'preserve-3d',
+                transform: 'rotateY(180deg)',
+                WebkitTransform: 'rotateY(180deg)',
+                isolation: 'isolate',
+              }}
             >
               <div className="w-full flex justify-between items-center mb-6">
                 <div className="flex items-center gap-2 text-xs font-bold text-primary-600 dark:text-primary-400 uppercase tracking-widest">

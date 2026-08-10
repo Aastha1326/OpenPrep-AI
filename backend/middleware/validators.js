@@ -334,7 +334,7 @@ const validateExplainQuestion = [
 ];
 
 const validateToggleQuizBookmark = [
-  param('quizId').optional().isUUID(4).withMessage('Valid quiz ID is required'),
+  body('quizId').optional().isUUID(4).withMessage('Valid quiz ID is required'),
   handleValidationErrors,
 ];
 

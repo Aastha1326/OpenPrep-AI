@@ -317,7 +317,7 @@ formData.append('year', year);
 
   return (
     <LeatherBoard>
-      <div className="pl-4 md:pl-16 pr-4 lg:pr-8 py-8 space-y-8">
+      <div className="pl-4 md:pl-16 pr-4 lg:pr-8 pt-16 sm:pt-8 pb-8 space-y-8">
         
         {/* --- HEADER --- */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-black/20 pb-6 gap-4">

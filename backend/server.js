@@ -44,6 +44,7 @@ const communityRoutes = require('./routes/communityRoutes');
 const userRoutes = require('./routes/userRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const aiRoutes = require('./routes/aiRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 initNotificationCron();
@@ -63,30 +64,62 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // Security Middlewares
-app.use(
-  helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://fonts.googleapis.com"],
-        imgSrc: ["'self'", 'data:', 'https:'],
-        connectSrc: ["'self'"],
-        fontSrc: ["'self'", 'https:', 'data:', "https://fonts.gstatic.com"],
-        objectSrc: ["'none'"],
-        frameAncestors: ["'none'"],
-        upgradeInsecureRequests: [],
-      },
+// Directives shared by every response. Gemini calls happen server-side (see
+// services/geminiService.js) but the API host is still explicitly
+// allow-listed here in case a client ever needs to reach it directly.
+const baseCspDirectives = {
+  defaultSrc: ["'self'"],
+  styleSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://fonts.googleapis.com'],
+  imgSrc: ["'self'", 'data:', 'https:'],
+  connectSrc: ["'self'", 'https://generativelanguage.googleapis.com'],
+  fontSrc: ["'self'", 'https:', 'data:', 'https://fonts.gstatic.com'],
+  objectSrc: ["'none'"],
+  frameAncestors: ["'none'"],
+  upgradeInsecureRequests: [],
+};
+
+const hstsOptions = {
+  maxAge: 63072000, // 2 years
+  includeSubDomains: true,
+  preload: true,
+};
+
+// Strict CSP for every route: no 'unsafe-inline' in script-src, which is
+// what security-header scanners (e.g. Mozilla Observatory) require for a
+// Grade A score.
+const securityHeaders = helmet({
+  contentSecurityPolicy: {
+    directives: {
+      ...baseCspDirectives,
+      scriptSrc: ["'self'", 'https://cdn.jsdelivr.net'],
     },
-    hsts: {
-      maxAge: 63072000, // 2 years
-      includeSubDomains: true,
-      preload: true,
+  },
+  hsts: hstsOptions,
+  xContentTypeOptions: true,
+  xFrameOptions: { action: 'deny' },
+});
+
+// swagger-ui-express renders its page with an inline bootstrap <script>, so
+// /api-docs needs 'unsafe-inline' in script-src or the docs page breaks.
+// Every other route keeps the strict policy above.
+const docsSecurityHeaders = helmet({
+  contentSecurityPolicy: {
+    directives: {
+      ...baseCspDirectives,
+      scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
     },
-    xContentTypeOptions: true,
-  })
-);
-app.use(getCorsMiddleware());
+  },
+  hsts: hstsOptions,
+  xContentTypeOptions: true,
+  xFrameOptions: { action: 'deny' },
+});
+
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api-docs')) {
+    return docsSecurityHeaders(req, res, next);
+  }
+  return securityHeaders(req, res, next);
+});app.use(getCorsMiddleware());
 app.use(passport.initialize());
 
 // Cookie parser (required for csurf cookie-based tokens)
@@ -192,6 +225,7 @@ app.use('/api/community', communityRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Base Route
 app.get('/', (req, res) => {
