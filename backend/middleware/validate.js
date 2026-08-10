@@ -12,12 +12,13 @@ const validateRequest = (schema) => {
       next();
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const fieldErrors = error.errors.map((err) => ({
-          field: err.path.join('.'),
+        const issues = error.issues || error.errors || [];
+        const fieldErrors = issues.map((err) => ({
+          field: err.path ? err.path.join('.') : '',
           message: err.message,
         }));
         
-        const errorString = error.errors.map((err) => err.message).join(', ');
+        const errorString = issues.map((err) => err.message).join(', ');
 
         return res.status(400).json({
           success: false,
@@ -31,6 +32,8 @@ const validateRequest = (schema) => {
 };
 
 // Zod schema definitions
+
+// User Auth - Registration
 const registerSchema = z.object({
   name: z.string({
     required_error: 'Name is required',
@@ -61,8 +64,73 @@ const registerSchema = z.object({
   .refine((val) => /[^A-Za-z0-9]/.test(val), {
     message: 'Password must contain at least one special character',
   }),
-});
+}).strict();
 
+// User Auth - Login
+const loginSchema = z.object({
+  email: z.string({
+    required_error: 'Email is required',
+  })
+  .trim()
+  .email('Please provide a valid email address'),
+
+  password: z.string({
+    required_error: 'Password is required',
+  })
+  .min(1, 'Password is required'),
+}).strict();
+
+// User Auth - Profile Update
+const updateProfileSchema = z.object({
+  name: z.string().trim().min(2).max(50).optional(),
+  email: z.string().trim().email('Please provide a valid email address').optional(),
+  bio: z.string().max(500).optional(),
+  avatar: z.string().optional(),
+  targetExam: z.string().optional(),
+}).strict();
+
+// Quiz - AI Generation & Creation
+const createQuizSchema = z.object({
+  subjectId: z.string({
+    required_error: 'Valid subject ID is required',
+  }).uuid('Valid subject ID is required'),
+  
+  topicId: z.string().uuid('Valid topic ID is required').optional(),
+  numQuestions: z.number().int().min(1).max(50).optional(),
+  difficulty: z.enum(['Easy', 'Medium', 'Hard']).optional(),
+  title: z.string().min(1).max(200).optional(),
+}).strict();
+
+// Flashcards - Deck & Card Creation
+const createFlashcardDeckSchema = z.object({
+  subjectId: z.string({
+    required_error: 'Valid subject ID is required',
+  }).uuid('Valid subject ID is required'),
+
+  topicId: z.string().uuid('Valid topic ID is required').optional(),
+  title: z.string({
+    required_error: 'Please provide a deck title',
+  }).trim().min(1, 'Please provide a deck title').max(200),
+
+  cards: z.array(
+    z.object({
+      front: z.string({ required_error: 'Front text is required' }).min(1),
+      back: z.string({ required_error: 'Back text is required' }).min(1),
+    }).strict()
+  ).optional(),
+}).strict();
+
+// Study Plan - Task Updates
+const updateStudyTaskSchema = z.object({
+  completed: z.boolean().optional(),
+  studyTimeMinutes: z.number().min(0, 'Study time must be a non-negative number').optional(),
+  title: z.string().min(1).max(200).optional(),
+  newDate: z.string().refine((val) => !isNaN(Date.parse(val)), {
+    message: 'A valid newDate is required',
+  }).optional(),
+}).strict();
+
+// Study Plan - Creation
 const createStudyPlanSchema = z.object({
   examId: z.string({
     required_error: 'Valid exam ID is required',
@@ -86,6 +154,7 @@ const createStudyPlanSchema = z.object({
   path: ['endDate'],
 });
 
+// Quiz - Submission
 const submitQuizSchema = z.object({
   answers: z.array(
     z.object({
@@ -108,6 +177,11 @@ const submitQuizSchema = z.object({
 module.exports = {
   validateRequest,
   registerSchema,
+  loginSchema,
+  updateProfileSchema,
+  createQuizSchema,
+  createFlashcardDeckSchema,
+  updateStudyTaskSchema,
   createStudyPlanSchema,
   submitQuizSchema,
 };
