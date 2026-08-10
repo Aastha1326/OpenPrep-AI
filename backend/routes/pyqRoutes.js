@@ -2,13 +2,15 @@ const express = require('express');
 const {
   uploadAndAnalyzePYQ,
   getPYQs,
+  searchPYQs,
   getPYQDetails,
   getPYQAnalysis,
   deletePYQ,
   getPYQTrends,
   getUpcomingForecast,
   getPYQClusters,
-} = require('../controllers/pyqController');const { protect } = require('../middleware/auth');
+} = require('../controllers/pyqController');
+const { protect } = require('../middleware/auth');
 const { strictAiLimiter } = require('../middleware/rateLimiter');
 const { checkQuota } = require('../middleware/quotaMiddleware');
 const upload = require('../middleware/upload');
@@ -161,6 +163,40 @@ router.post(
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
+
+/**
+ * @swagger
+ * /api/pyqs/search:
+ *   get:
+ *     summary: Full-text search for PYQ question papers and topics using tsvector/tsquery
+ *     tags: [PYQs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         schema:
+ *           type: string
+ *         description: Search query terms
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Alternative query param for search terms
+ *     responses:
+ *       200:
+ *         description: Ranked full-text search results
+ *       400:
+ *         description: Missing search query
+ *       401:
+ *         description: Not authenticated
+ */
+router.get(
+  '/search',
+  protect,
+  cacheMiddleware((req) => `pyqs:${req.user.id}:${req.originalUrl}`),
+  searchPYQs
+);
 
 router.get(
   '/',
