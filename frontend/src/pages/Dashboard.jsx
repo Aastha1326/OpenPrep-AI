@@ -22,6 +22,8 @@ import FlashcardWidget from '../components/dashboard/FlashcardWidget';
 import PinnedTasks from '../components/dashboard/PinnedTasks';
 import CreateNoteModal from '../components/dashboard/CreateNoteModal';
 import StudyPlanModal from '../components/dashboard/StudyPlanModal';
+import Whiteboard from '../components/dashboard/Whiteboard';
+import FatigueMonitor from '../components/dashboard/FatigueMonitor';
 import ThemeToggle from '../components/ThemeToggle';
 
 import {
@@ -193,7 +195,9 @@ const Dashboard = () => {
   // ── Note Modal State ──
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isStudyPlanOpen, setIsStudyPlanOpen] = useState(false);
+  const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
   const [comingSoon, setComingSoon] = useState(null);
+  const [sessionStartTime] = useState(Date.now());
 
   useEffect(() => {
     if (comingSoon) {
@@ -678,6 +682,9 @@ const Dashboard = () => {
         onClose={() => setIsStudyPlanOpen(false)}
         activePlan={activePlan}
       />
+
+      {/* --- FATIGUE MONITOR --- */}
+      <FatigueMonitor sessionStartTime={sessionStartTime} />
 
       {/* --- COMING SOON TOAST --- */}
       <AnimatePresence>

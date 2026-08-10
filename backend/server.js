@@ -31,6 +31,7 @@ const flashcardRoutes = require('./routes/flashcardRoutes');
 const noteRoutes = require('./routes/noteRoutes');
 const progressRoutes = require('./routes/progressRoutes');
 const communityRoutes = require('./routes/communityRoutes');
+const fatigueRoutes = require('./routes/fatigueRoutes');
 
 // Connect to Database
 connectDB();
@@ -125,6 +126,7 @@ app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/progress', progressRoutes);
 app.use('/api/community', communityRoutes);
+app.use('/api/study', fatigueRoutes);
 
 // Base Route
 app.get('/', (req, res) => {
