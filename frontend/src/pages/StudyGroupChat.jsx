@@ -163,7 +163,7 @@ const StudyGroupChat = () => {
 
   return (
     <LeatherBoard>
-      <div className="pl-4 md:pl-8 pr-4 py-8 max-w-6xl mx-auto h-[90vh] flex flex-col">
+      <div className="pl-4 md:pl-8 pr-4 pt-16 sm:pt-8 pb-8 max-w-6xl mx-auto min-h-[90vh] flex flex-col">
         {/* --- HEADER --- */}
         <div className="flex justify-between items-center border-b border-black/20 pb-4 mb-6">
           <div>

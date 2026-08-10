@@ -213,7 +213,7 @@ const Settings = () => {
 
   return (
     <LeatherBoard>
-      <div className="pl-4 md:pl-16 pr-4 lg:pr-8 py-8 space-y-10">
+      <div className="pl-4 md:pl-16 pr-4 lg:pr-8 pt-16 sm:pt-8 pb-8 space-y-10">
         {/* --- HEADER --- */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-black/20 pb-6 gap-4">
           <motion.div

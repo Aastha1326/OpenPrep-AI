@@ -15,6 +15,7 @@ import {
   CalendarDays,
   GanttChartSquare,
   List,
+  Sparkles,
 } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 import API from '../../services/api';
@@ -31,6 +32,7 @@ const CreateStudyPlanForm = ({
   minStartDate,
   minEndDate,
   exams,
+  prefillExamName,
 }) => (
   <div className="max-w-xl mx-auto">
     <div className="flex items-center justify-between mb-6">
@@ -188,6 +190,7 @@ const StudyPlanModal = ({
   onBumpTime,
   onPlanCreated,
   onPlanUpdate,
+  syllabusPrefill,
 }) => {
   const contentRef = useRef(null);
   const [isExporting, setIsExporting] = useState(false);
