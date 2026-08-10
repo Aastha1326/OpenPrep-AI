@@ -333,6 +333,11 @@ const validateExplainQuestion = [
   handleValidationErrors,
 ];
 
+const validateToggleQuizBookmark = [
+  param('quizId').optional().isUUID(4).withMessage('Valid quiz ID is required'),
+  handleValidationErrors,
+];
+
 // ---------------------------------------------------------------------------
 // Note routes
 // ---------------------------------------------------------------------------
