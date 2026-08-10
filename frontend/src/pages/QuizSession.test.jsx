@@ -87,7 +87,10 @@ describe('QuizSession', () => {
 
     expect(screen.getByText('Time Elapsed')).toBeInTheDocument();
     expect(screen.getByText('Submitting Quiz...')).toBeInTheDocument();
-    expect(API.post).toHaveBeenCalledWith('/quizzes/q1/submit', { answers: [] });
+    expect(API.post).toHaveBeenCalledWith('/quizzes/q1/submit', {
+      answers: [],
+      submissionId: expect.any(String),
+    });
   });
 
   test('auto-submits the selected answers when time runs out and shows the result', async () => {
@@ -106,6 +109,7 @@ describe('QuizSession', () => {
     await waitFor(() => {
       expect(API.post).toHaveBeenCalledWith('/quizzes/q1/submit', {
         answers: [{ questionId: 'qq1', selectedAnswer: '4' }],
+        submissionId: expect.any(String),
       });
     });
     expect(await screen.findByText('Quiz Completed!')).toBeInTheDocument();
@@ -144,6 +148,7 @@ describe('QuizSession', () => {
           { questionId: 'qq1', selectedAnswer: '4' },
           { questionId: 'qq2', selectedAnswer: '6' },
         ],
+        submissionId: expect.any(String),
       });
     });
     expect(await screen.findByText('Quiz Completed!')).toBeInTheDocument();
@@ -312,4 +317,54 @@ describe('QuizSession', () => {
     expect(screen.queryByRole('button', { name: /Submit Quiz/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/NaN/i)).not.toBeInTheDocument();
   });
+
+  test('prevents duplicate submissions on rapid double-click and sends an idempotency key', async () => {
+    API.get.mockResolvedValue({ data: { data: sampleQuiz } });
+    let rejectPost;
+    API.post.mockImplementation((url) => {
+      if (url === '/quizzes/q1/submit') {
+        return new Promise((_, reject) => {
+          rejectPost = reject;
+        });
+      }
+      return Promise.resolve({ data: {} });
+    });
+    renderQuiz();
+
+    fireEvent.click(await screen.findByText('What is 2+2?'));
+    fireEvent.click(screen.getByText('4'));
+    fireEvent.click(screen.getByRole('button', { name: /Next/i }));
+    fireEvent.click(await screen.findByText('What is 2*3?'));
+    fireEvent.click(screen.getByText('6'));
+
+    const submitBtn = screen.getByRole('button', { name: /Submit Quiz/i });
+    fireEvent.click(submitBtn);
+    // AC1: the Submit button must be disabled immediately once submission starts
+    expect(submitBtn).toBeDisabled();
+    fireEvent.click(submitBtn);
+
+    // The ref guard must swallow the second click — only ONE submit POST fires.
+    // (The telemetry queue also POSTs a flush, so filter for the submit URL.)
+    const submitCalls = () =>
+      API.post.mock.calls.filter(([u]) => u === '/quizzes/q1/submit');
+    expect(submitCalls()).toHaveLength(1);
+    expect(screen.getByText('Submitting...')).toBeInTheDocument();
+
+    const [url, payload] = submitCalls()[0];
+    expect(url).toBe('/quizzes/q1/submit');
+    expect(payload.answers).toHaveLength(2);
+    expect(typeof payload.submissionId).toBe('string');
+
+    // Simulate a lost response: the submitting flag clears (button re-enables) and
+    // the retry reuses the SAME submissionId so the backend can drop the duplicate (#762).
+    await act(async () => {
+      rejectPost({ response: { data: { error: 'network error' } } });
+    });
+
+    const retryBtn = await screen.findByRole('button', { name: /Submit Quiz/i });
+    fireEvent.click(retryBtn);
+    expect(submitCalls()).toHaveLength(2);
+    expect(submitCalls()[1][1].submissionId).toBe(payload.submissionId);
+  });
 });
+

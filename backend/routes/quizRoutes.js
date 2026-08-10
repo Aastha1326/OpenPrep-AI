@@ -418,6 +418,10 @@ router.get('/:id', protect, getQuizDetails);
  *                 minimum: 0
  *                 maximum: 86400
  *                 description: Time spent in seconds (optional)
+ *               submissionId:
+ *                 type: string
+ *                 format: uuid
+ *                 description: Unique client-generated idempotency key for this submission (optional)
  *     responses:
  *       201:
  *         description: Quiz attempt submitted successfully
@@ -427,6 +431,21 @@ router.get('/:id', protect, getQuizDetails);
  *               type: object
  *               properties:
  *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/QuizAttempt'
+ *       200:
+ *         description: Duplicate submission detected — returns the original attempt without creating a new one
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 duplicate:
  *                   type: boolean
  *                   example: true
  *                 data:

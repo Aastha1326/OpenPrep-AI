@@ -1,5 +1,6 @@
 const { Op } = require('sequelize');
 const { v4: uuidv4 } = require('uuid');
+const NodeCache = require('node-cache');
 const PDFDocument = require('pdfkit');
 const { sequelize } = require('../config/db');
 const Quiz = require('../models/Quiz');
@@ -17,6 +18,14 @@ const { runCalibration } = require('../services/difficultyCalibrator');
 // Window (ms) during which duplicate quiz submissions for the same quiz are ignored.
 // Prevents double-click on "Submit Quiz" from creating duplicate attempt records.
 const DUPLICATE_SUBMIT_WINDOW_MS = 5000;
+
+// Window (seconds) during which retried submissions carrying the same client
+// submissionId are dropped. Keyed idempotency for retries/lost responses (#762).
+const DUPLICATE_SUBMISSION_TTL_SECONDS = 10;
+const duplicateSubmissionCache = new NodeCache({
+  stdTTL: DUPLICATE_SUBMISSION_TTL_SECONDS,
+  checkperiod: 5,
+});
 
 // Extract the questions the student answered incorrectly from a loaded quiz
 // attempt, together with the attempt's quiz topic/subject metadata.
@@ -199,7 +208,7 @@ exports.getQuizDetails = async (req, res, next) => {
 // @access  Private
 exports.submitQuizAttempt = async (req, res, next) => {
   try {
-    const { answers, timeSpent } = req.body;
+    const { answers, timeSpent, submissionId } = req.body;
     if (!Array.isArray(answers)) {
       return res.status(400).json({ success: false, error: 'Answers must be provided as an array' });
     }
@@ -227,6 +236,20 @@ exports.submitQuizAttempt = async (req, res, next) => {
         success: false, 
         error: 'Invalid questionId(s) submitted that do not belong to this quiz' 
       });
+    }
+
+    // Idempotency fast-path: a retried submission carrying the same client UUID
+    // within the dedup window is dropped and the original attempt returned (#762).
+    if (submissionId) {
+      const cachedAttemptId = duplicateSubmissionCache.get(`${req.user.id}:${req.params.id}:${submissionId}`);
+      if (cachedAttemptId) {
+        const cachedAttempt = await QuizAttempt.findByPk(cachedAttemptId);
+        if (cachedAttempt) {
+          return res
+            .status(200)
+            .json({ success: true, data: cachedAttempt, duplicate: true });
+        }
+      }
     }
 
     // Atomically check for duplicate submissions and persist the attempt.
@@ -318,6 +341,12 @@ exports.submitQuizAttempt = async (req, res, next) => {
     }
 
     const { attempt, duplicate, score } = result;
+
+    // Remember the submission UUID so retries within the dedup window can be
+    // dropped without re-running scoring or side effects (#762).
+    if (submissionId && attempt) {
+      duplicateSubmissionCache.set(`${req.user.id}:${req.params.id}:${submissionId}`, attempt.id);
+    }
 
     // Duplicate submission detected — return the original attempt without
     // re-running side effects (progress, activity log, weakness aggregation).

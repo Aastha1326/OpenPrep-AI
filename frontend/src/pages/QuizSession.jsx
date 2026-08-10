@@ -10,6 +10,7 @@ import {
   FaFilePdf,
   FaBookmark,
   FaRegBookmark,
+  FaSpinner,
 } from 'react-icons/fa';
 import API from '../services/api';
 import MathRenderer from '../components/common/MathRenderer';
@@ -17,14 +18,14 @@ import { exportAsCSV, exportAsJSON } from '../utils/exportUtils';
 import html2pdf from 'html2pdf.js';
 import RevisionSheetModal from '../components/dashboard/RevisionSheetModal';
 import RemediationPlanModal from '../components/dashboard/RemediationPlanModal';
+import QuestionExplanation from '../components/dashboard/QuestionExplanation';
 
 const REVIEW_FILTERS = [
   { key: 'all', label: 'All Questions' },
   { key: 'incorrect', label: 'Incorrect Only' },
   { key: 'bookmarked', label: 'Bookmarked' },
   { key: 'correct', label: 'Correct' },
-];import API from '../services/api';
-import MathRenderer from '../components/common/MathRenderer';
+];
 import { createQuizTelemetryQueue } from '../utils/quizTelemetry';
 const SECONDS_PER_QUESTION = 60;
 
@@ -60,6 +61,8 @@ const QuizSession = () => {
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState({}); // { questionId: selectedOption }
+  const [bookmarkedIds, setBookmarkedIds] = useState(new Set());
+  const [reviewFilter, setReviewFilter] = useState('all');
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState(null);
   const [isRevisionModalOpen, setIsRevisionModalOpen] = useState(false);
@@ -69,10 +72,41 @@ const QuizSession = () => {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const submittingRef = useRef(false);
+  // Unique idempotency key for this session's submission — reused across retries
+  // so the backend can drop duplicate submissions (#762).
+  const submissionIdRef = useRef(null);
+  const getSubmissionId = () => {
+    if (!submissionIdRef.current) {
+      // Always a real v4 UUID: crypto.randomUUID (secure contexts), with a
+      // spec-compliant fallback for non-secure contexts (e.g. http:// over LAN)
+      // so the backend's uuid() validation never rejects the idempotency key.
+      const uuidv4 = () => {
+        // Degrade gracefully if crypto is entirely unavailable (ancient
+        // browsers) — the format stays spec-compliant v4 either way so the
+        // backend's uuid() validation never rejects the idempotency key.
+        const hasCrypto =
+          typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function';
+        const bytes = hasCrypto
+          ? crypto.getRandomValues(new Uint8Array(16))
+          : Array.from({ length: 16 }, () => Math.floor(Math.random() * 256));
+        bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+        bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 10
+        const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+        return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+      };
+      submissionIdRef.current =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : uuidv4();
+    }
+    return submissionIdRef.current;
+  };
 
 // Absolute deadline timestamp reference to prevent background tab timer throttling drift
   const endTimeRef = useRef(null);
   const autoSubmittedRef = useRef(false);
+  // Roving-tabindex refs for the review filter tabs (was an undeclared reference on main)
+  const filterTabRefs = useRef([]);
 
   // Client-side telemetry buffer: batches question timing/option-selection
   // events instead of sending an HTTP request per interaction.
@@ -194,7 +228,10 @@ const submitQuiz = useCallback(async () => {
       telemetryRef.current?.stopAutoFlush();
       telemetryRef.current?.flush();
 
-      const res = await API.post(`/quizzes/${id}/submit`, { answers: formattedAnswers });
+      const res = await API.post(`/quizzes/${id}/submit`, {
+        answers: formattedAnswers,
+        submissionId: getSubmissionId(),
+      });
       setResult(res.data.data);
       setSubmitted(true);
     } catch (err) {
@@ -374,7 +411,7 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
       return true;
     });
   return (
-    <div className={`min-h-screen bg-slate-900 text-white ${languageClassName} py-10 px-4 md:px-20`}>
+    <div className="min-h-screen bg-slate-900 text-white py-10 px-4 md:px-20">
       {timeElapsed && !submitted && (
         <div
           role="alert"
@@ -477,7 +514,15 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
                   }
                   className="flex items-center px-6 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold shadow-lg shadow-emerald-500/20 transition-all"
                 >
-                  Submit Quiz <FaCheckCircle className="ml-2" />
+                  {submitting ? (
+                    <>
+                      <FaSpinner className="ml-2 animate-spin" /> Submitting...
+                    </>
+                  ) : (
+                    <>
+                      Submit Quiz <FaCheckCircle className="ml-2" />
+                    </>
+                  )}
                 </button>
               ) : (
                 <button
