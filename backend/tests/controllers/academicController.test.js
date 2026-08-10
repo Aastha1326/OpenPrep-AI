@@ -43,7 +43,7 @@ describe('Academic Controller - Integration Tests', () => {
       password: 'password123',
     });
 
-    authToken = jwt.sign({ id: testUser.id }, process.env.JWT_SECRET);
+    authToken = jwt.sign({ id: testUser.id, type: 'access' }, process.env.JWT_SECRET);
   });
 
   afterAll(() => {
@@ -92,7 +92,7 @@ describe('Academic Controller - Integration Tests', () => {
       });
 
       it('should return empty array if no exams exist for different user', async () => {
-        const otherToken = jwt.sign({ id: otherUser.id }, process.env.JWT_SECRET);
+        const otherToken = jwt.sign({ id: otherUser.id, type: 'access' }, process.env.JWT_SECRET);
         const res = await request(app)
           .get('/api/academic/exams')
           .set('Authorization', `Bearer ${otherToken}`);
@@ -117,6 +117,23 @@ describe('Academic Controller - Integration Tests', () => {
     });
 
     describe('DELETE /api/academic/exams/:id', () => {
+      it('should delete an exam with no subjects', async () => {
+        const emptyExam = await Exam.create({
+          name: 'Empty Exam',
+          description: 'Exam with no subjects',
+          date: '2026-06-01',
+          user: testUser.id,
+        });
+
+        const res = await request(app)
+          .delete(`/api/academic/exams/${emptyExam.id}`)
+          .set('Authorization', `Bearer ${authToken}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(true);
+        expect(await Exam.findByPk(emptyExam.id)).toBeNull();
+      });
+
       it('should delete an exam and its subjects/topics', async () => {
         const exam = await Exam.create({
           name: 'Delete Exam',
@@ -244,6 +261,38 @@ describe('Academic Controller - Integration Tests', () => {
 
         const topicsLeft = await Topic.findAll({ where: { subject: subject.id } });
         expect(topicsLeft.length).toBe(0);
+      });
+
+      it('should delete a subject with linked PYQs without foreign key constraint errors', async () => {
+        const subject = await Subject.create({
+          name: 'Subject with PYQ',
+          description: 'Testing PYQ cascade delete',
+          exam: examForSubject.id,
+          user: testUser.id,
+        });
+
+        const pyq = await PYQ.create({
+          title: '2025 Physics PYQ',
+          exam: examForSubject.id,
+          subject: subject.id,
+          year: 2025,
+          difficulty: 'Medium',
+          fileUrl: 'uploads/sample.pdf',
+          user: testUser.id,
+        });
+
+        const res = await request(app)
+          .delete(`/api/academic/subjects/${subject.id}`)
+          .set('Authorization', `Bearer ${authToken}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(true);
+
+        const pyqsLeft = await PYQ.findAll({ where: { subject: subject.id } });
+        expect(pyqsLeft.length).toBe(0);
+
+        const subjectDeleted = await Subject.findByPk(subject.id);
+        expect(subjectDeleted).toBeNull();
       });
     });
   });

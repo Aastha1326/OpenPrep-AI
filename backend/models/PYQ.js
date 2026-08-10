@@ -30,6 +30,14 @@ const PYQ = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: false,
     },
+    difficulty: {
+      type: DataTypes.ENUM('Easy', 'Medium', 'Hard'),
+      defaultValue: 'Medium',
+    },
+    chapters: {
+      type: DataTypes.ARRAY(DataTypes.STRING),
+      defaultValue: [],
+    },
     fileUrl: {
       type: DataTypes.STRING,
       allowNull: false,
@@ -71,6 +79,22 @@ const PYQ = sequelize.define(
       {
         name: 'pyq_user_exam_idx',
         fields: ['user', 'exam'],
+      },
+      {
+        name: 'pyq_subject_year_difficulty_idx',
+        fields: ['subject', 'year', 'difficulty'],
+      },
+      {
+        name: 'pyq_exam_year_subject_idx',
+        fields: ['exam', 'year', 'subject'],
+      },
+      {
+        name: 'pyq_user_exam_created_idx',
+        fields: ['user', 'exam', 'createdAt'],
+      },
+      {
+        name: 'pyq_user_subject_year_idx',
+        fields: ['user', 'subject', 'year'],
       },
     ],
     hooks: {
