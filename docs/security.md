@@ -89,6 +89,12 @@ This document outlines the security architecture, data validation flows, and pol
 ### 9. API Key Protection
 * **Gemini API Key**: The Google Gemini API key is loaded into memory using `process.env.GEMINI_API_KEY` and is never exposed to client browsers. All LLM operations are handled securely on the Node.js backend.
 
+### 10. File Upload Magic Byte Verification
+* File uploads are validated twice: first by extension + declared MIME type, then by **binary magic byte inspection** using the `file-type` library inside a custom multer storage engine.
+* The uploaded buffer is verified against the claimed extension (e.g., `.pdf` must start with the PDF signature, `.png` with the PNG signature) **before** any file is written to disk.
+* Files whose binary content does not match their extension — such as an executable or script renamed to `payload.pdf` — are rejected with a `400` response and are never persisted to `uploads/`.
+* `.txt` files have no magic bytes; they are accepted only when no known binary signature is detected.
+
 ---
 
 ## 🚨 Vulnerability Disclosure Policy
