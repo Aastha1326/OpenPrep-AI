@@ -3,6 +3,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const jwt = require('jsonwebtoken');
 const progressRoutes = require('../../routes/progressRoutes');
+const analyticsRoutes = require('../../routes/analyticsRoutes');
 const errorHandler = require('../../middleware/error');
 const User = require('../../models/User');
 const Exam = require('../../models/Exam');
@@ -17,6 +18,7 @@ const Flashcard = require('../../models/Flashcard');
 const app = express();
 app.use(express.json());
 app.use('/api/progress', progressRoutes);
+app.use('/api/analytics', analyticsRoutes);
 app.use(errorHandler);
 
 describe('Progress Controller - Integration Tests', () => {
@@ -577,6 +579,85 @@ describe('Progress Controller - Integration Tests', () => {
 
       const resPdf = await request(app).get('/api/progress/export/pdf');
       expect(resPdf.status).toBe(401);
+    });
+  });
+
+  // =========================================================================
+  // GET /api/analytics/activity-heatmap
+  // =========================================================================
+  describe('GET /api/analytics/activity-heatmap', () => {
+    it('should return 365 zero-filled days when user has no activity', async () => {
+      const res = await request(app)
+        .get('/api/analytics/activity-heatmap')
+        .set('Authorization', `Bearer ${otherAuthToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
+      expect(res.body.data).toHaveLength(365);
+      expect(res.body.data[0]).toHaveProperty('date');
+      expect(res.body.data[0]).toHaveProperty('questionsSolved', 0);
+      expect(res.body.data[0]).toHaveProperty('flashcardsReviewed', 0);
+      expect(res.body.data[0]).toHaveProperty('total', 0);
+      // Dates should be ascending (oldest → newest)
+      expect(res.body.data[0].date < res.body.data[364].date).toBe(true);
+    });
+
+    it('should aggregate quiz attempts and flashcard reviews per day', async () => {
+      // Seed a quiz attempt and a flashcard for the test user today
+      const heatmapQuiz = await Quiz.create({
+        title: 'Heatmap Test Quiz',
+        subject: testSubject.id,
+        topic: testTopic.id,
+        createdBy: testUser.id,
+        questions: [
+          {
+            _id: uuidv4(),
+            questionText: 'Heatmap question 1',
+            options: ['A', 'B', 'C', 'D'],
+            correctAnswer: 0,
+            explanation: 'Test',
+          },
+        ],
+      });
+      await QuizAttempt.create({
+        user: testUser.id,
+        quiz: heatmapQuiz.id,
+        score: 80,
+        totalQuestions: 14,
+        answers: [],
+        weakTopics: [],
+        strongTopics: [],
+      });
+      await Flashcard.create({
+        user: testUser.id,
+        subject: testSubject.id,
+        front: 'Heatmap test question',
+        back: 'Heatmap test answer',
+      });
+
+      const res = await request(app)
+        .get('/api/analytics/activity-heatmap')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveLength(365);
+
+      // Timezone-agnostic: find the day that received the seeded activity
+      const activeEntry = res.body.data.find(
+        (d) => d.questionsSolved >= 14 && d.flashcardsReviewed >= 1
+      );
+      expect(activeEntry).toBeDefined();
+      expect(activeEntry.questionsSolved).toBeGreaterThanOrEqual(14);
+      expect(activeEntry.flashcardsReviewed).toBeGreaterThanOrEqual(1);
+      expect(activeEntry.total).toBe(activeEntry.questionsSolved + activeEntry.flashcardsReviewed);
+    });
+
+    it('should return 401 without auth token', async () => {
+      const res = await request(app).get('/api/analytics/activity-heatmap');
+      expect(res.status).toBe(401);
+      expect(res.body.success).toBe(false);
     });
   });
 });

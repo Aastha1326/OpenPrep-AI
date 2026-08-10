@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const pdfParse = require('pdf-parse');
 const { Op } = require('sequelize');
+const { sequelize } = require('../config/db');
 const PYQ = require('../models/PYQ');
 const Subject = require('../models/Subject');
 const Topic = require('../models/Topic');
@@ -253,11 +254,20 @@ exports.getPYQClusters = async (req, res, next) => {
   }
 };
 
-// @desc    Get all PYQs for the authenticated user// @route   GET /api/pyqs
+// @desc    Full-text search for PYQ question papers & contents
+//          Uses PostgreSQL tsvector / tsquery & GIN index ranking when available
+// @route   GET /api/pyqs/search
 // @access  Private
-exports.getPYQs = async (req, res, next) => {
+exports.searchPYQs = async (req, res, next) => {
+  const startTime = process.hrtime.bigint();
   try {
-    const { subjectId, courseId, year, difficulty, chapter } = req.query;
+    const { q, search, subjectId, courseId, year, difficulty, chapter } = req.query;
+    const searchQuery = (q || search || '').trim();
+
+    if (!searchQuery) {
+      return res.status(400).json({ success: false, error: 'Search query is required' });
+    }
+
     const targetId = subjectId || courseId;
     if (targetId) {
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -275,7 +285,115 @@ exports.getPYQs = async (req, res, next) => {
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const offset = (page - 1) * limit;
 
-const filter = { user: req.user.id };
+    const filter = { user: req.user.id };
+    if (targetId) filter.subject = targetId;
+    if (year) filter.year = parseInt(year, 10);
+    if (difficulty) {
+      const difficultyList = difficulty.split(',').filter((d) => ['Easy', 'Medium', 'Hard'].includes(d));
+      if (difficultyList.length > 0) filter.difficulty = { [Op.in]: difficultyList };
+    }
+    if (chapter) filter.chapters = { [Op.contains]: [chapter] };
+
+    // Format multi-keyword search terms
+    const cleanWords = searchQuery
+      .replace(/[':\*\&\|\!\(\)]/g, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length > 0);
+
+    let order = [['year', 'DESC']];
+
+    const dialect = sequelize ? sequelize.getDialect() : 'postgres';
+    if (dialect === 'postgres' && cleanWords.length > 0) {
+      const tsqueryStr = cleanWords.map((w) => `${w}:*`).join(' & ');
+      const escapedTsquery = sequelize.escape(tsqueryStr);
+
+      filter[Op.and] = filter[Op.and] || [];
+      filter[Op.and].push(
+        sequelize.literal(
+          `coalesce("searchVector", to_tsvector('english', coalesce(title, '') || ' ' || coalesce(array_to_string(chapters, ' '), '') || ' ' || coalesce("analysisResults"::text, ''))) @@ to_tsquery('english', ${escapedTsquery})`
+        )
+      );
+
+      order = [
+        [
+          sequelize.literal(
+            `ts_rank(coalesce("searchVector", to_tsvector('english', coalesce(title, '') || ' ' || coalesce(array_to_string(chapters, ' '), '') || ' ' || coalesce("analysisResults"::text, ''))), to_tsquery('english', ${escapedTsquery}))`
+          ),
+          'DESC',
+        ],
+        ['year', 'DESC'],
+      ];
+    } else if (cleanWords.length > 0) {
+      // In-memory / SQLite fallback for unit testing environments
+      const searchConditions = cleanWords.map((word) => {
+        const pattern = `%${word}%`;
+        const searchOp = Op.iLike || Op.like;
+        return {
+          [Op.or]: [
+            { title: { [searchOp]: pattern } },
+            sequelize.where(sequelize.fn('LOWER', sequelize.col('title')), 'LIKE', pattern.toLowerCase()),
+            sequelize.where(sequelize.fn('LOWER', sequelize.col('chapters')), 'LIKE', pattern.toLowerCase()),
+            sequelize.where(sequelize.fn('LOWER', sequelize.col('analysisResults')), 'LIKE', pattern.toLowerCase()),
+          ],
+        };
+      });
+      filter[Op.and] = [...(filter[Op.and] || []), ...searchConditions];
+    }
+
+    const { count: total, rows: pyqs } = await PYQ.findAndCountAll({
+      where: filter,
+      order,
+      offset,
+      limit,
+    });
+
+    const endTime = process.hrtime.bigint();
+    const queryExecutionTimeMs = Number(endTime - startTime) / 1e6;
+
+    res.status(200).json({
+      success: true,
+      count: pyqs.length,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+      queryExecutionTimeMs: Math.round(queryExecutionTimeMs * 100) / 100,
+      data: pyqs,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get all PYQs for the authenticated user (with optional search)
+// @route   GET /api/pyqs
+// @access  Private
+exports.getPYQs = async (req, res, next) => {
+  try {
+    const { subjectId, courseId, year, difficulty, chapter, search, q } = req.query;
+    const searchQuery = (q || search || '').trim();
+
+    if (searchQuery) {
+      return exports.searchPYQs(req, res, next);
+    }
+
+    const targetId = subjectId || courseId;
+    if (targetId) {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(targetId)) {
+        return res.status(400).json({ success: false, error: 'Invalid ID format' });
+      }
+
+      const subjectExists = await Subject.findByPk(targetId);
+      if (!subjectExists) {
+        return res.status(404).json({ success: false, error: 'Course/Subject not found' });
+      }
+    }
+
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const offset = (page - 1) * limit;
+
+    const filter = { user: req.user.id };
     if (targetId) filter.subject = targetId;
     if (year) filter.year = parseInt(year, 10);
     if (difficulty) {

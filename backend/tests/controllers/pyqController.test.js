@@ -66,7 +66,9 @@ describe('PYQ Controller - Integration Tests', () => {
   });
 
   afterEach(async () => {
-    await cacheService.del([`pyqs:${testUser.id}:*`, `pyqs:${otherUser?.id}:*`]);
+    if (testUser?.id) {
+      await cacheService.del([`pyqs:${testUser.id}:*`, `pyqs:${otherUser?.id}:*`]);
+    }
   });
 
   afterAll(() => {
@@ -482,6 +484,95 @@ describe('PYQ Controller - Integration Tests', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(400);
+    });
+  });
+
+  // =========================================================================
+  // GET /api/pyqs/search — Full-Text Search
+  // =========================================================================
+  describe('GET /api/pyqs/search', () => {
+    let searchablePyq;
+
+    beforeAll(async () => {
+      searchablePyq = await PYQ.create({
+        title: 'Advanced Binary Tree & Dynamic Programming Question Paper',
+        exam: testExam.id,
+        subject: testSubject.id.toString(),
+        year: 2024,
+        chapters: ['Data Structures', 'Algorithms'],
+        fileUrl: '/uploads/pyq-search-test.pdf',
+        analyzed: true,
+        analysisResults: {
+          chapterWeightage: [{ chapterName: 'Algorithms', weightagePercent: 30 }],
+          importantTopics: [{ topicName: 'Dynamic Programming Recursion', frequency: 5, importance: 'High' }],
+          repeatedQuestions: [{ questionText: 'Explain binary search tree recursion and time complexity.', years: [2022, 2024] }],
+          trendAnalysis: 'Focus on recursion and dynamic programming algorithms.',
+        },
+        user: testUser.id,
+      });
+    });
+
+    afterAll(async () => {
+      if (searchablePyq) {
+        await searchablePyq.destroy();
+      }
+    });
+
+    it('should perform multi-keyword search and return ranked results with sub-100ms timing', async () => {
+      const res = await request(app)
+        .get('/api/pyqs/search')
+        .query({ q: 'Binary Tree Dynamic Programming' })
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toBeInstanceOf(Array);
+      expect(res.body.count).toBeGreaterThanOrEqual(1);
+      expect(res.body.data[0].title).toContain('Binary Tree');
+      expect(res.body).toHaveProperty('queryExecutionTimeMs');
+      expect(res.body.queryExecutionTimeMs).toBeLessThan(100);
+    });
+
+    it('should support search via /api/pyqs?search=query parameter', async () => {
+      const res = await request(app)
+        .get('/api/pyqs')
+        .query({ search: 'Algorithms Recursion' })
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toBeInstanceOf(Array);
+      expect(res.body.count).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should return 400 when search query is empty', async () => {
+      const res = await request(app)
+        .get('/api/pyqs/search')
+        .query({ q: '   ' })
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toContain('Search query is required');
+    });
+
+    it('should cache search results and respond with X-Cache HIT on duplicate query', async () => {
+      const query = 'Dynamic Programming';
+      const firstRes = await request(app)
+        .get('/api/pyqs/search')
+        .query({ q: query })
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(firstRes.status).toBe(200);
+      expect(firstRes.headers['x-cache']).toBe('MISS');
+
+      const secondRes = await request(app)
+        .get('/api/pyqs/search')
+        .query({ q: query })
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(secondRes.status).toBe(200);
+      expect(secondRes.headers['x-cache']).toBe('HIT');
     });
   });
 });
