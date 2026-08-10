@@ -50,6 +50,9 @@ import PomodoroTimer from '../components/dashboard/PomodoroTimer';
 import FlashcardWidget from '../components/dashboard/FlashcardWidget';
 import BadgeGrid from '../components/dashboard/BadgeGrid';
 import PinnedTasks from '../components/dashboard/PinnedTasks';
+import FatigueMonitor from '../components/dashboard/FatigueMonitor';
+import UploadMaterial from '../components/dashboard/UploadMaterial';
+import SkillTree from '../components/dashboard/SkillTree';
 import CreateNoteModal from '../components/dashboard/CreateNoteModal';
 import StudyPlanModal from '../components/dashboard/StudyPlanModal';
 import PyqAnalysisModal from '../components/dashboard/PyqAnalysisModal';
@@ -468,10 +471,11 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
-            className="flex-1"
-          >
-            <h1 className="text-5xl md:text-6xl font-bold text-gold-foil mb-2 font-playfair tracking-tight">
-              Welcome back{user?.name ? `, ${user.name}` : ', Scholar'}.
+            className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10"
+        >
+          <div>
+            <h1 className="text-3xl font-playfair font-bold text-stone-800 dark:text-stone-100 mb-2">
+              Welcome back, <span className="text-amber-600 dark:text-amber-500">{user?.name?.split(' ')[0] || 'Scholar'}</span>
             </h1>
             <p className="text-amber-100/70 text-lg italic font-playfair">
               &ldquo;The roots of education are bitter, but the fruit is sweet.&rdquo; – Aristotle
@@ -570,17 +574,17 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             </button>
 
             <button
-              onClick={handleLogout}
-              className="bg-gradient-to-br from-red-700 to-red-900 text-red-50 px-4 py-3 rounded-sm border border-red-500/50 shadow-[0_4px_15px_rgba(0,0,0,0.5)] hover:shadow-[0_6px_20px_rgba(220,50,50,0.3)] transition-all flex items-center gap-2 group"
-              aria-label="Log out"
+              onClick={() => setIsSkillTreeOpen(true)}
+              className="bg-stone-800 text-amber-500 px-4 py-2 rounded-lg font-bold hover:bg-stone-700 transition shadow-lg border border-amber-900/30 flex items-center gap-2"
             >
               <LogOut className="w-5 h-5 group-hover:text-white" />
               <span className="font-playfair font-bold text-sm tracking-wide group-hover:text-white hidden sm:inline">
                 Logout
               </span>
             </button>
-          </motion.div>
-        </div>
+            <ThemeToggle />
+          </div>
+        </motion.div>
 
         {/* --- TARGET EXAM COMPOSITE BUNDLE OVERVIEW --- */}
         <TargetExamOverviewWidget
