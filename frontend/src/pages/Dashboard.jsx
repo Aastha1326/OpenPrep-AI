@@ -56,6 +56,7 @@ import PyqAnalysisModal from '../components/dashboard/PyqAnalysisModal';
 import WeaknessDashboardWidget from '../components/dashboard/WeaknessDashboardWidget';
 import SubjectMasteryWidget from '../components/dashboard/SubjectMasteryWidget';
 import FocusEfficiencyWidget from '../components/dashboard/FocusEfficiencyWidget';
+import ActivityHeatmap from '../components/dashboard/ActivityHeatmap';
 import LeaderboardWidget from '../components/dashboard/LeaderboardWidget';
 import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
 import TargetExamOverviewWidget from '../components/dashboard/TargetExamOverviewWidget';
@@ -857,6 +858,9 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
 
         <div className="my-6">
           <FocusEfficiencyWidget />
+        </div>
+        <div className="my-6">
+          <ActivityHeatmap />
         </div>
         <div className="my-6">
           <BadgesList achievements={user?.achievements || []} />
