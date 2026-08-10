@@ -50,12 +50,16 @@ import PomodoroTimer from '../components/dashboard/PomodoroTimer';
 import FlashcardWidget from '../components/dashboard/FlashcardWidget';
 import BadgeGrid from '../components/dashboard/BadgeGrid';
 import PinnedTasks from '../components/dashboard/PinnedTasks';
+import FatigueMonitor from '../components/dashboard/FatigueMonitor';
+import UploadMaterial from '../components/dashboard/UploadMaterial';
+import SkillTree from '../components/dashboard/SkillTree';
 import CreateNoteModal from '../components/dashboard/CreateNoteModal';
 import StudyPlanModal from '../components/dashboard/StudyPlanModal';
 import PyqAnalysisModal from '../components/dashboard/PyqAnalysisModal';
 import WeaknessDashboardWidget from '../components/dashboard/WeaknessDashboardWidget';
 import SubjectMasteryWidget from '../components/dashboard/SubjectMasteryWidget';
 import FocusEfficiencyWidget from '../components/dashboard/FocusEfficiencyWidget';
+import ActivityHeatmap from '../components/dashboard/ActivityHeatmap';
 import LeaderboardWidget from '../components/dashboard/LeaderboardWidget';
 import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
 import TargetExamOverviewWidget from '../components/dashboard/TargetExamOverviewWidget';
@@ -66,6 +70,7 @@ import ThemeToggle from '../components/ThemeToggle';
 import BadgesList from '../components/BadgesList';
 import SM2SettingsModal from '../components/dashboard/SM2SettingsModal';
 import CommunityDecksModal from '../components/dashboard/CommunityDecksModal';
+import QuizSetupModal from '../components/dashboard/QuizSetupModal';
 import GenerateFlashcardsFromYouTubeModal from '../components/dashboard/GenerateFlashcardsFromYouTubeModal';
 import {
   fetchDashboardStats,
@@ -262,7 +267,9 @@ const Dashboard = () => {
 
   // ── Note & PYQ Modal State ──
 const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
-  const [isYoutubeFlashcardModalOpen, setIsYoutubeFlashcardModalOpen] = useState(false);  const [isStudyPlanOpen, setIsStudyPlanOpen] = useState(false);
+  const [isQuizSetupOpen, setIsQuizSetupOpen] = useState(false);
+  const [isYoutubeFlashcardModalOpen, setIsYoutubeFlashcardModalOpen] = useState(false);
+  const [isStudyPlanOpen, setIsStudyPlanOpen] = useState(false);
   const [isPyqModalOpen, setIsPyqModalOpen] = useState(false);
   const [isBundleModalOpen, setIsBundleModalOpen] = useState(false);
   const [isSyllabusImportOpen, setIsSyllabusImportOpen] = useState(false);
@@ -457,17 +464,18 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
         </button>
       </div>
 
-      <div className="pl-4 md:pl-16 pr-4 lg:pr-8 py-8 space-y-12">
+      <div className="pl-4 md:pl-16 pr-4 lg:pr-8 pt-16 sm:pt-8 pb-8 space-y-12">
         {/* --- HERO SECTION --- */}
         <div className="flex flex-col md:flex-row justify-between items-start border-b border-black/20 pb-8 gap-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
-            className="flex-1"
-          >
-            <h1 className="text-5xl md:text-6xl font-bold text-gold-foil mb-2 font-playfair tracking-tight">
-              Welcome back{user?.name ? `, ${user.name}` : ', Scholar'}.
+            className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10"
+        >
+          <div>
+            <h1 className="text-3xl font-playfair font-bold text-stone-800 dark:text-stone-100 mb-2">
+              Welcome back, <span className="text-amber-600 dark:text-amber-500">{user?.name?.split(' ')[0] || 'Scholar'}</span>
             </h1>
             <p className="text-amber-100/70 text-lg italic font-playfair">
               &ldquo;The roots of education are bitter, but the fruit is sweet.&rdquo; – Aristotle
@@ -566,17 +574,17 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             </button>
 
             <button
-              onClick={handleLogout}
-              className="bg-gradient-to-br from-red-700 to-red-900 text-red-50 px-4 py-3 rounded-sm border border-red-500/50 shadow-[0_4px_15px_rgba(0,0,0,0.5)] hover:shadow-[0_6px_20px_rgba(220,50,50,0.3)] transition-all flex items-center gap-2 group"
-              aria-label="Log out"
+              onClick={() => setIsSkillTreeOpen(true)}
+              className="bg-stone-800 text-amber-500 px-4 py-2 rounded-lg font-bold hover:bg-stone-700 transition shadow-lg border border-amber-900/30 flex items-center gap-2"
             >
               <LogOut className="w-5 h-5 group-hover:text-white" />
               <span className="font-playfair font-bold text-sm tracking-wide group-hover:text-white hidden sm:inline">
                 Logout
               </span>
             </button>
-          </motion.div>
-        </div>
+            <ThemeToggle />
+          </div>
+        </motion.div>
 
         {/* --- TARGET EXAM COMPOSITE BUNDLE OVERVIEW --- */}
         <TargetExamOverviewWidget
@@ -857,6 +865,9 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
 
         <div className="my-6">
           <FocusEfficiencyWidget />
+        </div>
+        <div className="my-6">
+          <ActivityHeatmap />
         </div>
         <div className="my-6">
           <BadgesList achievements={user?.achievements || []} />
@@ -1149,12 +1160,8 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
         onClose={() => setIsSettingsModalOpen(false)}
       />
 
-      {/* --- WHITEBOARD --- */}
-      <AnimatePresence>
-        {isWhiteboardOpen && (
-          <Whiteboard onClose={() => setIsWhiteboardOpen(false)} />
-        )}
-      </AnimatePresence>
+      {/* --- FATIGUE MONITOR --- */}
+      <FatigueMonitor sessionStartTime={sessionStartTime} />
 
       {/* --- COMING SOON TOAST --- */}
 

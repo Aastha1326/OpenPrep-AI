@@ -31,6 +31,7 @@ const CreateStudyPlanForm = ({
   minStartDate,
   minEndDate,
   exams,
+  prefillExamName,
 }) => (
   <div className="max-w-xl mx-auto">
     <div className="flex items-center justify-between mb-6">
@@ -188,6 +189,7 @@ const StudyPlanModal = ({
   onBumpTime,
   onPlanCreated,
   onPlanUpdate,
+  syllabusPrefill,
 }) => {
   const contentRef = useRef(null);
   const [isExporting, setIsExporting] = useState(false);

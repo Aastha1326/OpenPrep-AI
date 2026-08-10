@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { Provider } from 'react-redux'
 import { store } from './store'
 import { ThemeProvider } from './context/ThemeContext'
+import { SyncProvider } from './context/SyncContext'
 import ErrorBoundary from './components/ErrorBoundary'
 import './index.css'
 import './i18n';
@@ -14,9 +15,11 @@ createRoot(document.getElementById('root')).render(
     <ErrorBoundary>
       <Provider store={store}>
         <ThemeProvider>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
+          <SyncProvider>
+            <BrowserRouter>
+              <App />
+            </BrowserRouter>
+          </SyncProvider>
         </ThemeProvider>
       </Provider>
     </ErrorBoundary>

@@ -13,6 +13,7 @@ const QuizTelemetryEvent = require('../models/QuizTelemetryEvent');
 const QuizBookmark = require('../models/QuizBookmark');const geminiService = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
 const { runCalibration } = require('../services/difficultyCalibrator');
+const { calculateTopicProficiency, getDifficultyLevel } = require('../services/proficiencyService');
 
 // Window (ms) during which duplicate quiz submissions for the same quiz are ignored.
 // Prevents double-click on "Submit Quiz" from creating duplicate attempt records.
@@ -73,6 +74,10 @@ exports.generateAIQuiz = async (req, res, next) => {
         .join('\n');
     }
 
+    // Adaptive difficulty calculation
+    const proficiency = await calculateTopicProficiency(req.user.id, subjectId, topicId);
+    const difficultyLevel = getDifficultyLevel(proficiency);
+
     // Call Gemini Service
     const aiQuiz = await geminiService.generateQuiz(
       subject.name,
@@ -80,7 +85,8 @@ exports.generateAIQuiz = async (req, res, next) => {
       notesText,
       count || 5,
       req.query.refresh === 'true',
-      normalizedLanguage
+      normalizedLanguage,
+      difficultyLevel
     );
 
     // Assign unique question IDs (similar to Mongoose subdocument ids)

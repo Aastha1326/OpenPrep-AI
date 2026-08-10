@@ -603,7 +603,8 @@ exports.generateQuiz = async (
   notesText = '',
   count = 5,
   forceRefresh = false,
-  language = 'english'
+  language = 'english',
+  difficultyLevel = 'Medium'
 ) => {
   const normalizedLanguage = normalizeQuizLanguage(language);
 
@@ -612,7 +613,7 @@ exports.generateQuiz = async (
     return { _mock: true, ...getMockQuiz(subjectName, topicName, count, normalizedLanguage) };
   }
 
-  const cacheKey = hashKey('quiz', `${subjectName}:${topicName}:${count}:${notesText}:${normalizedLanguage}`);
+  const cacheKey = hashKey('quiz', `${subjectName}:${topicName}:${count}:${notesText}:${normalizedLanguage}:${difficultyLevel}`);
 
   // Check cache (skip if forceRefresh)
   if (!forceRefresh) {
@@ -625,6 +626,7 @@ exports.generateQuiz = async (
     const notesDigest = await buildNotesDigest(notesText, subjectName);
     const prompt = `
       Create a multiple choice quiz for ${subjectName} - ${topicName} with exactly ${count} questions.
+      The difficulty level of the questions should be set to: ${difficultyLevel}.
       Generate the quiz content in ${normalizedLanguage} language. Use ${normalizedLanguage} script and vocabulary naturally. If the requested language is Hindi or Hinglish, preserve Devanagari script and common educational terms; if Tamil, Telugu, or Marathi, use the appropriate script and vocabulary.
       Use the following notes/context if available:
       """

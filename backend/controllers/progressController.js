@@ -925,3 +925,76 @@ exports.getWeeklyFocusEfficiency = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Get daily study activity for the last 365 days (contribution heatmap)
+// @route   GET /api/analytics/activity-heatmap
+// @access  Private
+exports.getActivityHeatmap = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const days = 365;
+
+    // Use UTC-based date math so the zero-filled keys match the DB's
+    // DATE(createdAt) / DATE(updatedAt) values regardless of server timezone.
+    const startDate = new Date();
+    startDate.setUTCDate(startDate.getUTCDate() - (days - 1));
+    startDate.setUTCHours(0, 0, 0, 0);
+
+    // Daily questions solved (sum of totalQuestions per quiz attempt) and
+    // daily flashcard reviews (cards touched within the day) in parallel.
+    const [quizRows, flashcardRows] = await Promise.all([
+      QuizAttempt.findAll({
+        attributes: [
+          [fn('DATE', col('createdAt')), 'date'],
+          [fn('SUM', col('totalQuestions')), 'questionsSolved'],
+        ],
+        where: { user: userId, createdAt: { [Op.gte]: startDate } },
+        group: [fn('DATE', col('createdAt'))],
+        raw: true,
+      }),
+      Flashcard.findAll({
+        attributes: [
+          [fn('DATE', col('updatedAt')), 'date'],
+          [fn('COUNT', col('id')), 'flashcardsReviewed'],
+        ],
+        where: { user: userId, updatedAt: { [Op.gte]: startDate } },
+        group: [fn('DATE', col('updatedAt'))],
+        raw: true,
+      }),
+    ]);
+
+    // Index aggregated rows by date so both signals merge per day.
+    const daily = new Map();
+    quizRows.forEach((r) => {
+      daily.set(r.date, {
+        questionsSolved: parseInt(r.questionsSolved, 10) || 0,
+        flashcardsReviewed: 0,
+      });
+    });
+    flashcardRows.forEach((r) => {
+      const entry = daily.get(r.date) || { questionsSolved: 0, flashcardsReviewed: 0 };
+      entry.flashcardsReviewed = parseInt(r.flashcardsReviewed, 10) || 0;
+      daily.set(r.date, entry);
+    });
+
+    // Zero-fill the full 365-day window (oldest → newest).
+    const heatmap = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date();
+      date.setUTCDate(date.getUTCDate() - i);
+      date.setUTCHours(0, 0, 0, 0);
+      const dateStr = date.toISOString().split('T')[0];
+      const entry = daily.get(dateStr) || { questionsSolved: 0, flashcardsReviewed: 0 };
+      heatmap.push({
+        date: dateStr,
+        questionsSolved: entry.questionsSolved,
+        flashcardsReviewed: entry.flashcardsReviewed,
+        total: entry.questionsSolved + entry.flashcardsReviewed,
+      });
+    }
+
+    res.status(200).json({ success: true, data: heatmap });
+  } catch (error) {
+    next(error);
+  }
+};

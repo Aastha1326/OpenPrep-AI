@@ -13,6 +13,7 @@ const {
   logFocusSession,
   getWeeklyFocusEfficiency,
 } = require('../controllers/progressController');
+const { awardXP, unlockSkillNode } = require('../controllers/xpController');
 const { protect } = require('../middleware/auth');
 const {
   validateTrackStudyTime,
