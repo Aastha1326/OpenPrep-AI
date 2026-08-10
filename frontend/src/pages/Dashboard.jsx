@@ -1156,6 +1156,9 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
         onClose={() => setIsSettingsModalOpen(false)}
       />
 
+      {/* --- FATIGUE MONITOR --- */}
+      <FatigueMonitor sessionStartTime={sessionStartTime} />
+
       {/* --- COMING SOON TOAST --- */}
 
       <AnimatePresence>
