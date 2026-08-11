@@ -174,6 +174,11 @@ exports.register = async (req, res, next) => {
         studyHours: user.studyHours,
         isEmailVerified: user.isEmailVerified,
         leaderboardVisible: user.leaderboardVisible,
+        xp: user.xp || 0,
+        level: user.level || 1,
+        badges: user.badges || [],
+        skillPoints: user.skillPoints || 0,
+        unlockedNodes: user.unlockedNodes || ['root'],
       };
     }
 
@@ -343,6 +348,11 @@ exports.login = async (req, res, next) => {
         sm2IntervalModifier: user.sm2IntervalModifier,
         sm2Step1Interval: user.sm2Step1Interval,
         sm2Step2Interval: user.sm2Step2Interval,
+        xp: user.xp || 0,
+        level: user.level || 1,
+        badges: user.badges || [],
+        skillPoints: user.skillPoints || 0,
+        unlockedNodes: user.unlockedNodes || ['root'],
       },
     });
   } catch (error) {
@@ -381,13 +391,12 @@ exports.getMe = async (req, res, next) => {
         },
         studyHours: user.studyHours,
         isEmailVerified: user.isEmailVerified,
-        leaderboardVisible: user.leaderboardVisible,
-        receiveWeeklyDigest: user.receiveWeeklyDigest,
         achievements: user.achievements || [],
-        sm2EasyFactorModifier: user.sm2EasyFactorModifier,
-        sm2IntervalModifier: user.sm2IntervalModifier,
-        sm2Step1Interval: user.sm2Step1Interval,
-        sm2Step2Interval: user.sm2Step2Interval,
+        xp: user.xp || 0,
+        level: user.level || 1,
+        badges: user.badges || [],
+        skillPoints: user.skillPoints || 0,
+        unlockedNodes: user.unlockedNodes || ['root'],
       },
     });
   } catch (error) {

@@ -190,3 +190,35 @@ sequenceDiagram
         Client->>Client: Clear all tokens, redirect to /login
     end
 ```
+
+---
+
+## 🌐 Google OAuth 2.0 Integration (Production Setup)
+
+OpenPrep AI supports **"Continue with Google"** authentication via Google Identity Services (GIS).
+
+### Production Setup Instructions
+
+1. **Create Google Cloud OAuth 2.0 Credentials**:
+   - Navigate to [Google Cloud Console Credentials](https://console.cloud.google.com/apis/credentials).
+   - Click **Create Credentials** -> **OAuth client ID**.
+   - Select **Web application**.
+   - Under **Authorized JavaScript origins**, add your frontend production URL (e.g., `https://your-domain.com`).
+   - Under **Authorized redirect URIs**, add `https://your-domain.com`.
+   - Copy your generated Client ID (ending in `.apps.googleusercontent.com`).
+
+2. **Configure Environment Variables**:
+   - **Frontend** (`frontend/.env` / Vercel / Netlify environment settings):
+     ```env
+     VITE_GOOGLE_CLIENT_ID=your_client_id.apps.googleusercontent.com
+     ```
+   - **Backend** (`backend/.env` / Render / Railway / Docker environment settings):
+     ```env
+     GOOGLE_CLIENT_ID=your_client_id.apps.googleusercontent.com
+     ```
+
+3. **Authentication Handshake**:
+   - The frontend obtains an authentic Google ID Token via GIS.
+   - It posts the token to `POST /api/auth/google`.
+   - The backend validates the ID token signature and audience using `google-auth-library` (`OAuth2Client.verifyIdToken`), automatically linking or registering the user account.
+

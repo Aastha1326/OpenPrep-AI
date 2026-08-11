@@ -7,6 +7,8 @@ const cookieParser = require('cookie-parser');
 const csrf = require('csurf');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const http = require('http');
+const { Server } = require('socket.io');
 const { connectDB } = require('./config/db');
 const errorHandler = require('./middleware/error');
 const { protect } = require('./middleware/auth');
@@ -280,6 +282,7 @@ app.use(
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
+const server = http.createServer(app);
 
 const server = http.createServer(app);
 

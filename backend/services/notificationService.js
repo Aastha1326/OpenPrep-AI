@@ -31,21 +31,37 @@ const initNotificationCron = () => {
       });
 
       if (users.length > 0) {
-        console.log(`Sending daily reminders to ${users.length} users for time ${currentTime}`);
-        
-        const payload = JSON.stringify({
-          title: 'Daily Study Goal Reminder 📚',
-          body: 'It is time for your daily revision session! Log in to keep your streak alive and hit your targets.',
-          icon: '/icon512_maskable.png',
-          badge: '/icon512_rounded.png',
-          data: {
-            url: '/'
-          }
-        });
+        console.log(`Checking due flashcards for ${users.length} users at ${currentTime}`);
+        const Flashcard = require('../models/Flashcard');
 
         for (const user of users) {
           try {
-            await webpush.sendNotification(user.pushSubscription, payload);
+            const dueCount = await Flashcard.count({
+              where: {
+                user: user.id,
+                nextReviewDate: {
+                  [Op.lte]: new Date(),
+                },
+              },
+            });
+
+            if (dueCount > 0) {
+              const isHighPriority = dueCount >= 10;
+              const payload = JSON.stringify({
+                title: isHighPriority ? 'Optimal Spaced Repetition Window 🧠' : 'Daily Flashcards Ready 📚',
+                body: isHighPriority
+                  ? `You have ${dueCount} flashcards due for revision! Optimize your memory retention by reviewing now.`
+                  : `You have ${dueCount} flashcards due for revision today. Keep up the daily practice!`,
+                icon: '/icon512_maskable.png',
+                badge: '/icon512_rounded.png',
+                data: {
+                  url: '/flashcards/review'
+                }
+              });
+
+              await webpush.sendNotification(user.pushSubscription, payload);
+              console.log(`Sent push notification to user ${user.id} with ${dueCount} due cards.`);
+            }
           } catch (error) {
             console.error(`Failed to send push notification to user ${user.id}:`, error.message);
             // If subscription is invalid/expired (status 410 or 404), we should probably clear it

@@ -18,63 +18,18 @@ export const ThemeProvider = ({ children }) => {
 
   const getInitialTheme = () => {
     const saved = localStorage.getItem('openprep_theme') || localStorage.getItem('theme');
-    if (saved) return saved;
-    return 'system';
+    return saved === 'dark' ? 'dark' : 'light';
   };
 
   const theme = reduxTheme || getInitialTheme();
-
-  // Handle OS system preference changes dynamically
-  useEffect(() => {
-    if (theme !== 'system') return;
-
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e) => {
-      const root = window.document.documentElement;
-      if (e.matches) {
-        root.classList.add('dark');
-      } else {
-        root.classList.remove('dark');
-      }
-    };
-
-    if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener('change', handleChange);
-    } else if (mediaQuery.addListener) {
-      mediaQuery.addListener(handleChange);
-    }
-
-    return () => {
-      if (mediaQuery.removeEventListener) {
-        mediaQuery.removeEventListener('change', handleChange);
-      } else if (mediaQuery.removeListener) {
-        mediaQuery.removeListener(handleChange);
-      }
-    };
-  }, [theme]);
 
   // Sync theme changes with DOM root (html tag) and localStorage
   useEffect(() => {
     const root = window.document.documentElement;
     if (theme === 'dark') {
       root.classList.add('dark');
-      root.classList.remove('oled');
-
-    } else if (theme === 'oled') {
-      root.classList.add('dark');
-      root.classList.add('oled');
-    } else if (theme === 'light') {
+    } else {
       root.classList.remove('dark');
-      root.classList.remove('oled');
-    } else if (theme === 'system') {
-      root.classList.remove('oled');
-
-      const isSystemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-      if (isSystemDark) {
-        root.classList.add('dark');
-      } else {
-        root.classList.remove('dark');
-      }
     }
     localStorage.setItem('openprep_theme', theme);
     localStorage.setItem('theme', theme);
