@@ -25,7 +25,7 @@ import {
   MessageSquare,
   Shield,
   Globe,
-  Youtube,
+  Video,
   Brain,
   Bot,
 } from 'lucide-react';import API from '../services/api';
@@ -545,7 +545,8 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
                 />
               </motion.div>
             )}
-          </motion.div>
+          </div>
+        </motion.div>
 
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
@@ -655,8 +656,8 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
               </span>
             </button>
             <ThemeToggle />
-          </div>
-        </motion.div>
+          </motion.div>
+        </div>
 
         {/* --- TARGET EXAM COMPOSITE BUNDLE OVERVIEW --- */}
         <TargetExamOverviewWidget
