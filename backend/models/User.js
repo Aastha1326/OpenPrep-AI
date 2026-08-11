@@ -133,6 +133,13 @@ const User = sequelize.define(
       type: DataTypes.BOOLEAN,
       defaultValue: true,
     },
+    googleCalendarRefreshToken: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    syncGoogleCalendar: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
     pushSubscription: {
       type: DataTypes.JSONB,
       allowNull: true,
