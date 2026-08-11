@@ -495,7 +495,8 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
                 />
               </motion.div>
             )}
-          </motion.div>
+          </div>
+        </motion.div>
 
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
@@ -583,7 +584,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
               </span>
             </button>
             <ThemeToggle />
-          </div>
+          </motion.div>
         </motion.div>
 
         {/* --- TARGET EXAM COMPOSITE BUNDLE OVERVIEW --- */}
@@ -1184,6 +1185,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           </motion.div>
         )}
       </AnimatePresence>
+      </div>
     </LeatherBoard>
   );
 };
