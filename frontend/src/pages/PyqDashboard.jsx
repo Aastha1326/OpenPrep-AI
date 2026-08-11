@@ -62,6 +62,7 @@ const PyqDashboard = () => {
   // State
   const [subjects, setSubjects] = useState([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState(searchParams.get('subjectId') || '');
+  console.log('DEBUG rendering:', { selectedSubjectId });
   const [selectedDifficulties, setSelectedDifficulties] = useState(
     searchParams.get('difficulty') ? searchParams.get('difficulty').split(',') : []
   );

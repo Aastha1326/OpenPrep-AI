@@ -16,6 +16,8 @@ import {
   GanttChartSquare,
   List,
   Gauge,
+  Sparkles,
+} from 'lucide-react';
   Loader,
 } from 'lucide-react';
 import CalendarExportDropdown from '../CalendarExportDropdown';
@@ -23,6 +25,68 @@ import html2pdf from 'html2pdf.js';
 import API from '../../services/api';
 import { toLocalDateString, formatDateOnly } from '../../utils/dateUtils';
 import StudyPlanGanttView from './StudyPlanGanttView';
+
+const MILESTONE_TYPE_LABELS = {
+  weekly_checkpoint: 'Weekly Checkpoint',
+  mid_course_review: 'Mid-Course Review',
+  final_review: 'Final Review',
+  exam_day: 'Target Exam',
+};
+
+const MilestoneBadge = ({ date, status }) => {
+  if (status === 'completed') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-800 border border-green-200 shadow-sm">
+        <CheckCircle className="w-4 h-4" />
+        Completed
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-[#8B4513]/10 text-[#8B4513] border border-[#8B4513]/20 shadow-sm">
+      <CalendarIcon className="w-4 h-4" />
+      {formatDateOnly(date)}
+    </span>
+  );
+};
+
+const MilestonesSection = ({ milestones }) => (
+  <div className="mt-12 mb-8">
+    <div className="flex items-center gap-2 mb-6 border-b border-[#8B4513]/20 pb-2">
+      <Sparkles className="w-6 h-6 text-yellow-600" />
+      <h3 className="text-2xl font-bold font-playfair text-[#3E2723]">
+        Milestones & Checkpoints
+      </h3>
+    </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {milestones.map((m) => (
+        <div
+          key={m.id}
+          className="bg-white rounded-md border border-[#8B4513]/20 p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group"
+        >
+          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:scale-110 transition-transform">
+            <Sparkles className="w-24 h-24" />
+          </div>
+          <div className="flex justify-between items-start mb-3 relative z-10">
+            <div>
+              <span className="inline-block px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-[#8B4513]/5 text-[#8B4513]/70 mb-2">
+                {MILESTONE_TYPE_LABELS[m.type] || 'Milestone'}
+              </span>
+              <h4 className="text-lg font-bold text-neutral-800 font-playfair">
+                {m.title}
+              </h4>
+            </div>
+            <MilestoneBadge date={m.date} status={m.status} />
+          </div>
+          <p className="text-sm text-neutral-600 relative z-10">
+            {m.description}
+          </p>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
 // Create Study Plan Form Component
 const CreateStudyPlanForm = ({
   onClose,
@@ -775,6 +839,9 @@ const totalWeakCount = useMemo(() => {
                       </div>
                     )}
                   </div>
+                  {activePlan?.milestones?.length > 0 && (
+                    <MilestonesSection milestones={activePlan.milestones} />
+                  )}
                   {/* PDF Footer spacer */}
                   <div className="mt-12 pt-4 border-t border-[#8B4513]/20 text-center text-sm text-[#8B4513]/60 italic font-playfair">
                     Stay consistent. The roots of education are bitter, but the fruit is sweet.

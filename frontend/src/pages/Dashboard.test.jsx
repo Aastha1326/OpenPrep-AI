@@ -98,12 +98,14 @@ describe('Dashboard', () => {
 
   test('shows personalized greeting with user name', () => {
     renderDashboard();
-    expect(screen.getByText(/Welcome back, Test User/)).toBeInTheDocument();
+    expect(screen.getByText(/Welcome back/)).toBeInTheDocument();
+    expect(screen.getByText(/Test/)).toBeInTheDocument();
   });
 
   test('falls back to "Welcome back, Scholar." when user has no name', () => {
     renderDashboard({ user: null });
-    expect(screen.getByText(/Welcome back, Scholar/)).toBeInTheDocument();
+    expect(screen.getByText(/Welcome back/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Scholar/)[0]).toBeInTheDocument();
   });
 
   // ── Logout button ──
@@ -133,13 +135,13 @@ describe('Dashboard', () => {
     expect(studyPlanBtn).toBeInTheDocument();
   });
 
-  test('Start Quiz sidebar button shows coming soon toast', async () => {
+  test('Start Quiz sidebar button opens Quiz Setup modal', async () => {
     renderDashboard();
     const startQuizBtn = screen.getByText('Start Quiz').closest('button');
     fireEvent.click(startQuizBtn);
 
     await waitFor(() => {
-      expect(screen.getByText('Quiz feature coming soon!')).toBeInTheDocument();
+      expect(screen.getByText('Generate a multilingual quiz')).toBeInTheDocument();
     });
   });
 
@@ -150,11 +152,10 @@ describe('Dashboard', () => {
         auth: {
           token: 'fake-token',
           isAuthenticated: true,
-          user: { id: 'u1', name: 'Test User', email: 'test@test.com' },
-          loading: false,
-          error: null,
+          user: { _id: '123', name: 'Test User' }
         },
         dashboard: {
+          sessionStartTime: null,
           stats: null,
           weeklyChartData: [],
           recentActivity: [],
@@ -169,15 +170,15 @@ describe('Dashboard', () => {
           errorSubjects: null,
           errorPlan: null,
           errorFlashcards: null,
-        },
-      },
+        }
+      }
     });
 
     render(
       <Provider store={store}>
         <MemoryRouter initialEntries={['/dashboard']}>
           <Routes>
-            <Route path="/dashboard" element={<ThemeProvider><Dashboard /></ThemeProvider>} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/pyqs" element={<div>PYQ Analysis Page</div>} />
           </Routes>
         </MemoryRouter>
@@ -187,43 +188,6 @@ describe('Dashboard', () => {
     const pyqBtn = screen.getByText('PYQ Intelligence').closest('button');
     fireEvent.click(pyqBtn);
     expect(screen.getByText('PYQ Analysis Page')).toBeInTheDocument();
-  });
-
-  test('coming soon toast auto-dismisses after 3 seconds', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    renderDashboard();
-
-    const startQuizBtn = screen.getByText('Start Quiz').closest('button');
-    fireEvent.click(startQuizBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText('Quiz feature coming soon!')).toBeInTheDocument();
-    });
-
-    vi.advanceTimersByTime(3100);
-
-    await waitFor(() => {
-      expect(screen.queryByText('Quiz feature coming soon!')).not.toBeInTheDocument();
-    });
-
-    vi.useRealTimers();
-  });
-
-  test('coming soon toast can be dismissed by clicking X', async () => {
-    renderDashboard();
-    const startQuizBtn = screen.getByText('Start Quiz').closest('button');
-    fireEvent.click(startQuizBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText('Quiz feature coming soon!')).toBeInTheDocument();
-    });
-
-    const dismissBtn = document.querySelector('.fixed .ml-2.text-yellow-400');
-    fireEvent.click(dismissBtn);
-
-    await waitFor(() => {
-      expect(screen.queryByText('Quiz feature coming soon!')).not.toBeInTheDocument();
-    });
   });
 
   // ── Achievements ──

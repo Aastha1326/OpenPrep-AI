@@ -1,5 +1,14 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  X,
+  PlaySquare as Youtube,
+  Sparkles,
+  Loader,
+  AlertCircle,
+  CheckSquare,
+  Square,
+} from 'lucide-react';
 import { X, Video, Sparkles, Loader, AlertCircle, CheckSquare, Square } from 'lucide-react';
 import API from '../../services/api';
 

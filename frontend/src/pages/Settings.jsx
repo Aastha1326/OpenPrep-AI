@@ -138,7 +138,7 @@ const Settings = () => {
   }, [leaderboardVisible, dispatch]);
 
   const [reminderTime, setReminderTime] = useState(user?.dailyReminderTime || '09:00');
-  const [pushStatus, setPushStatus] = useState(Notification.permission);
+  const [pushStatus, setPushStatus] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'default');
   const [pushSubscribed, setPushSubscribed] = useState(!!user?.pushSubscription);
   const [pushLoading, setPushLoading] = useState(false);
 

@@ -1,21 +1,52 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { toggleTheme as toggleThemeAction, setTheme as setThemeAction } from '../store/slices/dashboardSlice';
 
-const ThemeContext = createContext();
+export const ThemeContext = createContext({
+  theme: 'system',
+  setTheme: () => {},
+});
 
 export const ThemeProvider = ({ children }) => {
-  const dispatch = useDispatch();
-  const reduxTheme = useSelector((state) => state.dashboard?.theme);
-
-  // High contrast accessibility mode state
-  const [highContrast, setHighContrast] = useState(() => {
+  // Theme can be: 'light', 'dark', 'high-contrast', 'system'
+  const [theme, setThemeState] = useState(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('openprep_high_contrast') === 'true' || localStorage.getItem('high_contrast') === 'true';
+      const saved = localStorage.getItem('openprep_theme') || localStorage.getItem('theme');
+      return saved || 'system';
     }
-    return false;
+    return 'system';
   });
 
+  const setTheme = (newTheme) => {
+    setThemeState(newTheme);
+  };
+
+  // Handle OS system preference changes dynamically
+  useEffect(() => {
+    if (theme !== 'system') return;
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e) => {
+      const root = window.document.documentElement;
+      if (e.matches) {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
+    };
+
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleChange);
+    } else if (mediaQuery.addListener) {
+      mediaQuery.addListener(handleChange);
+    }
+
+    return () => {
+      if (mediaQuery.removeEventListener) {
+        mediaQuery.removeEventListener('change', handleChange);
+      } else if (mediaQuery.removeListener) {
+        mediaQuery.removeListener(handleChange);
+      }
+    };
+  }, [theme]);
   const getInitialTheme = () => {
     const saved = localStorage.getItem('openprep_theme') || localStorage.getItem('theme');
     return saved === 'dark' ? 'dark' : 'light';
@@ -26,37 +57,31 @@ export const ThemeProvider = ({ children }) => {
   // Sync theme changes with DOM root (html tag) and localStorage
   useEffect(() => {
     const root = window.document.documentElement;
+    
+    // Clear old classes
+    root.classList.remove('dark', 'oled', 'high-contrast');
+
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else if (theme === 'high-contrast') {
+      root.classList.add('high-contrast');
+    } else if (theme === 'system') {
+      const isSystemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (isSystemDark) {
+        root.classList.add('dark');
+      }
     if (theme === 'dark') {
       root.classList.add('dark');
     } else {
       root.classList.remove('dark');
     }
+    
     localStorage.setItem('openprep_theme', theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
 
-  // Sync high contrast mode changes with DOM root (html tag) and localStorage
-  useEffect(() => {
-    const root = window.document.documentElement;
-    if (highContrast) {
-      root.classList.add('high-contrast');
-    } else {
-      root.classList.remove('high-contrast');
-    }
-    localStorage.setItem('openprep_high_contrast', highContrast);
-    localStorage.setItem('high_contrast', highContrast);
-  }, [highContrast]);
-
-  const toggleTheme = () => {
-    dispatch(toggleThemeAction());
-  };
-
-  const toggleHighContrast = () => {
-    setHighContrast((prev) => !prev);
-  };
-
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, highContrast, toggleHighContrast }}>
+    <ThemeContext.Provider value={{ theme, setTheme }}>
       {children}
     </ThemeContext.Provider>
   );
