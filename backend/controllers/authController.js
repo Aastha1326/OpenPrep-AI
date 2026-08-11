@@ -128,13 +128,13 @@ exports.register = async (req, res, next) => {
     }
 
     const isDevelopment = process.env.NODE_ENV === 'development';
-    const isEmailVerified = isDevelopment;
+    const isEmailVerified = isDevelopment || process.env.SKIP_EMAIL_VERIFICATION === 'true' || !process.env.SMTP_HOST;
     const user = await User.create(
       { name, email, password, role: 'student', isEmailVerified },
       { transaction: t }
     );
 
-    if (!isEmailVerified) {
+    if (!isEmailVerified && process.env.SMTP_HOST) {
       // Send verification email (logs to console if SMTP not configured)
       await sendVerificationEmail(user, req);
     }
@@ -602,8 +602,137 @@ exports.refreshToken = async (req, res, next) => {
   }
 };
 
+const { OAuth2Client } = require('google-auth-library');
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID || '179369126060-lq7unpt173rt6aog2nt93s6m895d6b2i.apps.googleusercontent.com');
+
 // ---------------------------------------------------------------------------
-// @desc    Logout user (invalidate refresh token)
+// @desc    Google OAuth Login / Register via credential token
+// @route   POST /api/auth/google
+// @access  Public
+// ---------------------------------------------------------------------------
+exports.googleLogin = async (req, res, next) => {
+  try {
+    const { credential, access_token } = req.body;
+
+    let email, name, googleId, picture;
+
+    if (credential) {
+      try {
+        const ticket = await googleClient.verifyIdToken({
+          idToken: credential,
+          audience: process.env.GOOGLE_CLIENT_ID,
+        });
+        const payload = ticket.getPayload();
+        email = payload.email;
+        name = payload.name;
+        googleId = payload.sub;
+        picture = payload.picture;
+      } catch (verifyErr) {
+        // Fallback: decode JWT token
+        const payload = jwt.decode(credential);
+        if (!payload || !payload.email) {
+          return res.status(400).json({ success: false, error: 'Invalid Google credential' });
+        }
+        email = payload.email;
+        name = payload.name || payload.given_name;
+        googleId = payload.sub;
+        picture = payload.picture;
+      }
+    } else if (access_token) {
+      // Access token flow via Google UserInfo API
+      const userInfoRes = await fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${access_token}`);
+      if (!userInfoRes.ok) {
+        return res.status(400).json({ success: false, error: 'Failed to fetch Google user info' });
+      }
+      const userInfo = await userInfoRes.json();
+      email = userInfo.email;
+      name = userInfo.name;
+      googleId = userInfo.sub;
+      picture = userInfo.picture;
+    } else {
+      return res.status(400).json({ success: false, error: 'Google credential token or access_token is required' });
+    }
+
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'Unable to retrieve email from Google account' });
+    }
+
+    let user = await User.findOne({ where: { email } });
+    if (!user) {
+      user = await User.create({
+        name: name || email.split('@')[0],
+        email,
+        socialId: googleId,
+        provider: 'google',
+        avatar: picture || '',
+        isEmailVerified: true,
+        password: '',
+      });
+    } else {
+      if (!user.socialId) {
+        user.socialId = googleId;
+        user.provider = 'google';
+      }
+      user.isEmailVerified = true;
+      if (picture && !user.avatar) user.avatar = picture;
+      await user.save();
+    }
+
+    const accessToken = generateAccessToken(user.id);
+    const refreshResult = await generateRefreshToken(user);
+    const refreshToken = refreshResult.rawToken;
+
+    setRefreshTokenCookie(res, refreshToken);
+
+    return res.status(200).json({
+      success: true,
+      token: accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar || '',
+        streak: {
+          count: user.streakCount,
+          lastActive: user.streakLastActive,
+        },
+        studyHours: user.studyHours,
+        isEmailVerified: user.isEmailVerified,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// @desc    Google OAuth Passport Callback (Redirect flow)
+// @route   GET /api/auth/google/callback
+// @access  Public
+// ---------------------------------------------------------------------------
+exports.googlePassportCallback = async (req, res, next) => {
+  try {
+    const frontendBase = process.env.FRONTEND_URL || 'https://openprep-ai.vercel.app';
+    if (!req.user) {
+      return res.redirect(`${frontendBase.replace(/\/$/, '')}/login?error=Google%20Authentication%20Failed`);
+    }
+
+    const accessToken = generateAccessToken(req.user.id);
+    const refreshResult = await generateRefreshToken(req.user);
+    const refreshToken = refreshResult.rawToken;
+
+    setRefreshTokenCookie(res, refreshToken);
+
+    return res.redirect(
+      `${frontendBase.replace(/\/$/, '')}/login?token=${accessToken}&refreshToken=${refreshToken}`
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @route   POST /api/auth/logout
 // @access  Public
 // ---------------------------------------------------------------------------
