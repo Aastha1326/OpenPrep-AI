@@ -50,6 +50,23 @@ export const loginUser = createAsyncThunk(
   }
 );
 
+/** Login / Register using Google ID token. Backend returns { token, refreshToken, user }. */
+export const googleLoginUser = createAsyncThunk(
+  'auth/googleLogin',
+  async (credential, { rejectWithValue }) => {
+    try {
+      const response = await API.post('/auth/google', { credential });
+      const { token, refreshToken } = response.data;
+      localStorage.setItem('token', token);
+      localStorage.setItem('refreshToken', refreshToken);
+      return response.data;
+    } catch (err) {
+      const message = err.response?.data?.error || 'Google login failed';
+      return rejectWithValue(message);
+    }
+  }
+);
+
 /** Fetch the current user profile (GET /auth/me). */
 export const loadUser = createAsyncThunk(
   'auth/loadUser',
@@ -296,6 +313,26 @@ const authSlice = createSlice({
         // action.payload is { error, needsVerification }
         const payload = action.payload || { error: 'Login failed', needsVerification: false };
         state.error = typeof payload === 'string' ? payload : payload.error;
+      })
+
+      // ── Google Login ──
+      .addCase(googleLoginUser.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.message = null;
+      })
+      .addCase(googleLoginUser.fulfilled, (state, action) => {
+        state.loading = false;
+        state.isAuthenticated = true;
+        state.token = action.payload.token;
+        state.refreshToken = action.payload.refreshToken;
+        state.user = action.payload.user;
+        state.registrationSuccess = false;
+      })
+      .addCase(googleLoginUser.rejected, (state, action) => {
+        state.loading = false;
+        state.isAuthenticated = false;
+        state.error = action.payload || 'Google login failed';
       })
 
       // ── Load User ──

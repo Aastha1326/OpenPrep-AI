@@ -47,6 +47,12 @@ export const ThemeProvider = ({ children }) => {
       }
     };
   }, [theme]);
+  const getInitialTheme = () => {
+    const saved = localStorage.getItem('openprep_theme') || localStorage.getItem('theme');
+    return saved === 'dark' ? 'dark' : 'light';
+  };
+
+  const theme = reduxTheme || getInitialTheme();
 
   // Sync theme changes with DOM root (html tag) and localStorage
   useEffect(() => {
@@ -64,6 +70,10 @@ export const ThemeProvider = ({ children }) => {
       if (isSystemDark) {
         root.classList.add('dark');
       }
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
     }
     
     localStorage.setItem('openprep_theme', theme);

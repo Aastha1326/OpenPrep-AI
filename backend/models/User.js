@@ -133,6 +133,49 @@ const User = sequelize.define(
       type: DataTypes.BOOLEAN,
       defaultValue: true,
     },
+    googleCalendarRefreshToken: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    syncGoogleCalendar: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    pushSubscription: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+    },
+    dailyReminderTime: {
+      type: DataTypes.STRING,
+      defaultValue: '09:00',
+    },
+    xp: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+    level: {
+      type: DataTypes.INTEGER,
+      defaultValue: 1,
+    },
+    badges: {
+      type: DataTypes.JSONB,
+      defaultValue: [],
+    },
+    skillPoints: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+    unlockedNodes: {
+      type: DataTypes.JSONB,
+      defaultValue: ['root'],
+    },
+    streakFreezesEquippedThisMonth: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+    lastStreakFreezeEquipMonth: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
   },
   {
     timestamps: true,

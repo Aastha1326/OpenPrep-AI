@@ -9,6 +9,7 @@ import {
   CheckSquare,
   Square,
 } from 'lucide-react';
+import { X, Video, Sparkles, Loader, AlertCircle, CheckSquare, Square } from 'lucide-react';
 import API from '../../services/api';
 
 const GenerateFlashcardsFromYouTubeModal = ({ onClose, onImported }) => {
@@ -94,7 +95,7 @@ const GenerateFlashcardsFromYouTubeModal = ({ onClose, onImported }) => {
         >
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-slate-100">
-              <Youtube className="w-5 h-5 text-red-600" /> Generate Flashcards from YouTube
+              <Video className="w-5 h-5 text-red-600" /> Generate Flashcards from YouTube
             </h3>
             <button onClick={onClose} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
               <X className="w-5 h-5" />

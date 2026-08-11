@@ -18,6 +18,9 @@ import {
   Gauge,
   Sparkles,
 } from 'lucide-react';
+  Loader,
+} from 'lucide-react';
+import CalendarExportDropdown from '../CalendarExportDropdown';
 import html2pdf from 'html2pdf.js';
 import API from '../../services/api';
 import { toLocalDateString, formatDateOnly } from '../../utils/dateUtils';
@@ -568,19 +571,12 @@ const totalWeakCount = useMemo(() => {
               <div className="flex flex-wrap items-center gap-3">
                 {!showForm && activePlan && (
                   <>
-                    <button
-                      onClick={handleExportIcs}
-                      disabled={isSyncingCalendar}
-                      className="flex items-center space-x-2 bg-gradient-to-r from-emerald-700 to-emerald-900 text-white px-4 py-2 rounded-sm hover:from-emerald-600 hover:to-emerald-800 transition-colors disabled:opacity-50 cursor-pointer"
-                      title="Export calendar file for Google Calendar or Outlook (.ics)"
-                    >
-                      <CalendarDays
-                        className={`w-5 h-5 ${isSyncingCalendar ? 'animate-spin' : ''}`}
-                      />
-                      <span className="font-semibold">
-                        {isSyncingCalendar ? 'Exporting...' : 'Sync Calendar (.ics)'}
-                      </span>
-                    </button>
+                    <CalendarExportDropdown 
+                      activePlanId={activePlan.id}
+                      isSyncingCalendar={isSyncingCalendar}
+                      setIsSyncingCalendar={setIsSyncingCalendar}
+                      onExportIcs={handleExportIcs}
+                    />
                     <button
                       onClick={handleReschedule}
                       disabled={isRescheduling}

@@ -2,8 +2,15 @@ import axios from 'axios';
 import { store } from '../store';
 import { logout } from '../store/slices/authSlice';
 
+const getBaseUrl = () => {
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return '/api';
+  }
+  return import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+};
+
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: getBaseUrl(),
   headers: {
     'Content-Type': 'application/json',
   },

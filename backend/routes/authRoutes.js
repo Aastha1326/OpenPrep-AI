@@ -5,8 +5,9 @@ const { RATE_LIMIT } = require('../config/constants');
 const {
   register,
   login,
+  googleLogin,
+  googlePassportCallback,
   getMe,
-  updateSettings,
   forgotPassword,
   verifyEmail,
   resetPassword,
@@ -596,15 +597,13 @@ router.get('/me', protect, getMe);
 router.patch('/settings', protect, validateUpdateSettings, updateSettings);
 
 // OAuth2 Google routes
+router.post('/google', googleLogin);
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
 router.get(
   '/google/callback',
   passport.authenticate('google', { failureRedirect: '/login', session: false }),
-  (req, res) => {
-    // Generate token in production, but for now just redirect
-    res.redirect('/dashboard');
-  }
+  googlePassportCallback
 );
 
 // User settings routes
