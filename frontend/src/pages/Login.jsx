@@ -23,6 +23,9 @@ const Login = () => {
     return () => { dispatch(clearError()); };
   }, [dispatch]);
 
+  const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  const googleAuthUrl = `${apiBaseUrl.replace(/\/$/, '')}/auth/google`;
+
   const handleChange = (e) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
@@ -163,7 +166,7 @@ const Login = () => {
             <motion.a
               whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.99 }}
-              href="http://localhost:5000/api/auth/google"
+              href={googleAuthUrl}
               className="w-full py-2.5 rounded-xl btn-secondary-theme font-bold shadow-sm hover:shadow transition-all duration-200 flex items-center justify-center gap-2 text-xs sm:text-sm cursor-pointer"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24">

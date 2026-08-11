@@ -128,13 +128,13 @@ exports.register = async (req, res, next) => {
     }
 
     const isDevelopment = process.env.NODE_ENV === 'development';
-    const isEmailVerified = isDevelopment;
+    const isEmailVerified = isDevelopment || process.env.SKIP_EMAIL_VERIFICATION === 'true' || !process.env.SMTP_HOST;
     const user = await User.create(
       { name, email, password, role: 'student', isEmailVerified },
       { transaction: t }
     );
 
-    if (!isEmailVerified) {
+    if (!isEmailVerified && process.env.SMTP_HOST) {
       // Send verification email (logs to console if SMTP not configured)
       await sendVerificationEmail(user, req);
     }
