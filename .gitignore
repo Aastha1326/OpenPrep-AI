@@ -17,6 +17,9 @@ coverage/
 .env.production.local
 backend/.env
 frontend/.env
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
 
 # Logs
 logs
