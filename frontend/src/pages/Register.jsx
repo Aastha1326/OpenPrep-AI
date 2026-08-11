@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, User, Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
+import { Mail, User, Lock, Eye, EyeOff, AlertCircle, CheckCircle, BookOpen } from 'lucide-react';
 import { registerUser, clearError, clearRegistrationSuccess } from '../store/slices/authSlice';
+import ThemeToggle from '../components/ThemeToggle';
+import SoundToggle from '../components/SoundToggle';
 
 // Password validation criteria (synced with backend validators.js)
 const PASSWORD_CRITERIA = [
@@ -41,19 +43,35 @@ const Register = () => {
   // ── Confirmation screen after successful registration ──
   if (registrationSuccess) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-amber-900 via-stone-900 to-stone-950 p-4">
-        <div className="w-full max-w-md bg-gradient-to-br from-amber-50 to-amber-100 rounded-sm shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-amber-700/50 p-8 text-center">
-          <div className="w-16 h-16 rounded-full bg-amber-600/20 flex items-center justify-center mx-auto mb-6">
-            <Mail className="w-8 h-8 text-amber-700" />
+      <div className="min-h-screen flex flex-col justify-between bg-[#FFFBE9] dark:bg-[#000000] text-[#1F150C] dark:text-[#E1DCC9] p-4 sm:p-6 transition-colors duration-300 font-inter relative overflow-hidden">
+        {/* Top Header */}
+        <div className="w-full max-w-6xl mx-auto flex items-center justify-between py-2">
+          <Link to="/" className="flex items-center gap-2.5">
+            <div className="bg-[#AD8B73] dark:bg-[#1F150C] p-2 rounded-xl border border-[#CEAB93]/40 dark:border-[#412D15] flex items-center justify-center">
+              <BookOpen className="h-5 w-5 text-[#FFFBE9] dark:text-[#E1DCC9]" />
+            </div>
+            <span className="font-playfair text-lg font-bold text-[#1F150C] dark:text-[#E1DCC9]">
+              OpenPrep AI
+            </span>
+          </Link>
+          <div className="flex items-center gap-2">
+            <SoundToggle />
+            <ThemeToggle />
           </div>
-          <h1 className="text-2xl font-bold font-playfair text-stone-900 mb-2">Check Your Email</h1>
-          <p className="text-stone-600 mb-6 leading-relaxed">{message}</p>
-          <div className="bg-amber-600/10 border border-amber-600/20 rounded-sm p-4 mb-6 text-left text-sm text-stone-700">
-            <p className="font-semibold flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-600" />
+        </div>
+
+        <div className="w-full max-w-md mx-auto my-auto bg-[#E3CAA5]/60 dark:bg-[#1F150C] rounded-2xl border border-[#CEAB93] dark:border-[#412D15] shadow-2xl p-6 sm:p-8 text-center transition-colors duration-300">
+          <div className="w-16 h-16 rounded-full bg-[#AD8B73]/20 dark:bg-[#412D15] flex items-center justify-center mx-auto mb-6 border border-[#CEAB93] dark:border-[#412D15]">
+            <Mail className="w-8 h-8 text-[#AD8B73] dark:text-[#E1DCC9]" />
+          </div>
+          <h1 className="text-2xl font-extrabold font-playfair text-[#1F150C] dark:text-[#E1DCC9] mb-2">Check Your Email</h1>
+          <p className="text-[#412D15] dark:text-[#C4BA9D] mb-6 leading-relaxed text-sm font-medium">{message}</p>
+          <div className="bg-[#E3CAA5]/40 dark:bg-[#2C1E16] border border-[#CEAB93] dark:border-[#412D15] rounded-xl p-4 mb-6 text-left text-sm text-[#1F150C] dark:text-[#E1DCC9]">
+            <p className="font-bold flex items-center gap-2 text-[#AD8B73] dark:text-[#E1DCC9]">
+              <AlertCircle className="w-4 h-4" />
               Didn't receive the email?
             </p>
-            <ul className="mt-2 list-disc list-inside space-y-1 text-stone-600">
+            <ul className="mt-2 list-disc list-inside space-y-1 text-xs text-[#412D15] dark:text-[#C4BA9D]">
               <li>Check your spam / promotions folder</li>
               <li>Make sure you entered the correct email address</li>
               <li>The link expires in 24 hours</li>
@@ -61,10 +79,14 @@ const Register = () => {
           </div>
           <Link
             to="/login"
-            className="inline-block bg-amber-700 hover:bg-amber-800 text-amber-50 font-semibold px-6 py-3 rounded-sm transition-colors"
+            className="w-full py-3.5 rounded-xl btn-primary-theme font-bold shadow-lg hover:shadow-xl transition-all inline-block text-sm"
           >
             Go to Login
           </Link>
+        </div>
+
+        <div className="text-center text-xs text-[#8C6A53] dark:text-[#C4BA9D] py-2">
+          © {new Date().getFullYear()} OpenPrep AI. All rights reserved.
         </div>
       </div>
     );
@@ -72,15 +94,36 @@ const Register = () => {
 
   // ── Registration form ──
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-amber-900 via-stone-900 to-stone-950 p-4">
-      <div className="w-full max-w-md bg-gradient-to-br from-amber-50 to-amber-100 rounded-sm shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-amber-700/50 p-8">
+    <div className="min-h-screen flex flex-col justify-between bg-[#FFFBE9] dark:bg-[#000000] text-[#1F150C] dark:text-[#E1DCC9] p-4 sm:p-6 transition-colors duration-300 font-inter relative overflow-hidden">
+      {/* Glow Effects */}
+      <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-[#AD8B73]/10 dark:bg-[#412D15]/30 rounded-full blur-3xl -z-10 animate-pulse-glow" />
+
+      {/* Top Header */}
+      <div className="w-full max-w-6xl mx-auto flex items-center justify-between py-2">
+        <Link to="/" className="flex items-center gap-2.5">
+          <div className="bg-[#AD8B73] dark:bg-[#1F150C] p-2 rounded-xl border border-[#CEAB93]/40 dark:border-[#412D15] flex items-center justify-center">
+            <BookOpen className="h-5 w-5 text-[#FFFBE9] dark:text-[#E1DCC9]" />
+          </div>
+          <span className="font-playfair text-lg font-bold text-[#1F150C] dark:text-[#E1DCC9]">
+            OpenPrep AI
+          </span>
+        </Link>
+
+        <div className="flex items-center gap-2">
+          <SoundToggle />
+          <ThemeToggle />
+        </div>
+      </div>
+
+      {/* Main Card */}
+      <div className="w-full max-w-md mx-auto my-auto bg-[#E3CAA5]/60 dark:bg-[#1F150C] rounded-2xl border border-[#CEAB93] dark:border-[#412D15] shadow-2xl p-6 sm:p-8 transition-colors duration-300">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold font-playfair text-stone-900">Create Account</h1>
-          <p className="text-stone-600 mt-2 text-sm">Join OpenPrep AI and start your preparation</p>
+          <h1 className="text-3xl font-extrabold font-playfair text-[#1F150C] dark:text-[#E1DCC9]">Create Account</h1>
+          <p className="text-[#412D15] dark:text-[#C4BA9D] mt-2 text-sm font-medium">Join OpenPrep AI and start your preparation</p>
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-sm p-3 mb-6 flex items-start gap-2 text-sm text-red-700">
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3.5 mb-6 flex items-start gap-2.5 text-sm text-red-700 dark:text-red-300 font-medium">
             <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
             <span>{error}</span>
           </div>
@@ -89,9 +132,9 @@ const Register = () => {
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Name */}
           <div>
-            <label htmlFor="register-name" className="block text-sm font-semibold text-stone-700 mb-1">Full Name</label>
+            <label htmlFor="register-name" className="block text-xs font-bold uppercase tracking-wider text-[#1F150C] dark:text-[#E1DCC9] mb-1.5">Full Name</label>
             <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+              <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8C6A53] dark:text-[#C4BA9D]" />
               <input
                 id="register-name"
                 type="text"
@@ -100,16 +143,16 @@ const Register = () => {
                 onChange={handleChange}
                 required
                 placeholder="Enter your name"
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-stone-300 rounded-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:border-transparent text-sm"
+                className="w-full pl-10 pr-4 py-3 bg-[#FFFBE9] dark:bg-[#2C1E16] border border-[#CEAB93] dark:border-[#412D15] rounded-xl text-[#1F150C] dark:text-[#E1DCC9] placeholder-[#8C6A53]/70 dark:placeholder-[#C4BA9D]/50 focus:outline-none focus:ring-2 focus:ring-[#AD8B73] dark:focus:ring-[#E1DCC9] focus:border-transparent text-sm transition-all shadow-sm"
               />
             </div>
           </div>
 
           {/* Email */}
           <div>
-            <label htmlFor="register-email" className="block text-sm font-semibold text-stone-700 mb-1">Email</label>
+            <label htmlFor="register-email" className="block text-xs font-bold uppercase tracking-wider text-[#1F150C] dark:text-[#E1DCC9] mb-1.5">Email</label>
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8C6A53] dark:text-[#C4BA9D]" />
               <input
                 id="register-email"
                 type="email"
@@ -118,16 +161,16 @@ const Register = () => {
                 onChange={handleChange}
                 required
                 placeholder="you@example.com"
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-stone-300 rounded-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:border-transparent text-sm"
+                className="w-full pl-10 pr-4 py-3 bg-[#FFFBE9] dark:bg-[#2C1E16] border border-[#CEAB93] dark:border-[#412D15] rounded-xl text-[#1F150C] dark:text-[#E1DCC9] placeholder-[#8C6A53]/70 dark:placeholder-[#C4BA9D]/50 focus:outline-none focus:ring-2 focus:ring-[#AD8B73] dark:focus:ring-[#E1DCC9] focus:border-transparent text-sm transition-all shadow-sm"
               />
             </div>
           </div>
 
           {/* Password */}
           <div>
-            <label htmlFor="register-password" className="block text-sm font-semibold text-stone-700 mb-1">Password</label>
+            <label htmlFor="register-password" className="block text-xs font-bold uppercase tracking-wider text-[#1F150C] dark:text-[#E1DCC9] mb-1.5">Password</label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+              <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8C6A53] dark:text-[#C4BA9D]" />
               <input
                 id="register-password"
                 type={showPassword ? 'text' : 'password'}
@@ -137,39 +180,34 @@ const Register = () => {
                 required
                 minLength={8}
                 placeholder="Min. 8 chars, upper, lower, number, special"
-                className="w-full pl-10 pr-10 py-2.5 bg-white border border-stone-300 rounded-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:border-transparent text-sm"
+                className="w-full pl-10 pr-10 py-3 bg-[#FFFBE9] dark:bg-[#2C1E16] border border-[#CEAB93] dark:border-[#412D15] rounded-xl text-[#1F150C] dark:text-[#E1DCC9] placeholder-[#8C6A53]/70 dark:placeholder-[#C4BA9D]/50 focus:outline-none focus:ring-2 focus:ring-[#AD8B73] dark:focus:ring-[#E1DCC9] focus:border-transparent text-sm transition-all shadow-sm"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#8C6A53] hover:text-[#1F150C] dark:text-[#C4BA9D] dark:hover:text-[#E1DCC9] transition"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
             {/* Real-time password criteria checklist */}
             {formData.password.length > 0 && (
-              <ul className="mt-2 space-y-1">
+              <ul className="mt-2 space-y-1 bg-[#FFFBE9]/60 dark:bg-[#2C1E16]/60 p-2.5 rounded-xl border border-[#CEAB93]/50 dark:border-[#412D15]">
                 {PASSWORD_CRITERIA.map((rule, idx) => {
                   const passed = rule.test(formData.password);
                   return (
-                    <li key={idx} className={`flex items-center gap-1.5 text-xs ${passed ? 'text-green-700' : 'text-stone-400'}`}>
+                    <li key={idx} className={`flex items-center gap-1.5 text-xs font-medium ${passed ? 'text-emerald-700 dark:text-emerald-400' : 'text-[#8C6A53] dark:text-[#C4BA9D]'}`}>
                       {passed ? (
-                        <CheckCircle className="w-3.5 h-3.5 text-green-600 shrink-0" />
+                        <CheckCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                       ) : (
-                        <span className="w-3.5 h-3.5 rounded-full border border-stone-300 shrink-0" />
+                        <span className="w-3.5 h-3.5 rounded-full border border-[#CEAB93] dark:border-[#412D15] shrink-0" />
                       )}
                       {rule.label}
                     </li>
                   );
                 })}
               </ul>
-            )}
-            {formData.password.length === 0 && (
-              <p className="text-xs text-stone-500 mt-1">
-                Must contain uppercase, lowercase, number, and special character
-              </p>
             )}
           </div>
 
@@ -178,10 +216,10 @@ const Register = () => {
             disabled={loading}
             aria-busy={loading}
             aria-label="Create account"
-            className="w-full bg-amber-700 hover:bg-amber-800 disabled:bg-amber-400 text-amber-50 font-semibold py-2.5 rounded-sm transition-colors flex items-center justify-center gap-2"
+            className="w-full py-3.5 rounded-xl btn-primary-theme font-bold shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 text-sm"
           >
             {loading ? (
-              <span className="w-4 h-4 border-2 border-amber-200 border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+              <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" aria-hidden="true" />
             ) : (
               'Create Account'
             )}
@@ -189,15 +227,15 @@ const Register = () => {
         </form>
 
         <div className="mt-6 flex items-center justify-center space-x-2">
-          <span className="h-px w-full bg-stone-300"></span>
-          <span className="text-sm text-stone-500 font-medium">OR</span>
-          <span className="h-px w-full bg-stone-300"></span>
+          <span className="h-px w-full bg-[#CEAB93]/60 dark:bg-[#412D15]"></span>
+          <span className="text-xs text-[#8C6A53] dark:text-[#C4BA9D] font-bold tracking-wider">OR</span>
+          <span className="h-px w-full bg-[#CEAB93]/60 dark:bg-[#412D15]"></span>
         </div>
 
         <div className="mt-6">
           <a
             href="http://localhost:5000/api/auth/google"
-            className="w-full flex items-center justify-center gap-2 bg-white border border-stone-300 hover:bg-stone-50 text-stone-700 font-semibold py-2.5 rounded-sm transition-colors"
+            className="w-full py-3 rounded-xl btn-secondary-theme font-bold shadow-sm hover:shadow transition-all duration-200 flex items-center justify-center gap-2 text-sm cursor-pointer"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -210,12 +248,17 @@ const Register = () => {
           </a>
         </div>
 
-        <p className="text-center text-sm text-stone-600 mt-6">
+        <p className="text-center text-sm text-[#412D15] dark:text-[#C4BA9D] mt-6 font-medium">
           Already have an account?{' '}
-          <Link to="/login" className="text-amber-700 hover:text-amber-800 font-semibold">
+          <Link to="/login" className="font-bold text-[#AD8B73] hover:text-[#1F150C] dark:text-[#E1DCC9] dark:hover:text-[#FFFBE9] transition">
             Sign In
           </Link>
         </p>
+      </div>
+
+      {/* Footer copyright */}
+      <div className="text-center text-xs text-[#8C6A53] dark:text-[#C4BA9D] py-2">
+        © {new Date().getFullYear()} OpenPrep AI. All rights reserved.
       </div>
     </div>
   );
