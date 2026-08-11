@@ -43,9 +43,10 @@ const pdfParseSemaphore = new Semaphore(2);
 // @access  Private
 exports.uploadAndAnalyzePYQ = async (req, res, next) => {
   try {
-const { examId, subjectId, year, title, difficulty } = req.body;
-    if (!req.file) {
-      return res.status(400).json({ success: false, error: 'Please upload a question paper PDF' });
+    const { examId, subjectId, year, title, difficulty, extractedText: ocrText, fileUrl: ocrFileUrl } = req.body;
+    
+    if (!req.file && !ocrText) {
+      return res.status(400).json({ success: false, error: 'Please upload a question paper PDF or provide extracted text' });
     }
 
     const subject = await Subject.findByPk(subjectId);
@@ -53,20 +54,25 @@ const { examId, subjectId, year, title, difficulty } = req.body;
       return res.status(404).json({ success: false, error: 'Subject not found' });
     }
 
-    // Read PDF and extract text
-    let extractedText = '';
-    try {
-      await pdfParseSemaphore.acquire();
+    // Read PDF and extract text if no OCR text provided
+    let extractedText = ocrText || '';
+    let fileUrl = ocrFileUrl || '';
+
+    if (!ocrText && req.file) {
+      fileUrl = `/uploads/${req.file.filename}`;
       try {
-        const dataBuffer = await fs.promises.readFile(req.file.path);
-        const pdfData = await pdfParse(dataBuffer);
-        extractedText = pdfData.text;
-      } finally {
-        pdfParseSemaphore.release();
+        await pdfParseSemaphore.acquire();
+        try {
+          const dataBuffer = await fs.promises.readFile(req.file.path);
+          const pdfData = await pdfParse(dataBuffer);
+          extractedText = pdfData.text;
+        } finally {
+          pdfParseSemaphore.release();
+        }
+      } catch (parseError) {
+        console.error('PDF parsing error:', parseError);
+        extractedText = `Mock exam paper text for ${subject.name} - Year ${year}. Dynamic Program, caching, time complexity analysis.`;
       }
-    } catch (parseError) {
-      console.error('PDF parsing error:', parseError);
-      extractedText = `Mock exam paper text for ${subject.name} - Year ${year}. Dynamic Program, caching, time complexity analysis.`;
     }
 
     // Call Gemini API for structure analysis
@@ -84,7 +90,7 @@ const { examId, subjectId, year, title, difficulty } = req.body;
       year: parseInt(year),
       difficulty: ['Easy', 'Medium', 'Hard'].includes(difficulty) ? difficulty : 'Medium',
       chapters,
-      fileUrl: `/uploads/${req.file.filename}`,
+      fileUrl: fileUrl,
       analyzed: true,
       analysisResults: analysis,
       user: req.user.id,
