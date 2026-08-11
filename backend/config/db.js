@@ -12,8 +12,11 @@ const sequelize = new Sequelize(
       idle: parseInt(process.env.DB_POOL_IDLE, 10) || 10000
     },
     dialectOptions: {
-      statement_timeout: parseInt(process.env.DB_STATEMENT_TIMEOUT, 10) || 5000,
-      idle_in_transaction_session_timeout: parseInt(process.env.DB_IDLE_IN_TRANSACTION_TIMEOUT, 10) || 5000
+      ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes('supabase.co')
+        ? { require: true, rejectUnauthorized: false }
+        : false,
+      statement_timeout: parseInt(process.env.DB_STATEMENT_TIMEOUT, 10) || 15000,
+      idle_in_transaction_session_timeout: parseInt(process.env.DB_IDLE_IN_TRANSACTION_TIMEOUT, 10) || 15000
     },
     retry: {
       match: [

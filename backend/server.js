@@ -7,6 +7,8 @@ const cookieParser = require('cookie-parser');
 const csrf = require('csurf');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const http = require('http');
+const { Server } = require('socket.io');
 const { connectDB } = require('./config/db');
 const errorHandler = require('./middleware/error');
 const { protect } = require('./middleware/auth');
@@ -45,6 +47,7 @@ const userRoutes = require('./routes/userRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const calendarRoutes = require('./routes/calendarRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 initNotificationCron();
@@ -230,6 +233,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/calendar', calendarRoutes);
 
 // Base Route
 app.get('/', (req, res) => {
@@ -278,6 +282,7 @@ app.use(
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
+const server = http.createServer(app);
 
 const server = http.createServer(app);
 

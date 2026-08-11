@@ -41,7 +41,7 @@ Exam.hasMany(PYQ, { foreignKey: 'exam', onDelete: 'CASCADE' });
 Exam.hasMany(StudyPlan, { foreignKey: 'exam', onDelete: 'CASCADE' });
 
 // Subject associations
-Subject.belongsTo(Exam, { foreignKey: 'exam', as: 'examRef' });
+Subject.belongsTo(Exam, { foreignKey: 'exam', as: 'examRef', onDelete: 'CASCADE' });
 Subject.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 Subject.hasMany(Topic, { foreignKey: 'subject', onDelete: 'CASCADE' });
 Subject.hasMany(PYQ, { foreignKey: 'subject', onDelete: 'CASCADE' });
@@ -51,7 +51,7 @@ Subject.hasMany(Flashcard, { foreignKey: 'subject', onDelete: 'CASCADE' });
 Subject.hasMany(Progress, { foreignKey: 'subject', onDelete: 'CASCADE' });
 
 // Topic associations
-Topic.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef' });
+Topic.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'CASCADE' });
 Topic.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 Topic.hasMany(Quiz, { foreignKey: 'topic', onDelete: 'SET NULL' });
 Topic.hasMany(Note, { foreignKey: 'topic', onDelete: 'CASCADE' });
@@ -60,7 +60,7 @@ Topic.hasMany(Progress, { foreignKey: 'topic', onDelete: 'CASCADE' });
 
 // PYQ associations
 PYQ.belongsTo(Exam, { foreignKey: 'exam', as: 'examRef' });
-PYQ.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef' });
+PYQ.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'CASCADE' });
 PYQ.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 
 // StudyPlan associations
@@ -68,29 +68,30 @@ StudyPlan.belongsTo(Exam, { foreignKey: 'exam', as: 'examRef' });
 StudyPlan.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 
 // Quiz associations
-Quiz.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef' });
-Quiz.belongsTo(Topic, { foreignKey: 'topic', as: 'topicRef' });
+Quiz.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'CASCADE' });
+Quiz.belongsTo(Topic, { foreignKey: 'topic', as: 'topicRef', onDelete: 'SET NULL' });
 Quiz.belongsTo(User, { foreignKey: 'createdBy', as: 'creatorRef' });
 Quiz.hasMany(QuizAttempt, { foreignKey: 'quiz', onDelete: 'CASCADE' });
+Quiz.hasMany(QuizTelemetryEvent, { foreignKey: 'quiz', onDelete: 'CASCADE' });
 
 // QuizAttempt associations
 QuizAttempt.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
-QuizAttempt.belongsTo(Quiz, { foreignKey: 'quiz', as: 'quizRef' });
+QuizAttempt.belongsTo(Quiz, { foreignKey: 'quiz', as: 'quizRef', onDelete: 'CASCADE' });
 
 // Note associations
-Note.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef' });
-Note.belongsTo(Topic, { foreignKey: 'topic', as: 'topicRef' });
+Note.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'CASCADE' });
+Note.belongsTo(Topic, { foreignKey: 'topic', as: 'topicRef', onDelete: 'CASCADE' });
 Note.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 
 // Flashcard associations
 Flashcard.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
-Flashcard.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef' });
-Flashcard.belongsTo(Topic, { foreignKey: 'topic', as: 'topicRef' });
+Flashcard.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'CASCADE' });
+Flashcard.belongsTo(Topic, { foreignKey: 'topic', as: 'topicRef', onDelete: 'CASCADE' });
 
 // Progress associations
 Progress.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
-Progress.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef' });
-Progress.belongsTo(Topic, { foreignKey: 'topic', as: 'topicRef' });
+Progress.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'CASCADE' });
+Progress.belongsTo(Topic, { foreignKey: 'topic', as: 'topicRef', onDelete: 'CASCADE' });
 
 // Feedback associations
 Feedback.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
@@ -106,11 +107,12 @@ FocusSession.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 
 // QuizTelemetryEvent associations
 QuizTelemetryEvent.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+QuizTelemetryEvent.belongsTo(Quiz, { foreignKey: 'quiz', as: 'quizRef', onDelete: 'CASCADE' });
 User.hasMany(QuizTelemetryEvent, { foreignKey: 'user', onDelete: 'CASCADE' });
 
 // QuizBookmark associations
 QuizBookmark.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
-QuizBookmark.belongsTo(Quiz, { foreignKey: 'quiz', as: 'quizRef' });
+QuizBookmark.belongsTo(Quiz, { foreignKey: 'quiz', as: 'quizRef', onDelete: 'CASCADE' });
 User.hasMany(QuizBookmark, { foreignKey: 'user', onDelete: 'CASCADE' });
 Quiz.hasMany(QuizBookmark, { foreignKey: 'quiz', onDelete: 'CASCADE' });
 

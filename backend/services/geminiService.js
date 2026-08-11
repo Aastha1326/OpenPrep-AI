@@ -1664,3 +1664,34 @@ exports.predictUpcomingExamTrends = async (subjectName, history, forceRefresh = 
     return getMockUpcomingTrends(subjectName);
   }
 };
+
+/**
+ * AI Study Chat Assistant - generate message response with history context
+ */
+exports.generateChatResponse = async ({ message, history }) => {
+  if (!genAI) {
+    console.warn('Gemini API key not configured. Using Mock AI Response.');
+    return `This is a helpful mock explanation from your AI Study Mentor. To get real live responses, please configure your GEMINI_API_KEY in the backend .env file.\n\nHere is your query resolved: "${message}"`;
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const formattedHistory = (history || []).map((h) => ({
+      role: h.role === 'user' ? 'user' : 'model',
+      parts: [{ text: h.parts || h.text || '' }],
+    }));
+
+    const chat = model.startChat({
+      history: formattedHistory,
+      generationConfig: {
+        maxOutputTokens: 1000,
+      },
+    });
+
+    const result = await chat.sendMessage(message);
+    return result.response.text();
+  } catch (error) {
+    console.error('Gemini Chat generation failed:', error);
+    throw error;
+  }
+};

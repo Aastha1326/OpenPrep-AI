@@ -246,6 +246,12 @@ exports.toggleTaskCompletion = async (req, res, next) => {
     //   false -> true : add hours (task was just completed)
     //   true  -> false: subtract hours (task was unmarked)
     //   same state    : no change (prevents double-counting)
+    let progression = null;
+    if (completed && !wasCompleted) {
+      const xpService = require('../services/xpService');
+      progression = await xpService.addXP(req.user, 150);
+    }
+
     if (studyTimeMinutes) {
       const hours = studyTimeMinutes / 60;
 
@@ -267,7 +273,7 @@ exports.toggleTaskCompletion = async (req, res, next) => {
       // If state unchanged (completed === wasCompleted), do nothing
     }
 
-    res.status(200).json({ success: true, data: plan });
+    res.status(200).json({ success: true, data: plan, progression });
   } catch (error) {
     next(error);
   }
