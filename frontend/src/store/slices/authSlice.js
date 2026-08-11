@@ -4,6 +4,32 @@ import API from '../../services/api';
 // ── Helper: read tokens from localStorage ──
 const getInitialToken = () => localStorage.getItem('token');
 const getInitialRefreshToken = () => localStorage.getItem('refreshToken');
+/** Login with email + password. Backend returns { token, refreshToken, user } or { requires2FA: true }. */
+export const loginUser = createAsyncThunk(
+  'auth/login',
+  async (userData, { rejectWithValue }) => {
+    try {
+      const response = await API.post('/auth/login', userData);
+      
+      // If 2FA is enabled, backend may return requires2FA instead of tokens immediately
+      if (response.data.requires2FA) {
+        return { requires2FA: true, email: userData.email };
+      }
+
+      const { token, refreshToken } = response.data;
+      localStorage.setItem('token', token);
+      localStorage.setItem('refreshToken', refreshToken);
+      return response.data;
+    } catch (err) {
+      const message = err.response?.data?.error || 'Login failed';
+      const status = err.response?.status;
+      return rejectWithValue(status === 403
+        ? { error: message, needsVerification: true }
+        : { error: message, needsVerification: false }
+      );
+    }
+  }
+);
 
 // ── Async Thunks ──
 
@@ -301,6 +327,10 @@ const authSlice = createSlice({
       })
       .addCase(loginUser.fulfilled, (state, action) => {
         state.loading = false;
+        if (action.payload.requires2FA) {
+          // Do not set authenticated state yet; waiting for 2FA verification code
+          return;
+        }
         state.isAuthenticated = true;
         state.token = action.payload.token;
         state.refreshToken = action.payload.refreshToken;
