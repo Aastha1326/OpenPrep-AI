@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import SecuritySettings from '../components/SecuritySettings';
 import {
   Flame,
   Play,
@@ -1321,5 +1322,9 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
     </LeatherBoard>
   );
 };
+{/* --- SECURITY SETTINGS (2FA) --- */}
+<div className="my-6">
+  <SecuritySettings />
+</div>
 
 export default Dashboard;
