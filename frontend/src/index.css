@@ -553,30 +553,63 @@ html.dark .hover\:bg-zinc-800:hover {
 
 /* ───────── COLOR HUNT LIGHT THEME (#AD8B73, #CEAB93, #E3CAA5, #FFFBE9) ───────── */
 html:not(.dark) {
-  --foreground: #2C1E16;
+  --foreground: #1F150C;
+  color: #1F150C !important;
 }
 
 html:not(.dark) body {
   background-color: #FFFBE9 !important;
-  color: #2C1E16 !important;
+  color: #1F150C !important;
 }
 
 html:not(.dark) .min-h-screen {
   background-color: #FFFBE9 !important;
-  color: #2C1E16 !important;
+  color: #1F150C !important;
+}
+
+/* Force high-contrast dark text in Light Mode for ALL text elements */
+html:not(.dark) h1,
+html:not(.dark) h2,
+html:not(.dark) h3,
+html:not(.dark) h4,
+html:not(.dark) h5,
+html:not(.dark) h6,
+html:not(.dark) .text-slate-900,
+html:not(.dark) .text-slate-800,
+html:not(.dark) .text-slate-700,
+html:not(.dark) .text-slate-600,
+html:not(.dark) .text-slate-500,
+html:not(.dark) .text-slate-400,
+html:not(.dark) .text-slate-300,
+html:not(.dark) .text-slate-200,
+html:not(.dark) .text-slate-100,
+html:not(.dark) .text-amber-950,
+html:not(.dark) .text-amber-900,
+html:not(.dark) .text-amber-800,
+html:not(.dark) .text-amber-700 {
+  color: #1F150C !important;
+}
+
+html:not(.dark) p,
+html:not(.dark) .text-slate-600,
+html:not(.dark) .text-slate-500 {
+  color: #412D15 !important;
 }
 
 /* Light Surfaces & Cards */
 html:not(.dark) [class*="bg-[#FDFBF7]"],
 html:not(.dark) [class*="bg-[#fdfbf7]"],
 html:not(.dark) .bg-slate-50,
+html:not(.dark) .bg-slate-100,
 html:not(.dark) .bg-amber-50\/50 {
   background-color: #FFFBE9 !important;
 }
 
 html:not(.dark) .bg-white,
 html:not(.dark) .bg-amber-50,
-html:not(.dark) .bg-amber-100\/50 {
+html:not(.dark) .bg-amber-100\/50,
+html:not(.dark) .bg-slate-800,
+html:not(.dark) .bg-slate-900 {
   background-color: #E3CAA5 !important;
 }
 
@@ -584,23 +617,10 @@ html:not(.dark) .bg-amber-100\/50 {
 html:not(.dark) .border-slate-200,
 html:not(.dark) .border-slate-300,
 html:not(.dark) .border-amber-200,
-html:not(.dark) .border-amber-300 {
+html:not(.dark) .border-amber-300,
+html:not(.dark) .border-slate-700,
+html:not(.dark) .border-slate-800 {
   border-color: #CEAB93 !important;
-}
-
-/* Light Text */
-html:not(.dark) .text-slate-900,
-html:not(.dark) .text-slate-800,
-html:not(.dark) .text-amber-950,
-html:not(.dark) .text-amber-900 {
-  color: #2C1E16 !important;
-}
-
-html:not(.dark) .text-slate-700,
-html:not(.dark) .text-slate-600,
-html:not(.dark) .text-amber-800,
-html:not(.dark) .text-amber-700 {
-  color: #5C4333 !important;
 }
 
 /* Light Primary Accents & Buttons */
@@ -620,18 +640,11 @@ html:not(.dark) .hover\:bg-indigo-700:hover {
   background-color: #8C6A53 !important;
 }
 
-html:not(.dark) h1 .text-white,
-html:not(.dark) h1.text-white,
-html:not(.dark) h2 .text-white,
-html:not(.dark) h2.text-white,
-html:not(.dark) nav .text-white,
-html:not(.dark) header .text-white {
-  color: #2C1E16 !important;
-}
-
-html:not(.dark) button .text-white,
-html:not(.dark) a.bg-amber-600 .text-white,
-html:not(.dark) a.bg-orange-600 .text-white {
+html:not(.dark) button.bg-\[\#AD8B73\],
+html:not(.dark) a.bg-\[\#AD8B73\],
+html:not(.dark) button.bg-\[\#AD8B73\] *,
+html:not(.dark) a.bg-\[\#AD8B73\] * {
   color: #FFFBE9 !important;
 }
+
 

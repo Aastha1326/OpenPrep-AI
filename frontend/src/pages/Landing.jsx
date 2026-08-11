@@ -95,7 +95,7 @@ const Landing = () => {
   ];
 
   return (
-    <div className="min-h-screen font-inter bg-[#FDFBF7] dark:bg-dark-bg text-slate-800 dark:text-slate-100 transition-colors duration-300">
+    <div className="min-h-screen font-inter bg-[#FFFBE9] dark:bg-[#000000] text-[#1F150C] dark:text-[#E1DCC9] transition-colors duration-300">
       {/* ── HEADER / NAVIGATION ── */}
       <header className="sticky top-0 z-50 glass-panel border-b border-[#CEAB93]/50 dark:border-[#412D15] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
