@@ -666,7 +666,7 @@ exports.googleLogin = async (req, res, next) => {
         provider: 'google',
         avatar: picture || '',
         isEmailVerified: true,
-        password: '',
+        password: crypto.randomBytes(16).toString('hex'),
       });
     } else {
       if (!user.socialId) {

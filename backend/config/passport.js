@@ -28,7 +28,7 @@ passport.use(
               email: profile.emails[0].value,
               socialId: profile.id,
               provider: 'google',
-              password: '', // allow null is enabled but sequelize string might complain if null, empty string is fine
+              password: crypto.randomBytes(16).toString('hex'),
             });
           }
         }
