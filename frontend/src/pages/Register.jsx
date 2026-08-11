@@ -25,8 +25,13 @@ const Register = () => {
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
 
-  const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-  const googleAuthUrl = `${apiBaseUrl.replace(/\/$/, '')}/auth/google`;
+  const getApiBaseUrl = () => {
+    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      return `${window.location.origin}/api`;
+    }
+    return import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  };
+  const googleAuthUrl = `${getApiBaseUrl().replace(/\/$/, '')}/auth/google`;
 
   useEffect(() => {
     if (isAuthenticated) navigate('/dashboard', { replace: true });
