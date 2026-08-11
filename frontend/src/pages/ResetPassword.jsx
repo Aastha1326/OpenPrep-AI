@@ -164,8 +164,5 @@ const ResetPassword = () => {
     </div>
   );
 };
-
 export default ResetPassword;
 
-
-export default ResetPassword;
