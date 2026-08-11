@@ -194,6 +194,12 @@ html.high-contrast textarea {
   border: 2px solid #FFFFFF !important;
 }
 
+.high-contrast *:focus,
+html.high-contrast *:focus {
+  outline: 3px solid #FFFF00 !important;
+  outline-offset: 2px !important;
+}
+
 .glass-card {
   background: rgba(255, 255, 255, 0.5);
   backdrop-filter: blur(10px);

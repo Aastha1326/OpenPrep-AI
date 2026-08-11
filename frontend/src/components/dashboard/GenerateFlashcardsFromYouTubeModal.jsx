@@ -1,6 +1,14 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Youtube, Sparkles, Loader, AlertCircle, CheckSquare, Square } from 'lucide-react';
+import {
+  X,
+  PlaySquare as Youtube,
+  Sparkles,
+  Loader,
+  AlertCircle,
+  CheckSquare,
+  Square,
+} from 'lucide-react';
 import API from '../../services/api';
 
 const GenerateFlashcardsFromYouTubeModal = ({ onClose, onImported }) => {

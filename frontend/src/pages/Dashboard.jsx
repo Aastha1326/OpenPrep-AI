@@ -23,9 +23,9 @@ import {
   Upload,
   Settings,
   MessageSquare,
-Shield,
+  Shield,
   Globe,
-  Youtube,
+  PlaySquare as Youtube,
 } from 'lucide-react';import API from '../services/api';
 import { toDateOnlyString } from '../utils/dateUtils';
 import {
@@ -277,6 +277,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isCommunityDecksOpen, setIsCommunityDecksOpen] = useState(false);
   const [syllabusPrefill, setSyllabusPrefill] = useState(null);
   const [comingSoon, setComingSoon] = useState(null);
+  const [sessionStartTime] = useState(Date.now());
   const [isExporting, setIsExporting] = useState(false);
 
   const handleGoToStudyPlanFromImport = (prefill) => {
@@ -372,7 +373,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
 
   const tasksProgress =
     targetTasksCount > 0
-      ? Math.round((completedTasksCount / targetTasksCount) * 100)
+      ? Math.min(100, Math.round((completedTasksCount / targetTasksCount) * 100))
       : 0;
 
   const completedBonusCount = todayTasks.filter(
@@ -495,6 +496,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
                 />
               </motion.div>
             )}
+          </div>
           </motion.div>
 
           <motion.div
@@ -574,17 +576,17 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             </button>
 
             <button
-              onClick={() => setIsSkillTreeOpen(true)}
+              onClick={handleLogout}
               className="bg-stone-800 text-amber-500 px-4 py-2 rounded-lg font-bold hover:bg-stone-700 transition shadow-lg border border-amber-900/30 flex items-center gap-2"
             >
               <LogOut className="w-5 h-5 group-hover:text-white" />
               <span className="font-playfair font-bold text-sm tracking-wide group-hover:text-white hidden sm:inline">
-                Logout
+                Log out
               </span>
             </button>
             <ThemeToggle />
-          </div>
-        </motion.div>
+          </motion.div>
+        </div>
 
         {/* --- TARGET EXAM COMPOSITE BUNDLE OVERVIEW --- */}
         <TargetExamOverviewWidget
