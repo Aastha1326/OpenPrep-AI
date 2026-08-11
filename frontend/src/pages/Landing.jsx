@@ -224,81 +224,81 @@ const Landing = () => {
             transition={{ type: 'spring', stiffness: 50, damping: 20, delay: 0.4 }}
             className="mt-16 w-full max-w-5xl relative group"
           >
-            <div className="absolute -inset-1 rounded-2xl bg-[#AD8B73]/20 dark:bg-[#412D15]/40 opacity-30 blur-xl group-hover:opacity-50 transition duration-1000" />
-            <div className="relative rounded-2xl border border-[#CEAB93] dark:border-[#412D15] overflow-hidden shadow-2xl bg-[#E3CAA5] dark:bg-[#1F150C] p-2 md:p-4">
+            <div className="absolute -inset-1 rounded-2xl bg-[#AD8B73]/30 opacity-40 blur-xl group-hover:opacity-60 transition duration-1000" />
+            <div className="relative rounded-2xl border border-[#CEAB93] overflow-hidden shadow-2xl bg-[#1F150C] p-2 md:p-4">
               {/* Fake Browser Chrome */}
-              <div className="flex items-center justify-between border-b border-black/10 dark:border-white/10 pb-3 mb-4 px-2">
+              <div className="flex items-center justify-between border-b border-[#412D15] pb-3 mb-4 px-2">
                 <div className="flex items-center gap-1.5">
-                  <div className="h-3 w-3 rounded-full bg-red-400" />
-                  <div className="h-3 w-3 rounded-full bg-yellow-400" />
-                  <div className="h-3 w-3 rounded-full bg-green-400" />
+                  <div className="h-3 w-3 rounded-full bg-[#AD8B73]" />
+                  <div className="h-3 w-3 rounded-full bg-[#CEAB93]" />
+                  <div className="h-3 w-3 rounded-full bg-[#E3CAA5]" />
                 </div>
-                <div className="text-xs bg-black/5 dark:bg-white/5 px-20 py-1 rounded-md text-slate-500 dark:text-slate-400 font-mono select-none">
+                <div className="text-xs bg-[#2C1E16] px-20 py-1 rounded-md text-[#C4BA9D] font-mono select-none border border-[#412D15]">
                   openprep-ai.vercel.app/dashboard
                 </div>
                 <div className="w-10 h-3" />
               </div>
 
-              {/* Mockup Inside Screen */}
-              <div className="rounded-lg bg-[#fdfbf7] dark:bg-slate-900 border border-black/10 dark:border-white/5 p-4 md:p-8 min-h-[300px] text-left">
+              {/* Mockup Inside Screen (Dark Espresso Theme Matching SS 2) */}
+              <div className="rounded-lg bg-[#1F150C] border border-[#412D15] p-4 md:p-8 min-h-[300px] text-left text-[#E1DCC9]">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {/* Left Column: Mock Syllabus Summary */}
                   <div className="md:col-span-2 space-y-6">
-                    <div className="flex justify-between items-center border-b border-black/10 dark:border-white/10 pb-4">
+                    <div className="flex justify-between items-center border-b border-[#412D15] pb-4">
                       <div>
-                        <h4 className="font-playfair text-2xl font-bold text-amber-900 dark:text-white">
+                        <h4 className="font-playfair text-2xl font-bold text-[#E1DCC9]">
                           Exam: Physics Semester II
                         </h4>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                        <p className="text-xs text-[#C4BA9D]">
                           Target Date: May 12, 2026 • 24 Days Remaining
                         </p>
                       </div>
-                      <span className="text-xs bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/20 px-2 py-1 rounded-md font-medium">
+                      <span className="text-xs bg-[#E3CAA5] text-[#1F150C] border border-[#CEAB93] px-3 py-1 rounded-md font-bold">
                         92% Ready
                       </span>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/25 relative overflow-hidden">
-                        <span className="text-[10px] text-amber-800 dark:text-amber-400 font-bold uppercase tracking-wider">
+                      <div className="p-4 rounded-xl bg-[#2C1E16] border border-[#412D15] relative overflow-hidden">
+                        <span className="text-[10px] text-[#CEAB93] font-bold uppercase tracking-wider">
                           Top Priority Chapter
                         </span>
-                        <h5 className="font-playfair text-lg font-bold text-slate-800 dark:text-white mt-1">
+                        <h5 className="font-playfair text-lg font-bold text-[#E1DCC9] mt-1">
                           Electromagnetism
                         </h5>
-                        <p className="text-xs text-slate-500 mt-2">
+                        <p className="text-xs text-[#C4BA9D] mt-2">
                           12 PYQ Matches • 32% Exam Weightage
                         </p>
                       </div>
-                      <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/25 relative overflow-hidden">
-                        <span className="text-[10px] text-emerald-800 dark:text-emerald-400 font-bold uppercase tracking-wider">
+                      <div className="p-4 rounded-xl bg-[#2C1E16] border border-[#412D15] relative overflow-hidden">
+                        <span className="text-[10px] text-[#CEAB93] font-bold uppercase tracking-wider">
                           Next Study Session
                         </span>
-                        <h5 className="font-playfair text-lg font-bold text-slate-800 dark:text-white mt-1">
+                        <h5 className="font-playfair text-lg font-bold text-[#E1DCC9] mt-1">
                           Quantum Theory
                         </h5>
-                        <p className="text-xs text-slate-500 mt-2">
+                        <p className="text-xs text-[#C4BA9D] mt-2">
                           Today at 4:00 PM • Spaced Repetition Due
                         </p>
                       </div>
                     </div>
 
                     {/* Fake Chart / Report */}
-                    <div className="p-4 rounded-xl border border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.01]">
+                    <div className="p-4 rounded-xl border border-[#412D15] bg-[#2C1E16]">
                       <div className="flex justify-between items-center mb-3">
-                        <h6 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                        <h6 className="text-xs font-semibold uppercase tracking-wider text-[#C4BA9D]">
                           Weekly Score Trend
                         </h6>
-                        <span className="text-xs text-amber-700 dark:text-amber-400 font-semibold">
+                        <span className="text-xs text-[#E1DCC9] font-bold">
                           +18.4% improvement
                         </span>
                       </div>
                       <div className="flex gap-2 items-end h-28 pt-4">
-                        <div className="w-full bg-slate-200 dark:bg-slate-800 h-[60%] rounded" />
-                        <div className="w-full bg-slate-200 dark:bg-slate-800 h-[72%] rounded" />
-                        <div className="w-full bg-gradient-to-t from-amber-700 to-amber-950 h-[85%] rounded" />
-                        <div className="w-full bg-slate-200 dark:bg-slate-800 h-[78%] rounded" />
-                        <div className="w-full bg-gradient-to-t from-amber-700 to-amber-950 h-[92%] rounded" />
+                        <div className="w-full bg-[#412D15] h-[60%] rounded" />
+                        <div className="w-full bg-[#412D15] h-[72%] rounded" />
+                        <div className="w-full bg-gradient-to-t from-[#AD8B73] to-[#E3CAA5] h-[85%] rounded" />
+                        <div className="w-full bg-[#412D15] h-[78%] rounded" />
+                        <div className="w-full bg-gradient-to-t from-[#AD8B73] to-[#E3CAA5] h-[92%] rounded" />
                       </div>
                     </div>
                   </div>
@@ -306,54 +306,54 @@ const Landing = () => {
                   {/* Right Column: Fake Widgets */}
                   <div className="space-y-6">
                     {/* Active Streak */}
-                    <div className="p-4 rounded-xl bg-amber-900/10 dark:bg-amber-500/5 border border-amber-500/20 flex items-center justify-between">
+                    <div className="p-4 rounded-xl bg-[#2C1E16] border border-[#412D15] flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-amber-700 to-amber-900 flex items-center justify-center text-white text-lg font-bold">
+                        <div className="h-10 w-10 rounded-lg bg-[#AD8B73] flex items-center justify-center text-[#FFFBE9] text-lg font-bold">
                           🔥
                         </div>
                         <div>
-                          <h6 className="text-sm font-bold">14 Day Streak</h6>
-                          <p className="text-[10px] text-slate-500">120 XP earned today</p>
+                          <h6 className="text-sm font-bold text-[#E1DCC9]">14 Day Streak</h6>
+                          <p className="text-[10px] text-[#C4BA9D]">120 XP earned today</p>
                         </div>
                       </div>
-                      <Check className="h-5 w-5 text-amber-700 dark:text-amber-400" />
+                      <Check className="h-5 w-5 text-[#E1DCC9]" />
                     </div>
 
                     {/* Spaced Repetition Flashcard Review */}
-                    <div className="p-4 rounded-xl border border-dashed border-amber-500/30 bg-[#F5E6CA] text-slate-800 shadow-paper relative">
-                      <div className="absolute top-3 right-3 text-[10px] text-amber-800 font-mono">
+                    <div className="p-4 rounded-xl border-2 border-dashed border-[#CEAB93] bg-[#E3CAA5] text-[#1F150C] shadow-md relative">
+                      <div className="absolute top-3 right-3 text-[10px] text-[#1F150C] font-mono font-bold">
                         Card 3 of 12
                       </div>
-                      <span className="text-[9px] font-bold text-amber-800 uppercase bg-amber-500/10 px-1.5 py-0.5 rounded">
+                      <span className="text-[9px] font-bold text-[#FFFBE9] uppercase bg-[#AD8B73] px-1.5 py-0.5 rounded">
                         Physics
                       </span>
-                      <h5 className="font-playfair text-base font-bold mt-2">
+                      <h5 className="font-playfair text-base font-bold mt-2 text-[#1F150C]">
                         What is the Heisenberg Uncertainty Principle?
                       </h5>
-                      <p className="text-xs text-slate-500 mt-2 select-none italic">
+                      <p className="text-xs text-[#412D15] mt-2 select-none italic font-medium">
                         Click card to reveal answer...
                       </p>
                     </div>
 
                     {/* Progress Checklist */}
-                    <div className="p-4 rounded-xl border border-black/5 dark:border-white/5 space-y-3 bg-black/[0.01] dark:bg-white/[0.01]">
-                      <h6 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <div className="p-4 rounded-xl border border-[#412D15] space-y-3 bg-[#2C1E16]">
+                      <h6 className="text-xs font-bold text-[#CEAB93] uppercase tracking-wider">
                         Today's Goals
                       </h6>
-                      <div className="flex items-center gap-2 text-xs">
-                        <div className="h-4 w-4 rounded border border-amber-500 bg-amber-500/20 flex items-center justify-center">
-                          <Check className="h-3 w-3 text-amber-800 dark:text-amber-400" />
+                      <div className="flex items-center gap-2 text-xs text-[#E1DCC9]">
+                        <div className="h-4 w-4 rounded border border-[#CEAB93] bg-[#AD8B73] flex items-center justify-center">
+                          <Check className="h-3 w-3 text-[#FFFBE9]" />
                         </div>
                         <span>Review Electromagnetism Notes</span>
                       </div>
-                      <div className="flex items-center gap-2 text-xs">
-                        <div className="h-4 w-4 rounded border border-amber-500 bg-amber-500/20 flex items-center justify-center">
-                          <Check className="h-3 w-3 text-amber-800 dark:text-amber-400" />
+                      <div className="flex items-center gap-2 text-xs text-[#E1DCC9]">
+                        <div className="h-4 w-4 rounded border border-[#CEAB93] bg-[#AD8B73] flex items-center justify-center">
+                          <Check className="h-3 w-3 text-[#FFFBE9]" />
                         </div>
                         <span>Attempt 10-Question AI Quiz</span>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-slate-400">
-                        <div className="h-4 w-4 rounded border border-slate-300 dark:border-slate-700" />
+                      <div className="flex items-center gap-2 text-xs text-[#C4BA9D]">
+                        <div className="h-4 w-4 rounded border border-[#412D15]" />
                         <span>Update Spaced Flashcards</span>
                       </div>
                     </div>
