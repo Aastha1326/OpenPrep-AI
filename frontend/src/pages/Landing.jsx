@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import SoundToggle from '../components/SoundToggle';
-import heroImage from '../assets/hero.webp';
 
 const Landing = () => {
   const navigate = useNavigate();
@@ -98,15 +97,15 @@ const Landing = () => {
   return (
     <div className="min-h-screen font-inter bg-[#FDFBF7] dark:bg-dark-bg text-slate-800 dark:text-slate-100 transition-colors duration-300">
       {/* ── HEADER / NAVIGATION ── */}
-      <header className="sticky top-0 z-50 glass-panel border-b border-black/10 dark:border-white/10 px-6 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-50 glass-panel border-b border-[#CEAB93]/50 dark:border-[#412D15] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-br from-amber-800 to-amber-950 p-2.5 rounded-xl shadow-lg border border-amber-500/30 flex items-center justify-center">
-            <BookOpen className="h-6 w-6 text-white" />
+          <div className="bg-[#AD8B73] dark:bg-[#1F150C] p-2.5 rounded-xl shadow-md border border-[#CEAB93]/40 dark:border-[#412D15] flex items-center justify-center">
+            <BookOpen className="h-6 w-6 text-[#FFFBE9] dark:text-[#E1DCC9]" />
           </div>
           <div>
-            <h1 className="font-playfair text-xl font-bold tracking-tight text-amber-900 dark:text-white flex items-center gap-1.5">
+            <h1 className="font-playfair text-xl font-bold tracking-tight text-[#2C1E16] dark:text-[#E1DCC9] flex items-center gap-1.5">
               OpenPrep{' '}
-              <span className="text-sm px-2 py-0.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-md font-mono border border-amber-500/20">
+              <span className="text-sm px-2 py-0.5 bg-[#AD8B73]/15 text-[#AD8B73] dark:bg-[#412D15] dark:text-[#E1DCC9] rounded-md font-mono border border-[#CEAB93]/30 dark:border-[#412D15]">
                 AI
               </span>
             </h1>
@@ -124,7 +123,7 @@ const Landing = () => {
           {isAuthenticated ? (
             <Link
               to="/dashboard"
-              className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-amber-700 to-amber-900 hover:from-amber-600 hover:to-amber-800 text-white font-medium shadow-md transition-all duration-200 text-sm hover:shadow-lg hover:-translate-y-0.5 flex items-center gap-2"
+              className="px-5 py-2.5 rounded-lg bg-[#AD8B73] hover:bg-[#8C6A53] text-[#FFFBE9] dark:bg-[#E1DCC9] dark:hover:bg-[#C4BA9D] dark:text-[#1F150C] font-semibold shadow-md transition-all duration-200 text-sm hover:shadow-lg hover:-translate-y-0.5 flex items-center gap-2"
             >
               Go to Dashboard <ChevronRight className="h-4 w-4" />
             </Link>
@@ -132,13 +131,13 @@ const Landing = () => {
             <div className="flex items-center gap-2">
               <Link
                 to="/login"
-                className="hidden sm:inline-block px-4 py-2 text-sm font-medium text-slate-600 hover:text-amber-800 dark:text-slate-300 dark:hover:text-amber-400 transition"
+                className="hidden sm:inline-block px-4 py-2 text-sm font-medium text-[#5C4333] hover:text-[#AD8B73] dark:text-[#C4BA9D] dark:hover:text-[#E1DCC9] transition"
               >
                 Sign In
               </Link>
               <Link
                 to="/register"
-                className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-amber-700 to-amber-900 hover:from-amber-600 hover:to-amber-800 text-white font-medium shadow-md transition-all duration-200 text-sm hover:shadow-lg hover:-translate-y-0.5"
+                className="px-5 py-2.5 rounded-lg bg-[#AD8B73] hover:bg-[#8C6A53] text-[#FFFBE9] dark:bg-[#E1DCC9] dark:hover:bg-[#C4BA9D] dark:text-[#1F150C] font-semibold shadow-md transition-all duration-200 text-sm hover:shadow-lg hover:-translate-y-0.5"
               >
                 Get Started
               </Link>
@@ -148,11 +147,11 @@ const Landing = () => {
       </header>
 
       {/* ── HERO SECTION ── */}
-      <section className="relative overflow-hidden pt-20 pb-28 px-6 lg:px-8 border-b border-black/5 dark:border-white/5">
+      <section className="relative overflow-hidden pt-16 pb-24 px-6 lg:px-8 border-b border-[#CEAB93]/30 dark:border-[#412D15]">
         {/* Glow Effects */}
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-amber-400/10 dark:bg-amber-500/5 rounded-full blur-3xl -z-10 animate-pulse-glow" />
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#AD8B73]/10 dark:bg-[#412D15]/30 rounded-full blur-3xl -z-10 animate-pulse-glow" />
         <div
-          className="absolute top-1/3 right-1/4 w-[30rem] h-[30rem] bg-indigo-400/10 dark:bg-indigo-500/5 rounded-full blur-3xl -z-10 animate-pulse-glow"
+          className="absolute top-1/3 right-1/4 w-[30rem] h-[30rem] bg-[#CEAB93]/15 dark:bg-[#1F150C] rounded-full blur-3xl -z-10 animate-pulse-glow"
           style={{ animationDelay: '2s' }}
         />
 
@@ -161,27 +160,27 @@ const Landing = () => {
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.6 }}
-            className="mb-6 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-400 text-sm font-medium flex items-center gap-2 shadow-sm"
+            className="mb-6 px-4 py-1.5 rounded-full bg-[#E3CAA5]/80 dark:bg-[#1F150C] border border-[#CEAB93] dark:border-[#412D15] text-[#2C1E16] dark:text-[#E1DCC9] text-sm font-medium flex items-center gap-2 shadow-sm"
           >
-            <Sparkles className="h-4 w-4" /> Exam Preparation Reimagined with AI
+            <Sparkles className="h-4 w-4 text-[#AD8B73] dark:text-[#E1DCC9]" /> Exam Preparation Reimagined with AI
           </motion.div>
 
           <motion.h2
             initial={{ y: 30, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="font-playfair text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-tight max-w-4xl text-slate-900 dark:text-white"
+            className="font-playfair text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-tight max-w-4xl text-[#2C1E16] dark:text-[#E1DCC9]"
           >
             Study Smarter. Analyze PYQs.
             <br />
-            <span className="text-amber-800 dark:text-amber-400">Master Your Exam Planner.</span>
+            <span className="text-[#AD8B73] dark:text-[#E1DCC9] underline decoration-[#CEAB93]/50 underline-offset-8">Master Your Exam Planner.</span>
           </motion.h2>
 
           <motion.p
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.2 }}
-            className="mt-6 text-lg sm:text-xl text-slate-600 dark:text-slate-300 max-w-2xl leading-relaxed font-inter"
+            className="mt-6 text-lg sm:text-xl text-[#5C4333] dark:text-[#C4BA9D] max-w-2xl leading-relaxed font-inter"
           >
             Stop wasting hours mapping syllabus weightages. Upload notes, analyze previous year
             questions, track your weak subjects, and learn using adaptive spaced repetition
@@ -196,7 +195,7 @@ const Landing = () => {
           >
             <button
               onClick={() => navigate(isAuthenticated ? '/dashboard' : '/register')}
-              className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-amber-700 to-amber-900 hover:from-amber-600 hover:to-amber-800 text-white font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center gap-2 text-base cursor-pointer"
+              className="w-full sm:w-auto px-8 py-4 rounded-xl bg-[#AD8B73] hover:bg-[#8C6A53] text-[#FFFBE9] dark:bg-[#E1DCC9] dark:hover:bg-[#C4BA9D] dark:text-[#1F150C] font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center gap-2 text-base cursor-pointer"
             >
               Open Your Free Study Journal <ArrowRight className="h-5 w-5" />
             </button>
@@ -205,7 +204,7 @@ const Landing = () => {
                 const element = document.getElementById('features');
                 element?.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="w-full sm:w-auto px-8 py-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/60 font-semibold shadow-sm hover:shadow transition-all duration-200 text-slate-700 dark:text-slate-200 cursor-pointer"
+              className="w-full sm:w-auto px-8 py-4 rounded-xl bg-[#E3CAA5]/80 hover:bg-[#E3CAA5] text-[#2C1E16] border border-[#CEAB93] dark:bg-[#1F150C] dark:hover:bg-[#412D15] dark:text-[#E1DCC9] dark:border-[#412D15] font-semibold shadow-sm hover:shadow transition-all duration-200 cursor-pointer"
             >
               Explore Features
             </button>
@@ -216,19 +215,10 @@ const Landing = () => {
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 50, damping: 20, delay: 0.4 }}
-            className="mt-20 w-full max-w-5xl relative group"
+            className="mt-16 w-full max-w-5xl relative group"
           >
-            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-700 opacity-20 blur-xl group-hover:opacity-30 transition duration-1000" />
-            <div className="relative rounded-2xl border border-black/10 dark:border-white/10 overflow-hidden shadow-2xl bg-[#F5E6CA] dark:bg-dark-card p-2 md:p-4">
-              <img
-                src={heroImage}
-                loading="lazy"
-                decoding="async"
-                width="1200"
-                height="675"
-                alt="Dashboard"
-                className="w-full h-auto rounded-lg shadow-md mb-8"
-              />
+            <div className="absolute -inset-1 rounded-2xl bg-[#AD8B73]/20 dark:bg-[#412D15]/40 opacity-30 blur-xl group-hover:opacity-50 transition duration-1000" />
+            <div className="relative rounded-2xl border border-[#CEAB93] dark:border-[#412D15] overflow-hidden shadow-2xl bg-[#E3CAA5] dark:bg-[#1F150C] p-2 md:p-4">
               {/* Fake Browser Chrome */}
               <div className="flex items-center justify-between border-b border-black/10 dark:border-white/10 pb-3 mb-4 px-2">
                 <div className="flex items-center gap-1.5">
