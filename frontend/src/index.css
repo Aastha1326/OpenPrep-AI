@@ -551,12 +551,26 @@ html.dark .hover\:bg-zinc-800:hover {
   background-color: #412D15 !important;
 }
 
-/* ───────── COLOR HUNT LIGHT THEME (#AD8B73, #CEAB93, #E3CAA5, #FFFBE9) ───────── */
-html:not(.dark) {
-  --foreground: #1F150C;
-  color: #1F150C !important;
+/* ───────── COLOR HUNT DARK THEME (#000000, #1F150C, #412D15, #E1DCC9) ───────── */
+html.dark,
+.dark {
+  background-color: #000000 !important;
+  color-scheme: dark;
 }
 
+html.dark body,
+.dark body {
+  background-color: #000000 !important;
+  color: #E1DCC9 !important;
+}
+
+html.dark .min-h-screen,
+.dark .min-h-screen {
+  background-color: #000000 !important;
+  color: #E1DCC9 !important;
+}
+
+/* ───────── COLOR HUNT LIGHT THEME (#AD8B73, #CEAB93, #E3CAA5, #FFFBE9) ───────── */
 html:not(.dark) body {
   background-color: #FFFBE9 !important;
   color: #1F150C !important;
@@ -567,84 +581,71 @@ html:not(.dark) .min-h-screen {
   color: #1F150C !important;
 }
 
-/* Force high-contrast dark text in Light Mode for ALL text elements */
-html:not(.dark) h1,
-html:not(.dark) h2,
-html:not(.dark) h3,
-html:not(.dark) h4,
-html:not(.dark) h5,
-html:not(.dark) h6,
-html:not(.dark) .text-slate-900,
-html:not(.dark) .text-slate-800,
-html:not(.dark) .text-slate-700,
-html:not(.dark) .text-slate-600,
-html:not(.dark) .text-slate-500,
-html:not(.dark) .text-slate-400,
-html:not(.dark) .text-slate-300,
-html:not(.dark) .text-slate-200,
-html:not(.dark) .text-slate-100,
-html:not(.dark) .text-amber-950,
-html:not(.dark) .text-amber-900,
-html:not(.dark) .text-amber-800,
-html:not(.dark) .text-amber-700 {
-  color: #1F150C !important;
-}
-
-html:not(.dark) p,
-html:not(.dark) .text-slate-600,
-html:not(.dark) .text-slate-500 {
-  color: #412D15 !important;
-}
-
-/* Light Surfaces & Cards */
-html:not(.dark) [class*="bg-[#FDFBF7]"],
-html:not(.dark) [class*="bg-[#fdfbf7]"],
-html:not(.dark) .bg-slate-50,
-html:not(.dark) .bg-slate-100,
-html:not(.dark) .bg-amber-50\/50 {
-  background-color: #FFFBE9 !important;
-}
-
-html:not(.dark) .bg-white,
-html:not(.dark) .bg-amber-50,
-html:not(.dark) .bg-amber-100\/50,
-html:not(.dark) .bg-slate-800,
-html:not(.dark) .bg-slate-900 {
-  background-color: #E3CAA5 !important;
-}
-
-/* Light Borders */
-html:not(.dark) .border-slate-200,
-html:not(.dark) .border-slate-300,
-html:not(.dark) .border-amber-200,
-html:not(.dark) .border-amber-300,
-html:not(.dark) .border-slate-700,
-html:not(.dark) .border-slate-800 {
-  border-color: #CEAB93 !important;
-}
-
-/* Light Primary Accents & Buttons */
-html:not(.dark) .bg-amber-600,
-html:not(.dark) .bg-amber-700,
-html:not(.dark) .bg-amber-800,
-html:not(.dark) .bg-orange-600,
-html:not(.dark) .bg-indigo-600 {
+/* ───────── GUARANTEED HIGH CONTRAST BUTTON & CARD THEME UTILITIES ───────── */
+.btn-primary-theme {
   background-color: #AD8B73 !important;
   color: #FFFBE9 !important;
 }
 
-html:not(.dark) .hover\:bg-amber-700:hover,
-html:not(.dark) .hover\:bg-amber-800:hover,
-html:not(.dark) .hover\:bg-orange-700:hover,
-html:not(.dark) .hover\:bg-indigo-700:hover {
-  background-color: #8C6A53 !important;
-}
-
-html:not(.dark) button.bg-\[\#AD8B73\],
-html:not(.dark) a.bg-\[\#AD8B73\],
-html:not(.dark) button.bg-\[\#AD8B73\] *,
-html:not(.dark) a.bg-\[\#AD8B73\] * {
+.btn-primary-theme,
+.btn-primary-theme * {
   color: #FFFBE9 !important;
 }
+
+.dark .btn-primary-theme,
+html.dark .btn-primary-theme {
+  background-color: #E1DCC9 !important;
+  color: #1F150C !important;
+}
+
+.dark .btn-primary-theme *,
+html.dark .btn-primary-theme * {
+  color: #1F150C !important;
+}
+
+.btn-secondary-theme {
+  background-color: #E3CAA5 !important;
+  color: #1F150C !important;
+  border: 1px solid #CEAB93 !important;
+}
+
+.btn-secondary-theme,
+.btn-secondary-theme * {
+  color: #1F150C !important;
+}
+
+.dark .btn-secondary-theme,
+html.dark .btn-secondary-theme {
+  background-color: #1F150C !important;
+  color: #E1DCC9 !important;
+  border: 1px solid #412D15 !important;
+}
+
+.dark .btn-secondary-theme *,
+html.dark .btn-secondary-theme * {
+  color: #E1DCC9 !important;
+}
+
+.card-cta-theme {
+  background-color: #1F150C !important;
+  color: #E1DCC9 !important;
+  border: 2px dashed #CEAB93 !important;
+}
+
+.card-cta-theme h1,
+.card-cta-theme h2,
+.card-cta-theme h3,
+.card-cta-theme h4,
+.card-cta-theme h5,
+.card-cta-theme h6 {
+  color: #E1DCC9 !important;
+}
+
+.card-cta-theme p,
+.card-cta-theme span {
+  color: #C4BA9D !important;
+}
+
+
 
 

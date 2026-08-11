@@ -123,7 +123,7 @@ const Landing = () => {
           {isAuthenticated ? (
             <Link
               to="/dashboard"
-              className="px-5 py-2.5 rounded-lg bg-[#AD8B73] hover:bg-[#8C6A53] text-[#FFFBE9] dark:bg-[#E1DCC9] dark:hover:bg-[#C4BA9D] dark:text-[#1F150C] font-semibold shadow-md transition-all duration-200 text-sm hover:shadow-lg hover:-translate-y-0.5 flex items-center gap-2"
+              className="px-5 py-2.5 rounded-lg btn-primary-theme font-semibold shadow-md transition-all duration-200 text-sm hover:shadow-lg hover:-translate-y-0.5 flex items-center gap-2"
             >
               Go to Dashboard <ChevronRight className="h-4 w-4" />
             </Link>
@@ -131,13 +131,13 @@ const Landing = () => {
             <div className="flex items-center gap-2">
               <Link
                 to="/login"
-                className="hidden sm:inline-block px-4 py-2 text-sm font-medium text-[#5C4333] hover:text-[#AD8B73] dark:text-[#C4BA9D] dark:hover:text-[#E1DCC9] transition"
+                className="hidden sm:inline-block px-4 py-2 text-sm font-bold text-[#1F150C] hover:text-[#AD8B73] dark:text-[#E1DCC9] dark:hover:text-[#FFFBE9] transition"
               >
                 Sign In
               </Link>
               <Link
                 to="/register"
-                className="px-5 py-2.5 rounded-lg bg-[#AD8B73] hover:bg-[#8C6A53] text-[#FFFBE9] dark:bg-[#E1DCC9] dark:hover:bg-[#C4BA9D] dark:text-[#1F150C] font-semibold shadow-md transition-all duration-200 text-sm hover:shadow-lg hover:-translate-y-0.5"
+                className="px-5 py-2.5 rounded-lg btn-primary-theme font-semibold shadow-md transition-all duration-200 text-sm hover:shadow-lg hover:-translate-y-0.5"
               >
                 Get Started
               </Link>
@@ -160,7 +160,7 @@ const Landing = () => {
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.6 }}
-            className="mb-6 px-4 py-1.5 rounded-full bg-[#E3CAA5]/80 dark:bg-[#1F150C] border border-[#CEAB93] dark:border-[#412D15] text-[#2C1E16] dark:text-[#E1DCC9] text-sm font-medium flex items-center gap-2 shadow-sm"
+            className="mb-6 px-4 py-1.5 rounded-full bg-[#E3CAA5] dark:bg-[#1F150C] border border-[#CEAB93] dark:border-[#412D15] text-[#1F150C] dark:text-[#E1DCC9] text-sm font-semibold flex items-center gap-2 shadow-sm"
           >
             <Sparkles className="h-4 w-4 text-[#AD8B73] dark:text-[#E1DCC9]" /> Exam Preparation Reimagined with AI
           </motion.div>
@@ -169,18 +169,18 @@ const Landing = () => {
             initial={{ y: 30, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="font-playfair text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-tight max-w-4xl text-[#2C1E16] dark:text-[#E1DCC9]"
+            className="font-playfair text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-tight max-w-4xl text-[#1F150C] dark:text-[#E1DCC9]"
           >
             Study Smarter. Analyze PYQs.
             <br />
-            <span className="text-[#AD8B73] dark:text-[#E1DCC9] underline decoration-[#CEAB93]/50 underline-offset-8">Master Your Exam Planner.</span>
+            <span className="text-[#AD8B73] dark:text-[#E1DCC9] underline decoration-[#CEAB93]/60 underline-offset-8">Master Your Exam Planner.</span>
           </motion.h2>
 
           <motion.p
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.2 }}
-            className="mt-6 text-lg sm:text-xl text-[#5C4333] dark:text-[#C4BA9D] max-w-2xl leading-relaxed font-inter"
+            className="mt-6 text-lg sm:text-xl text-[#412D15] dark:text-[#C4BA9D] max-w-2xl leading-relaxed font-inter font-medium"
           >
             Stop wasting hours mapping syllabus weightages. Upload notes, analyze previous year
             questions, track your weak subjects, and learn using adaptive spaced repetition
@@ -195,7 +195,7 @@ const Landing = () => {
           >
             <button
               onClick={() => navigate(isAuthenticated ? '/dashboard' : '/register')}
-              className="w-full sm:w-auto px-8 py-4 rounded-xl bg-[#AD8B73] hover:bg-[#8C6A53] text-[#FFFBE9] dark:bg-[#E1DCC9] dark:hover:bg-[#C4BA9D] dark:text-[#1F150C] font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center gap-2 text-base cursor-pointer"
+              className="w-full sm:w-auto px-8 py-4 rounded-xl btn-primary-theme font-bold shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center gap-2 text-base cursor-pointer"
             >
               Open Your Free Study Journal <ArrowRight className="h-5 w-5" />
             </button>
@@ -204,7 +204,7 @@ const Landing = () => {
                 const element = document.getElementById('features');
                 element?.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="w-full sm:w-auto px-8 py-4 rounded-xl bg-[#E3CAA5]/80 hover:bg-[#E3CAA5] text-[#2C1E16] border border-[#CEAB93] dark:bg-[#1F150C] dark:hover:bg-[#412D15] dark:text-[#E1DCC9] dark:border-[#412D15] font-semibold shadow-sm hover:shadow transition-all duration-200 cursor-pointer"
+              className="w-full sm:w-auto px-8 py-4 rounded-xl btn-secondary-theme font-bold shadow-sm hover:shadow transition-all duration-200 cursor-pointer"
             >
               Explore Features
             </button>
@@ -503,21 +503,20 @@ const Landing = () => {
 
       {/* ── FINAL CALL TO ACTION ── */}
       <section className="py-24 px-6 text-center max-w-4xl mx-auto">
-        <div className="relative p-12 rounded-3xl overflow-hidden bg-leather border-stitched text-white shadow-leather">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-amber-900/40 via-transparent to-transparent opacity-85 pointer-events-none" />
-          <h3 className="font-playfair text-3xl sm:text-4xl font-extrabold text-gold-foil leading-tight">
+        <div className="relative p-12 rounded-3xl overflow-hidden card-cta-theme shadow-2xl">
+          <h3 className="font-playfair text-3xl sm:text-4xl font-extrabold text-[#E1DCC9] leading-tight">
             Stop Guessing. Start Mastering.
           </h3>
-          <p className="mt-4 text-slate-200 max-w-xl mx-auto text-sm sm:text-base leading-relaxed">
+          <p className="mt-4 text-[#C4BA9D] max-w-xl mx-auto text-sm sm:text-base leading-relaxed font-medium">
             Create your account today to configure your personal study planners, generate quizzes,
             and unlock spaced flashcards.
           </p>
           <div className="mt-8 flex justify-center">
             <button
               onClick={() => navigate(isAuthenticated ? '/dashboard' : '/register')}
-              className="px-8 py-4 rounded-xl bg-gold-foil hover:opacity-90 text-amber-950 font-bold shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 flex items-center gap-2 cursor-pointer"
+              className="px-8 py-4 rounded-xl btn-primary-theme font-bold shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 flex items-center gap-2 cursor-pointer"
             >
-              Sign Up Now <ArrowRight className="h-5 w-5 text-amber-950" />
+              Sign Up Now <ArrowRight className="h-5 w-5" />
             </button>
           </div>
         </div>
