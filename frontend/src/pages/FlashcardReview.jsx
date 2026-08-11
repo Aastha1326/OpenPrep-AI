@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Brain, ArrowLeft, RotateCw, CheckCircle2, Volume2, VolumeX, AlertCircle, Settings } from 'lucide-react';
 import API from '../services/api';
+import useVoiceControl from '../hooks/useVoiceControl';
+import VoiceModeToggle from '../components/VoiceModeToggle';
+import AudioWaveform from '../components/AudioWaveform';
 
 const STORAGE_KEY = 'flashcardReviewSession';
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -141,7 +144,6 @@ const FlashcardReview = () => {
     hard: 0, // quality < 3
   });
 
-  const [isSpeaking, setIsSpeaking] = useState(false);
   const [speechRate, setSpeechRate] = useState(1);
 
   const [submitting, setSubmitting] = useState(false);
@@ -150,18 +152,6 @@ const FlashcardReview = () => {
   const reviewCardIdRef = useRef(null);
   const isMountedRef = useRef(true);
   const sessionStatsRef = useRef(sessionStats);
-
-  // Cancel speech synthesis and reset the speaking flag when the card or
-  // flip state changes (render-phase reset keeps the flag in sync).
-  const speechKey = `${currentIndex}:${isFlipped}`;
-  const [prevSpeechKey, setPrevSpeechKey] = useState(speechKey);
-  if (prevSpeechKey !== speechKey) {
-    setPrevSpeechKey(speechKey);
-    setIsSpeaking(false);
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
-  }
 
   const fetchDueCards = async () => {
     try {
@@ -251,29 +241,52 @@ const FlashcardReview = () => {
     navigate('/dashboard');
   }, [navigate]);
 
-  const speakText = (text, rate) => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
-    if (!text) return;
+  const handleVoiceCommand = useCallback((command) => {
+    if (command === 'FLIP' && !isFlipped) {
+      handleCardFlip();
+    } else if (isFlipped) {
+      if (command === 'RATE_0') handleReview(0);
+      else if (command === 'RATE_1') handleReview(1);
+      else if (command === 'RATE_2') handleReview(2);
+      else if (command === 'RATE_3') handleReview(3);
+      else if (command === 'RATE_4') handleReview(4);
+      else if (command === 'RATE_5') handleReview(5);
+    }
+  }, [isFlipped, handleCardFlip, handleReview]);
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = rate;
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-    setIsSpeaking(true);
-    window.speechSynthesis.speak(utterance);
-  };
+  const {
+    isSupported,
+    isEnabled,
+    isPaused,
+    status,
+    errorMsg,
+    toggleVoiceMode,
+    speak,
+    cancelSpeech
+  } = useVoiceControl({
+    onCommand: handleVoiceCommand,
+    speechRate
+  });
+
+  const isSpeaking = status === 'SPEAKING';
+
+  // Cancel speech synthesis when card or flip state changes
+  const speechKey = `${currentIndex}:${isFlipped}`;
+  useEffect(() => {
+    cancelSpeech();
+    if (isEnabled && !isPaused && currentCard) {
+       const textToRead = isFlipped ? currentCard.back : currentCard.front;
+       speak(textToRead);
+    }
+  }, [speechKey, isEnabled, isPaused, currentCard, speak, cancelSpeech]);
 
   const handleSpeak = (e) => {
     e.stopPropagation();
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-
     if (isSpeaking) {
-      window.speechSynthesis.cancel();
-      setIsSpeaking(false);
+      cancelSpeech();
     } else {
       const textToRead = isFlipped ? currentCard?.back : currentCard?.front;
-      speakText(textToRead, speechRate);
+      speak(textToRead);
     }
   };
 
@@ -285,8 +298,11 @@ const FlashcardReview = () => {
     setSpeechRate(nextRate);
 
     if (isSpeaking) {
-      const textToRead = isFlipped ? currentCard?.back : currentCard?.front;
-      speakText(textToRead, nextRate);
+      cancelSpeech();
+      setTimeout(() => {
+        const textToRead = isFlipped ? currentCard?.back : currentCard?.front;
+        speak(textToRead); // Will use the newly set rate implicitly because hook deps update
+      }, 50);
     }
   };
 
@@ -431,7 +447,16 @@ const FlashcardReview = () => {
           <span>SM-2 Review Queue</span>
         </div>
         <div className="flex items-center gap-3">
-          <div className="text-sm font-semibold text-neutral-500 dark:text-neutral-400">
+          <AudioWaveform status={status} />
+          <VoiceModeToggle
+            isSupported={isSupported}
+            isEnabled={isEnabled}
+            isPaused={isPaused}
+            toggleVoiceMode={toggleVoiceMode}
+            errorMsg={errorMsg}
+            status={status}
+          />
+          <div className="text-sm font-semibold text-neutral-500 dark:text-neutral-400 border-l border-neutral-300 dark:border-slate-700 pl-3">
             {currentIndex + 1} <span className="text-neutral-300 dark:text-neutral-600">/</span> {cards.length}
           </div>
           <button
