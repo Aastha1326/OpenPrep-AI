@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, User, Lock, Eye, EyeOff, AlertCircle, CheckCircle, BookOpen, ArrowRight, Sparkles } from 'lucide-react';
 import { useGoogleLogin } from '@react-oauth/google';
-import { registerUser, googleLoginUser, clearError, clearRegistrationSuccess } from '../store/slices/authSlice';
+import { registerUser, googleLoginUser, loadUser, clearError, clearRegistrationSuccess } from '../store/slices/authSlice';
 import ThemeToggle from '../components/ThemeToggle';
 import SoundToggle from '../components/SoundToggle';
 
@@ -25,9 +25,27 @@ const Register = () => {
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
 
+  const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  const googleAuthUrl = `${apiBaseUrl.replace(/\/$/, '')}/auth/google`;
+
   useEffect(() => {
     if (isAuthenticated) navigate('/dashboard', { replace: true });
   }, [isAuthenticated, navigate]);
+
+  useEffect(() => {
+    // Check if returning from Passport Google OAuth redirect with tokens in URL
+    const searchParams = new URLSearchParams(window.location.search);
+    const token = searchParams.get('token');
+    const refreshToken = searchParams.get('refreshToken');
+
+    if (token && refreshToken) {
+      localStorage.setItem('token', token);
+      localStorage.setItem('refreshToken', refreshToken);
+      dispatch(loadUser()).then(() => {
+        navigate('/dashboard', { replace: true });
+      });
+    }
+  }, [dispatch, navigate]);
 
   useEffect(() => {
     return () => { dispatch(clearError()); dispatch(clearRegistrationSuccess()); };
@@ -38,13 +56,17 @@ const Register = () => {
       await dispatch(googleLoginUser({ access_token: tokenResponse.access_token })).unwrap();
       navigate('/dashboard', { replace: true });
     } catch (err) {
-      console.error('Google registration error:', err);
+      console.warn('Google popup error, falling back to redirect:', err);
+      window.location.href = googleAuthUrl;
     }
   };
 
   const loginWithGoogle = useGoogleLogin({
     onSuccess: handleGoogleSuccess,
-    onError: (err) => console.error('Google OAuth Error:', err),
+    onError: (err) => {
+      console.warn('Google OAuth popup blocked or failed, redirecting:', err);
+      window.location.href = googleAuthUrl;
+    },
   });
 
   const handleChange = (e) => {

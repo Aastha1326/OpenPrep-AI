@@ -6,6 +6,7 @@ const {
   register,
   login,
   googleLogin,
+  googlePassportCallback,
   getMe,
   forgotPassword,
   verifyEmail,
@@ -602,10 +603,7 @@ router.get('/google', passport.authenticate('google', { scope: ['profile', 'emai
 router.get(
   '/google/callback',
   passport.authenticate('google', { failureRedirect: '/login', session: false }),
-  (req, res) => {
-    // Generate token in production, but for now just redirect
-    res.redirect('/dashboard');
-  }
+  googlePassportCallback
 );
 
 // User settings routes

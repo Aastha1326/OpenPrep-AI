@@ -707,6 +707,32 @@ exports.googleLogin = async (req, res, next) => {
   }
 };
 
+// ---------------------------------------------------------------------------
+// @desc    Google OAuth Passport Callback (Redirect flow)
+// @route   GET /api/auth/google/callback
+// @access  Public
+// ---------------------------------------------------------------------------
+exports.googlePassportCallback = async (req, res, next) => {
+  try {
+    const frontendBase = process.env.FRONTEND_URL || 'https://openprep-ai.vercel.app';
+    if (!req.user) {
+      return res.redirect(`${frontendBase.replace(/\/$/, '')}/login?error=Google%20Authentication%20Failed`);
+    }
+
+    const accessToken = generateAccessToken(req.user.id);
+    const refreshResult = await generateRefreshToken(req.user);
+    const refreshToken = refreshResult.rawToken;
+
+    setRefreshTokenCookie(res, refreshToken);
+
+    return res.redirect(
+      `${frontendBase.replace(/\/$/, '')}/login?token=${accessToken}&refreshToken=${refreshToken}`
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @route   POST /api/auth/logout
 // @access  Public
 // ---------------------------------------------------------------------------
