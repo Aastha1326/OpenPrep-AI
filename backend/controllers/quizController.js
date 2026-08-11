@@ -374,9 +374,15 @@ exports.submitQuizAttempt = async (req, res, next) => {
       description: `Completed practice quiz: "${quiz.title}" with score ${score}%`,
     });
 
+    // Award XP for completing quiz attempt
+    const xpService = require('../services/xpService');
+    const xpEarned = Math.round(score * 1.5 + 50);
+    const progression = await xpService.addXP(req.user, xpEarned);
+
     res.status(201).json({
       success: true,
       data: attempt,
+      progression,
     });
   } catch (error) {
     next(error);

@@ -25,6 +25,7 @@ const PyqDashboard = lazy(() => import('./pages/PyqDashboard'));
 const Settings = lazy(() => import('./pages/Settings'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const StudyGroupChat = lazy(() => import('./pages/StudyGroupChat'));
+const AiAssistant = lazy(() => import('./pages/AiAssistant'));
 
 function App() {
   const dispatch = useDispatch();
@@ -106,6 +107,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <StudyGroupChat />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/ai-assistant"
+            element={
+              <ProtectedRoute>
+                <AiAssistant />
               </ProtectedRoute>
             }
           />

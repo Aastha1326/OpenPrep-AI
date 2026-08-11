@@ -1,0 +1,8 @@
+-- Migration to add XP progression and Streak Freeze tracking fields to Users
+ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "xp" INTEGER DEFAULT 0;
+ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "level" INTEGER DEFAULT 1;
+ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "badges" JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "skillPoints" INTEGER DEFAULT 0;
+ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "unlockedNodes" JSONB DEFAULT '["root"]'::jsonb;
+ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "streakFreezesEquippedThisMonth" INTEGER DEFAULT 0;
+ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "lastStreakFreezeEquipMonth" VARCHAR(255) DEFAULT NULL;

@@ -11,6 +11,8 @@ const Progress = require('../models/Progress');
 const StudyPlan = require('../models/StudyPlan');
 const PYQ = require('../models/PYQ');
 const ActivityLog = require('../models/ActivityLog');
+const QuizBookmark = require('../models/QuizBookmark');
+const QuizTelemetryEvent = require('../models/QuizTelemetryEvent');
 const {
   validateSyllabusPayload,
   readFile,
@@ -110,6 +112,8 @@ exports.deleteExam = async (req, res, next) => {
 
       if (quizIds.length > 0) {
         await QuizAttempt.destroy({ where: { quiz: { [Op.in]: quizIds } }, transaction: t });
+        await QuizBookmark.destroy({ where: { quiz: { [Op.in]: quizIds } }, transaction: t });
+        await QuizTelemetryEvent.destroy({ where: { quiz: { [Op.in]: quizIds } }, transaction: t });
       }
 
       // 2. Delete quizzes
@@ -335,6 +339,8 @@ exports.deleteSubject = async (req, res, next) => {
     const quizIds = quizzes.map((q) => q.id);
     if (quizIds.length > 0) {
       await QuizAttempt.destroy({ where: { quiz: { [Op.in]: quizIds } }, transaction: t });
+      await QuizBookmark.destroy({ where: { quiz: { [Op.in]: quizIds } }, transaction: t });
+      await QuizTelemetryEvent.destroy({ where: { quiz: { [Op.in]: quizIds } }, transaction: t });
     }
 
     // 2. Delete child records that reference this subject
@@ -450,7 +456,48 @@ exports.deleteTopic = async (req, res, next) => {
     // 2. Nullify topic reference on quizzes (quiz itself is preserved)
     await Quiz.update({ topic: null }, { where: { topic: topic.id }, transaction: t });
 
-    // 3. Delete the topic itself
+    // 3. Remove topic references from QuizAttempt arrays
+    await QuizAttempt.update(
+      {
+        weakTopics: sequelize.fn('array_remove', sequelize.col('weakTopics'), topic.id),
+        strongTopics: sequelize.fn('array_remove', sequelize.col('strongTopics'), topic.id),
+      },
+      {
+        where: {
+          [Op.or]: [
+            { weakTopics: { [Op.contains]: [topic.id] } },
+            { strongTopics: { [Op.contains]: [topic.id] } },
+          ],
+        },
+        transaction: t,
+      }
+    );
+
+    // 4. Nullify topic reference inside StudyPlan dailyGoals JSONB structure
+    const studyPlans = await StudyPlan.findAll({
+      where: { user: req.user.id },
+      transaction: t,
+    });
+    for (const plan of studyPlans) {
+      let updated = false;
+      const dailyGoals = plan.dailyGoals || [];
+      const newGoals = dailyGoals.map(day => {
+        const tasks = (day.tasks || []).map(task => {
+          if (task.topic === topic.id) {
+            updated = true;
+            return { ...task, topic: null };
+          }
+          return task;
+        });
+        return { ...day, tasks };
+      });
+      if (updated) {
+        plan.dailyGoals = newGoals;
+        await plan.save({ transaction: t });
+      }
+    }
+
+    // 5. Delete the topic itself
     await topic.destroy({ transaction: t });
 
     await t.commit();

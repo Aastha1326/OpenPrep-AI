@@ -23,11 +23,14 @@ import {
   Upload,
   Settings,
   MessageSquare,
-Shield,
+  Shield,
   Globe,
   Youtube,
+  Brain,
+  Bot,
 } from 'lucide-react';import API from '../services/api';
 import { toDateOnlyString } from '../utils/dateUtils';
+import SkillTree from '../components/dashboard/SkillTree';
 import {
   LineChart,
   Line,
@@ -52,7 +55,6 @@ import BadgeGrid from '../components/dashboard/BadgeGrid';
 import PinnedTasks from '../components/dashboard/PinnedTasks';
 import FatigueMonitor from '../components/dashboard/FatigueMonitor';
 import UploadMaterial from '../components/dashboard/UploadMaterial';
-import SkillTree from '../components/dashboard/SkillTree';
 import CreateNoteModal from '../components/dashboard/CreateNoteModal';
 import StudyPlanModal from '../components/dashboard/StudyPlanModal';
 import PyqAnalysisModal from '../components/dashboard/PyqAnalysisModal';
@@ -79,7 +81,7 @@ import {
   fetchDueFlashcards,
   reviewFlashcard,
 } from '../store/slices/dashboardSlice';
-import { logout } from '../store/slices/authSlice';
+import { logout, loadUser } from '../store/slices/authSlice';
 
 // ── Helpers ──
 
@@ -278,6 +280,34 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [syllabusPrefill, setSyllabusPrefill] = useState(null);
   const [comingSoon, setComingSoon] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isSkillTreeOpen, setIsSkillTreeOpen] = useState(false);
+  const [showLevelUpModal, setShowLevelUpModal] = useState(false);
+  const [levelUpLevel, setLevelUpLevel] = useState(null);
+  const [prevLevel, setPrevLevel] = useState(null);
+
+  useEffect(() => {
+    if (user?.level) {
+      if (prevLevel && user.level > prevLevel) {
+        setLevelUpLevel(user.level);
+        setShowLevelUpModal(true);
+      }
+      setPrevLevel(user.level);
+    }
+  }, [user?.level, prevLevel]);
+
+  const handleEquipStreakFreeze = async () => {
+    try {
+      const res = await API.post('/progress/streak-freeze/equip');
+      if (res.data.success) {
+        alert('Streak Freeze Shield equipped successfully!');
+        dispatch(loadUser());
+        dispatch(fetchDashboardStats());
+      }
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.error || 'Failed to equip Streak Freeze shield.');
+    }
+  };
 
   const handleGoToStudyPlanFromImport = (prefill) => {
     if (prefill) setSyllabusPrefill(prefill);
@@ -451,6 +481,12 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           delay={0.48}
           onClick={() => setIsCommunityDecksOpen(true)}
         />
+        <GoldTabButton
+          icon={Bot}
+          label="AI Study Assistant"
+          delay={0.5}
+          onClick={() => navigate('/ai-assistant')}
+        />
         <button
           onClick={() => {
             setIsNoteModalOpen(true);
@@ -480,6 +516,20 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             <p className="text-amber-100/70 text-lg italic font-playfair">
               &ldquo;The roots of education are bitter, but the fruit is sweet.&rdquo; – Aristotle
             </p>
+
+            {/* --- XP PROGRESS BAR --- */}
+            <div className="mt-4 flex flex-col max-w-md bg-stone-900/40 backdrop-blur-sm border border-amber-500/10 p-3 rounded-lg">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-amber-400 font-bold text-xs uppercase tracking-wider">Level {user?.level || 1}</span>
+                <span className="text-amber-200/50 text-xs font-mono">{(user?.xp || 0) % 1000} / 1000 XP</span>
+              </div>
+              <div className="w-full bg-stone-950 h-2 rounded-full overflow-hidden border border-stone-800">
+                <div 
+                  className="bg-gradient-to-r from-amber-500 to-amber-300 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(100, ((user?.xp || 0) % 1000) / 10)}%` }}
+                />
+              </div>
+            </div>
 
             {/* --- EXAM COUNTDOWN WIDGET --- */}
             {activePlan?.exam?.date && (
@@ -537,6 +587,18 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
                 SM-2 Settings
               </div>
             </button>
+
+            <button
+              onClick={() => setIsSkillTreeOpen(true)}
+              className="bg-neutral-800 text-yellow-500 border border-yellow-700/50 hover:bg-neutral-700 p-2.5 rounded-sm shadow-[0_4px_10px_rgba(0,0,0,0.4)] flex items-center justify-center relative group"
+              aria-label="Skill Tree"
+            >
+              <Brain className="w-5 h-5 transition-transform duration-300 group-hover:scale-110" />
+              <div className="absolute top-full mt-2 px-2 py-1 bg-neutral-800 text-yellow-500 text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                Skill Tree
+              </div>
+            </button>
+
             <div className="flex flex-col items-center">
               <div className="relative">
                 <Flame
@@ -549,18 +611,28 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
               <span className="text-amber-200/50 text-xs uppercase tracking-widest">Streak</span>
             </div>
 
-            {streakFreezes > 0 && (
-              <div className="flex flex-col items-center ml-2">
-                <div className="relative group cursor-pointer" title="Streak Freeze Shield">
-                  <Shield className="w-10 h-10 text-cyan-400 animate-pulse" fill="currentColor" />
-                  <div className="absolute inset-0 blur-md bg-cyan-400/30 rounded-full" />
+            <div className="flex flex-col items-center ml-2">
+              <div 
+                className="relative group cursor-pointer flex flex-col items-center" 
+                onClick={handleEquipStreakFreeze}
+                title="Click to equip Streak Freeze (Limit 2/month)"
+              >
+                <div className="relative">
+                  <Shield className="w-10 h-10 text-cyan-400 hover:text-cyan-300 transition-colors" fill="currentColor" />
+                  <div className="absolute inset-0 blur-md bg-cyan-400/20 rounded-full" />
                 </div>
-                <span className="text-cyan-300 font-bold text-xl">{streakFreezes}</span>
+                <span className="text-cyan-300 font-bold text-xl">{streakFreezes || 0}</span>
                 <span className="text-cyan-200/50 text-[10px] uppercase tracking-widest">
                   Freezes
                 </span>
               </div>
-            )}
+              <button
+                onClick={handleEquipStreakFreeze}
+                className="text-[9px] text-cyan-400 hover:text-cyan-300 underline font-mono mt-0.5"
+              >
+                Equip Shield
+              </button>
+            </div>
 
             <button
               onClick={() => navigate('/settings')}
@@ -1181,6 +1253,62 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             >
               <X className="w-4 h-4" />
             </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* --- SKILL TREE MODAL --- */}
+      <AnimatePresence>
+        {isSkillTreeOpen && (
+          <SkillTree onClose={() => setIsSkillTreeOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* --- LEVEL UP MODAL --- */}
+      <AnimatePresence>
+        {showLevelUpModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.8, y: 50 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.8, y: 50 }}
+              className="bg-stone-950 border-2 border-amber-500 rounded-3xl p-8 max-w-sm text-center shadow-[0_0_50px_rgba(245,158,11,0.3)] relative overflow-hidden"
+            >
+              {/* Glow element */}
+              <div className="absolute -inset-10 bg-amber-500/10 blur-xl rounded-full" />
+              
+              <div className="relative z-10 space-y-6">
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ repeat: Infinity, duration: 10, ease: 'linear' }}
+                  className="w-24 h-24 mx-auto rounded-full bg-amber-500/20 border-2 border-amber-500 flex items-center justify-center shadow-lg"
+                >
+                  <Award className="w-12 h-12 text-amber-400" />
+                </motion.div>
+                
+                <h2 className="text-3xl font-playfair font-bold text-amber-500">LEVEL UP!</h2>
+                
+                <p className="text-stone-300">
+                  Congratulations! You have reached <strong className="text-white">Level {levelUpLevel}</strong>!
+                </p>
+                
+                <div className="bg-stone-900 border border-stone-800 p-3 rounded-lg text-sm text-amber-200">
+                  +1 Skill Point awarded! Spend it in the Skill Tree.
+                </div>
+
+                <button
+                  onClick={() => setShowLevelUpModal(false)}
+                  className="w-full bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-700 hover:to-amber-600 text-stone-950 font-bold py-2.5 rounded-lg transition-all"
+                >
+                  Awesome!
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
