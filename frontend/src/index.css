@@ -2,6 +2,8 @@
 
 @import "tailwindcss";
 
+@variant dark (&:where(.dark, .dark *));
+
 /* ── Color Hunt Theme Configuration ──
    Light Theme: https://colorhunt.co/palette/ad8b73ceab93e3caa5fffbe9
    - #AD8B73 (Dark Warm Sand / Accent / Primary Buttons)

@@ -14,10 +14,13 @@ import {
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import SoundToggle from '../components/SoundToggle';
+import { useTheme } from '../context/ThemeContext';
 
 const Landing = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useSelector((state) => state.auth);
+  const { theme } = useTheme();
+  const isDark = theme === 'dark' || theme === 'oled';
 
   // Fade-in animation variants
   const containerVariants = {
@@ -95,7 +98,7 @@ const Landing = () => {
   ];
 
   return (
-    <div className="min-h-screen font-inter bg-[#FFFBE9] dark:bg-[#000000] text-[#1F150C] dark:text-[#E1DCC9] transition-colors duration-300">
+    <div className="min-h-screen font-inter bg-[#FFFBE9] dark:bg-[#000000] text-[#000000] dark:text-[#E1DCC9] transition-colors duration-300">
       {/* ── HEADER / NAVIGATION ── */}
       <header className="sticky top-0 z-50 glass-panel border-b border-[#CEAB93]/50 dark:border-[#412D15] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -103,9 +106,9 @@ const Landing = () => {
             <BookOpen className="h-6 w-6 text-[#FFFBE9] dark:text-[#E1DCC9]" />
           </div>
           <div>
-            <h1 className="font-playfair text-xl font-bold tracking-tight text-[#2C1E16] dark:text-[#E1DCC9] flex items-center gap-1.5">
+            <h1 className="font-playfair text-xl font-bold tracking-tight flex items-center gap-1.5" style={{ color: isDark ? '#E1DCC9' : '#000000' }}>
               OpenPrep{' '}
-              <span className="text-sm px-2 py-0.5 bg-[#AD8B73]/15 text-[#AD8B73] dark:bg-[#412D15] dark:text-[#E1DCC9] rounded-md font-mono border border-[#CEAB93]/30 dark:border-[#412D15]">
+              <span className="text-sm px-2 py-0.5 bg-[#AD8B73]/20 text-[#000000] dark:bg-[#412D15] dark:text-[#E1DCC9] rounded-md font-mono border border-[#CEAB93]/50 dark:border-[#412D15]" style={{ color: isDark ? '#E1DCC9' : '#000000' }}>
                 AI
               </span>
             </h1>
@@ -131,7 +134,8 @@ const Landing = () => {
             <div className="flex items-center gap-2">
               <Link
                 to="/login"
-                className="hidden sm:inline-block px-4 py-2 text-sm font-bold text-[#1F150C] hover:text-[#AD8B73] dark:text-[#E1DCC9] dark:hover:text-[#FFFBE9] transition"
+                className="hidden sm:inline-block px-4 py-2 text-sm font-bold transition"
+                style={{ color: isDark ? '#E1DCC9' : '#000000' }}
               >
                 Sign In
               </Link>
@@ -160,27 +164,30 @@ const Landing = () => {
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.6 }}
-            className="mb-6 px-4 py-1.5 rounded-full bg-[#E3CAA5] dark:bg-[#1F150C] border border-[#CEAB93] dark:border-[#412D15] text-[#1F150C] dark:text-[#E1DCC9] text-sm font-semibold flex items-center gap-2 shadow-sm"
+            className="mb-6 px-4 py-1.5 rounded-full bg-[#E3CAA5] dark:bg-[#1F150C] border border-[#CEAB93] dark:border-[#412D15] text-sm font-bold flex items-center gap-2 shadow-sm"
+            style={{ color: isDark ? '#E1DCC9' : '#000000' }}
           >
-            <Sparkles className="h-4 w-4 text-[#AD8B73] dark:text-[#E1DCC9]" /> Exam Preparation Reimagined with AI
+            <Sparkles className="h-4 w-4" style={{ color: isDark ? '#E1DCC9' : '#000000' }} /> Exam Preparation Reimagined with AI
           </motion.div>
 
           <motion.h2
             initial={{ y: 30, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="font-playfair text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-tight max-w-4xl text-[#1F150C] dark:text-[#E1DCC9]"
+            className="font-playfair text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-tight max-w-4xl"
+            style={{ color: isDark ? '#E1DCC9' : '#000000' }}
           >
             Study Smarter. Analyze PYQs.
             <br />
-            <span className="text-[#AD8B73] dark:text-[#E1DCC9] underline decoration-[#CEAB93]/60 underline-offset-8">Master Your Exam Planner.</span>
+            <span className="underline decoration-[#CEAB93] underline-offset-8" style={{ color: isDark ? '#E1DCC9' : '#000000' }}>Master Your Exam Planner.</span>
           </motion.h2>
 
           <motion.p
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.2 }}
-            className="mt-6 text-lg sm:text-xl text-[#412D15] dark:text-[#C4BA9D] max-w-2xl leading-relaxed font-inter font-medium"
+            className="mt-6 text-lg sm:text-xl max-w-2xl leading-relaxed font-inter font-semibold"
+            style={{ color: isDark ? '#C4BA9D' : '#000000' }}
           >
             Stop wasting hours mapping syllabus weightages. Upload notes, analyze previous year
             questions, track your weak subjects, and learn using adaptive spaced repetition
