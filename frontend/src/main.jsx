@@ -26,18 +26,24 @@ window.addEventListener('unhandledrejection', (event) => {
   }
 });
 
+import { GoogleOAuthProvider } from '@react-oauth/google';
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '179369126060-lq7unpt173rt6aog2nt93s6m895d6b2i.apps.googleusercontent.com';
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ErrorBoundary>
-      <Provider store={store}>
-        <ThemeProvider>
-          <SyncProvider>
-            <BrowserRouter>
-              <App />
-            </BrowserRouter>
-          </SyncProvider>
-        </ThemeProvider>
-      </Provider>
+      <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+        <Provider store={store}>
+          <ThemeProvider>
+            <SyncProvider>
+              <BrowserRouter>
+                <App />
+              </BrowserRouter>
+            </SyncProvider>
+          </ThemeProvider>
+        </Provider>
+      </GoogleOAuthProvider>
     </ErrorBoundary>
   </StrictMode>,
 )

@@ -3,7 +3,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, User, Lock, Eye, EyeOff, AlertCircle, CheckCircle, BookOpen, ArrowRight, Sparkles } from 'lucide-react';
-import { registerUser, clearError, clearRegistrationSuccess } from '../store/slices/authSlice';
+import { useGoogleLogin } from '@react-oauth/google';
+import { registerUser, googleLoginUser, clearError, clearRegistrationSuccess } from '../store/slices/authSlice';
 import ThemeToggle from '../components/ThemeToggle';
 import SoundToggle from '../components/SoundToggle';
 
@@ -32,8 +33,19 @@ const Register = () => {
     return () => { dispatch(clearError()); dispatch(clearRegistrationSuccess()); };
   }, [dispatch]);
 
-  const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-  const googleAuthUrl = `${apiBaseUrl.replace(/\/$/, '')}/auth/google`;
+  const handleGoogleSuccess = async (tokenResponse) => {
+    try {
+      await dispatch(googleLoginUser({ access_token: tokenResponse.access_token })).unwrap();
+      navigate('/dashboard', { replace: true });
+    } catch (err) {
+      console.error('Google registration error:', err);
+    }
+  };
+
+  const loginWithGoogle = useGoogleLogin({
+    onSuccess: handleGoogleSuccess,
+    onError: (err) => console.error('Google OAuth Error:', err),
+  });
 
   const handleChange = (e) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -235,10 +247,11 @@ const Register = () => {
             </div>
 
             {/* Google OAuth Button */}
-            <motion.a
+            <motion.button
+              type="button"
               whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.99 }}
-              href={googleAuthUrl}
+              onClick={() => loginWithGoogle()}
               className="w-full py-2.5 rounded-xl btn-secondary-theme font-bold shadow-sm hover:shadow transition-all duration-200 flex items-center justify-center gap-2 text-xs sm:text-sm cursor-pointer"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24">
@@ -249,7 +262,7 @@ const Register = () => {
                 <path fill="none" d="M1 1h22v22H1z" />
               </svg>
               Continue with Google
-            </motion.a>
+            </motion.button>
           </div>
 
           {/* Legal Terms Footer */}
