@@ -629,8 +629,8 @@ html.dark .btn-secondary-theme * {
 }
 
 .card-cta-theme {
-  background-color: #1F150C !important;
-  color: #E1DCC9 !important;
+  background-color: #E3CAA5 !important;
+  color: #1F150C !important;
   border: 2px dashed #CEAB93 !important;
 }
 
@@ -640,11 +640,40 @@ html.dark .btn-secondary-theme * {
 .card-cta-theme h4,
 .card-cta-theme h5,
 .card-cta-theme h6 {
-  color: #E1DCC9 !important;
+  color: #1F150C !important;
 }
 
 .card-cta-theme p,
 .card-cta-theme span {
+  color: #412D15 !important;
+}
+
+.dark .card-cta-theme,
+html.dark .card-cta-theme {
+  background-color: #1F150C !important;
+  color: #E1DCC9 !important;
+  border: 2px dashed #412D15 !important;
+}
+
+.dark .card-cta-theme h1,
+.dark .card-cta-theme h2,
+.dark .card-cta-theme h3,
+.dark .card-cta-theme h4,
+.dark .card-cta-theme h5,
+.dark .card-cta-theme h6,
+html.dark .card-cta-theme h1,
+html.dark .card-cta-theme h2,
+html.dark .card-cta-theme h3,
+html.dark .card-cta-theme h4,
+html.dark .card-cta-theme h5,
+html.dark .card-cta-theme h6 {
+  color: #E1DCC9 !important;
+}
+
+.dark .card-cta-theme p,
+.dark .card-cta-theme span,
+html.dark .card-cta-theme p,
+html.dark .card-cta-theme span {
   color: #C4BA9D !important;
 }
 
