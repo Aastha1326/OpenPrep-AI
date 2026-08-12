@@ -8,6 +8,7 @@ import GitHubLoginButton from '../components/auth/GitHubLoginButton';
 import { loginUser, loadUser, clearError } from '../store/slices/authSlice';
 import ThemeToggle from '../components/ThemeToggle';
 import SoundToggle from '../components/SoundToggle';
+import ForgotPasswordModal from '../components/auth/ForgotPasswordModal';
 
 const Login = () => {
   const dispatch = useDispatch();
@@ -339,6 +340,7 @@ const Login = () => {
           </div>
         </div>
       </motion.div>
+      <ForgotPasswordModal isOpen={isForgotPasswordOpen} onClose={() => setIsForgotPasswordOpen(false)} />
     </div>
   );
 };

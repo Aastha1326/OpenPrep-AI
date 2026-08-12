@@ -11,6 +11,8 @@ const {
   forgotPassword,
   verifyEmail,
   resetPassword,
+  verifyOtp,
+  resetPasswordOtp,
   refreshToken,
   logout,
   updateSettings,
@@ -31,6 +33,8 @@ const {
   validateRefreshToken,
   validateResendVerification,
   validateUpdateSettings,
+  validateVerifyOtp,
+  validateResetPasswordOtp,
 } = require('../middleware/validators');
 const { validateRequest, registerSchema } = require('../middleware/validate');
 
@@ -140,6 +144,22 @@ router.post(
   authEmailLimiter,
   validateForgotPassword,
   forgotPassword
+);
+
+// Verify OTP reset code
+router.post(
+  '/verify-otp',
+  resetPasswordLimiter,
+  validateVerifyOtp,
+  verifyOtp
+);
+
+// Reset password using OTP
+router.post(
+  '/reset-password',
+  resetPasswordLimiter,
+  validateResetPasswordOtp,
+  resetPasswordOtp
 );
 
 // Resend email verification link
