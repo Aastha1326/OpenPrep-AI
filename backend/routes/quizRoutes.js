@@ -25,7 +25,10 @@ const {
 const { validateRequest, submitQuizSchema } = require('../middleware/validate');
 
 const router = express.Router();
+const { getNextAdaptiveQuestion } = require('../controllers/adaptiveQuizController');
 
+// Register adaptive route
+router.post('/adaptive/next-question', protect, getNextAdaptiveQuestion);
 /**
  * @swagger
  * tags:
