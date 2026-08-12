@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const User = require('../models/User');
-
 const avatarsDir = path.resolve(path.join(__dirname, '../uploads/avatars'));
 
 // Safely remove a previously stored avatar file. Guards against path
@@ -140,6 +140,101 @@ exports.getQuota = async (req, res, next) => {
       used: user.dailyAiUsageCount,
       secondsUntilReset,
       resetTime: tomorrowUTC.toISOString(),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+// ---------------------------------------------------------------------------
+// @desc    Get exam countdown preferences
+// @route   GET /api/users/exam-countdown
+// @access  Private
+// ---------------------------------------------------------------------------
+exports.getExamCountdownPreferences = async (req, res, next) => {
+  try {
+    const user = await User.findByPk(req.user.id, {
+      attributes: ['examCountdownPreferences'],
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: user.examCountdownPreferences || {
+        targetExamDate: null,
+        targetScore: null,
+        milestones: [],
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// @desc    Update exam countdown preferences
+// @route   PUT /api/users/exam-countdown
+// @access  Private
+// ---------------------------------------------------------------------------
+exports.updateExamCountdownPreferences = async (req, res, next) => {
+  try {
+    const { targetExamDate, targetScore, milestones } = req.body;
+
+    if (targetExamDate && Number.isNaN(new Date(targetExamDate).getTime())) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid target exam date',
+      });
+    }
+
+    if (
+      targetScore !== null &&
+      targetScore !== undefined &&
+      (Number.isNaN(Number(targetScore)) || Number(targetScore) < 0)
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: 'Target score must be a valid non-negative number',
+      });
+    }
+
+    if (!Array.isArray(milestones)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Milestones must be an array',
+      });
+    }
+
+    const normalizedMilestones = milestones
+      .filter((milestone) => milestone?.title && milestone?.date)
+      .map((milestone) => ({
+        id: milestone.id || crypto.randomUUID(),
+        title: String(milestone.title).trim().slice(0, 100),
+        date: milestone.date,
+        completed: Boolean(milestone.completed),
+      }));
+
+    const user = await User.findByPk(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    user.examCountdownPreferences = {
+      targetExamDate: targetExamDate || null,
+      targetScore: targetScore !== undefined && targetScore !== null
+        ? Number(targetScore)
+        : null,
+      milestones: normalizedMilestones,
+    };
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      data: user.examCountdownPreferences,
     });
   } catch (error) {
     next(error);

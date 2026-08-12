@@ -134,7 +134,37 @@ describe('ExamCountdownWidget', () => {
       screen.getByLabelText(/exam countdown: neet 2026/i)
     ).toBeInTheDocument();
   });
+it('shows exam settings when no target exam is configured', () => {
+  renderWidget(null);
 
+  expect(
+    screen.getByRole('button', { name: /set your target exam/i })
+  ).toBeInTheDocument();
+});
+
+it('opens the exam countdown settings modal', async () => {
+  renderWidget(daysFromNow(30));
+
+  await act(async () => {
+    screen.getByRole('button', {
+      name: /edit exam countdown settings/i,
+    }).click();
+  });
+
+  expect(
+    screen.getByRole('dialog', {
+      name: /exam countdown settings/i,
+    })
+  ).toBeInTheDocument();
+});
+
+it('renders progress indicators and motivation quote', () => {
+  renderWidget(daysFromNow(30));
+
+  expect(screen.getByText(/time elapsed/i)).toBeInTheDocument();
+  expect(screen.getByText(/milestones/i)).toBeInTheDocument();
+  expect(screen.getByText(/new motivation/i)).toBeInTheDocument();
+});
   // ── Live tick ─────────────────────────────────────────────────────────────
 
   it('updates seconds digit every second', async () => {
