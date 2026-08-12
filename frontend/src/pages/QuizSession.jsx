@@ -15,7 +15,11 @@ import {
 import API from '../services/api';
 import MathRenderer from '../components/common/MathRenderer';
 import { exportAsCSV, exportAsJSON } from '../utils/exportUtils';
-import html2pdf from 'html2pdf.js';
+import useVoiceControl from '../hooks/useVoiceControl';
+import VoiceModeToggle from '../components/VoiceModeToggle';
+import AudioWaveform from '../components/AudioWaveform';
+import BadgeUnlockModal from '../components/gamification/BadgeUnlockModal';
+import LevelUpModal from '../components/gamification/LevelUpModal';
 import RevisionSheetModal from '../components/dashboard/RevisionSheetModal';
 import RemediationPlanModal from '../components/dashboard/RemediationPlanModal';
 import QuestionExplanation from '../components/dashboard/QuestionExplanation';
@@ -59,6 +63,10 @@ const QuizSession = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const [activeBadgeUnlock, setActiveBadgeUnlock] = useState(null);
+  const [levelUpLevel, setLevelUpLevel] = useState(null);
+  const [showLevelUpModal, setShowLevelUpModal] = useState(false);
+
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState({}); // { questionId: selectedOption }
   const [bookmarkedIds, setBookmarkedIds] = useState(new Set());
@@ -71,6 +79,7 @@ const QuizSession = () => {
   const [timeLeft, setTimeLeft] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+
   const submittingRef = useRef(false);
   // Unique idempotency key for this session's submission — reused across retries
   // so the backend can drop duplicate submissions (#762).
@@ -111,7 +120,7 @@ const QuizSession = () => {
   // Client-side telemetry buffer: batches question timing/option-selection
   // events instead of sending an HTTP request per interaction.
   const telemetryRef = useRef(null);
-  const questionEnteredAtRef = useRef(Date.now());
+  const questionEnteredAtRef = useRef(0);
   const handleExportResultsCSV = () => {
     const rows = buildQuizResultRows(quiz, answers);
     exportAsCSV(
@@ -153,16 +162,14 @@ const QuizSession = () => {
     }
   };
 
-  useEffect(() => {
-    fetchQuiz();
-  }, [id]);
-
-const fetchQuiz = async () => {
+const fetchQuiz = useCallback(async () => {
     try {
       const res = await API.get(`/quizzes/${id}`);
       const loadedQuiz = res.data.data;
       setQuiz(loadedQuiz);
-      const totalSeconds = (loadedQuiz?.questions?.length || 0) * SECONDS_PER_QUESTION;
+      const totalSeconds = loadedQuiz?.timeLimit
+        ? loadedQuiz.timeLimit * 60
+        : (loadedQuiz?.questions?.length || 0) * SECONDS_PER_QUESTION;
       setTimeLeft(totalSeconds);
       endTimeRef.current = Date.now() + totalSeconds * 1000;
       setLoading(false);
@@ -171,11 +178,18 @@ const fetchQuiz = async () => {
       telemetryRef.current.startAutoFlush();
       questionEnteredAtRef.current = Date.now();
     } catch (err) {
+      console.error(err);
       setError('Failed to load quiz details.');
       setLoading(false);
     }
-  };
-const handleOptionSelect = (questionId, option) => {
+  }, [id]);
+
+  useEffect(() => {
+    fetchQuiz();
+  }, [id, fetchQuiz]);
+  const timeElapsed = timeLeft === 0 && !submitted;
+
+const handleOptionSelect = useCallback((questionId, option) => {
     if (submitted || timeElapsed || submitting) return;
     setAnswers((prevAnswers) => ({
       ...prevAnswers,
@@ -186,7 +200,7 @@ const handleOptionSelect = (questionId, option) => {
       questionIndex: currentQuestionIndex,
       selectedOption: option,
     });
-  };
+  }, [submitted, timeElapsed, submitting, currentQuestionIndex]);
 
   const recordQuestionView = () => {
     telemetryRef.current?.enqueue('question_view', {
@@ -212,6 +226,47 @@ const handleOptionSelect = (questionId, option) => {
       setCurrentQuestionIndex(currentQuestionIndex - 1);
     }
   };
+
+  const handleVoiceCommand = useCallback((command) => {
+    const q = quiz?.questions?.[currentQuestionIndex];
+    if (!q) return;
+    let optionIndex = -1;
+    if (command === 'OPTION_0') optionIndex = 0;
+    else if (command === 'OPTION_1') optionIndex = 1;
+    else if (command === 'OPTION_2') optionIndex = 2;
+    else if (command === 'OPTION_3') optionIndex = 3;
+
+    if (optionIndex !== -1 && q.options[optionIndex]) {
+      handleOptionSelect(q._id, q.options[optionIndex]);
+    }
+  }, [quiz, currentQuestionIndex, handleOptionSelect]);
+
+  const {
+    isSupported,
+    isEnabled,
+    isPaused,
+    status,
+    errorMsg,
+    toggleVoiceMode,
+    speak,
+    cancelSpeech
+  } = useVoiceControl({
+    onCommand: handleVoiceCommand,
+  });
+
+  useEffect(() => {
+    cancelSpeech();
+    const q = quiz?.questions?.[currentQuestionIndex];
+    if (isEnabled && !isPaused && !submitted && q) {
+      const optionLabels = ['A', 'B', 'C', 'D'];
+      let text = q.questionText + '. ';
+      q.options.forEach((opt, idx) => {
+        if (idx < 4) text += `Option ${optionLabels[idx]}: ${opt}. `;
+      });
+      speak(text);
+    }
+  }, [quiz, currentQuestionIndex, isEnabled, isPaused, submitted, speak, cancelSpeech]);
+
 const submitQuiz = useCallback(async () => {
     if (submittingRef.current) return;
     submittingRef.current = true;
@@ -228,10 +283,22 @@ const submitQuiz = useCallback(async () => {
       telemetryRef.current?.stopAutoFlush();
       telemetryRef.current?.flush();
 
+      const timezoneOffset = new Date().getTimezoneOffset();
       const res = await API.post(`/quizzes/${id}/submit`, {
         answers: formattedAnswers,
         submissionId: getSubmissionId(),
+      }, {
+        headers: { 'x-timezone-offset': String(timezoneOffset) }
       });
+      
+      if (res.data?.progression?.newBadges?.length > 0) {
+        setActiveBadgeUnlock(res.data.progression.newBadges[0]);
+      }
+      if (res.data?.progression?.leveledUp) {
+        setLevelUpLevel(res.data.progression.level);
+        setShowLevelUpModal(true);
+      }
+
       setResult(res.data.data);
       setSubmitted(true);
     } catch (err) {
@@ -391,7 +458,7 @@ const submitQuiz = useCallback(async () => {
 
 const currentQuestion = quiz.questions[currentQuestionIndex];
   const isLastQuestion = currentQuestionIndex === quiz.questions.length - 1;
-  const timeElapsed = timeLeft === 0 && !submitted;
+  
   const lowTime = timeLeft > 0 && timeLeft <= 30;
 
   const reviewCounts = { all: quiz.questions.length, correct: 0, incorrect: 0, bookmarked: 0 };
@@ -446,6 +513,15 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
           <h1 className="text-2xl font-bold text-slate-100">{quiz.title}</h1>
           {!submitted && (
             <div className="flex items-center gap-3">
+              <AudioWaveform status={status} />
+              <VoiceModeToggle
+                isSupported={isSupported}
+                isEnabled={isEnabled}
+                isPaused={isPaused}
+                toggleVoiceMode={toggleVoiceMode}
+                errorMsg={errorMsg}
+                status={status}
+              />
               <span
                 role="timer"
                 aria-label={`Time remaining: ${formatTime(timeLeft)}`}
@@ -722,6 +798,20 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
           </div>
         )}
       </div>
+
+      {/* --- GAMIFICATION CELEBRATION MODALS --- */}
+      <BadgeUnlockModal
+        isOpen={!!activeBadgeUnlock}
+        title={activeBadgeUnlock?.title}
+        description={activeBadgeUnlock?.description}
+        onClose={() => setActiveBadgeUnlock(null)}
+      />
+
+      <LevelUpModal
+        level={levelUpLevel}
+        isOpen={showLevelUpModal}
+        onClose={() => setShowLevelUpModal(false)}
+      />
     </div>
   );
 };

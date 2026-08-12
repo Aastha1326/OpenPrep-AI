@@ -2,8 +2,15 @@ import axios from 'axios';
 import { store } from '../store';
 import { logout } from '../store/slices/authSlice';
 
+const getBaseUrl = () => {
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return '/api';
+  }
+  return import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+};
+
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: getBaseUrl(),
   headers: {
     'Content-Type': 'application/json',
   },
@@ -105,6 +112,22 @@ API.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    if (error.response?.status === 429) {
+      const data = error.response.data;
+      const retryInSeconds = data?.retryInSeconds || parseInt(error.response.headers['retry-after'], 10) || 900;
+      const errorMsg = data?.error || 'AI daily usage quota exceeded.';
+
+      const resetTime = Date.now() + retryInSeconds * 1000;
+      localStorage.setItem('ai_quota_reset_time', String(resetTime));
+      localStorage.setItem('ai_quota_error_msg', errorMsg);
+
+      window.dispatchEvent(
+        new CustomEvent('quota-exceeded', {
+          detail: { retryInSeconds, message: errorMsg },
+        })
+      );
+    }
 
     // Only attempt refresh on 401, and only once per request
     const isAuthEndpoint = originalRequest?.url?.includes('/auth/');

@@ -378,9 +378,9 @@ exports.reviewFlashcard = async (req, res, next) => {
     efactor = efactor + deltaEF * easyFactorModifier;
     if (efactor < 1.3) efactor = 1.3;
 
-    card.interval = result.interval;
-    card.repetitions = result.repetitions;
-    card.efactor = result.efactor;
+    card.interval = interval;
+    card.repetitions = repetitions;
+    card.efactor = efactor;
 
     // Set next review date from now
     card.nextReviewDate = new Date(Date.now() + card.interval * 24 * 60 * 60 * 1000);
@@ -412,7 +412,19 @@ exports.reviewFlashcard = async (req, res, next) => {
       await progress.save();
     }
 
-    res.status(200).json({ success: true, data: card });
+    const gamificationService = require('../services/gamificationService');
+    const progression = await gamificationService.awardXP(req.user.id, 30, 'flashcard_review');
+
+    const timezoneOffset = Number(req.headers['x-timezone-offset']) || 0;
+    await gamificationService.updateStreak(req.user.id, timezoneOffset);
+
+    const user = await User.findByPk(req.user.id);
+    const newBadges = await gamificationService.checkAndUnlockBadges(user, 'flashcard_review', {
+      timezoneOffsetMinutes: timezoneOffset
+    });
+    progression.newBadges = newBadges;
+
+    res.status(200).json({ success: true, data: card, progression });
   } catch (error) {
     next(error);
   }
@@ -822,6 +834,7 @@ exports.getCommunityDecks = async (req, res, next) => {
         clonedFromId: deck.clonedFromId,
         cloneCount: deck.cloneCount,
         rating: deck.rating,
+        starCount: deck.starCount || 0,
         tags: deck.tags ? JSON.parse(deck.tags) : [],
         cardCount,
         ownerName: deck.userRef ? deck.userRef.name : 'Peer Student',
@@ -928,3 +941,57 @@ exports.cloneCommunityDeck = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Rate a community flashcard deck
+// @route   POST /api/flashcards/decks/:subjectId/rate
+// @access  Private
+exports.rateCommunityDeck = async (req, res, next) => {
+  try {
+    const { subjectId } = req.params;
+    const { rating } = req.body;
+
+    if (rating === undefined || rating < 1 || rating > 5) {
+      return res.status(400).json({ success: false, error: 'Please provide a rating between 1 and 5' });
+    }
+
+    const subject = await Subject.findOne({ where: { id: subjectId, isPublic: true } });
+    if (!subject) {
+      return res.status(404).json({ success: false, error: 'Public flashcard deck not found' });
+    }
+
+    const currentRating = subject.rating || 0.0;
+    const currentCount = subject.ratingCount || 0;
+    const newCount = currentCount + 1;
+    const newRating = ((currentRating * currentCount) + parseFloat(rating)) / newCount;
+
+    subject.rating = parseFloat(newRating.toFixed(2));
+    subject.ratingCount = newCount;
+    await subject.save();
+
+    res.status(200).json({ success: true, data: { rating: subject.rating, ratingCount: subject.ratingCount } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Star a community flashcard deck
+// @route   POST /api/flashcards/decks/:subjectId/star
+// @access  Private
+exports.starCommunityDeck = async (req, res, next) => {
+  try {
+    const { subjectId } = req.params;
+
+    const subject = await Subject.findOne({ where: { id: subjectId, isPublic: true } });
+    if (!subject) {
+      return res.status(404).json({ success: false, error: 'Public flashcard deck not found' });
+    }
+
+    subject.starCount = (subject.starCount || 0) + 1;
+    await subject.save();
+
+    res.status(200).json({ success: true, data: { starCount: subject.starCount } });
+  } catch (error) {
+    next(error);
+  }
+};
+
