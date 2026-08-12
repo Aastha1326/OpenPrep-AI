@@ -3,10 +3,13 @@ import { store } from '../store';
 import { logout } from '../store/slices/authSlice';
 
 const getBaseUrl = () => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
   if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
     return '/api';
   }
-  return import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  return 'http://localhost:5000/api';
 };
 
 const API = axios.create({

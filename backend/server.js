@@ -16,8 +16,6 @@ const fs = require('fs');
 const PYQ = require('./models/PYQ');
 const Note = require('./models/Note');
 const Achievement = require('./models/Achievement');
-const http = require('http');
-const { Server } = require('socket.io');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
 const passport = require('./config/passport');
@@ -282,8 +280,6 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 const server = http.createServer(app);
 
-const server = http.createServer(app);
-
 const io = new Server(server, {
   cors: {
     origin: getSocketCorsOrigin(),
@@ -302,9 +298,14 @@ require('./sockets/chatHandler')(io);
 const { startScheduler } = require('./services/weeklyDigestService');
 startScheduler();
 
-server.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
-});
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+  server.listen(PORT, () => {
+    console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+  });
+}
+
+module.exports = app;
+
 
 // Graceful Shutdown Logic
 const gracefulShutdown = (signal) => {

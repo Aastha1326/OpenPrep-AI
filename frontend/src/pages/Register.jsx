@@ -26,10 +26,13 @@ const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
 
   const getApiBaseUrl = () => {
+    if (import.meta.env.VITE_API_URL) {
+      return import.meta.env.VITE_API_URL;
+    }
     if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
       return `${window.location.origin}/api`;
     }
-    return import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    return 'http://localhost:5000/api';
   };
   const googleAuthUrl = `${getApiBaseUrl().replace(/\/$/, '')}/auth/google`;
 
@@ -80,6 +83,14 @@ const Register = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    const allPassed = PASSWORD_CRITERIA.every((rule) => rule.test(formData.password));
+    if (!allPassed) {
+      dispatch({
+        type: 'auth/register/rejected',
+        payload: 'Password must be 8+ characters, with uppercase, lowercase, number, and special character.',
+      });
+      return;
+    }
     dispatch(registerUser(formData));
   };
 
