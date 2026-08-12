@@ -154,6 +154,7 @@ const User = sequelize.define(
       type: DataTypes.INTEGER,
       defaultValue: 6,
     },
+
     leaderboardVisible: {
       type: DataTypes.BOOLEAN,
       defaultValue: true,
