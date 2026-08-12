@@ -501,7 +501,6 @@ const [activeInsightTab, setActiveInsightTab] = useState('paper');
                 </div>
 
               </div>
-              </div>
               {/* Drag and Drop Zone OR OCR Upload Zone */}
               {activeUploadTab === 'pdf' ? (
                 <div
