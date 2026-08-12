@@ -96,7 +96,13 @@ const dashboardSlice = createSlice({
   initialState,
   reducers: {
     toggleTheme: (state) => {
-      const nextTheme = state.theme === 'dark' ? 'light' : 'dark';
+      // Rotate through: system -> light -> dark -> high-contrast
+      let nextTheme = 'system';
+
+      if (state.theme === 'system') nextTheme = 'light';
+      else if (state.theme === 'light') nextTheme = 'dark';
+      else if (state.theme === 'dark') nextTheme = 'high-contrast';
+      
       state.theme = nextTheme;
       localStorage.setItem('openprep_theme', nextTheme);
       localStorage.setItem('theme', nextTheme);

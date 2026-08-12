@@ -9,7 +9,7 @@ const Exam = require('../../models/Exam');
 const Subject = require('../../models/Subject');
 const Topic = require('../../models/Topic');
 const Flashcard = require('../../models/Flashcard');
-
+const geminiService = require('../../services/geminiService');
 const app = express();
 app.use(express.json());
 app.use('/api/flashcards', flashcardRoutes);
@@ -20,7 +20,74 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
   let testSubject;
   let testTopic;
   let authToken;
+describe('POST /api/flashcards/from-audio', () => {
+  it('should reject requests without an audio file', async () => {
+    const res = await request(app)
+      .post('/api/flashcards/from-audio')
+      .set('Authorization', `Bearer ${authToken}`)
+      .field('subjectId', testSubject.id);
 
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('should reject unsupported audio formats', async () => {
+    const res = await request(app)
+      .post('/api/flashcards/from-audio')
+      .set('Authorization', `Bearer ${authToken}`)
+      .attach(
+        'audio',
+        Buffer.from('not an audio file'),
+        {
+          filename: 'lecture.txt',
+          contentType: 'text/plain',
+        }
+      );
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('should expose transcription and generated cards for valid audio', async () => {
+    const originalTranscribe = geminiService.transcribeAndSummarizeAudio;
+    const originalGenerate = geminiService.generateFlashcards;
+
+    geminiService.transcribeAndSummarizeAudio = async () => ({
+      transcription: 'Newton second law states that force equals mass times acceleration.',
+    });
+
+    geminiService.generateFlashcards = async () => [
+      {
+        front: 'What is Newton second law?',
+        back: 'Force equals mass multiplied by acceleration.',
+      },
+    ];
+
+    const res = await request(app)
+      .post('/api/flashcards/from-audio')
+      .set('Authorization', `Bearer ${authToken}`)
+      .field('subjectId', testSubject.id)
+      .attach(
+        'audio',
+        Buffer.from([
+          0x49, 0x44, 0x33, 0x04, 0x00, 0x00, 0x00, 0x00,
+          0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ]),
+        {
+          filename: 'lecture.mp3',
+          contentType: 'audio/mpeg',
+        }
+      );
+
+    geminiService.transcribeAndSummarizeAudio = originalTranscribe;
+    geminiService.generateFlashcards = originalGenerate;
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.transcription).toContain('Newton second law');
+    expect(res.body.data).toHaveLength(1);
+  });
+});
   beforeAll(async () => {
     process.env.JWT_SECRET = 'test_jwt_secret_for_flashcards';
 

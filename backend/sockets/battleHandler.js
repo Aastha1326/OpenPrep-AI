@@ -1,319 +1,341 @@
-const {
-  createRoomState,
-  roomRequiresPassword,
-  isPasswordValid,
-  generateRoomCode,
-  validateRoomCode,
-} = require('./battleRoomAccess');
-
-const rooms = {};
-
-const MAX_ROOM_CODE_ATTEMPTS = 5;
-
-const isAllReady = (room) => {
-  const playerKeys = Object.keys(room.players);
-  return playerKeys.length > 1 && playerKeys.every((id) => room.players[id].isReady);
-};
-
-const tryStartBattle = (io, roomId) => {
-  const room = rooms[roomId];
-  if (!room || room.status !== 'waiting' || !isAllReady(room)) return;
-
-  room.status = 'playing';
-  io.to(roomId).emit('battle_start', {
-    message: 'All players ready! Battle starts now!',
-  });
-  io.to(roomId).emit('room_update', {
-    players: room.players,
-    status: room.status,
-  });
-};
-
-const normalizeRoomCode = (code) => (code || '').trim().toUpperCase();
-
-const allocateRoomCode = () => {
-  for (let i = 0; i < MAX_ROOM_CODE_ATTEMPTS; i += 1) {
-    const code = generateRoomCode();
-    if (!rooms[code]) return code;
-  }
-  return null;
-};
-
-const addPlayerToRoom = ({ io, socket, roomId, username }) => {
-  const room = rooms[roomId];
-  if (!room) return null;
-
-  room.players[socket.id] = {
-    username: username || 'Anonymous',
-    score: 0,
-    isReady: false,
-    online: true,
-  };
-
-  io.to(roomId).emit('room_update', {
-    players: room.players,
-    status: room.status,
-  });
-
-  io.to(roomId).emit('presence_update', {
-    socketId: socket.id,
-    username: username || 'Anonymous',
-    online: true,
-  });
-
-  return room;
-};
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
+const BattleSession = require('../models/BattleSession');
+const BattleParticipant = require('../models/BattleParticipant');
+const roomManager = require('../utils/roomManager');
+const { awardXP } = require('../services/gamificationService');
 
 module.exports = (io) => {
-  io.on('connection', (socket) => {
-    console.log(`Socket connected: ${socket.id}`);
-
-    const handleCreateRoom = (payload, callback) => {
-      const suppliedCode = normalizeRoomCode(payload?.roomId);
-      const username = payload?.username || 'Anonymous';
-      const roomName = (payload?.roomName || 'Battle Room').trim() || 'Battle Room';
-      const password = payload?.password || '';
-
-      if (suppliedCode && rooms[suppliedCode]) {
-        if (callback) {
-          callback({
-            success: false,
-            message: `Room code ${suppliedCode} is already in use. Try joining it instead.`,
-          });
-        }
-        return;
+  // Authentication middleware
+  io.use(async (socket, next) => {
+    try {
+      const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+      if (!token) {
+        return next(new Error('Authentication token is required.'));
       }
-
-      if (suppliedCode && !validateRoomCode(suppliedCode)) {
-        if (callback) {
-          callback({
-            success: false,
-            message: 'Room code must be exactly 6 letters or numbers.',
-          });
-        }
-        return;
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const user = await User.findByPk(decoded.id);
+      if (!user) {
+        return next(new Error('User not found.'));
       }
+      socket.user = user;
+      next();
+    } catch (err) {
+      return next(new Error('Authentication failed. Invalid token.'));
+    }
+  });
 
-      const roomId = suppliedCode || allocateRoomCode();
-      if (!roomId) {
-        if (callback) {
-          callback({
-            success: false,
-            message: 'Could not allocate a room code. Please try again.',
-          });
-        }
-        return;
-      }
+  const runBattleLoop = (roomCode) => {
+    const room = roomManager.getRoom(roomCode);
+    if (!room || room.status !== 'playing') return;
 
-      rooms[roomId] = createRoomState({ roomId, roomName, password });
-      socket.join(roomId);
-      const room = addPlayerToRoom({ io, socket, roomId, username });
+    const questions = room.quiz?.questions || [];
+    if (questions.length === 0) {
+      finishBattle(roomCode);
+      return;
+    }
 
-      if (callback) {
-        callback({
-          success: true,
-          roomId,
-          room: {
-            id: room.id,
-            name: room.name,
-            password: room.password,
-          },
-          isPrivate: roomRequiresPassword(room),
-        });
-      }
+    sendQuestion(roomCode, room.currentQuestionIndex);
+  };
 
-      console.log(`User ${username} created room ${roomId}`);
-    };
+  const sendQuestion = (roomCode, questionIndex) => {
+    const room = roomManager.getRoom(roomCode);
+    if (!room || room.status !== 'playing') return;
 
-    const handleJoinRoom = (payload, callback) => {
-      const roomId = normalizeRoomCode(payload?.roomId);
-      const username = payload?.username || 'Anonymous';
-      const enteredPassword = payload?.password || '';
+    const questions = room.quiz?.questions || [];
+    if (questionIndex >= questions.length) {
+      finishBattle(roomCode);
+      return;
+    }
 
-      if (!roomId) {
-        if (callback) {
-          callback({ success: false, message: 'A room code is required.' });
-        }
-        return;
-      }
+    const currentQuestion = questions[questionIndex];
+    room.currentQuestionIndex = questionIndex;
+    room.questionActive = true;
+    room.timeRemaining = room.timePerQuestion;
+    room.answersReceived = 0;
 
-      const room = rooms[roomId];
-      if (!room) {
-        if (callback) {
-          callback({
-            success: false,
-            message: `Room ${roomId} not found. Check the code and try again.`,
-          });
-        }
-        return;
-      }
+    // Reset player answers for this question
+    for (const socketId in room.players) {
+      room.players[socketId].answeredThisQuestion = false;
+      room.players[socketId].timeSpentMs = 0;
+    }
 
-      if (roomRequiresPassword(room) && !isPasswordValid(room, enteredPassword)) {
-        if (callback) {
-          callback({
-            success: false,
-            requiresPassword: true,
-            message: 'Incorrect password',
-          });
-        }
-        return;
-      }
-
-      socket.join(roomId);
-      const joinedRoom = addPlayerToRoom({ io, socket, roomId, username });
-
-      if (callback) {
-        callback({
-          success: true,
-          roomId,
-          room: {
-            id: joinedRoom.id,
-            name: joinedRoom.name,
-            password: joinedRoom.password,
-          },
-          isPrivate: roomRequiresPassword(joinedRoom),
-        });
-      }
-
-      console.log(`User ${username} joined room ${roomId}`);
-    };
-
-    socket.on('create-room', (payload, callback) => {
-      handleCreateRoom(payload, callback);
+    io.to(roomCode).emit('new_question', {
+      questionIndex,
+      questionText: currentQuestion.questionText,
+      options: currentQuestion.options,
+      totalQuestions: questions.length,
+      timeLimit: room.timePerQuestion,
     });
+
+    // Start countdown timer
+    if (room.timerInterval) clearInterval(room.timerInterval);
+    room.timerInterval = setInterval(() => {
+      room.timeRemaining -= 1;
+      io.to(roomCode).emit('timer_tick', { timeRemaining: room.timeRemaining });
+
+      if (room.timeRemaining <= 0) {
+        clearInterval(room.timerInterval);
+        revealQuestionResult(roomCode);
+      }
+    }, 1000);
+  };
+
+  const revealQuestionResult = (roomCode) => {
+    const room = roomManager.getRoom(roomCode);
+    if (!room) return;
+
+    room.questionActive = false;
+    if (room.timerInterval) clearInterval(room.timerInterval);
+
+    const currentQuestion = room.quiz.questions[room.currentQuestionIndex];
+    io.to(roomCode).emit('question_result', {
+      correctAnswerIndex: currentQuestion.correctAnswer,
+      correctAnswerText: currentQuestion.options[currentQuestion.correctAnswer],
+      explanation: currentQuestion.explanation || '',
+      players: room.players,
+    });
+
+    // Advance to next question after 4 seconds
+    setTimeout(() => {
+      if (room.status === 'playing') {
+        sendQuestion(roomCode, room.currentQuestionIndex + 1);
+      }
+    }, 4000);
+  };
+
+  const finishBattle = async (roomCode) => {
+    const room = roomManager.getRoom(roomCode);
+    if (!room) return;
+
+    room.status = 'finished';
+    if (room.timerInterval) clearInterval(room.timerInterval);
+
+    try {
+      const dbSession = await BattleSession.findOne({ where: { roomCode } });
+      if (dbSession) {
+        dbSession.status = 'finished';
+        
+        // Compile scores map
+        const finalScores = {};
+        const participantsData = [];
+        
+        // Find winner
+        let highestScore = -1;
+        let winnerSocketId = null;
+
+        for (const socketId in room.players) {
+          const player = room.players[socketId];
+          finalScores[player.userId] = player.score;
+
+          if (player.score > highestScore) {
+            highestScore = player.score;
+            winnerSocketId = socketId;
+          }
+        }
+
+        dbSession.scores = finalScores;
+        await dbSession.save();
+
+        // Create participant logs & award gamification XP
+        for (const socketId in room.players) {
+          const player = room.players[socketId];
+          const questionsCount = room.quiz?.questions?.length || 1;
+          const avgTimeMs = player.correctCount > 0 ? (player.timeSpentSumMs / player.correctCount) : 0;
+
+          await BattleParticipant.create({
+            battleId: dbSession.id,
+            userId: player.userId,
+            score: player.score,
+            correctCount: player.correctCount,
+            avgTimeMs,
+          });
+
+          // Award XP: Winner gets 200 XP, others get 100 XP
+          const isWinner = socketId === winnerSocketId;
+          const xpAmount = isWinner ? 200 : 100;
+          await awardXP(player.userId, xpAmount, 'battle_completion');
+        }
+      }
+    } catch (err) {
+      console.error('Error saving battle sessions to database:', err);
+    }
+
+    io.to(roomCode).emit('battle_finished', {
+      players: room.players,
+    });
+
+    roomManager.removeRoom(roomCode);
+  };
+
+  io.on('connection', (socket) => {
+    console.log(`Battle socket connection established: ${socket.id} (user: ${socket.user.name})`);
 
     socket.on('join-room', (payload, callback) => {
-      handleJoinRoom(payload, callback);
+      const roomCode = (payload?.roomId || '').trim().toUpperCase();
+      if (!roomCode) {
+        return callback && callback({ success: false, message: 'Room code is required.' });
+      }
+
+      const room = roomManager.getRoom(roomCode);
+      if (!room) {
+        return callback && callback({ success: false, message: 'Lobby room not found.' });
+      }
+
+      if (room.status !== 'waiting') {
+        return callback && callback({ success: false, message: 'Battle is already in progress.' });
+      }
+
+      if (room.password && room.password !== payload.password) {
+        return callback && callback({ success: false, requiresPassword: true, message: 'Invalid password.' });
+      }
+
+      socket.join(roomCode);
+      roomManager.addPlayer(roomCode, socket.id, socket.user.id, socket.user.name);
+
+      io.to(roomCode).emit('room_update', {
+        players: room.players,
+        status: room.status,
+        hostUserId: room.hostUserId,
+      });
+
+      if (callback) {
+        callback({
+          success: true,
+          roomId: roomCode,
+          room: {
+            id: room.roomCode,
+            name: room.roomName,
+            hostUserId: room.hostUserId,
+            questionCount: room.questionCount,
+            timePerQuestion: room.timePerQuestion,
+          },
+        });
+      }
     });
 
-    socket.on('join_room', (payload, callback) => {
-      const normalizedPayload =
-        typeof payload === 'string' ? { roomId: payload, username: 'Anonymous' } : payload;
-      handleJoinRoom(normalizedPayload, callback);
-    });
+    socket.on('toggle_ready', ({ roomId }) => {
+      const roomCode = (roomId || '').trim().toUpperCase();
+      const room = roomManager.getRoom(roomCode);
+      if (!room || !room.players[socket.id]) return;
 
-    // Re-sync a client's view of the room (e.g. after the tab regains focus)
-    socket.on('request_sync', ({ roomId }) => {
-      const room = rooms[roomId];
-      if (!room) return;
+      const player = room.players[socket.id];
+      player.isReady = !player.isReady;
 
-      socket.emit('room_update', {
+      io.to(roomCode).emit('room_update', {
         players: room.players,
         status: room.status,
       });
-    });
-    socket.on('toggle_ready', ({ roomId }) => {
-      const player = rooms[roomId] && rooms[roomId].players[socket.id];
-      if (!player) return;
 
-      player.isReady = !player.isReady;
-
-      io.to(roomId).emit('user:ready', {
-        socketId: socket.id,
-        username: player.username,
-        isReady: player.isReady,
-      });
-
-      io.to(roomId).emit('room_update', {
-        players: rooms[roomId].players,
-        status: rooms[roomId].status,
-      });
-
-      tryStartBattle(io, roomId);
+      // Auto start if all players are ready
+      if (roomManager.checkAllReady(roomCode) && Object.keys(room.players).length >= 1) {
+        room.status = 'playing';
+        io.to(roomCode).emit('battle_start');
+        runBattleLoop(roomCode);
+      }
     });
 
-    socket.on('user:ready', ({ roomId, isReady }) => {
-      const player = rooms[roomId] && rooms[roomId].players[socket.id];
-      if (!player) return;
+    socket.on('start-game', ({ roomId }) => {
+      const roomCode = (roomId || '').trim().toUpperCase();
+      const room = roomManager.getRoom(roomCode);
+      if (!room) return;
 
-      player.isReady = !!isReady;
+      if (room.hostUserId !== socket.user.id) {
+        return socket.emit('error', 'Only the room host can start the battle.');
+      }
 
-      io.to(roomId).emit('user:ready', {
-        socketId: socket.id,
-        username: player.username,
-        isReady: player.isReady,
-      });
-
-      io.to(roomId).emit('room_update', {
-        players: rooms[roomId].players,
-        status: rooms[roomId].status,
-      });
-
-      tryStartBattle(io, roomId);
+      room.status = 'playing';
+      io.to(roomCode).emit('battle_start');
+      runBattleLoop(roomCode);
     });
 
-    socket.on('user:typing', ({ roomId, isTyping }) => {
-      const player = rooms[roomId] && rooms[roomId].players[socket.id];
-      if (!player) return;
+    socket.on('submit_answer', ({ roomId, optionIndex, timeSpentMs = 0 }) => {
+      const roomCode = (roomId || '').trim().toUpperCase();
+      const room = roomManager.getRoom(roomCode);
+      if (!room || room.status !== 'playing' || !room.questionActive) return;
 
-      socket.to(roomId).emit('user:typing', {
-        socketId: socket.id,
-        username: player.username,
-        isTyping: !!isTyping,
-      });
-    });
+      const player = room.players[socket.id];
+      if (!player || player.answeredThisQuestion) return;
 
-    socket.on('submit_answer', ({ roomId, isCorrect, points = 10 }) => {
-      const player = rooms[roomId] && rooms[roomId].players[socket.id];
-      if (player && rooms[roomId].status === 'playing') {
-        if (isCorrect) {
-          player.score += points;
-        }
+      player.answeredThisQuestion = true;
+      const currentQuestion = room.quiz.questions[room.currentQuestionIndex];
+      const isCorrect = optionIndex === currentQuestion.correctAnswer;
 
-        io.to(roomId).emit('score_update', {
-          players: rooms[roomId].players,
+      if (isCorrect) {
+        // Base points + speed bonus
+        const remainingPercentage = room.timeRemaining / room.timePerQuestion;
+        const speedBonus = Math.round(remainingPercentage * 50);
+        player.score += (100 + speedBonus);
+        player.correctCount += 1;
+        player.timeSpentSumMs += timeSpentMs;
+      }
+
+      room.answersReceived += 1;
+
+      // Count only online players who haven't disconnected
+      const activePlayersCount = Object.values(room.players).filter((p) => p.online).length;
+
+      if (room.answersReceived >= activePlayersCount) {
+        revealQuestionResult(roomCode);
+      } else {
+        io.to(roomCode).emit('room_update', {
+          players: room.players,
+          status: room.status,
         });
       }
     });
 
     socket.on('leave-room', ({ roomId }) => {
-      const room = rooms[roomId];
-      const player = room && room.players[socket.id];
-      if (!room || !player) return;
+      const roomCode = (roomId || '').trim().toUpperCase();
+      socket.leave(roomCode);
 
-      delete room.players[socket.id];
-      socket.leave(roomId);
+      roomManager.removePlayer(
+        roomCode,
+        socket.id,
+        (nextSocketId, nextUsername) => {
+          io.to(roomCode).emit('host_changed', {
+            hostUserId: roomManager.getRoom(roomCode).hostUserId,
+            username: nextUsername,
+          });
+        },
+        () => {
+          console.log(`Lobby room ${roomCode} has been closed due to inactivity.`);
+        }
+      );
 
-      if (Object.keys(room.players).length === 0) {
-        delete rooms[roomId];
-      } else {
-        io.to(roomId).emit('presence_update', {
-          socketId: socket.id,
-          username: player.username,
-          online: false,
-        });
-        io.to(roomId).emit('player_left', { username: player.username });
-        io.to(roomId).emit('room_update', {
+      const room = roomManager.getRoom(roomCode);
+      if (room) {
+        io.to(roomCode).emit('room_update', {
           players: room.players,
           status: room.status,
         });
       }
-
-      console.log(`User ${player.username} left room ${roomId}`);
     });
 
     socket.on('disconnect', () => {
-      console.log(`Socket disconnected: ${socket.id}`);
-      for (const roomId in rooms) {
-        if (rooms[roomId].players[socket.id]) {
-          const username = rooms[roomId].players[socket.id].username;
-          delete rooms[roomId].players[socket.id];
+      console.log(`Socket disconnected from battle arena: ${socket.id}`);
+      // Find which room this socket was part of
+      for (const code in roomManager.rooms) {
+        const room = roomManager.rooms[code];
+        if (room.players[socket.id]) {
+          roomManager.removePlayer(
+            code,
+            socket.id,
+            (nextSocketId, nextUsername) => {
+              io.to(code).emit('host_changed', {
+                hostUserId: room.hostUserId,
+                username: nextUsername,
+              });
+            },
+            () => {
+              console.log(`Lobby room ${code} has been closed after disconnection.`);
+            }
+          );
 
-          io.to(roomId).emit('presence_update', {
-            socketId: socket.id,
-            username,
-            online: false,
+          io.to(code).emit('room_update', {
+            players: room.players,
+            status: room.status,
           });
-
-          if (Object.keys(rooms[roomId].players).length === 0) {
-            delete rooms[roomId];
-          } else {
-            io.to(roomId).emit('player_left', { username });
-            io.to(roomId).emit('room_update', {
-              players: rooms[roomId].players,
-              status: rooms[roomId].status,
-            });
-          }
           break;
         }
       }

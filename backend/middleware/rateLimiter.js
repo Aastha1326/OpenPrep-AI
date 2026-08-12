@@ -10,12 +10,21 @@ const shouldSkip = () => process.env.NODE_ENV === 'test';
  * - Provides clear error message on exhaustion
  */
 const aiLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
+  windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10,
   skip: shouldSkip,
-  message: {
-    success: false,
-    error: 'Too many AI requests. Please wait a moment before generating more content.',
+  keyGenerator: (req) => {
+    return req.user && req.user.id ? String(req.user.id) : (req.ip || req.connection.remoteAddress || '127.0.0.1');
+  },
+  handler: (req, res, next, options) => {
+    const retryInSeconds = Math.ceil(options.windowMs / 1000);
+    res.setHeader('Retry-After', retryInSeconds);
+    res.status(429).json({
+      success: false,
+      error: 'AI rate limit exceeded',
+      retryInSeconds,
+      remainingQuota: 0,
+    });
   },
   standardHeaders: true,
   legacyHeaders: true,

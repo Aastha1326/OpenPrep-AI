@@ -1,12 +1,21 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Brain, ArrowLeft, RotateCw, CheckCircle2, Volume2, VolumeX, AlertCircle, Settings } from 'lucide-react';
-import API from '../services/api';
+import {
+  Brain,
+  ArrowLeft,
+  RotateCw,
+  CheckCircle2,
+  Volume2,
+  VolumeX,
+  AlertCircle,
+  Settings,
+  FileAudio,
+} from 'lucide-react';import API from '../services/api';
 import useVoiceControl from '../hooks/useVoiceControl';
 import VoiceModeToggle from '../components/VoiceModeToggle';
 import AudioWaveform from '../components/AudioWaveform';
-
+import GenerateFlashcardsFromAudioModal from '../components/dashboard/GenerateFlashcardsFromAudioModal';
 const STORAGE_KEY = 'flashcardReviewSession';
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -61,6 +70,7 @@ const FlashcardReview = () => {
   });
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isAudioGeneratorOpen, setIsAudioGeneratorOpen] = useState(false);
   const [modalSettings, setModalSettings] = useState(userSettings);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
@@ -145,7 +155,10 @@ const FlashcardReview = () => {
   });
 
   const [speechRate, setSpeechRate] = useState(1);
-
+const [speechLanguage, setSpeechLanguage] = useState('en-US');
+const [voiceAnswer, setVoiceAnswer] = useState('');
+const [voiceAnswerFeedback, setVoiceAnswerFeedback] = useState(null);
+const [isVoiceAnswerListening, setIsVoiceAnswerListening] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const submittingRef = useRef(false);
@@ -253,25 +266,92 @@ const FlashcardReview = () => {
       else if (command === 'RATE_5') handleReview(5);
     }
   }, [isFlipped, handleCardFlip, handleReview]);
+const extractAnswerKeywords = useCallback((text) => {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .split(/\s+/)
+    .filter((word) => word.length >= 4)
+    .filter(
+      (word, index, words) =>
+        words.indexOf(word) === index
+    );
+}, []);
 
-  const {
-    isSupported,
-    isEnabled,
-    isPaused,
-    status,
-    errorMsg,
-    toggleVoiceMode,
-    speak,
-    cancelSpeech
-  } = useVoiceControl({
-    onCommand: handleVoiceCommand,
-    speechRate
+const validateVoiceAnswer = useCallback(
+  (transcript) => {
+    if (!currentCard?.back || !transcript) return;
+
+    const expectedKeywords = extractAnswerKeywords(currentCard.back);
+    const spokenWords = new Set(extractAnswerKeywords(transcript));
+
+    if (expectedKeywords.length === 0) return;
+
+    const matchedKeywords = expectedKeywords.filter((word) =>
+      spokenWords.has(word)
+    );
+
+    const matchPercentage =
+      matchedKeywords.length / expectedKeywords.length;
+
+    if (matchPercentage >= 0.35) {
+      setVoiceAnswerFeedback({
+        type: 'success',
+        message: 'Answer matched. Flipping to the next card.',
+      });
+
+      setTimeout(() => {
+        if (!isFlipped) {
+          handleCardFlip();
+        }
+      }, 500);
+    } else {
+      setVoiceAnswerFeedback({
+        type: 'retry',
+        message: 'I could not match that answer. Try again or flip the card manually.',
+      });
+    }
+  },
+  [currentCard, extractAnswerKeywords, handleCardFlip, isFlipped]
+);
+const {
+  isSupported,
+  isEnabled,
+  isPaused,
+  status,
+  errorMsg,
+  toggleVoiceMode,
+  speak,
+  cancelSpeech,
+  supportedLanguages,
+} = useVoiceControl({    onCommand: handleVoiceCommand,
+    onTranscript: (transcript) => {
+      if (!isFlipped) return;
+
+      setVoiceAnswer(transcript);
+      setIsVoiceAnswerListening(false);
+      validateVoiceAnswer(transcript);
+    },
+    speechRate,
+    language: speechLanguage,
   });
+const isSpeaking = status === 'SPEAKING';
+const isListeningForAnswer =
+  isEnabled && isFlipped && status === 'LISTENING';
 
-  const isSpeaking = status === 'SPEAKING';
-
+useEffect(() => {
+  setIsVoiceAnswerListening(isListeningForAnswer);
+}, [isListeningForAnswer]);const microphoneUnavailable =
+  isEnabled &&
+  (status === 'ERROR' ||
+    errorMsg?.toLowerCase().includes('microphone'));
   // Cancel speech synthesis when card or flip state changes
   const speechKey = `${currentIndex}:${isFlipped}`;
+  useEffect(() => {
+  setVoiceAnswer('');
+  setVoiceAnswerFeedback(null);
+  setIsVoiceAnswerListening(false);
+}, [currentIndex, isFlipped]);
   useEffect(() => {
     cancelSpeech();
     if (isEnabled && !isPaused && currentCard) {
@@ -343,7 +423,15 @@ const FlashcardReview = () => {
       clearSession();
     }
   }, [isSessionComplete, noCardsDue]);
-
+{noCardsDue && (
+  <button
+    onClick={() => setIsAudioGeneratorOpen(true)}
+    className="px-6 py-3 bg-primary-600 text-white font-semibold rounded-lg hover:bg-primary-700 transition-colors flex items-center"
+  >
+    <FileAudio className="w-5 h-5 mr-2" />
+    Create from Audio
+  </button>
+)}
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center">
@@ -363,7 +451,17 @@ const FlashcardReview = () => {
       </div>
     );
   }
-
+{isAudioGeneratorOpen && (
+  <GenerateFlashcardsFromAudioModal
+    onClose={() => setIsAudioGeneratorOpen(false)}
+    onImported={async () => {
+      setIsAudioGeneratorOpen(false);
+      setLoading(true);
+      setError(null);
+      await fetchDueCards();
+    }}
+  />
+)}
   // --- Session Summary Screen ---
   if (isSessionComplete || noCardsDue) {
     return (
@@ -448,15 +546,19 @@ const FlashcardReview = () => {
         </div>
         <div className="flex items-center gap-3">
           <AudioWaveform status={status} />
-          <VoiceModeToggle
-            isSupported={isSupported}
-            isEnabled={isEnabled}
-            isPaused={isPaused}
-            toggleVoiceMode={toggleVoiceMode}
-            errorMsg={errorMsg}
-            status={status}
-          />
-          <div className="text-sm font-semibold text-neutral-500 dark:text-neutral-400 border-l border-neutral-300 dark:border-slate-700 pl-3">
+<VoiceModeToggle
+  isSupported={isSupported}
+  isEnabled={isEnabled}
+  isPaused={isPaused}
+  toggleVoiceMode={toggleVoiceMode}
+  errorMsg={errorMsg}
+  status={status}
+  speechRate={speechRate}
+  onSpeechRateChange={setSpeechRate}
+  language={speechLanguage}
+  onLanguageChange={setSpeechLanguage}
+  supportedLanguages={supportedLanguages}
+/>          <div className="text-sm font-semibold text-neutral-500 dark:text-neutral-400 border-l border-neutral-300 dark:border-slate-700 pl-3">
             {currentIndex + 1} <span className="text-neutral-300 dark:text-neutral-600">/</span> {cards.length}
           </div>
           <button
@@ -468,7 +570,69 @@ const FlashcardReview = () => {
           </button>
         </div>
       </div>
+{isEnabled && isFlipped && (
+  <div
+    className="w-full max-w-2xl mt-4 rounded-lg border border-primary-200 dark:border-primary-900/50 bg-primary-50 dark:bg-primary-950/20 p-4"
+    aria-live="polite"
+  >
+    <div className="flex items-center justify-between gap-3">
+      <div>
+        <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+          Voice answer
+        </p>
 
+        <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+          Speak your answer clearly. OpenPrep will compare it with the
+          key concepts on the back of the card.
+        </p>
+      </div>
+
+      <div
+        className={`w-3 h-3 rounded-full shrink-0 ${
+          isVoiceAnswerListening
+            ? 'bg-red-500 animate-pulse'
+            : 'bg-neutral-300 dark:bg-slate-600'
+        }`}
+        aria-label={
+          isVoiceAnswerListening
+            ? 'Microphone is listening'
+            : 'Microphone is not listening'
+        }
+      />
+    </div>
+
+    {voiceAnswer && (
+      <p className="mt-3 text-sm text-neutral-700 dark:text-neutral-300">
+        <span className="font-semibold">Heard:</span> {voiceAnswer}
+      </p>
+    )}
+
+    {voiceAnswerFeedback && (
+      <p
+        className={`mt-2 text-xs font-medium ${
+          voiceAnswerFeedback.type === 'success'
+            ? 'text-green-600 dark:text-green-400'
+            : 'text-amber-600 dark:text-amber-400'
+        }`}
+      >
+        {voiceAnswerFeedback.message}
+      </p>
+    )}
+
+    {microphoneUnavailable && (
+      <div className="mt-3 rounded-md bg-red-50 dark:bg-red-950/30 p-3 text-xs text-red-600 dark:text-red-400">
+        <p className="font-semibold">
+          Microphone access is unavailable.
+        </p>
+        <p className="mt-1">
+          You can still flip the card and use the normal rating buttons.
+          Check your browser microphone permission if you want to use
+          voice answers.
+        </p>
+      </div>
+    )}
+  </div>
+)}
       {/* Progress Bar */}
       <div className="w-full max-w-3xl h-1.5 bg-neutral-200 dark:bg-slate-800 rounded-full mb-12 overflow-hidden">
         <motion.div 

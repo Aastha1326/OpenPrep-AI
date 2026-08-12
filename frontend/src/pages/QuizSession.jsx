@@ -18,6 +18,8 @@ import { exportAsCSV, exportAsJSON } from '../utils/exportUtils';
 import useVoiceControl from '../hooks/useVoiceControl';
 import VoiceModeToggle from '../components/VoiceModeToggle';
 import AudioWaveform from '../components/AudioWaveform';
+import BadgeUnlockModal from '../components/gamification/BadgeUnlockModal';
+import LevelUpModal from '../components/gamification/LevelUpModal';
 import RevisionSheetModal from '../components/dashboard/RevisionSheetModal';
 import RemediationPlanModal from '../components/dashboard/RemediationPlanModal';
 import QuestionExplanation from '../components/dashboard/QuestionExplanation';
@@ -60,6 +62,10 @@ const QuizSession = () => {
   const [quiz, setQuiz] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const [activeBadgeUnlock, setActiveBadgeUnlock] = useState(null);
+  const [levelUpLevel, setLevelUpLevel] = useState(null);
+  const [showLevelUpModal, setShowLevelUpModal] = useState(false);
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState({}); // { questionId: selectedOption }
@@ -161,7 +167,9 @@ const fetchQuiz = useCallback(async () => {
       const res = await API.get(`/quizzes/${id}`);
       const loadedQuiz = res.data.data;
       setQuiz(loadedQuiz);
-      const totalSeconds = (loadedQuiz?.questions?.length || 0) * SECONDS_PER_QUESTION;
+      const totalSeconds = loadedQuiz?.timeLimit
+        ? loadedQuiz.timeLimit * 60
+        : (loadedQuiz?.questions?.length || 0) * SECONDS_PER_QUESTION;
       setTimeLeft(totalSeconds);
       endTimeRef.current = Date.now() + totalSeconds * 1000;
       setLoading(false);
@@ -275,10 +283,22 @@ const submitQuiz = useCallback(async () => {
       telemetryRef.current?.stopAutoFlush();
       telemetryRef.current?.flush();
 
+      const timezoneOffset = new Date().getTimezoneOffset();
       const res = await API.post(`/quizzes/${id}/submit`, {
         answers: formattedAnswers,
         submissionId: getSubmissionId(),
+      }, {
+        headers: { 'x-timezone-offset': String(timezoneOffset) }
       });
+      
+      if (res.data?.progression?.newBadges?.length > 0) {
+        setActiveBadgeUnlock(res.data.progression.newBadges[0]);
+      }
+      if (res.data?.progression?.leveledUp) {
+        setLevelUpLevel(res.data.progression.level);
+        setShowLevelUpModal(true);
+      }
+
       setResult(res.data.data);
       setSubmitted(true);
     } catch (err) {
@@ -778,6 +798,20 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
           </div>
         )}
       </div>
+
+      {/* --- GAMIFICATION CELEBRATION MODALS --- */}
+      <BadgeUnlockModal
+        isOpen={!!activeBadgeUnlock}
+        title={activeBadgeUnlock?.title}
+        description={activeBadgeUnlock?.description}
+        onClose={() => setActiveBadgeUnlock(null)}
+      />
+
+      <LevelUpModal
+        level={levelUpLevel}
+        isOpen={showLevelUpModal}
+        onClose={() => setShowLevelUpModal(false)}
+      />
     </div>
   );
 };

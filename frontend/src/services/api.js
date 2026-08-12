@@ -116,6 +116,22 @@ API.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    if (error.response?.status === 429) {
+      const data = error.response.data;
+      const retryInSeconds = data?.retryInSeconds || parseInt(error.response.headers['retry-after'], 10) || 900;
+      const errorMsg = data?.error || 'AI daily usage quota exceeded.';
+
+      const resetTime = Date.now() + retryInSeconds * 1000;
+      localStorage.setItem('ai_quota_reset_time', String(resetTime));
+      localStorage.setItem('ai_quota_error_msg', errorMsg);
+
+      window.dispatchEvent(
+        new CustomEvent('quota-exceeded', {
+          detail: { retryInSeconds, message: errorMsg },
+        })
+      );
+    }
+
     // Only attempt refresh on 401, and only once per request
     const isAuthEndpoint = originalRequest?.url?.includes('/auth/');
     if (error.response?.status !== 401 || originalRequest?._retry || isAuthEndpoint) {

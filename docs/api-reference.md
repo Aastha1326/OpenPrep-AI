@@ -901,3 +901,187 @@ This document catalogs the REST API endpoints available in the **OpenPrep AI** b
   "error": "Not authorized, no token"
 }
 ```
+## ⚠️ Error Responses
+
+The API uses standard HTTP status codes to indicate whether a request was successful or failed. Error responses follow a consistent JSON structure whenever possible.
+
+### 400 Bad Request
+
+Returned when the request contains invalid, missing, or malformed data.
+
+**Example Response:**
+
+```json
+{
+  "success": false,
+  "error": "Invalid request data"
+}
+```
+
+**Common Causes:**
+- Required fields are missing.
+- Request body contains invalid values.
+- Invalid request format is provided.
+
+**Client Handling:**
+Validate the request data and display a clear message to the user before retrying.
+
+---
+
+### 401 Unauthorized
+
+Returned when authentication is required but the request does not contain a valid access token.
+
+**Example Response:**
+
+```json
+{
+  "success": false,
+  "error": "Not authorized, no token"
+}
+```
+
+**Common Causes:**
+
+- Access token is missing.
+- Access token is invalid or expired.
+- Authentication credentials are not provided.
+
+**Client Handling:**
+Prompt the user to authenticate again and retry the request with a valid access token.
+
+---
+
+### 403 Forbidden
+
+Returned when the user is authenticated but does not have permission to perform the requested action.
+
+**Example Response:**
+
+```json
+{
+  "success": false,
+  "error": "Forbidden"
+}
+```
+
+**Common Causes:**
+
+- The authenticated user does not have the required role or permissions.
+- The requested resource is restricted to authorized users.
+- The user does not own the requested resource.
+
+**Client Handling:**
+Display an appropriate permission error and do not retry the request unless the user's permissions or authentication context changes.
+
+---
+
+### 404 Not Found
+
+Returned when the requested resource or endpoint cannot be found.
+
+**Example Response:**
+
+```json
+{
+  "success": false,
+  "error": "Resource not found"
+}
+```
+**Common Causes:**
+
+- Requested resource does not exist.
+- The provided resource ID is invalid or does not belong to an existing record.
+- The requested API endpoint or route is incorrect.
+- The resource may have been deleted or is no longer available.
+
+**Client Handling:**
+
+Verify that the requested resource or endpoint exists before retrying the request.
+
+### 405 Method Not Allowed
+
+Returned when the requested endpoint exists, but the HTTP method used is not supported by that endpoint.
+
+**Example Response:**
+
+```json
+{
+  "success": false,
+  "error": "Method not allowed"
+}
+```
+**Common Causes:**
+
+- The wrong HTTP method was used for an existing endpoint.
+- A GET request was sent to an endpoint that only supports POST.
+- A POST request was sent to an endpoint that only supports GET.
+- The client is using an outdated API method.
+
+**Client Handling:**
+
+Verify the endpoint documentation and use the HTTP method supported by the route. Do not retry the same request with the same HTTP method.
+
+### 429 Too Many Requests
+
+Returned when the client exceeds the configured API rate limit.
+
+**Example Response:**
+
+```json
+{
+  "success": false,
+  "error": "Too many requests"
+}
+```
+**Common Causes:**
+
+- The client has exceeded the configured API rate limit.
+- Too many requests were sent within a short period.
+- The same endpoint was called repeatedly without respecting the rate-limit window.
+
+**Client Handling:**
+
+Wait before retrying the request and respect any rate-limit or retry-after information provided by the server.
+
+### 500 Internal Server Error
+
+Returned when the server encounters an unexpected error while processing the request.
+
+**Example Response:**
+
+```json
+{
+  "success": false,
+  "error": "Internal server error"
+}
+```
+
+**Common Causes:**
+
+- Unexpected backend exception.
+- Database connection failure.
+- External AI service failure.
+- Server configuration or environment variable issues.
+
+**Client Handling:**
+
+Display a generic error message and retry the request after a short delay. Do not expose internal server details to the client.
+
+---
+
+## 🤖 AI Endpoints
+
+This section documents endpoints that use AI-powered processing for study plans, quizzes, flashcards, notes, and academic analysis.
+
+### AI-Powered Features
+
+| Feature | Method | Endpoint | Description |
+|---|---|---|---|
+| PYQ Analysis | `POST` | `/pyq/upload` | Uploads and analyzes previous-year question papers |
+| AI Study Plan | `POST` | `/study-plans/generate-ai` | Generates a personalized study plan |
+| AI Quiz Generation | `POST` | `/quizzes/generate-ai` | Generates practice quizzes using AI |
+| AI Flashcard Generation | `POST` | `/flashcards/generate-ai` | Generates flashcards from a subject/topic |
+| Note Flashcard Generation | `POST` | `/flashcards/generate-from-note` | Generates flashcards from an existing note |
+| Voice Note Processing | `POST` | `/notes/voice` | Transcribes and summarizes uploaded audio |
+| Note Summarization | `POST` | `/notes/:id/summarize` | Generates an AI-powered summary of a note |
