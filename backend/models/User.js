@@ -94,6 +94,18 @@ const User = sequelize.define(
     resetPasswordExpire: {
       type: DataTypes.DATE,
     },
+    resetPasswordOtpHash: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    resetPasswordOtpExpires: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    resetPasswordAttempts: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
     refreshTokens: {
       type: DataTypes.JSONB,
       defaultValue: [],

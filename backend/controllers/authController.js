@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { Op } = require('sequelize');
+const bcrypt = require('bcryptjs');
 const { sequelize } = require('../config/db');
 const User = require('../models/User');
 const Achievement = require('../models/Achievement');
@@ -439,7 +440,31 @@ exports.updateSettings = async (req, res, next) => {
 };
 
 // ---------------------------------------------------------------------------
-// @desc    Forgot Password
+// @desc    Resend verification email
+// @route   POST /api/auth/resend-verification
+// @access  Public
+// ---------------------------------------------------------------------------
+exports.resendVerification = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ where: { email } });
+
+    // To prevent user enumeration, always return 200 success response
+    if (user && !user.isEmailVerified) {
+      await sendVerificationEmail(user);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'If an unverified account with that email exists, a verification link has been sent.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// @desc    Forgot Password (OTP version)
 // @route   POST /api/auth/forgot-password
 // @access  Public
 // ---------------------------------------------------------------------------
@@ -448,23 +473,153 @@ exports.forgotPassword = async (req, res, next) => {
     const { email } = req.body;
     const user = await User.findOne({ where: { email } });
 
-    // Always return the same response to prevent email enumeration
     if (user) {
-      await sendPasswordResetEmail(user, req);
+      // Rapid resend OTP requests -> rate limit resends to maximum 1 email per 60 seconds
+      if (user.resetPasswordOtpExpires) {
+        const timeRemaining = user.resetPasswordOtpExpires - new Date();
+        if (timeRemaining > 14 * 60 * 1000) {
+          return res.status(429).json({
+            success: false,
+            error: 'Please wait 60 seconds before requesting another code.',
+          });
+        }
+      }
+
+      // Generate secure 6-digit OTP
+      const otp = crypto.randomInt(100000, 1000000).toString();
+      const salt = await bcrypt.genSalt(10);
+      const hashedOtp = await bcrypt.hash(otp, salt);
+
+      user.resetPasswordOtpHash = hashedOtp;
+      user.resetPasswordOtpExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+      user.resetPasswordAttempts = 0;
+      await user.save();
+
+      // Send OTP via email
+      await sendEmail({
+        to: user.email,
+        subject: 'Your Password Reset Code — OpenPrep AI',
+        text: `Your password reset code is: ${otp}\n\nThis code expires in 15 minutes. If you did not request this, please ignore this email.`,
+      });
     }
 
     res.status(200).json({
       success: true,
-      message: 'If an account with that email exists, a password reset link has been sent.',
+      message: 'If an account with that email exists, a password reset code has been sent.',
     });
   } catch (error) {
-    // If email sending failed, clear the token from DB
-    const user = await User.findOne({ where: { email: req.body.email } });
-    if (user) {
-      user.resetPasswordToken = null;
-      user.resetPasswordExpire = null;
-      await user.save();
+    next(error);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// @desc    Verify OTP
+// @route   POST /api/auth/verify-otp
+// @access  Public
+// ---------------------------------------------------------------------------
+exports.verifyOtp = async (req, res, next) => {
+  try {
+    const { email, otp } = req.body;
+    const user = await User.findOne({ where: { email } });
+
+    if (!user || !user.resetPasswordOtpHash) {
+      return res.status(400).json({ success: false, error: 'Invalid email or code.' });
     }
+
+    // Check expiration
+    if (new Date() > user.resetPasswordOtpExpires) {
+      return res.status(400).json({ success: false, error: 'Reset code has expired.' });
+    }
+
+    // Check attempts limit (max 5 incorrect attempts)
+    if (user.resetPasswordAttempts >= 5) {
+      return res.status(400).json({
+        success: false,
+        error: 'Too many incorrect attempts. Please request a new code.',
+      });
+    }
+
+    // Match OTP
+    const isMatch = await bcrypt.compare(otp, user.resetPasswordOtpHash);
+    if (!isMatch) {
+      user.resetPasswordAttempts += 1;
+      await user.save();
+      return res.status(400).json({
+        success: false,
+        error: `Incorrect code. Remaining attempts: ${5 - user.resetPasswordAttempts}`,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Code verified successfully.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// @desc    Reset Password (OTP version)
+// @route   POST /api/auth/reset-password
+// @access  Public
+// ---------------------------------------------------------------------------
+exports.resetPasswordOtp = async (req, res, next) => {
+  try {
+    const { email, otp, password } = req.body;
+    const user = await User.findOne({ where: { email } });
+
+    if (!user || !user.resetPasswordOtpHash) {
+      return res.status(400).json({ success: false, error: 'Invalid email or code.' });
+    }
+
+    // Check expiration
+    if (new Date() > user.resetPasswordOtpExpires) {
+      return res.status(400).json({ success: false, error: 'Reset code has expired.' });
+    }
+
+    // Check attempts limit
+    if (user.resetPasswordAttempts >= 5) {
+      return res.status(400).json({
+        success: false,
+        error: 'Too many incorrect attempts. Please request a new code.',
+      });
+    }
+
+    // Match OTP
+    const isMatch = await bcrypt.compare(otp, user.resetPasswordOtpHash);
+    if (!isMatch) {
+      user.resetPasswordAttempts += 1;
+      await user.save();
+      return res.status(400).json({
+        success: false,
+        error: `Incorrect code. Remaining attempts: ${5 - user.resetPasswordAttempts}`,
+      });
+    }
+
+    // Set new password
+    user.password = password;
+    user.resetPasswordOtpHash = null;
+    user.resetPasswordOtpExpires = null;
+    user.resetPasswordAttempts = 0;
+    // Invalidate all existing refresh tokens
+    user.refreshTokens = [];
+
+    // Generate new token family for fresh session
+    const tokenFamily = generateTokenFamily();
+    const accessToken = generateAccessToken(user.id);
+    const refreshResult = await generateRefreshToken(user, tokenFamily);
+    const refreshToken = refreshResult.rawToken;
+
+    setRefreshTokenCookie(res, refreshToken);
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successful. You can now log in with your new password.',
+      token: accessToken,
+      refreshToken,
+    });
+  } catch (error) {
     next(error);
   }
 };

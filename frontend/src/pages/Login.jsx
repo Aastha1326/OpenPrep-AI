@@ -7,6 +7,7 @@ import { useGoogleLogin } from '@react-oauth/google';
 import { loginUser, googleLoginUser, loadUser, clearError } from '../store/slices/authSlice';
 import ThemeToggle from '../components/ThemeToggle';
 import SoundToggle from '../components/SoundToggle';
+import ForgotPasswordModal from '../components/auth/ForgotPasswordModal';
 
 const Login = () => {
   const dispatch = useDispatch();
@@ -15,6 +16,7 @@ const Login = () => {
 
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
 
   const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
   const googleAuthUrl = `${apiBaseUrl.replace(/\/$/, '')}/auth/google`;
@@ -147,9 +149,13 @@ const Login = () => {
                   <label htmlFor="login-password" className="block text-xs font-bold text-[#1F150C] dark:text-[#E1DCC9]">
                     Password
                   </label>
-                  <Link to="/forgot-password" className="text-xs font-semibold text-[#AD8B73] hover:underline dark:text-[#E1DCC9]">
+                  <button
+                    type="button"
+                    onClick={() => setIsForgotPasswordOpen(true)}
+                    className="text-xs font-semibold text-[#AD8B73] hover:underline dark:text-[#E1DCC9] bg-transparent border-none cursor-pointer"
+                  >
                     Forgot password?
-                  </Link>
+                  </button>
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8C6A53] dark:text-[#C4BA9D]" />
@@ -277,6 +283,7 @@ const Login = () => {
           </div>
         </div>
       </motion.div>
+      <ForgotPasswordModal isOpen={isForgotPasswordOpen} onClose={() => setIsForgotPasswordOpen(false)} />
     </div>
   );
 };
