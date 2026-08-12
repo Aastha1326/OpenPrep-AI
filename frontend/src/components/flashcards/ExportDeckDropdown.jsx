@@ -1,12 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Download, FileJson, FileText, Database, ChevronDown, Globe, Share2, ShieldAlert } from 'lucide-react';
 import API from '../../services/api';
+import ExportModal from '../common/ExportModal';
+import { buildFlashcardDocument, buildFlashcardChapters, exportHTMLToPDF, exportToEPUB } from '../../utils/exportDocs';
 
 const ExportDeckDropdown = ({ subjectId = null }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isPublic, setIsPublic] = useState(false);
   const [loadingShareState, setLoadingShareState] = useState(false);
+  const [showFormatModal, setShowFormatModal] = useState(false);
+  const [deckTitle, setDeckTitle] = useState('Flashcard Deck');
+  const [deckCount, setDeckCount] = useState(0);
   const dropdownRef = useRef(null);
 
   useEffect(() => {
@@ -75,6 +80,61 @@ const ExportDeckDropdown = ({ subjectId = null }) => {
     }
   };
 
+  // Fetch the deck (optionally subject-scoped) as JSON so it can be rebuilt
+  // into a formatted PDF/EPUB document on the client.
+  const fetchDeckCards = async () => {
+    const resolvedSubjectId = subjectId && typeof subjectId === 'object' ? subjectId.id : subjectId;
+    const params = { format: 'json' };
+    if (resolvedSubjectId) params.subjectId = resolvedSubjectId;
+
+    const res = await API.get('/flashcards/export', { params });
+    const cards = res.data?.data || [];
+    let title = 'Flashcard Deck';
+    if (resolvedSubjectId) {
+      try {
+        const subjectsRes = await API.get('/subjects');
+        const found = (subjectsRes.data?.data || []).find((s) => s.id === resolvedSubjectId);
+        if (found) title = found.name;
+      } catch {
+        // Keep the generic title if the subject lookup fails
+      }
+    }
+    return { cards, title };
+  };
+
+  const openFormattedExport = async () => {
+    setIsOpen(false);
+    setIsExporting(true);
+    try {
+      const { cards, title } = await fetchDeckCards();
+      setDeckTitle(title);
+      setDeckCount(cards.length);
+      setShowFormatModal(true);
+    } catch (err) {
+      console.error('Failed to load deck for export:', err);
+      alert('Failed to load flashcards for export.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleFormattedExport = async ({ format, layout, includeAnswerKey }) => {
+    const { cards, title } = await fetchDeckCards();
+    const baseName =
+      title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '') || 'flashcards';
+
+    if (format === 'pdf') {
+      const html = buildFlashcardDocument({ cards, layout, includeAnswerKey, title });
+      await exportHTMLToPDF(html, `openprep-${baseName}.pdf`);
+    } else {
+      const chapters = buildFlashcardChapters({ cards, layout, includeAnswerKey, title });
+      await exportToEPUB({ title, chapters, filename: `openprep-${baseName}.epub` });
+    }
+  };
+
   const handleToggleShare = async () => {
     const resolvedSubjectId = subjectId && typeof subjectId === 'object' ? subjectId.id : subjectId;
     if (!resolvedSubjectId) return;
@@ -139,6 +199,13 @@ const ExportDeckDropdown = ({ subjectId = null }) => {
               <Database className="mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500" />
               Anki (.apkg)
             </button>
+            <button
+              onClick={openFormattedExport}
+              className="group flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-slate-700"
+            >
+              <FileText className="mr-3 h-4 w-4 text-primary-500 group-hover:text-primary-600" />
+              Formatted PDF / EPUB
+            </button>
           </div>
 
           {subjectId && (
@@ -158,6 +225,15 @@ const ExportDeckDropdown = ({ subjectId = null }) => {
           )}
         </div>
       )}
+
+      <ExportModal
+        isOpen={showFormatModal}
+        onClose={() => setShowFormatModal(false)}
+        contentType="flashcards"
+        title={`Export ${deckTitle}`}
+        itemCount={deckCount}
+        onExport={handleFormattedExport}
+      />
     </div>
   );
 };

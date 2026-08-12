@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { Download, Upload, Loader, AlertCircle, X } from 'lucide-react';
+import { Download, Upload, Loader, AlertCircle, X, FileText } from 'lucide-react';
 import API from '../../services/api';
+import ExportModal from '../common/ExportModal';
+import { buildNotesDocument, buildNotesChapters, exportHTMLToPDF, exportToEPUB } from '../../utils/exportDocs';
 
 const downloadBlob = (blob, filename) => {
   const url = window.URL.createObjectURL(blob);
@@ -21,6 +23,8 @@ const ImportExportNotes = ({ onImported }) => {
   const [files, setFiles] = useState([]);
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState(null);
+  const [showFormatModal, setShowFormatModal] = useState(false);
+  const [noteCount, setNoteCount] = useState(0);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -51,6 +55,36 @@ const ImportExportNotes = ({ onImported }) => {
       setError('Failed to export notes.');
     } finally {
       setExporting(false);
+    }
+  };
+
+  const fetchNotes = async () => {
+    const res = await API.get('/notes/export', { params: { format: 'json' } });
+    return res.data?.data || [];
+  };
+
+  const openFormattedExport = async () => {
+    setExporting(true);
+    setError(null);
+    try {
+      const notes = await fetchNotes();
+      setNoteCount(notes.length);
+      setShowFormatModal(true);
+    } catch (err) {
+      setError('Failed to load notes for export.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleFormattedExport = async ({ format, layout }) => {
+    const notes = await fetchNotes();
+    if (format === 'pdf') {
+      const html = buildNotesDocument({ notes, layout, title: 'My Notes' });
+      await exportHTMLToPDF(html, 'openprep-notes.pdf');
+    } else {
+      const chapters = buildNotesChapters({ notes, layout, title: 'My Notes' });
+      await exportToEPUB({ title: 'My Notes', chapters, filename: 'openprep-notes.epub' });
     }
   };
 
@@ -103,6 +137,15 @@ const ImportExportNotes = ({ onImported }) => {
       >
         {exporting ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
         Export
+      </button>
+      <button
+        type="button"
+        disabled={exporting}
+        onClick={openFormattedExport}
+        className="flex items-center gap-1 px-2.5 py-1.5 bg-neutral-700 hover:bg-neutral-800 text-white text-xs font-bold rounded-sm shadow-sm transition-all disabled:opacity-60"
+      >
+        <FileText className="w-3.5 h-3.5" />
+        PDF / EPUB
       </button>
       <button
         type="button"
@@ -167,6 +210,14 @@ const ImportExportNotes = ({ onImported }) => {
           </div>
         </div>
       )}
+      <ExportModal
+        isOpen={showFormatModal}
+        onClose={() => setShowFormatModal(false)}
+        contentType="notes"
+        title="Export Notes"
+        itemCount={noteCount}
+        onExport={handleFormattedExport}
+      />
     </div>
   );
 };
