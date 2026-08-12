@@ -165,7 +165,10 @@ app.get('/api/csrf-token', (req, res) => {
 });
 
 // Response compression (skip binary uploads via default filter)
-app.use(compression());
+app.use(compression({
+  level: 6, // balanced gzip compression
+  threshold: 0,
+}));
 
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
@@ -195,7 +198,10 @@ app.use('/api/', apiLimiter);
 
 // Serve avatar images publicly — profile pictures are displayed to other
 // users (e.g. in community features) and aren't sensitive like notes/PYQs.
-app.use('/uploads/avatars', express.static(path.join(__dirname, 'uploads/avatars')));
+app.use('/uploads/avatars', express.static(path.join(__dirname, 'uploads/avatars'), {
+  maxAge: '1y',
+  immutable: true
+}));
 
 // Set Static Folder for File Uploads (Protected)
 // protect, Note, PYQ already imported at top of file
@@ -227,6 +233,7 @@ app.get('/uploads/:filename', protect, async (req, res, next) => {
       return res.status(403).json({ success: false, error: 'Not authorized to access this file' });
     }
 
+    res.set('Cache-Control', 'private, max-age=86400'); // 1 day cache for protected assets
     res.sendFile(path.join(__dirname, 'uploads', filename));
   } catch (error) {
     next(error);
