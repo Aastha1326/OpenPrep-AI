@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Play, Pause, RotateCcw, Clock, ChevronDown } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Play, Pause, RotateCcw, Clock, ChevronDown, Music } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import API from '../../services/api';
 
@@ -15,6 +15,10 @@ const PomodoroTimer = () => {
   const [totalStudyHours, setTotalStudyHours] = useState(0);
   const [pausedSeconds, setPausedSeconds] = useState(0);
   const [interruptions, setInterruptions] = useState(0);
+
+  const [audioSrc, setAudioSrc] = useState(localStorage.getItem('pomodoro_audio') || '');
+  const audioRef = useRef(null);
+
   // Fetch user's subjects on component mount
   useEffect(() => {
     const fetchSubjects = async () => {
@@ -131,7 +135,12 @@ const PomodoroTimer = () => {
   }, [isActive, isCompleted, timeLeft]);
   const toggleTimer = () => {
     if (isCompleted) setIsCompleted(false);
-    if (isActive) setInterruptions((count) => count + 1); // user is pausing -> count it
+    if (isActive) {
+      setInterruptions((count) => count + 1); // user is pausing -> count it
+      audioRef.current?.pause();
+    } else {
+      if (audioSrc) audioRef.current?.play().catch(() => {});
+    }
     setIsActive(!isActive);
   };
   const resetTimer = () => {
@@ -140,6 +149,7 @@ const PomodoroTimer = () => {
     setTimeLeft(25 * 60);
     setPausedSeconds(0);
     setInterruptions(0);
+    audioRef.current?.pause();
   };
   const handleSubjectSelect = (subject) => {
     setSelectedSubject(subject);
@@ -238,7 +248,35 @@ const PomodoroTimer = () => {
               <RotateCcw className="w-4 h-4" />
             </motion.button>
           </div>
+
+          {/* Ambient Audio Selection */}
+          <div className="mt-3 z-10 w-full px-8">
+            <select
+              value={audioSrc}
+              onChange={(e) => {
+                const src = e.target.value;
+                setAudioSrc(src);
+                localStorage.setItem('pomodoro_audio', src);
+                if (src && isActive && audioRef.current) {
+                  audioRef.current.src = src;
+                  audioRef.current.play().catch(() => {});
+                } else if (!src && audioRef.current) {
+                  audioRef.current.pause();
+                }
+              }}
+              className="w-full text-[10px] bg-transparent border-b border-neutral-400 text-neutral-600 focus:outline-none p-1"
+            >
+              <option value="">No ambient sound</option>
+              <option value="https://cdn.pixabay.com/download/audio/2021/08/04/audio_0625c1539c.mp3">Rain</option>
+              <option value="https://cdn.pixabay.com/download/audio/2021/08/09/audio_dc39b4b0eb.mp3">Forest</option>
+              <option value="https://cdn.pixabay.com/download/audio/2022/03/15/audio_73d47d12f3.mp3">White Noise</option>
+              <option value="https://cdn.pixabay.com/download/audio/2022/01/18/audio_82136d400e.mp3">Binaural 40Hz</option>
+            </select>
+          </div>
         </div>
+
+        {/* Hidden Audio Player */}
+        <audio ref={audioRef} src={audioSrc} loop />
 
         {/* Progress Indicator (SVG Circle) */}
         <svg
