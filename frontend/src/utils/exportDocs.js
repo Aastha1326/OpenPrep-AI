@@ -35,7 +35,7 @@ function renderMathFragments(text) {
     (match) => {
       const isBlock = match.startsWith('$$');
       const raw = match.slice(isBlock ? 2 : 1, isBlock ? -2 : -1).trim();
-      let html = '';
+      let html;
       try {
         html = katex.renderToString(raw, { displayMode: isBlock, throwOnError: false });
       } catch (err) {
@@ -55,6 +55,7 @@ function renderMathFragments(text) {
 }
 
 const restoreMath = (text, fragments) =>
+  // eslint-disable-next-line no-control-regex
   String(text).replace(/[\u0000]KATEX_MATH_(\d+)[\u0000]/g, (_, index) => fragments[Number(index)] ?? '');
 
 /**
@@ -79,8 +80,19 @@ function renderMathForEPUB(text) {
  * bold, italic, inline/block code, lists, blockquotes, horizontal rules).
  */
 export function markdownToHTML(md) {
-  const escaped = (str) =>
-    escapeHtml(str).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/(^|[^*])\*([^*\n]+?)\*/g, '$1<em>$2</em>');
+  const escaped = (str) => {
+    const codeSpans = [];
+    const html = escapeHtml(str).replace(/`([^`]+)`/g, (m, code) => {
+      const index = codeSpans.length;
+      codeSpans.push(`<code>${code}</code>`);
+      return `\u0001CODE_SPAN_${index}\u0001`;
+    });
+    return html
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/(^|[^*])\*([^*\n]+?)\*/g, '$1<em>$2</em>')
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\u0001]CODE_SPAN_(\d+)[\u0001]/g, (_, index) => codeSpans[Number(index)] ?? '');
+  };
 
   const blocks = String(md ?? '')
     .replace(/\r\n/g, '\n')
@@ -214,8 +226,6 @@ const epubEscapeXml = (value) =>
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
-const chapterNumberLabel = (title, index) => `${String(index + 1).padStart(2, '0')}`;
-
 // ---------------------------------------------------------------------------
 // Flashcard documents
 // ---------------------------------------------------------------------------
@@ -246,7 +256,7 @@ function flashcardAnswerKey(cards) {
 export function buildFlashcardDocument({ cards = [], layout = 'grid', includeAnswerKey = false, title = 'Flashcard Deck' }) {
   const normalized = LAYOUTS.includes(layout) ? layout : 'grid';
 
-  let body = '';
+  let body;
   if (normalized === 'grid') {
     const pages = [];
     for (let i = 0; i < cards.length; i += 8) {

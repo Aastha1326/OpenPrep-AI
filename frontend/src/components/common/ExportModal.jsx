@@ -9,8 +9,6 @@ import {
   Download,
   Loader2,
 } from 'lucide-react';
-import { LAYOUTS } from '../../utils/exportDocs';
-
 const LAYOUT_OPTIONS = [
   { value: 'grid', label: 'Grid', icon: LayoutGrid, description: '2×4 cards per page' },
   { value: 'list', label: 'List', icon: List, description: 'One card per row' },

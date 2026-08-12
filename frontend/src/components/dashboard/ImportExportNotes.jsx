@@ -51,7 +51,7 @@ const ImportExportNotes = ({ onImported }) => {
         responseType: 'blob',
       });
       downloadBlob(res.data, format === 'zip' ? 'openprep-notes.zip' : 'openprep-notes.json');
-    } catch (err) {
+    } catch {
       setError('Failed to export notes.');
     } finally {
       setExporting(false);
@@ -70,7 +70,7 @@ const ImportExportNotes = ({ onImported }) => {
       const notes = await fetchNotes();
       setNoteCount(notes.length);
       setShowFormatModal(true);
-    } catch (err) {
+    } catch {
       setError('Failed to load notes for export.');
     } finally {
       setExporting(false);

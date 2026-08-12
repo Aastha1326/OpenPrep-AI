@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Download, FileJson, FileText, Database, ChevronDown, Globe, Share2, ShieldAlert, Upload } from 'lucide-react';
+import { Download, FileJson, FileText, Database, ChevronDown, Globe, Upload } from 'lucide-react';
 import API from '../../services/api';
 import ExportModal from '../common/ExportModal';
 import { buildFlashcardDocument, buildFlashcardChapters, exportHTMLToPDF, exportToEPUB } from '../../utils/exportDocs';
