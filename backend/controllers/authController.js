@@ -116,7 +116,18 @@ exports.verifyLogin2FA = async (req, res, next) => {
     const refreshToken = refreshResult.rawToken;
 
     setRefreshTokenCookie(res, refreshToken);
-
+    res.status(200).json({
+      success: true,
+      token: accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isEmailVerified: user.isEmailVerified,
+        level: user.level || 1,
+        xp: user.xp || 0,
         unlockedNodes: user.unlockedNodes || ['root'],
       },
     });
@@ -452,8 +463,6 @@ exports.googleLogin = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       token: accessToken,
-=======
->>>>>>> 18bdb2e24fbfe9356291e11a5ec0dad6b95ff817
       refreshToken,
       user: {
         id: user.id,
