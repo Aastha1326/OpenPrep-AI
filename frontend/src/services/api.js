@@ -202,4 +202,8 @@ API.interceptors.response.use(
   }
 );
 
+export const generateAIQuiz = (data) => API.post('/quizzes/generate-ai', data);
+export const evaluateSubjectiveAnswer = (data) => API.post('/quizzes/evaluate-subjective', data);
+export const submitQuizAttempt = (id, data) => API.post(`/quizzes/${id}/submit`, data);
+
 export default API;

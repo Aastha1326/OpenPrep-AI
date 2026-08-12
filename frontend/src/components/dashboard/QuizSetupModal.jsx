@@ -23,6 +23,7 @@ const QuizSetupModal = ({ isOpen, onClose, onQuizGenerated }) => {
   const [topicId, setTopicId] = useState('');
   const [count, setCount] = useState(5);
   const [language, setLanguage] = useState('english');
+  const [questionType, setQuestionType] = useState('MCQ');
   const [loading, setLoading] = useState(false);
   const [loadingSubjects, setLoadingSubjects] = useState(false);
   const [error, setError] = useState('');
@@ -90,6 +91,7 @@ const QuizSetupModal = ({ isOpen, onClose, onQuizGenerated }) => {
         topicId: topicId || undefined,
         count: Number(count) || 5,
         language,
+        questionType,
       });
 
       if (onQuizGenerated) {
@@ -170,6 +172,36 @@ const QuizSetupModal = ({ isOpen, onClose, onQuizGenerated }) => {
                     ))
                   )}
                 </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Question Format
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setQuestionType('MCQ')}
+                    className={`px-3 py-2 text-xs font-semibold rounded-lg border text-center transition-all ${
+                      questionType === 'MCQ'
+                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-500'
+                        : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                    }`}
+                  >
+                    Multiple Choice (MCQ)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuestionType('SUBJECTIVE')}
+                    className={`px-3 py-2 text-xs font-semibold rounded-lg border text-center transition-all ${
+                      questionType === 'SUBJECTIVE'
+                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-500'
+                        : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                    }`}
+                  >
+                    Subjective / Short Answer
+                  </button>
+                </div>
               </div>
 
               <div>
