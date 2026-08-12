@@ -9,6 +9,9 @@ const {
   getPYQTrends,
   getUpcomingForecast,
   getPYQClusters,
+  analyzePYQBatch,
+  getSubjectAnalyses,
+  exportPYQAnalysisPDF,
 } = require('../controllers/pyqController');
 const { protect } = require('../middleware/auth');
 const { strictAiLimiter } = require('../middleware/rateLimiter');
@@ -394,5 +397,9 @@ router.post(
  */
 
 router.delete('/:id', protect, clearCache('pyqs:*'), deletePYQ);
+
+router.post('/analyze', protect, upload.array('files', 10), analyzePYQBatch);
+router.get('/subject/:subjectId', protect, getSubjectAnalyses);
+router.get('/analysis/:analysisId/export', protect, exportPYQAnalysisPDF);
 
 module.exports = router;

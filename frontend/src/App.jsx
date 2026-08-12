@@ -28,6 +28,8 @@ const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const StudyGroupChat = lazy(() => import('./pages/StudyGroupChat'));
 const AiAssistant = lazy(() => import('./pages/AiAssistant'));
 const OAuthCallback = lazy(() => import('./pages/OAuthCallback'));
+const PYQAnalytics = lazy(() => import('./pages/PYQAnalytics'));
+const QuizSession = lazy(() => import('./pages/QuizSession'));
 
 function App() {
   const dispatch = useDispatch();
@@ -172,6 +174,24 @@ function App() {
             element={
               <ProtectedRoute>
                 <PyqDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/pyq-analytics"
+            element={
+              <ProtectedRoute>
+                <PYQAnalytics />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/quiz/:id"
+            element={
+              <ProtectedRoute>
+                <QuizSession />
               </ProtectedRoute>
             }
           />

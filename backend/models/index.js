@@ -22,6 +22,8 @@ const QuizBookmark = require('./QuizBookmark');
 const UserBadge = require('./UserBadge');
 const BattleSession = require('./BattleSession');
 const BattleParticipant = require('./BattleParticipant');
+const PYQAnalysis = require('./PYQAnalysis');
+const PYQQuestion = require('./PYQQuestion');
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -135,6 +137,16 @@ BattleParticipant.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 
 BattleSession.belongsTo(Quiz, { foreignKey: 'quizId', as: 'quizRef', onDelete: 'SET NULL' });
 
+// PYQAnalysis and PYQQuestion associations
+User.hasMany(PYQAnalysis, { foreignKey: 'userId', onDelete: 'CASCADE' });
+PYQAnalysis.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+Subject.hasMany(PYQAnalysis, { foreignKey: 'subjectId', onDelete: 'CASCADE' });
+PYQAnalysis.belongsTo(Subject, { foreignKey: 'subjectId', as: 'subjectRef' });
+
+PYQAnalysis.hasMany(PYQQuestion, { foreignKey: 'pyqAnalysisId', onDelete: 'CASCADE' });
+PYQQuestion.belongsTo(PYQAnalysis, { foreignKey: 'pyqAnalysisId', as: 'analysisRef' });
+
 module.exports = {  sequelize,  User,
   Exam,
   Subject,
@@ -156,4 +168,6 @@ UsageQuota,
   QuizBookmark,
   BattleSession,
   BattleParticipant,
+  PYQAnalysis,
+  PYQQuestion,
 };
