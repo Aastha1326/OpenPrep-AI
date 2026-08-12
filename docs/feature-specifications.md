@@ -4,33 +4,39 @@ This document defines the functional specifications and algorithmic details for 
 
 ---
 
-## 📊 PYQ Intelligence
+## 📊 PYQ Intelligence & Batch Trend Analyzer
 
-The PYQ Intelligence engine extracts insights from historical exam papers to help students optimize their preparation.
+The PYQ Intelligence and Batch Trend Analyzer extracts consolidated chapter weightages and recurring concept frequencies from multiple historical exam papers.
 
 ### 1. Functional Scope
-* **Document Processing**: Students upload a PDF of a Previous Year Question Paper (PYQ).
-* **Text Extraction**: The backend extracts raw text from the PDF.
-* **AI Analysis**: The Gemini API processes the text to identify:
-  * **Chapter Weightage**: A percentage breakdown of chapters represented in the exam paper.
-  * **Important Topics**: Core concepts rated by importance (`High`, `Medium`, `Low`) and frequency.
-  * **Repeated Questions**: Detection of duplicate or highly similar questions across exam years.
-  * **Exam Trend Analysis**: Descriptive summaries analyzing emphasis on theory vs. practical problem-solving.
+* **Batch PDF Processing**: Students upload up to 10 past exam paper PDFs for a subject.
+* **Text Extraction & OCR**: 
+  * The backend extracts selectable text from PDF files using `pdf-parse`.
+  * If a file has empty text (such as scanned image-only PDFs), the system logs the event and routes to the OCR text-extraction pipeline.
+  * Image uploads (JPEG, PNG) are routed directly to the Tesseract.js OCR engine.
+* **AI Aggregation**: The Gemini API processes the combined text across years and extracts structured questions mapped to chapters, topics, marks, and year.
+* **Interactive Charts**:
+  * **Chapter Weightage Bar Chart**: Displays chapter marks percentage contributions. Clicking a bar allows launching targeted AI quizzes or creating flashcard decks for that specific chapter.
+  * **Concept Heatmap Grid**: Displays a Recharts scatter plot showing years on the X-axis, topic names on the Y-axis, and marks weightage as bubble sizes.
+* **High-Yield Priorities**: Lists chapters ranked by weightage percentage, suggesting study sequences.
+* **PDF Export**: Generates and downloads detailed past paper reports using PDFKit.
 
 ### 2. Prompt Schema & Flow
 The backend uses `gemini-1.5-flash` with a strict JSON system prompt to retrieve structured data. The schema must resolve to:
 ```json
 {
-  "chapterWeightage": [
-    { "chapterName": "string", "weightage": 35 }
-  ],
-  "importantTopics": [
-    { "topicName": "string", "importance": "High", "frequency": 4 }
-  ],
-  "repeatedQuestions": [
-    { "questionText": "string", "years": [2023, 2025] }
-  ],
-  "trendAnalysis": "string"
+  "examName": "CBSE Board Exams",
+  "yearRange": "2020-2025",
+  "totalQuestions": 32,
+  "questions": [
+    {
+      "chapterName": "Database Management",
+      "topicName": "SQL Joins",
+      "questionText": "Compare INNER JOIN versus LEFT OUTER JOIN.",
+      "marks": 5,
+      "year": 2024
+    }
+  ]
 }
 ```
 

@@ -1,7 +1,6 @@
-const { DataTypes } = require('sequelize');
-const { sequelize } = require('../config/db');
-const bcrypt = require('bcryptjs');
-const crypto = require('crypto');
+import speakeasy from 'speakeasy';
+import QRCode from 'qrcode';
+import crypto from 'crypto';
 
 const User = sequelize.define(
   'User',
@@ -48,6 +47,24 @@ const User = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
       unique: true,
+    },
+    googleId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      unique: true,
+    },
+    githubId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      unique: true,
+    },
+    avatarUrl: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    authProvider: {
+      type: DataTypes.ENUM('local', 'google', 'github'),
+      defaultValue: 'local',
     },
     streakCount: {
       type: DataTypes.INTEGER,
@@ -145,6 +162,14 @@ const User = sequelize.define(
       type: DataTypes.BOOLEAN,
       defaultValue: true,
     },
+    googleCalendarRefreshToken: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    syncGoogleCalendar: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
     pushSubscription: {
       type: DataTypes.JSONB,
       allowNull: true,
@@ -152,6 +177,14 @@ const User = sequelize.define(
     dailyReminderTime: {
       type: DataTypes.STRING,
       defaultValue: '09:00',
+    },
+    dailyAiUsageCount: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+    lastAiUsageReset: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW,
     },
     xp: {
       type: DataTypes.INTEGER,
@@ -181,12 +214,28 @@ const User = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
+    currentStreak: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+    longestStreak: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+    lastActivityDate: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+    },
+    streakFreezesAvailable: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
   },
   {
     timestamps: true,
     hooks: {
       beforeSave: async (user) => {
-        if (user.changed('password')) {
+        if (user.changed('password') && user.password) {
           const salt = await bcrypt.genSalt(10);
           user.password = await bcrypt.hash(user.password, salt);
         }
@@ -197,21 +246,13 @@ const User = sequelize.define(
 
 // Match user entered password to hashed password in database
 User.prototype.matchPassword = async function (enteredPassword) {
+  if (!this.password) return false;
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// Generate and hash reset/verification tokens
-User.prototype.generateToken = function (field) {
-  const token = crypto.randomBytes(32).toString('hex');
-  const hashed = crypto.createHash('sha256').update(token).digest('hex');
-  if (field === 'resetPassword') {
-    this.resetPasswordToken = hashed;
-    this.resetPasswordExpire = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-  } else if (field === 'emailVerification') {
-    this.emailVerificationToken = hashed;
-    this.emailVerificationExpire = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    const qrCodeUrl = await QRCode.toDataURL(secret.otpauth_url);
+    res.status(200).json({ success: true, secret: secret.base32, qrCodeUrl, backupCodes });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
-  return token;
 };
-
-module.exports = User;

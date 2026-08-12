@@ -5,6 +5,7 @@ const progressRoutes = require('../../routes/progressRoutes');
 const studyPlanRoutes = require('../../routes/studyPlanRoutes');
 const flashcardRoutes = require('../../routes/flashcardRoutes');
 const quizRoutes = require('../../routes/quizRoutes');
+const gamificationRoutes = require('../../routes/gamificationRoutes');
 const errorHandler = require('../../middleware/error');
 const User = require('../../models/User');
 const StudyPlan = require('../../models/StudyPlan');
@@ -20,6 +21,7 @@ app.use('/api/progress', progressRoutes);
 app.use('/api/study-plans', studyPlanRoutes);
 app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/quizzes', quizRoutes);
+app.use('/api/gamification', gamificationRoutes);
 app.use(errorHandler);
 
 describe('XP Progression & Streak Freeze Shield system', () => {
@@ -45,8 +47,9 @@ describe('XP Progression & Streak Freeze Shield system', () => {
       level: 1,
       skillPoints: 0,
       unlockedNodes: ['root'],
-      streakFreezes: 0,
-      streakFreezesEquippedThisMonth: 0,
+      streakFreezesAvailable: 0,
+      currentStreak: 0,
+      longestStreak: 0,
     });
 
     authToken = jwt.sign({ id: testUser.id, type: 'access' }, process.env.JWT_SECRET);
@@ -65,7 +68,7 @@ describe('XP Progression & Streak Freeze Shield system', () => {
     expect(res.body.unlockedNodes).toContain('root');
   });
 
-  it('should award XP and trigger level up with skill points', async () => {
+  it('should award XP and trigger level up with skill points using the sqrt formula', async () => {
     const res = await request(app)
       .post('/api/progress/xp/award')
       .set('Authorization', `Bearer ${authToken}`)
@@ -74,64 +77,43 @@ describe('XP Progression & Streak Freeze Shield system', () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.progression.xp).toBe(1500);
-    expect(res.body.progression.level).toBe(2);
-    expect(res.body.progression.skillPoints).toBe(1);
+    // sqrt(1500 / 100) = sqrt(15) = ~3.87 -> Math.floor(3.87) + 1 = 4
+    expect(res.body.progression.level).toBe(4);
+    expect(res.body.progression.skillPoints).toBe(3); // Level 1 -> Level 4 = 3 points
     expect(res.body.progression.leveledUp).toBe(true);
   });
 
-  it('should allow unlocking a node when user has skill points', async () => {
-    // 1. Manually update user to have 1 skill point
-    const user = await User.findByPk(testUser.id);
-    user.skillPoints = 1;
-    await user.save();
-
-    // 2. Perform Unlock request
+  it('should return gamification summary statistics', async () => {
     const res = await request(app)
-      .post('/api/progress/xp/unlock')
-      .set('Authorization', `Bearer ${authToken}`)
-      .send({ nodeId: 'memory_boost' });
+      .get('/api/gamification/summary')
+      .set('Authorization', `Bearer ${authToken}`);
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(res.body.unlockedNodes).toContain('memory_boost');
-    expect(res.body.skillPointsRemaining).toBe(0);
+    expect(res.body.data.xp).toBe(0);
+    expect(res.body.data.level).toBe(1);
+    expect(res.body.data.currentStreak).toBe(0);
+    expect(res.body.data.longestStreak).toBe(0);
+    expect(res.body.data.streakFreezesAvailable).toBe(0);
+    expect(res.body.data.badges).toBeInstanceOf(Array);
   });
 
-  it('should refuse unlock when user has insufficient skill points', async () => {
+  it('should successfully consume a streak freeze token and protect study streak', async () => {
+    // 1. Manually award a streak freeze
+    const user = await User.findByPk(testUser.id);
+    user.streakFreezesAvailable = 1;
+    user.currentStreak = 3;
+    await user.save();
+
     const res = await request(app)
-      .post('/api/progress/xp/unlock')
+      .post('/api/gamification/streak-freeze/use')
       .set('Authorization', `Bearer ${authToken}`)
-      .send({ nodeId: 'memory_boost' });
+      .send();
 
-    expect(res.status).toBe(400);
-    expect(res.body.success).toBe(false);
-    expect(res.body.error).toContain('Insufficient Skill Points');
-  });
-
-  it('should allow user to equip up to 2 streak freezes per month', async () => {
-    // Equip 1st
-    let res = await request(app)
-      .post('/api/progress/streak-freeze/equip')
-      .set('Authorization', `Bearer ${authToken}`);
     expect(res.status).toBe(200);
-    expect(res.body.streakFreezes).toBe(1);
-    expect(res.body.equippedThisMonth).toBe(1);
-
-    // Equip 2nd
-    res = await request(app)
-      .post('/api/progress/streak-freeze/equip')
-      .set('Authorization', `Bearer ${authToken}`);
-    expect(res.status).toBe(200);
-    expect(res.body.streakFreezes).toBe(2);
-    expect(res.body.equippedThisMonth).toBe(2);
-
-    // Equip 3rd (should fail)
-    res = await request(app)
-      .post('/api/progress/streak-freeze/equip')
-      .set('Authorization', `Bearer ${authToken}`);
-    expect(res.status).toBe(400);
-    expect(res.body.success).toBe(false);
-    expect(res.body.error).toContain('maximum limit of 2');
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.streakFreezesAvailable).toBe(0);
+    expect(res.body.data.currentStreak).toBe(3);
   });
 
   it('should award XP when completing study plan task', async () => {
@@ -156,7 +138,7 @@ describe('XP Progression & Streak Freeze Shield system', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.progression).toBeDefined();
-    expect(res.body.progression.xp).toBe(150);
+    expect(res.body.progression.xp).toBe(50); // New completion XP is 50
   });
 
   it('should award XP when reviewing a flashcard', async () => {
@@ -176,7 +158,7 @@ describe('XP Progression & Streak Freeze Shield system', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.progression).toBeDefined();
-    expect(res.body.progression.xp).toBe(80); // quality >= 4 gives 80 XP
+    expect(res.body.progression.xp).toBe(30); // New flashcard review XP is 30
   });
 
   it('should award XP when submitting a quiz attempt', async () => {
@@ -199,6 +181,6 @@ describe('XP Progression & Streak Freeze Shield system', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.progression).toBeDefined();
-    expect(res.body.progression.xp).toBe(200); // 100% score gives Math.round(100 * 1.5 + 50) = 200 XP
+    expect(res.body.progression.xp).toBe(100); // Quiz submit gives 100 XP
   });
 });

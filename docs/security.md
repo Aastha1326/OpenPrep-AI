@@ -95,6 +95,17 @@ This document outlines the security architecture, data validation flows, and pol
 * Files whose binary content does not match their extension — such as an executable or script renamed to `payload.pdf` — are rejected with a `400` response and are never persisted to `uploads/`.
 * `.txt` files have no magic bytes; they are accepted only when no known binary signature is detected.
 
+### 11. AI Quota Controls & API Rate Limiting
+* **AI Route Rate Limits**: Restricted to a maximum of 10 requests per 15-minute window. Enforced at the route level via express-rate-limit and token bucket (Redis/in-memory).
+* **Identifier Identification**: The rate-limiting keys are bound directly to the user's account ID when logged in, with a fallback to the client IP address.
+* **Daily Quota Enforcement**: Daily AI generation counts are persisted inside the `Users` table (`dailyAiUsageCount`, `lastAiUsageReset`).
+* **Tiered Allocations**: Enforced daily limits automatically based on user roles:
+  - Standard / Student: 15 requests per day
+  - Contributors: 50 requests per day
+  - Premium / Admins: 100 requests per day
+* **UTC Rollover Reset**: The daily usage counters reset automatically at midnight UTC.
+* **Failure Guard**: The quota count is incremented post-response only for successful 2xx responses, ensuring failed requests do not drain the user's daily quota.
+
 ---
 
 ## 🚨 Vulnerability Disclosure Policy
