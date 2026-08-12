@@ -24,6 +24,7 @@ const BattleSession = require('./BattleSession');
 const BattleParticipant = require('./BattleParticipant');
 const PYQAnalysis = require('./PYQAnalysis');
 const PYQQuestion = require('./PYQQuestion');
+const MindMap = require('./MindMap');
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -147,6 +148,12 @@ PYQAnalysis.belongsTo(Subject, { foreignKey: 'subjectId', as: 'subjectRef' });
 PYQAnalysis.hasMany(PYQQuestion, { foreignKey: 'pyqAnalysisId', onDelete: 'CASCADE' });
 PYQQuestion.belongsTo(PYQAnalysis, { foreignKey: 'pyqAnalysisId', as: 'analysisRef' });
 
+// MindMap associations
+User.hasMany(MindMap, { foreignKey: 'user', onDelete: 'CASCADE' });
+MindMap.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+MindMap.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'SET NULL' });
+MindMap.belongsTo(Note, { foreignKey: 'note', as: 'noteRef', onDelete: 'SET NULL' });
+
 module.exports = {  sequelize,  User,
   Exam,
   Subject,
@@ -170,4 +177,5 @@ UsageQuota,
   BattleParticipant,
   PYQAnalysis,
   PYQQuestion,
+  MindMap,
 };

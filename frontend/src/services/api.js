@@ -202,4 +202,8 @@ API.interceptors.response.use(
   }
 );
 
+export const generateMindMap = (payload) => API.post('/ai/mind-map/generate', payload);
+export const getMindMapById = (id) => API.get(`/ai/mind-map/${id}`);
+export const getUserMindMaps = () => API.get('/ai/mind-map');
+
 export default API;

@@ -31,6 +31,7 @@ const AiAssistant = lazy(() => import('./pages/AiAssistant'));
 const OAuthCallback = lazy(() => import('./pages/OAuthCallback'));
 const PYQAnalytics = lazy(() => import('./pages/PYQAnalytics'));
 const QuizSession = lazy(() => import('./pages/QuizSession'));
+const MindMapViewer = lazy(() => import('./pages/MindMapViewer'));
 
 function App() {
   const dispatch = useDispatch();
@@ -194,6 +195,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <QuizSession />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/mind-map"
+            element={
+              <ProtectedRoute>
+                <MindMapViewer />
               </ProtectedRoute>
             }
           />
