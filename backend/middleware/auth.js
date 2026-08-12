@@ -26,7 +26,19 @@ exports.protect = async (req, res, next) => {
       return res.status(401).json({ success: false, error: 'Not authorized to access this route' });
     }
 
-    const user = await User.findByPk(decoded.id);
+    const user = await User.findByPk(decoded.id, {
+      attributes: {
+        exclude: [
+          'password',
+          'refreshTokens',
+          'refreshTokenExpire',
+          'emailVerificationToken',
+          'emailVerificationExpire',
+          'resetPasswordToken',
+          'resetPasswordExpire',
+        ],
+      },
+    });
 
     if (!user) {
       return res.status(401).json({ success: false, error: 'User not found' });
