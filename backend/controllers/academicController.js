@@ -83,6 +83,25 @@ exports.deleteExam = async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'Exam not found' });
     }
 
+    // PYQ has an afterDestroy hook that deletes uploaded files from disk.
+    // Sequelize-level CASCADE does not fire model hooks, so we must delete PYQs
+    // explicitly with individualHooks: true before destroying the exam.
+    const subjects = await Subject.findAll({ where: { exam: exam.id }, transaction: t });
+    const subjectIds = subjects.map((sub) => sub.id);
+
+    if (subjectIds.length > 0) {
+      await PYQ.destroy({
+        where: { [Op.or]: [{ exam: exam.id }, { subject: { [Op.in]: subjectIds } }] },
+        transaction: t,
+        individualHooks: true,
+      });
+    } else {
+      await PYQ.destroy({ where: { exam: exam.id }, transaction: t, individualHooks: true });
+    }
+
+    // All other dependent records (Subjects, Topics, Quizzes, QuizAttempts,
+    // Notes, Flashcards, Progress, StudyPlan) are covered by onDelete: 'CASCADE'
+    // associations in models/index.js and will be removed automatically.
     // Associations configured with onDelete: 'CASCADE' in models/index.js
     // will automatically clean up Subjects, Topics, Quizzes, QuizAttempts, QuizBookmarks, QuizTelemetryEvents,
     // Notes, Flashcards, Progress, StudyPlans, and PYQs at the DB level.
@@ -95,6 +114,7 @@ exports.deleteExam = async (req, res, next) => {
     next(error);
   }
 };
+
 
 // ==========================================
 // SUBJECTS CONTROLLER

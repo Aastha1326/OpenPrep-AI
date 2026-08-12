@@ -110,12 +110,15 @@ const NotesWidget = ({ limit = 5 }) => {
   const [activeSentenceByNote, setActiveSentenceByNote] = useState({});
   const [flashcardNote, setFlashcardNote] = useState(null);
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
+  const [tagFilter, setTagFilter] = useState('');
 
   const loadNotes = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await API.get('/notes', { params: { limit } });
+      const params = { limit };
+      if (tagFilter.trim()) params.tag = tagFilter.trim();
+      const res = await API.get('/notes', { params });
       const items = res?.data?.data;
       setNotes(Array.isArray(items) ? items : []);
     } catch (err) {
@@ -127,7 +130,7 @@ const NotesWidget = ({ limit = 5 }) => {
 
   useEffect(() => {
     loadNotes();
-  }, [loadNotes]);
+  }, [loadNotes, tagFilter]);
 
   const generateSummary = useCallback(async (noteId) => {
     setSummaries((prev) => ({ ...prev, [noteId]: { loading: true, error: null } }));
@@ -174,6 +177,16 @@ const NotesWidget = ({ limit = 5 }) => {
       </h2>      <p className="text-xs text-neutral-500 italic -mt-2 mb-4">
         Generate a revision summary for a note, or record voice notes to summarize automatically.
       </p>
+
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="Filter by tag (e.g. Important)..."
+          value={tagFilter}
+          onChange={(e) => setTagFilter(e.target.value)}
+          className="w-full px-3 py-1.5 text-sm bg-white border border-neutral-300 rounded focus:outline-none focus:ring-1 focus:ring-yellow-600"
+        />
+      </div>
 
       {loading ? (
         <div className="space-y-3">
@@ -225,6 +238,13 @@ const NotesWidget = ({ limit = 5 }) => {
                       <p className="text-[10px] uppercase tracking-wider font-bold text-amber-800 mt-0.5">
                         {note.subject.name}
                       </p>
+                    )}
+                    {note.tags && note.tags.length > 0 && (
+                      <div className="flex gap-1 mt-1 flex-wrap">
+                        {note.tags.map(t => (
+                          <span key={t} className="text-[9px] bg-neutral-200 text-neutral-700 px-1.5 py-0.5 rounded-sm">#{t}</span>
+                        ))}
+                      </div>
                     )}
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
