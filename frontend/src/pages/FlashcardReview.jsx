@@ -1,12 +1,21 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Brain, ArrowLeft, RotateCw, CheckCircle2, Volume2, VolumeX, AlertCircle, Settings } from 'lucide-react';
-import API from '../services/api';
+import {
+  Brain,
+  ArrowLeft,
+  RotateCw,
+  CheckCircle2,
+  Volume2,
+  VolumeX,
+  AlertCircle,
+  Settings,
+  FileAudio,
+} from 'lucide-react';import API from '../services/api';
 import useVoiceControl from '../hooks/useVoiceControl';
 import VoiceModeToggle from '../components/VoiceModeToggle';
 import AudioWaveform from '../components/AudioWaveform';
-
+import GenerateFlashcardsFromAudioModal from '../components/dashboard/GenerateFlashcardsFromAudioModal';
 const STORAGE_KEY = 'flashcardReviewSession';
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -61,6 +70,7 @@ const FlashcardReview = () => {
   });
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isAudioGeneratorOpen, setIsAudioGeneratorOpen] = useState(false);
   const [modalSettings, setModalSettings] = useState(userSettings);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
@@ -343,7 +353,15 @@ const FlashcardReview = () => {
       clearSession();
     }
   }, [isSessionComplete, noCardsDue]);
-
+{noCardsDue && (
+  <button
+    onClick={() => setIsAudioGeneratorOpen(true)}
+    className="px-6 py-3 bg-primary-600 text-white font-semibold rounded-lg hover:bg-primary-700 transition-colors flex items-center"
+  >
+    <FileAudio className="w-5 h-5 mr-2" />
+    Create from Audio
+  </button>
+)}
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center">
@@ -363,7 +381,17 @@ const FlashcardReview = () => {
       </div>
     );
   }
-
+{isAudioGeneratorOpen && (
+  <GenerateFlashcardsFromAudioModal
+    onClose={() => setIsAudioGeneratorOpen(false)}
+    onImported={async () => {
+      setIsAudioGeneratorOpen(false);
+      setLoading(true);
+      setError(null);
+      await fetchDueCards();
+    }}
+  />
+)}
   // --- Session Summary Screen ---
   if (isSessionComplete || noCardsDue) {
     return (

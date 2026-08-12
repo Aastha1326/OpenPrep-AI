@@ -2,8 +2,9 @@ const express = require('express');
 const {
   generateAIFlashcards,
   generateFlashcardsFromNote,
+  generateFlashcardsFromAudio,
   generateFlashcardsFromYouTube,
-  autoTagFlashcard,
+  autoTagFlashcard,  
   createFlashcard,
   getFlashcards,
   reviewFlashcard,
@@ -21,6 +22,7 @@ const { protect } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
 const { checkQuota } = require('../middleware/quotaMiddleware');
 const flashcardUpload = require('../middleware/flashcardUpload');
+const audioFlashcardUpload = require('../middleware/audioFlashcardUpload');
 const {
 validateGenerateAIFlashcards,
   validateGenerateFlashcardsFromNote,
@@ -255,6 +257,23 @@ router.post(
  *       503:
  *         description: AI service unavailable
  */
+/**
+ * @swagger
+ * /api/flashcards/from-audio:
+ *   post:
+ *     summary: Transcribe an audio lecture and generate preview flashcards
+ *     tags: [Flashcards]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post(
+  '/from-audio',
+  protect,
+  aiLimiter,
+  checkQuota,
+  audioFlashcardUpload.single('audio'),
+  generateFlashcardsFromAudio
+);
 router.post(
   '/from-youtube',
   protect,
