@@ -11,7 +11,7 @@ const Exam = require('../models/Exam');
 const geminiService = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
 const { YoutubeTranscript } = require('youtube-transcript');
-
+const { fromBuffer } = require('file-type');
 /**
  * Extract an 11-character YouTube video ID from common URL formats
  * (watch?v=, youtu.be/, embed/, shorts/).
@@ -194,6 +194,131 @@ if (error instanceof GeminiServerError) {
 // @desc    Extract a YouTube lecture transcript and preview AI-generated flashcards (not saved)
 // @route   POST /api/flashcards/from-youtube
 // @access  Private
+// @desc    Transcribe audio and generate AI flashcards preview
+// @route   POST /api/flashcards/from-audio
+// @access  Private
+exports.generateFlashcardsFromAudio = async (req, res, next) => {
+  try {
+    const { subjectId, topicId, count } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please upload an MP3, WAV, or M4A audio file.',
+      });
+    }
+
+    if (req.file.size === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'The uploaded audio file is empty.',
+      });
+    }
+
+    const detectedType = await fromBuffer(req.file.buffer);
+
+    const validAudioTypes = new Set(['mp3', 'wav', 'm4a']);
+
+    if (!detectedType || !validAudioTypes.has(detectedType.ext)) {
+      return res.status(400).json({
+        success: false,
+        error: 'The audio file could not be read. Please upload a valid MP3, WAV, or M4A file.',
+      });
+    }
+
+    let subjectName = 'General';
+    if (subjectId) {
+      const subject = await Subject.findOne({
+        where: {
+          id: subjectId,
+          user: req.user.id,
+        },
+      });
+
+      if (!subject) {
+        return res.status(404).json({
+          success: false,
+          error: 'Subject not found',
+        });
+      }
+
+      subjectName = subject.name;
+    }
+
+    let topicName = 'Audio Lecture';
+
+    if (topicId) {
+      const topic = await Topic.findOne({
+        where: {
+          id: topicId,
+          user: req.user.id,
+        },
+      });
+
+      if (topic) {
+        topicName = topic.name;
+      }
+    }
+
+    const audioResult = await geminiService.transcribeAndSummarizeAudio(
+      req.file.buffer,
+      req.file.mimetype,
+      subjectName
+    );
+
+    const transcription = audioResult?.transcription?.trim();
+
+    if (
+      !transcription ||
+      transcription.length < 10 ||
+      transcription.toLowerCase().startsWith('unable to transcribe')
+    ) {
+      return res.status(422).json({
+        success: false,
+        error: 'No understandable speech was detected in the audio. Please upload a clear recording with spoken content.',
+      });
+    }
+
+    const cardsList = await geminiService.generateFlashcards(
+      subjectName,
+      topicName,
+      transcription,
+      Math.min(Math.max(parseInt(count, 10) || 6, 1), 20)
+    );
+
+    if (!Array.isArray(cardsList) || cardsList.length === 0) {
+      return res.status(422).json({
+        success: false,
+        error: 'The audio was transcribed, but no useful concepts could be converted into flashcards.',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      count: cardsList.length,
+      subjectId: subjectId || null,
+      transcription,
+      data: cardsList,
+    });
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({
+        success: false,
+        error: error.message,
+      });
+    }
+
+    next(error);
+  }
+};
 exports.generateFlashcardsFromYouTube = async (req, res, next) => {
   try {
     const { youtubeUrl, subjectId, topicId, count } = req.body;

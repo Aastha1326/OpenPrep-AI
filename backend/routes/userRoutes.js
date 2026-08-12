@@ -1,6 +1,11 @@
 const express = require('express');
-const { updateAvatar, deleteAvatar, getQuota } = require('../controllers/userController');
-const { protect } = require('../middleware/auth');
+const {
+  updateAvatar,
+  deleteAvatar,
+  getQuota,
+  getExamCountdownPreferences,
+  updateExamCountdownPreferences,
+} = require('../controllers/userController');const { protect } = require('../middleware/auth');
 const avatarUpload = require('../middleware/avatarUpload');
 
 const router = express.Router();
@@ -92,7 +97,9 @@ const router = express.Router();
 
 // Get remaining daily AI requests quota
 router.get('/quota', protect, getQuota);
-
+// Exam countdown preferences
+router.get('/exam-countdown', protect, getExamCountdownPreferences);
+router.put('/exam-countdown', protect, updateExamCountdownPreferences);
 // Upload/replace the authenticated user's avatar
 router.put('/avatar', protect, avatarUpload.single('avatar'), updateAvatar);
 

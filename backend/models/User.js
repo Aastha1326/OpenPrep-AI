@@ -175,11 +175,19 @@ const User = sequelize.define(
       type: DataTypes.JSONB,
       allowNull: true,
     },
-    dailyReminderTime: {
-      type: DataTypes.STRING,
-      defaultValue: '09:00',
-    },
-    dailyAiUsageCount: {
+dailyReminderTime: {
+  type: DataTypes.STRING,
+  defaultValue: '09:00',
+},
+examCountdownPreferences: {
+  type: DataTypes.JSONB,
+  allowNull: false,
+  defaultValue: {
+    targetExamDate: null,
+    targetScore: null,
+    milestones: [],
+  },
+},    dailyAiUsageCount: {
       type: DataTypes.INTEGER,
       defaultValue: 0,
     },

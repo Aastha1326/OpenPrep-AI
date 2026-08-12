@@ -586,23 +586,17 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             </div>
 
             {/* --- EXAM COUNTDOWN WIDGET --- */}
-            {activePlan?.exam?.date && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.4 }}
-                className="mt-5"
-              >
-                <ExamCountdownWidget
-                  examDate={activePlan.exam.date}
-                  examName={activePlan.exam.name}
-                />
-              </motion.div>
-            )}
-          </div>
-          </motion.div>
-        </motion.div>
-
+<motion.div
+  initial={{ opacity: 0, y: 10 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.5, delay: 0.4 }}
+  className="mt-5"
+>
+  <ExamCountdownWidget
+    examDate={activePlan?.exam?.date}
+    examName={activePlan?.exam?.name}
+  />
+</motion.div>
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
