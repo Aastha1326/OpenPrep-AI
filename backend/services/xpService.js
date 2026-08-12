@@ -1,14 +1,12 @@
 const User = require('../models/User');
 
 function calculateLevel(xp) {
-  // L = Math.floor(xp / 1000) + 1
-  const level = Math.floor(xp / 1000) + 1;
-  return Math.min(50, Math.max(1, level));
+  if (!xp || xp <= 0) return 1;
+  return Math.floor(Math.sqrt(xp / 100)) + 1;
 }
 
 function getNextLevelXP(level) {
-  if (level >= 50) return 50000;
-  return level * 1000;
+  return Math.pow(level, 2) * 100;
 }
 
 async function addXP(userRecord, amount) {

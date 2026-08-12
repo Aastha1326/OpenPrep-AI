@@ -19,6 +19,7 @@ const Achievement = require('./Achievement');
 const FocusSession = require('./FocusSession');
 const QuizTelemetryEvent = require('./QuizTelemetryEvent');
 const QuizBookmark = require('./QuizBookmark');
+const UserBadge = require('./UserBadge');
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -33,6 +34,7 @@ User.hasMany(Progress, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Feedback, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(ActivityLog, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Achievement, { foreignKey: 'userId', as: 'achievements', onDelete: 'CASCADE' });
+User.hasMany(UserBadge, { foreignKey: 'userId', as: 'badgesRef', onDelete: 'CASCADE' });
 
 // Exam associations
 Exam.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
@@ -102,6 +104,9 @@ ActivityLog.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 // Achievement associations
 Achievement.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 
+// UserBadge associations
+UserBadge.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
 // FocusSession associations
 FocusSession.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 
@@ -130,7 +135,8 @@ module.exports = {  sequelize,  User,
   Feedback,
   ActivityLog,
 UsageQuota,
-Achievement,
+  Achievement,
+  UserBadge,
   FocusSession,
   QuizTelemetryEvent,
   QuizBookmark,

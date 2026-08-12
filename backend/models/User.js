@@ -185,6 +185,22 @@ const User = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
+    currentStreak: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+    longestStreak: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+    lastActivityDate: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+    },
+    streakFreezesAvailable: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
   },
   {
     timestamps: true,

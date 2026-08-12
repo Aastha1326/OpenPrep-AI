@@ -248,8 +248,17 @@ exports.toggleTaskCompletion = async (req, res, next) => {
     //   same state    : no change (prevents double-counting)
     let progression = null;
     if (completed && !wasCompleted) {
-      const xpService = require('../services/xpService');
-      progression = await xpService.addXP(req.user, 150);
+      const gamificationService = require('../services/gamificationService');
+      progression = await gamificationService.awardXP(req.user.id, 50, 'task_complete');
+
+      const timezoneOffset = Number(req.headers['x-timezone-offset']) || 0;
+      await gamificationService.updateStreak(req.user.id, timezoneOffset);
+
+      const user = await User.findByPk(req.user.id);
+      const newBadges = await gamificationService.checkAndUnlockBadges(user, 'task_complete', {
+        timezoneOffsetMinutes: timezoneOffset
+      });
+      progression.newBadges = newBadges;
     }
 
     if (studyTimeMinutes) {
