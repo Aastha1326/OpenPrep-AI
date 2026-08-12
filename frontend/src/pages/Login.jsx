@@ -16,6 +16,12 @@ const Login = () => {
 
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
+  
+  // New state for handling 2FA step
+  const [requires2FA, setRequires2FA] = useState(false);
+  const [totpToken, setTotpToken] = useState('');
+  const [verifying2FA, setVerifying2FA] = useState(false);
+  const [twoFaError, setTwoFaError] = useState('');
 
   const [oauthError, setOauthError] = useState(null);
 
@@ -52,9 +58,48 @@ const Login = () => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    dispatch(loginUser(formData));
+    setTwoFaError('');
+    
+    // Dispatch login action
+    const resultAction = await dispatch(loginUser(formData));
+    if (loginUser.fulfilled.match(resultAction)) {
+      // Check if backend indicates 2FA is required
+      if (resultAction.payload?.requires2FA) {
+        setRequires2FA(true);
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
+    }
+  };
+
+  const handleVerify2FA = async (e) => {
+    e.preventDefault();
+    setVerifying2FA(true);
+    setTwoFaError('');
+
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/auth/2fa/verify-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email, token: totpToken }),
+      });
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        localStorage.setItem('token', data.token);
+        if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
+        dispatch(loadUser());
+        navigate('/dashboard', { replace: true });
+      } else {
+        setTwoFaError(data.error || 'Invalid 2FA code or backup code.');
+      }
+    } catch (err) {
+      setTwoFaError('An error occurred during 2FA verification.');
+    } finally {
+      setVerifying2FA(false);
+    }
   };
 
   return (
@@ -91,13 +136,16 @@ const Login = () => {
           <div className="my-auto py-2">
             <div className="mb-6">
               <h1 className="text-2xl sm:text-3xl font-extrabold font-playfair tracking-tight text-[#1F150C] dark:text-[#E1DCC9]">
-                Sign in
+                {requires2FA ? 'Two-Factor Authentication' : 'Sign in'}
               </h1>
               <p className="text-[#412D15] dark:text-[#C4BA9D] mt-1.5 text-xs sm:text-sm font-medium leading-relaxed">
-                Welcome back! Sign in to access your personalized dashboard. Don't have an account?{' '}
-                <Link to="/register" className="font-bold text-[#AD8B73] hover:underline dark:text-[#E1DCC9]">
-                  Sign up here
-                </Link>
+                {requires2FA 
+                  ? 'Please enter the 6-digit code from your authenticator app or a recovery code.'
+                  : <>Welcome back! Sign in to access your personalized dashboard. Don't have an account?{' '}
+                    <Link to="/register" className="font-bold text-[#AD8B73] hover:underline dark:text-[#E1DCC9]">
+                      Sign up here
+                    </Link></>
+                }
               </p>
             </div>
 
@@ -108,81 +156,119 @@ const Login = () => {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Email Address */}
-              <div>
-                <label htmlFor="login-email" className="block text-xs font-bold text-[#1F150C] dark:text-[#E1DCC9] mb-1">
-                  Email address
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8C6A53] dark:text-[#C4BA9D]" />
-                  <input
-                    id="login-email"
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    required
-                    placeholder="Provide your email address"
-                    className="w-full pl-10 pr-4 py-2.5 bg-[#FFFBE9] dark:bg-[#251D17] border border-[#CEAB93] dark:border-[#412D15] rounded-xl text-[#1F150C] dark:text-[#E1DCC9] placeholder-[#8C6A53]/60 dark:placeholder-[#C4BA9D]/40 focus:outline-none focus:ring-2 focus:ring-[#AD8B73] dark:focus:ring-[#E1DCC9] text-xs sm:text-sm transition-all shadow-sm font-medium"
-                  />
-                </div>
-              </div>
-
-              {/* Password */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label htmlFor="login-password" className="block text-xs font-bold text-[#1F150C] dark:text-[#E1DCC9]">
-                    Password
+            {!requires2FA ? (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Email Address */}
+                <div>
+                  <label htmlFor="login-email" className="block text-xs font-bold text-[#1F150C] dark:text-[#E1DCC9] mb-1">
+                    Email address
                   </label>
-                  <Link to="/forgot-password" className="text-xs font-semibold text-[#AD8B73] hover:underline dark:text-[#E1DCC9]">
-                    Forgot password?
-                  </Link>
+                  <div className="relative">
+                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8C6A53] dark:text-[#C4BA9D]" />
+                    <input
+                      id="login-email"
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      required
+                      placeholder="Provide your email address"
+                      className="w-full pl-10 pr-4 py-2.5 bg-[#FFFBE9] dark:bg-[#251D17] border border-[#CEAB93] dark:border-[#412D15] rounded-xl text-[#1F150C] dark:text-[#E1DCC9] placeholder-[#8C6A53]/60 dark:placeholder-[#C4BA9D]/40 focus:outline-none focus:ring-2 focus:ring-[#AD8B73] dark:focus:ring-[#E1DCC9] text-xs sm:text-sm transition-all shadow-sm font-medium"
+                    />
+                  </div>
                 </div>
-                <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8C6A53] dark:text-[#C4BA9D]" />
-                  <input
-                    id="login-password"
-                    type={showPassword ? 'text' : 'password'}
-                    name="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    required
-                    placeholder="Enter your password"
-                    className="w-full pl-10 pr-10 py-2.5 bg-[#FFFBE9] dark:bg-[#251D17] border border-[#CEAB93] dark:border-[#412D15] rounded-xl text-[#1F150C] dark:text-[#E1DCC9] placeholder-[#8C6A53]/60 dark:placeholder-[#C4BA9D]/40 focus:outline-none focus:ring-2 focus:ring-[#AD8B73] dark:focus:ring-[#E1DCC9] text-xs sm:text-sm transition-all shadow-sm font-medium"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#8C6A53] hover:text-[#1F150C] dark:text-[#C4BA9D] dark:hover:text-[#E1DCC9] transition"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
+
+                {/* Password */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label htmlFor="login-password" className="block text-xs font-bold text-[#1F150C] dark:text-[#E1DCC9]">
+                      Password
+                    </label>
+                    <Link to="/forgot-password" className="text-xs font-semibold text-[#AD8B73] hover:underline dark:text-[#E1DCC9]">
+                      Forgot password?
+                    </Link>
+                  </div>
+                  <div className="relative">
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8C6A53] dark:text-[#C4BA9D]" />
+                    <input
+                      id="login-password"
+                      type={showPassword ? 'text' : 'password'}
+                      name="password"
+                      value={formData.password}
+                      onChange={handleChange}
+                      required
+                      placeholder="Enter your password"
+                      className="w-full pl-10 pr-10 py-2.5 bg-[#FFFBE9] dark:bg-[#251D17] border border-[#CEAB93] dark:border-[#412D15] rounded-xl text-[#1F150C] dark:text-[#E1DCC9] placeholder-[#8C6A53]/60 dark:placeholder-[#C4BA9D]/40 focus:outline-none focus:ring-2 focus:ring-[#AD8B73] dark:focus:ring-[#E1DCC9] text-xs sm:text-sm transition-all shadow-sm font-medium"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#8C6A53] hover:text-[#1F150C] dark:text-[#C4BA9D] dark:hover:text-[#E1DCC9] transition"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              {/* Submit CTA */}
-              <motion.button
-                whileHover={{ scale: 1.015 }}
-                whileTap={{ scale: 0.985 }}
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 rounded-xl btn-primary-theme font-bold shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 text-sm mt-2"
-              >
-                {loading ? (
-                  <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  'Sign In'
-                )}
-              </motion.button>
-            </form>
+                {/* Submit CTA */}
+                <motion.button
+                  whileHover={{ scale: 1.015 }}
+                  whileTap={{ scale: 0.985 }}
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3 rounded-xl btn-primary-theme font-bold shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 text-sm mt-2"
+                >
+                  {loading ? (
+                    <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    'Sign In'
+                  )}
+                </motion.button>
+              </form>
+            ) : (
+              <form onSubmit={handleVerify2FA} className="space-y-4">
+                <div>
+                  <label htmlFor="totp-token" className="block text-xs font-bold text-[#1F150C] dark:text-[#E1DCC9] mb-1">
+                    Authentication Code
+                  </label>
+                  <div className="relative">
+                    <ShieldCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8C6A53] dark:text-[#C4BA9D]" />
+                    <input
+                      id="totp-token"
+                      type="text"
+                      maxLength="8"
+                      value={totpToken}
+                      onChange={(e) => setTotpToken(e.target.value)}
+                      required
+                      placeholder="Enter 6-digit code or backup code"
+                      className="w-full pl-10 pr-4 py-2.5 bg-[#FFFBE9] dark:bg-[#251D17] border border-[#CEAB93] dark:border-[#412D15] rounded-xl text-[#1F150C] dark:text-[#E1DCC9] placeholder-[#8C6A53]/60 dark:placeholder-[#C4BA9D]/40 focus:outline-none focus:ring-2 focus:ring-[#AD8B73] dark:focus:ring-[#E1DCC9] text-sm tracking-widest transition-all shadow-sm font-semibold"
+                    />
+                  </div>
+                </div>
 
-            {/* Divider */}
-            <div className="my-4 flex items-center justify-center space-x-2">
-              <span className="h-px w-full bg-[#CEAB93]/50 dark:bg-[#412D15]"></span>
-              <span className="text-[10px] text-[#8C6A53] dark:text-[#C4BA9D] font-bold tracking-wider uppercase">OR</span>
-              <span className="h-px w-full bg-[#CEAB93]/50 dark:bg-[#412D15]"></span>
-            </div>
+                <motion.button
+                  whileHover={{ scale: 1.015 }}
+                  whileTap={{ scale: 0.985 }}
+                  type="submit"
+                  disabled={verifying2FA}
+                  className="w-full py-3 rounded-xl btn-primary-theme font-bold shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 text-sm mt-2"
+                >
+                  {verifying2FA ? (
+                    <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    'Verify Code'
+                  )}
+                </motion.button>
+
+                <button
+                  type="button"
+                  onClick={() => setRequires2FA(false)}
+                  className="w-full text-center text-xs text-[#AD8B73] dark:text-[#C4BA9D] hover:underline font-semibold mt-2"
+                >
+                  Back to standard sign in
+                </button>
+              </form>
+            )}
 
             {/* Social OAuth Buttons */}
             <div className="space-y-3">

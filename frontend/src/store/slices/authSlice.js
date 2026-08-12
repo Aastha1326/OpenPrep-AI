@@ -28,18 +28,23 @@ export const registerUser = createAsyncThunk(
   }
 );
 
-/** Login with email + password. Backend returns { token, refreshToken, user }. */
+/** Login with email + password. Backend returns { token, refreshToken, user } or { requires2FA: true }. */
 export const loginUser = createAsyncThunk(
   'auth/login',
   async (userData, { rejectWithValue }) => {
     try {
       const response = await API.post('/auth/login', userData);
+      
+      // If 2FA is enabled, backend returns requires2FA instead of tokens immediately
+      if (response.data.requires2FA) {
+        return { requires2FA: true, email: userData.email };
+      }
+
       const { token, refreshToken } = response.data;
       localStorage.setItem('token', token);
       localStorage.setItem('refreshToken', refreshToken);
       return response.data;
     } catch (err) {
-      // Pass through the backend error (e.g. "Please verify your email before logging in")
       const message = err.response?.data?.error || 'Login failed';
       const status = err.response?.status;
       return rejectWithValue(status === 403
@@ -309,6 +314,10 @@ const authSlice = createSlice({
       })
       .addCase(loginUser.fulfilled, (state, action) => {
         state.loading = false;
+        if (action.payload.requires2FA) {
+          // Do not set authenticated state yet; waiting for 2FA verification code
+          return;
+        }
         state.isAuthenticated = true;
         state.token = action.payload.token;
         state.refreshToken = action.payload.refreshToken;
