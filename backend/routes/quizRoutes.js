@@ -15,7 +15,7 @@ const {
 } = require('../controllers/quizController');
 const { protect } = require('../middleware/auth');
 const telemetryAuth = require('../middleware/telemetryAuth');const { aiLimiter } = require('../middleware/rateLimiter');
-const { checkQuota } = require('../middleware/quotaMiddleware');
+const { checkAiQuota } = require('../middleware/aiQuotaMiddleware');
 const {
   validateGenerateAIQuiz,
   validateSubmitQuizAttempt,
@@ -103,7 +103,7 @@ const router = express.Router();
  *               $ref: '#/components/schemas/Error'
  */
 
-router.post('/generate-ai', protect, aiLimiter, checkQuota, validateGenerateAIQuiz, generateAIQuiz);
+router.post('/generate-ai', protect, aiLimiter, checkAiQuota, validateGenerateAIQuiz, generateAIQuiz);
 
 /**
  * @swagger
@@ -159,7 +159,7 @@ router.post(
   '/generate-revision-sheet',
   protect,
   aiLimiter,
-  checkQuota,
+  checkAiQuota,
   validateGenerateRevisionSheet,
   generateRevisionSheet
 );
@@ -205,7 +205,7 @@ router.post(
   '/generate-remediation-plan',
   protect,
   aiLimiter,
-  checkQuota,
+  checkAiQuota,
   validateGenerateRemediationPlan,
   generateRemediationPlan
 );

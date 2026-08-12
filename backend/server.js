@@ -230,6 +230,7 @@ app.use('/api/notes', noteRoutes);
 app.use('/api/progress', progressRoutes);
 app.use('/api/community', communityRoutes);
 app.use('/api/users', userRoutes);
+app.get('/api/user/quota', protect, require('./controllers/userController').getQuota);
 app.use('/api/ai', aiRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/analytics', analyticsRoutes);

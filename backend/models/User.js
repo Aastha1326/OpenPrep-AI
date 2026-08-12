@@ -140,6 +140,7 @@ const User = sequelize.define(
     syncGoogleCalendar: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
+    },
     pushSubscription: {
       type: DataTypes.JSONB,
       allowNull: true,
@@ -147,6 +148,14 @@ const User = sequelize.define(
     dailyReminderTime: {
       type: DataTypes.STRING,
       defaultValue: '09:00',
+    },
+    dailyAiUsageCount: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+    lastAiUsageReset: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW,
     },
     xp: {
       type: DataTypes.INTEGER,

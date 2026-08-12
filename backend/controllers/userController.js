@@ -93,3 +93,55 @@ exports.deleteAvatar = async (req, res, next) => {
     next(error);
   }
 };
+
+// ---------------------------------------------------------------------------
+// @desc    Get remaining daily AI requests quota
+// @route   GET /api/users/quota
+// @access  Private
+// ---------------------------------------------------------------------------
+exports.getQuota = async (req, res, next) => {
+  try {
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    const now = new Date();
+    const lastReset = user.lastAiUsageReset ? new Date(user.lastAiUsageReset) : null;
+    const needsReset =
+      !lastReset ||
+      lastReset.getUTCFullYear() !== now.getUTCFullYear() ||
+      lastReset.getUTCMonth() !== now.getUTCMonth() ||
+      lastReset.getUTCDate() !== now.getUTCDate();
+
+    if (needsReset) {
+      user.dailyAiUsageCount = 0;
+      user.lastAiUsageReset = now;
+      await user.save();
+    }
+
+    const TIER_LIMITS = {
+      student: 15,
+      contributor: 50,
+      admin: 100,
+      premium: 100,
+      default: 15,
+    };
+
+    const limit = TIER_LIMITS[user.role] || TIER_LIMITS.default;
+    const remaining = Math.max(0, limit - user.dailyAiUsageCount);
+    const tomorrowUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+    const secondsUntilReset = Math.ceil((tomorrowUTC.getTime() - now.getTime()) / 1000);
+
+    res.status(200).json({
+      success: true,
+      limit,
+      remaining,
+      used: user.dailyAiUsageCount,
+      secondsUntilReset,
+      resetTime: tomorrowUTC.toISOString(),
+    });
+  } catch (error) {
+    next(error);
+  }
+};

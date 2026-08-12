@@ -2,7 +2,7 @@ const express = require('express');
 const { explainQuestion, chatWithAssistant } = require('../controllers/aiController');
 const { protect } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
-const { checkQuota } = require('../middleware/quotaMiddleware');
+const { checkAiQuota } = require('../middleware/aiQuotaMiddleware');
 const { validateExplainQuestion } = require('../middleware/validators');
 
 const router = express.Router();
@@ -128,7 +128,7 @@ router.post(
   '/explain-question',
   protect,
   aiLimiter,
-  checkQuota,
+  checkAiQuota,
   validateExplainQuestion,
   explainQuestion
 );
@@ -137,7 +137,7 @@ router.post(
   '/chat',
   protect,
   aiLimiter,
-  checkQuota,
+  checkAiQuota,
   chatWithAssistant
 );
 

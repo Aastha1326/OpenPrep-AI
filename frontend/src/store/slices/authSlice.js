@@ -211,6 +211,8 @@ const initialState = {
   error: null,
   message: null,
   sessionExpired: false,
+  aiQuotaExceededUntil: null,
+  aiQuotaErrorMsg: null,
 };
 
 // ── Slice ──
@@ -241,6 +243,12 @@ const authSlice = createSlice({
     },
     clearSessionExpired: (state) => {
       state.sessionExpired = false;
+    },
+    setAiQuotaExceededUntil: (state, action) => {
+      state.aiQuotaExceededUntil = action.payload;
+    },
+    setAiQuotaErrorMsg: (state, action) => {
+      state.aiQuotaErrorMsg = action.payload;
     },
     checkTokenFreshness: (state) => {
       const token = localStorage.getItem('token');
@@ -466,5 +474,14 @@ const authSlice = createSlice({
   },
 });
 
-export const { logout, clearError, clearMessage, clearRegistrationSuccess, clearSessionExpired, checkTokenFreshness } = authSlice.actions;
+export const {
+  logout,
+  clearError,
+  clearMessage,
+  clearRegistrationSuccess,
+  clearSessionExpired,
+  checkTokenFreshness,
+  setAiQuotaExceededUntil,
+  setAiQuotaErrorMsg,
+} = authSlice.actions;
 export default authSlice.reducer;
