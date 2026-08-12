@@ -601,7 +601,6 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             )}
           </div>
           </motion.div>
-        </motion.div>
 
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
@@ -688,7 +687,6 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             </button>
             <ThemeToggle />
           </motion.div>
-        </motion.div>
         </div>
 
         {/* --- TARGET EXAM COMPOSITE BUNDLE OVERVIEW --- */}
@@ -1321,7 +1319,6 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           </motion.div>
         )}
       </AnimatePresence>
-      </div>
 
       {/* --- SKILL TREE MODAL --- */}
       <AnimatePresence>
@@ -1386,12 +1383,13 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
         description={activeBadgeUnlock?.description}
         onClose={() => setActiveBadgeUnlock(null)}
       />
+
+      {/* --- SECURITY SETTINGS (2FA) --- */}
+      <div className="my-6">
+        <SecuritySettings />
+      </div>
     </LeatherBoard>
   );
 };
-{/* --- SECURITY SETTINGS (2FA) --- */}
-<div className="my-6">
-  <SecuritySettings />
-</div>
 
 export default Dashboard;
