@@ -49,6 +49,24 @@ const User = sequelize.define(
       allowNull: true,
       unique: true,
     },
+    googleId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      unique: true,
+    },
+    githubId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      unique: true,
+    },
+    avatarUrl: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    authProvider: {
+      type: DataTypes.ENUM('local', 'google', 'github'),
+      defaultValue: 'local',
+    },
     streakCount: {
       type: DataTypes.INTEGER,
       defaultValue: 0,
@@ -206,7 +224,7 @@ const User = sequelize.define(
     timestamps: true,
     hooks: {
       beforeSave: async (user) => {
-        if (user.changed('password')) {
+        if (user.changed('password') && user.password) {
           const salt = await bcrypt.genSalt(10);
           user.password = await bcrypt.hash(user.password, salt);
         }
@@ -217,6 +235,7 @@ const User = sequelize.define(
 
 // Match user entered password to hashed password in database
 User.prototype.matchPassword = async function (enteredPassword) {
+  if (!this.password) return false;
   return await bcrypt.compare(enteredPassword, this.password);
 };
 

@@ -916,3 +916,81 @@ exports.resetSM2Settings = async (req, res, next) => {
   }
 };
 
+exports.oauthSuccessCallback = async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      const frontendBase = process.env.FRONTEND_URL || 'http://localhost:5173';
+      return res.redirect(`${frontendBase.replace(/\/$/, '')}/login?error=oauth_failed`);
+    }
+
+    if (user.isTemp) {
+      const frontendBase = process.env.FRONTEND_URL || 'http://localhost:5173';
+      return res.redirect(
+        `${frontendBase.replace(/\/$/, '')}/oauth-callback?prompt_email=true&githubId=${user.githubId}&name=${encodeURIComponent(user.name)}&avatarUrl=${encodeURIComponent(user.avatarUrl || '')}`
+      );
+    }
+
+    const accessToken = generateAccessToken(user.id);
+    const refreshResult = await generateRefreshToken(user);
+    const refreshToken = refreshResult.rawToken;
+    setRefreshTokenCookie(res, refreshToken);
+
+    const frontendBase = process.env.FRONTEND_URL || 'http://localhost:5173';
+    res.redirect(`${frontendBase.replace(/\/$/, '')}/oauth-callback?token=${accessToken}`);
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.registerOAuthEmail = async (req, res, next) => {
+  try {
+    const { email, githubId, name, avatarUrl } = req.body;
+    if (!email || !githubId) {
+      return res.status(400).json({ success: false, error: 'Email and GitHub ID are required.' });
+    }
+
+    let user = await User.findOne({ where: { githubId } });
+    if (!user) {
+      user = await User.findOne({ where: { email } });
+      if (user) {
+        user.githubId = githubId;
+        user.authProvider = 'github';
+        user.avatarUrl = avatarUrl || user.avatarUrl;
+        await user.save();
+      } else {
+        user = await User.create({
+          name: name || 'GitHub User',
+          email,
+          githubId,
+          authProvider: 'github',
+          avatarUrl,
+          isEmailVerified: true,
+          password: null,
+        });
+      }
+    }
+
+    const accessToken = generateAccessToken(user.id);
+    const refreshResult = await generateRefreshToken(user);
+    const refreshToken = refreshResult.rawToken;
+    setRefreshTokenCookie(res, refreshToken);
+
+    res.status(200).json({
+      success: true,
+      token: accessToken,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatarUrl: user.avatarUrl,
+        authProvider: user.authProvider,
+        isEmailVerified: user.isEmailVerified,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
