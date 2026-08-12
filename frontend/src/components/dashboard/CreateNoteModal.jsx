@@ -13,6 +13,7 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
   const [content, setContent] = useState('');
   const [subjects, setSubjects] = useState([]);
   const [subjectId, setSubjectId] = useState('');
+  const [tags, setTags] = useState('');
   const [noteId, setNoteId] = useState(null);
   const [autosaveStatus, setAutosaveStatus] = useState('');
   const [loading, setLoading] = useState(false);
@@ -48,6 +49,7 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
       setContent('');
       setNoteId(null);
       setAutosaveStatus('');
+      setTags('');
       lastSavedTitle.current = '';
       lastSavedContent.current = '';
       setActiveTab('write');
@@ -83,6 +85,7 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
           formData.append('title', title);
           formData.append('content', content);
           formData.append('subjectId', subjectId);
+          if (tags.trim()) formData.append('tags', tags);
 
           const response = await API.post('/notes', formData, {
             isBackground: true,
@@ -110,6 +113,7 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
             title,
             content,
             subjectId,
+            tags: tags ? tags.split(',').map(t => t.trim()) : [],
           }, {
             isBackground: true,
           });
@@ -162,12 +166,14 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
           title,
           content,
           subjectId,
+          tags: tags ? tags.split(',').map(t => t.trim()) : [],
         });
       } else {
         const formData = new FormData();
         formData.append('title', title);
         formData.append('content', content);
         formData.append('subjectId', subjectId);
+        if (tags.trim()) formData.append('tags', tags);
 
         response = await API.post('/notes', formData, {
           headers: {
@@ -295,6 +301,25 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="Enter note title..."
+                    className="w-full px-4 py-2 bg-white border border-neutral-300 rounded focus:outline-none focus:ring-2 focus:ring-yellow-600 focus:border-transparent transition-all"
+                    disabled={loading}
+                  />
+                </div>
+
+                {/* Tags */}
+                <div>
+                  <label
+                    htmlFor="tags"
+                    className="block text-sm font-semibold text-neutral-700 mb-1"
+                  >
+                    Tags (comma separated)
+                  </label>
+                  <input
+                    id="tags"
+                    type="text"
+                    value={tags}
+                    onChange={(e) => setTags(e.target.value)}
+                    placeholder="e.g. Important, Formulas, Exam2026"
                     className="w-full px-4 py-2 bg-white border border-neutral-300 rounded focus:outline-none focus:ring-2 focus:ring-yellow-600 focus:border-transparent transition-all"
                     disabled={loading}
                   />
