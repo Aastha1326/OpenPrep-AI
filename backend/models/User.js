@@ -1,7 +1,6 @@
-const { DataTypes } = require('sequelize');
-const { sequelize } = require('../config/db');
-const bcrypt = require('bcryptjs');
-const crypto = require('crypto');
+import speakeasy from 'speakeasy';
+import QRCode from 'qrcode';
+import crypto from 'crypto';
 
 const User = sequelize.define(
   'User',
@@ -111,6 +110,18 @@ const User = sequelize.define(
     },
     resetPasswordExpire: {
       type: DataTypes.DATE,
+    },
+    resetPasswordOtpHash: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    resetPasswordOtpExpires: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    resetPasswordAttempts: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
     },
     refreshTokens: {
       type: DataTypes.JSONB,
@@ -239,18 +250,9 @@ User.prototype.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// Generate and hash reset/verification tokens
-User.prototype.generateToken = function (field) {
-  const token = crypto.randomBytes(32).toString('hex');
-  const hashed = crypto.createHash('sha256').update(token).digest('hex');
-  if (field === 'resetPassword') {
-    this.resetPasswordToken = hashed;
-    this.resetPasswordExpire = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-  } else if (field === 'emailVerification') {
-    this.emailVerificationToken = hashed;
-    this.emailVerificationExpire = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    const qrCodeUrl = await QRCode.toDataURL(secret.otpauth_url);
+    res.status(200).json({ success: true, secret: secret.base32, qrCodeUrl, backupCodes });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
-  return token;
 };
-
-module.exports = User;
