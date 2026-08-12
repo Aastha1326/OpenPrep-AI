@@ -312,9 +312,21 @@ const io = new Server(server, {
 require('./sockets/battleHandler')(io);
 require('./sockets/chatHandler')(io);
 
-// Start weekly digest background scheduler
+// User notification room listener
+io.on('connection', (socket) => {
+  socket.on('join_user_room', (userId) => {
+    if (userId) {
+      socket.join(`user:${userId}`);
+    }
+  });
+});
+
+// Start background schedulers
 const { startScheduler } = require('./services/weeklyDigestService');
 startScheduler();
+
+const { initStudyReminderCron } = require('./jobs/studyReminderCron');
+initStudyReminderCron(io);
 
 if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   server.listen(PORT, () => {

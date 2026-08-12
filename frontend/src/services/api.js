@@ -202,4 +202,9 @@ API.interceptors.response.use(
   }
 );
 
+export const getNotifications = () => API.get('/notifications');
+export const markNotificationRead = (id) => API.patch(`/notifications/${id}/read`);
+export const markAllNotificationsRead = () => API.patch('/notifications/read-all');
+export const subscribePushNotifications = (payload) => API.post('/notifications/subscribe-push', payload);
+
 export default API;
