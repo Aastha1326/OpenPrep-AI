@@ -49,6 +49,7 @@ const aiRoutes = require('./routes/aiRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const calendarRoutes = require('./routes/calendarRoutes');
 const gamificationRoutes = require('./routes/gamificationRoutes');
+const battleRoutes = require('./routes/battleRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 initNotificationCron();
@@ -237,6 +238,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/gamification', gamificationRoutes);
+app.use('/api/battles', battleRoutes);
 
 // Base Route
 app.get('/', (req, res) => {

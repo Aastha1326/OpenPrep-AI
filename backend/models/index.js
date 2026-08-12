@@ -20,6 +20,8 @@ const FocusSession = require('./FocusSession');
 const QuizTelemetryEvent = require('./QuizTelemetryEvent');
 const QuizBookmark = require('./QuizBookmark');
 const UserBadge = require('./UserBadge');
+const BattleSession = require('./BattleSession');
+const BattleParticipant = require('./BattleParticipant');
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -121,6 +123,18 @@ QuizBookmark.belongsTo(Quiz, { foreignKey: 'quiz', as: 'quizRef', onDelete: 'CAS
 User.hasMany(QuizBookmark, { foreignKey: 'user', onDelete: 'CASCADE' });
 Quiz.hasMany(QuizBookmark, { foreignKey: 'quiz', onDelete: 'CASCADE' });
 
+// BattleSession and BattleParticipant associations
+User.hasMany(BattleSession, { foreignKey: 'hostUserId', onDelete: 'CASCADE' });
+BattleSession.belongsTo(User, { foreignKey: 'hostUserId', as: 'hostRef' });
+
+BattleSession.hasMany(BattleParticipant, { foreignKey: 'battleId', onDelete: 'CASCADE' });
+BattleParticipant.belongsTo(BattleSession, { foreignKey: 'battleId', as: 'battleRef' });
+
+User.hasMany(BattleParticipant, { foreignKey: 'userId', onDelete: 'CASCADE' });
+BattleParticipant.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+BattleSession.belongsTo(Quiz, { foreignKey: 'quizId', as: 'quizRef', onDelete: 'SET NULL' });
+
 module.exports = {  sequelize,  User,
   Exam,
   Subject,
@@ -140,4 +154,6 @@ UsageQuota,
   FocusSession,
   QuizTelemetryEvent,
   QuizBookmark,
+  BattleSession,
+  BattleParticipant,
 };
