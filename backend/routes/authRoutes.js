@@ -16,9 +16,8 @@ const {
   updateSettings,
   updateSM2Settings,
   resetSM2Settings,
-  setup2FA,
-  verifyAndEnable2FA,
-  verifyLogin2FA,
+  oauthSuccessCallback,
+  registerOAuthEmail,
 } = require('../controllers/authController');
 
 const { protect } = require('../middleware/auth');
@@ -181,15 +180,21 @@ router.get('/google', passport.authenticate('google', { scope: ['profile', 'emai
 router.get(
   '/google/callback',
   passport.authenticate('google', { failureRedirect: '/login', session: false }),
-  googlePassportCallback
+  oauthSuccessCallback
 );
 
-// Two-Factor Authentication (2FA) Routes
-router.post('/2fa/setup', protect, setup2FA);
-router.post('/2fa/verify-setup', protect, verifyAndEnable2FA);
-router.post('/2fa/verify-login', loginLimiter, verifyLogin2FA);
+// OAuth2 GitHub routes
+router.get('/github', passport.authenticate('github', { scope: ['user:email'] }));
+router.get(
+  '/github/callback',
+  passport.authenticate('github', { failureRedirect: '/login', session: false }),
+  oauthSuccessCallback
+);
 
-// User settings and SM-2 parameter routes
+// Finalize OAuth registration (e.g. if email was private/missing)
+router.post('/oauth/register-email', registerOAuthEmail);
+
+// User settings routes
 router.patch('/settings', protect, updateSettings);
 router.put('/sm2-settings', protect, updateSM2Settings);
 router.post('/sm2-settings/reset', protect, resetSM2Settings);

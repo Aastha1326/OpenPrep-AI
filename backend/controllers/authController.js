@@ -133,3 +133,180 @@ exports.verifyLogin2FA = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Update SM-2 parameters
+// @route   PUT /api/auth/sm2-settings
+// @access  Private
+exports.updateSM2Settings = async (req, res, next) => {
+  try {
+    const { sm2EasyFactorModifier, sm2IntervalModifier, sm2Step1Interval, sm2Step2Interval } = req.body;
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    if (sm2EasyFactorModifier !== undefined) {
+      user.sm2EasyFactorModifier = sm2EasyFactorModifier;
+    }
+    if (sm2IntervalModifier !== undefined) {
+      user.sm2IntervalModifier = sm2IntervalModifier;
+    }
+    if (sm2Step1Interval !== undefined) {
+      user.sm2Step1Interval = sm2Step1Interval;
+    }
+    if (sm2Step2Interval !== undefined) {
+      user.sm2Step2Interval = sm2Step2Interval;
+    }
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar || '',
+        leaderboardVisible: user.leaderboardVisible,
+        receiveWeeklyDigest: user.receiveWeeklyDigest,
+        sm2EasyFactorModifier: user.sm2EasyFactorModifier,
+        sm2IntervalModifier: user.sm2IntervalModifier,
+        sm2Step1Interval: user.sm2Step1Interval,
+        sm2Step2Interval: user.sm2Step2Interval,
+        streak: {
+          count: user.streakCount,
+          lastActive: user.streakLastActive,
+        },
+        studyHours: user.studyHours,
+        isEmailVerified: user.isEmailVerified,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Reset SM-2 parameters
+// @route   POST /api/auth/sm2-settings/reset
+// @access  Private
+exports.resetSM2Settings = async (req, res, next) => {
+  try {
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    user.sm2EasyFactorModifier = 1.0;
+    user.sm2IntervalModifier = 1.0;
+    user.sm2Step1Interval = 1;
+    user.sm2Step2Interval = 6;
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Reset to default parameters successfully!',
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar || '',
+        leaderboardVisible: user.leaderboardVisible,
+        receiveWeeklyDigest: user.receiveWeeklyDigest,
+        sm2EasyFactorModifier: user.sm2EasyFactorModifier,
+        sm2IntervalModifier: user.sm2IntervalModifier,
+        sm2Step1Interval: user.sm2Step1Interval,
+        sm2Step2Interval: user.sm2Step2Interval,
+        streak: {
+          count: user.streakCount,
+          lastActive: user.streakLastActive,
+        },
+        studyHours: user.studyHours,
+        isEmailVerified: user.isEmailVerified,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.oauthSuccessCallback = async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      const frontendBase = process.env.FRONTEND_URL || 'http://localhost:5173';
+      return res.redirect(`${frontendBase.replace(/\/$/, '')}/login?error=oauth_failed`);
+    }
+
+    if (user.isTemp) {
+      const frontendBase = process.env.FRONTEND_URL || 'http://localhost:5173';
+      return res.redirect(
+        `${frontendBase.replace(/\/$/, '')}/oauth-callback?prompt_email=true&githubId=${user.githubId}&name=${encodeURIComponent(user.name)}&avatarUrl=${encodeURIComponent(user.avatarUrl || '')}`
+      );
+    }
+
+    const accessToken = generateAccessToken(user.id);
+    const refreshResult = await generateRefreshToken(user);
+    const refreshToken = refreshResult.rawToken;
+    setRefreshTokenCookie(res, refreshToken);
+
+    const frontendBase = process.env.FRONTEND_URL || 'http://localhost:5173';
+    res.redirect(`${frontendBase.replace(/\/$/, '')}/oauth-callback?token=${accessToken}`);
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.registerOAuthEmail = async (req, res, next) => {
+  try {
+    const { email, githubId, name, avatarUrl } = req.body;
+    if (!email || !githubId) {
+      return res.status(400).json({ success: false, error: 'Email and GitHub ID are required.' });
+    }
+
+    let user = await User.findOne({ where: { githubId } });
+    if (!user) {
+      user = await User.findOne({ where: { email } });
+      if (user) {
+        user.githubId = githubId;
+        user.authProvider = 'github';
+        user.avatarUrl = avatarUrl || user.avatarUrl;
+        await user.save();
+      } else {
+        user = await User.create({
+          name: name || 'GitHub User',
+          email,
+          githubId,
+          authProvider: 'github',
+          avatarUrl,
+          isEmailVerified: true,
+          password: null,
+        });
+      }
+    }
+
+    const accessToken = generateAccessToken(user.id);
+    const refreshResult = await generateRefreshToken(user);
+    const refreshToken = refreshResult.rawToken;
+    setRefreshTokenCookie(res, refreshToken);
+
+    res.status(200).json({
+      success: true,
+      token: accessToken,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatarUrl: user.avatarUrl,
+        authProvider: user.authProvider,
+        isEmailVerified: user.isEmailVerified,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

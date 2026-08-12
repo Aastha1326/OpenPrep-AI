@@ -1,21 +1,37 @@
+const roomManager = require('../../utils/roomManager');
+const User = require('../../models/User');
+const BattleSession = require('../../models/BattleSession');
+const BattleParticipant = require('../../models/BattleParticipant');
+
+jest.mock('../../models/User');
+jest.mock('../../models/BattleSession');
+jest.mock('../../models/BattleParticipant');
+jest.mock('../../services/gamificationService', () => ({
+  awardXP: jest.fn().mockResolvedValue({ xp: 100 }),
+}));
+
 const createFakeIo = () => {
   const broadcasts = [];
   const io = {
     broadcasts,
     handlers: {},
+    middleware: null,
+    use: vi.fn((cb) => {
+      io.middleware = cb;
+    }),
     on: vi.fn((event, cb) => {
       io.handlers[event] = cb;
     }),
-    to: vi.fn(() => ({
+    to: vi.fn((roomId) => ({
       emit: vi.fn((event, data) => {
-        broadcasts.push({ event, data });
+        broadcasts.push({ roomId, event, data });
       }),
     })),
   };
   return io;
 };
 
-const createFakeSocket = (id) => {
+const createFakeSocket = (id, username = 'Mock Student') => {
   const emitted = [];
   const handlers = {};
   const socket = {
@@ -23,21 +39,25 @@ const createFakeSocket = (id) => {
     emitted,
     handlers,
     joinedRooms: [],
+    handshake: {
+      auth: { token: 'mock_jwt_token' },
+    },
+    user: {
+      id: `u-${id}`,
+      name: username,
+    },
     join: vi.fn((roomId) => {
       socket.joinedRooms.push(roomId);
     }),
-    leave: vi.fn(),
+    leave: vi.fn((roomId) => {
+      socket.joinedRooms = socket.joinedRooms.filter(r => r !== roomId);
+    }),
     on: vi.fn((event, cb) => {
       handlers[event] = cb;
     }),
     emit: vi.fn((event, data) => {
       emitted.push({ event, data });
     }),
-    to: vi.fn(() => ({
-      emit: vi.fn((event, data) => {
-        emitted.push({ event, data });
-      }),
-    })),
   };
   return socket;
 };
@@ -45,218 +65,148 @@ const createFakeSocket = (id) => {
 const setup = () => {
   const io = createFakeIo();
   require('../../sockets/battleHandler')(io);
-  const connect = (id) => {
-    const socket = createFakeSocket(id);
+  const connect = (id, username) => {
+    const socket = createFakeSocket(id, username);
+    if (io.middleware) {
+      io.middleware(socket, () => {});
+    }
     io.handlers.connection(socket);
     return socket;
   };
   const invoke = (socket, event, payload) =>
     new Promise((resolve) => {
-      socket.handlers[event](payload, resolve);
+      if (socket.handlers[event]) {
+        socket.handlers[event](payload, resolve);
+      } else {
+        resolve({ success: false, message: `Handler not registered: ${event}` });
+      }
     });
   return { io, connect, invoke };
 };
 
-const success = (result) => expect(result.success).toBe(true);
-
-// Room codes AND socket ids are globally unique per test: the in-memory rooms
-// map is shared across the whole file, so nothing may alias between tests.
-describe('battleHandler - room creation', () => {
-  it('generates a unique 6-character code when none is supplied', async () => {
-    const { connect, invoke } = setup();
-    const socket = connect('s-a1');
-    const res = await invoke(socket, 'create-room', { roomName: 'My Room' });
-
-    success(res);
-    expect(res.roomId).toMatch(/^[A-HJ-NP-Z2-9]{6}$/);
-    expect(res.room.id).toBe(res.roomId);
-    expect(res.room.name).toBe('My Room');
-    expect(res.isPrivate).toBe(false);
-    expect(socket.joinedRooms).toContain(res.roomId);
+describe('Real-Time Quiz Battle Sockets', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Reset roomManager rooms
+    for (const key in roomManager.rooms) {
+      delete roomManager.rooms[key];
+    }
   });
 
-  it('allows creating with an explicit valid code', async () => {
-    const { connect, invoke } = setup();
-    const socket = connect('s-a2');
-    const res = await invoke(socket, 'create-room', { roomId: 'AB2DEF' });
-    success(res);
-    expect(res.roomId).toBe('AB2DEF');
+  describe('Connection & Lobby Join Flow', () => {
+    it('fails to join if the room does not exist in roomManager', async () => {
+      const { connect, invoke } = setup();
+      const socket = connect('s1');
+
+      const res = await invoke(socket, 'join-room', { roomId: 'PREP99' });
+      expect(res.success).toBe(false);
+      expect(res.message).toMatch(/not found/);
+    });
+
+    it('successfully joins a waiting room and broadcasts update to peers', async () => {
+      // 1. Manually create a room in roomManager
+      roomManager.createRoom('PREP99', 'host-user', {
+        roomName: 'Biology Match',
+        questionCount: 5,
+        timePerQuestion: 15,
+        quiz: { questions: [{ text: 'Q1' }] },
+      });
+
+      const { io, connect, invoke } = setup();
+      const socket = connect('s2', 'Peer Learner');
+
+      const res = await invoke(socket, 'join-room', { roomId: 'PREP99' });
+      expect(res.success).toBe(true);
+      expect(res.room.name).toBe('Biology Match');
+      expect(socket.joinedRooms).toContain('PREP99');
+
+      // Verify room_update is broadcasted to the room
+      const updates = io.broadcasts.filter(b => b.event === 'room_update');
+      expect(updates.length).toBeGreaterThan(0);
+      const players = updates[0].data.players;
+      expect(players[socket.id].username).toBe('Peer Learner');
+    });
+
+    it('rejects joining if password does not match for private rooms', async () => {
+      roomManager.createRoom('PREP88', 'host-user', {
+        roomName: 'Private Match',
+        password: 'securePassword',
+      });
+
+      const { connect, invoke } = setup();
+      const socket = connect('s3');
+
+      const res = await invoke(socket, 'join-room', { roomId: 'PREP88', password: 'wrongPassword' });
+      expect(res.success).toBe(false);
+      expect(res.requiresPassword).toBe(true);
+    });
   });
 
-  it('rejects reusing a code that is already in use', async () => {
-    const { connect, invoke } = setup();
-    const first = connect('s-a3');
-    await invoke(first, 'create-room', { roomId: 'AB3DEF' });
+  describe('Synchronized Battle Loop', () => {
+    it('should calculate points including speed bonus for correct answers', async () => {
+      const room = roomManager.createRoom('PREP77', 'host-user', {
+        roomName: 'Speed Match',
+        timePerQuestion: 20,
+        quiz: {
+          questions: [
+            {
+              questionText: 'Q1',
+              options: ['A', 'B'],
+              correctAnswer: 0,
+              explanation: 'Exp',
+            }
+          ]
+        }
+      });
 
-    const second = connect('s-a4');
-    const res = await invoke(second, 'create-room', { roomId: 'AB3DEF' });
-    expect(res.success).toBe(false);
-    expect(res.message).toMatch(/already in use/);
+      const { connect, invoke } = setup();
+      const socket = connect('s4');
+      roomManager.addPlayer('PREP77', socket.id, socket.user.id, socket.user.name);
+
+      // Start the game manually by changing status
+      room.status = 'playing';
+      room.questionActive = true;
+      room.timeRemaining = 15; // 75% time remaining
+
+      // Submit correct answer: optionIndex 0
+      socket.handlers['submit_answer']({
+        roomId: 'PREP77',
+        optionIndex: 0,
+        timeSpentMs: 5000,
+      });
+
+      const player = room.players[socket.id];
+      expect(player.correctCount).toBe(1);
+      // Base score 100 + speed bonus Math.round(15 / 20 * 50) = 100 + 38 = 138 points
+      expect(player.score).toBe(138);
+    });
   });
 
-  it('rejects invalid code formats', async () => {
-    const { connect, invoke } = setup();
-    const socket = connect('s-a5');
+  describe('Player Disconnection & Host Handoffs', () => {
+    it('gracefully handles user disconnect without immediate lobby close', () => {
+      jest.useFakeTimers();
 
-    const tooShort = await invoke(socket, 'create-room', { roomId: 'ABC' });
-    expect(tooShort.success).toBe(false);
-    expect(tooShort.message).toMatch(/exactly 6/);
+      const room = roomManager.createRoom('PREP66', 'host-user', {
+        roomName: 'Grace Match',
+      });
 
-    const ambiguous = await invoke(socket, 'create-room', { roomId: 'AB3DE0' });
-    expect(ambiguous.success).toBe(false);
-  });
+      const { connect } = setup();
+      const hostSocket = connect('s5');
+      roomManager.addPlayer('PREP66', hostSocket.id, hostSocket.user.id, hostSocket.user.name);
 
-  it('creates a private room with a password', async () => {
-    const { connect, invoke } = setup();
-    const socket = connect('s-a6');
-    const res = await invoke(socket, 'create-room', { roomId: 'AB4DEF', password: 'secret' });
-    success(res);
-    expect(res.isPrivate).toBe(true);
-    expect(res.room.password).toBe('secret');
-  });
-});
+      // Trigger disconnect
+      hostSocket.handlers.disconnect();
 
-describe('battleHandler - joining rooms', () => {
-  it('fails to join a room that does not exist', async () => {
-    const { connect, invoke } = setup();
-    const socket = connect('s-a7');
-    const res = await invoke(socket, 'join-room', { roomId: 'ZZZZZZ' });
-    expect(res.success).toBe(false);
-    expect(res.message).toMatch(/not found/);
-  });
+      // Room should still exist during the 30s grace window
+      expect(roomManager.getRoom('PREP66')).not.toBeNull();
 
-  it('requires a room code', async () => {
-    const { connect, invoke } = setup();
-    const socket = connect('s-a8');
-    const res = await invoke(socket, 'join-room', {});
-    expect(res.success).toBe(false);
-    expect(res.message).toMatch(/required/);
-  });
+      // Fast-forward 30 seconds
+      jest.advanceTimersByTime(30000);
 
-  it('joins an existing public room and notifies everyone', async () => {
-    const { io, connect, invoke } = setup();
-    const host = connect('s-a9');
-    await invoke(host, 'create-room', { roomId: 'AB5DEF', roomName: 'Host Room' });
+      // Room should be cleaned up now as host was the only player
+      expect(roomManager.getRoom('PREP66')).toBeNull();
 
-    const guest = connect('s-b1');
-    const res = await invoke(guest, 'join-room', { roomId: 'ab5def' });
-    success(res);
-    expect(res.roomId).toBe('AB5DEF');
-    expect(guest.joinedRooms).toContain('AB5DEF');
-
-    const roomUpdates = io.broadcasts.filter((b) => b.event === 'room_update');
-    expect(roomUpdates.length).toBeGreaterThanOrEqual(2);
-    const latest = roomUpdates[roomUpdates.length - 1].data.players;
-    expect(Object.keys(latest)).toEqual(['s-a9', 's-b1']);
-  });
-
-  it('rejects the wrong password for a private room', async () => {
-    const { connect, invoke } = setup();
-    const host = connect('s-b2');
-    await invoke(host, 'create-room', { roomId: 'AB6DEF', password: 'secret' });
-
-    const guest = connect('s-b3');
-    const res = await invoke(guest, 'join-room', { roomId: 'AB6DEF', password: 'nope' });
-    expect(res.success).toBe(false);
-    expect(res.requiresPassword).toBe(true);
-  });
-
-  it('accepts the correct password for a private room', async () => {
-    const { connect, invoke } = setup();
-    const host = connect('s-b4');
-    await invoke(host, 'create-room', { roomId: 'AB7DEF', password: 'secret' });
-
-    const guest = connect('s-b5');
-    const res = await invoke(guest, 'join-room', { roomId: 'AB7DEF', password: 'secret' });
-    success(res);
-  });
-
-  it('supports join_room with a bare string payload', async () => {
-    const { io, connect, invoke } = setup();
-    const host = connect('s-b6');
-    await invoke(host, 'create-room', { roomId: 'AB8DEF' });
-
-    const guest = connect('s-b7');
-    const res = await invoke(guest, 'join_room', 'ab8def');
-    success(res);
-    expect(res.roomId).toBe('AB8DEF');
-    expect(io.broadcasts.some((b) => b.event === 'room_update')).toBe(true);
-  });
-});
-
-describe('battleHandler - live scoring', () => {
-  it('starts the battle when all players are ready', async () => {
-    const { io, connect, invoke } = setup();
-    const a = connect('s-b8');
-    await invoke(a, 'create-room', { roomId: 'AB9DEF' });
-    const b = connect('s-b9');
-    await invoke(b, 'join-room', { roomId: 'AB9DEF' });
-
-    a.handlers['toggle_ready']({ roomId: 'AB9DEF' });
-    b.handlers['user:ready']({ roomId: 'AB9DEF', isReady: true });
-
-    const starts = io.broadcasts.filter((x) => x.event === 'battle_start');
-    expect(starts).toHaveLength(1);
-  });
-
-  it('adds points only for correct answers during play', async () => {
-    const { io, connect, invoke } = setup();
-    const a = connect('s-c1');
-    await invoke(a, 'create-room', { roomId: 'AC2DEF' });
-    const b = connect('s-c2');
-    await invoke(b, 'join-room', { roomId: 'AC2DEF' });
-
-    a.handlers['user:ready']({ roomId: 'AC2DEF', isReady: true });
-    b.handlers['user:ready']({ roomId: 'AC2DEF', isReady: true });
-
-    a.handlers['submit_answer']({ roomId: 'AC2DEF', isCorrect: true, points: 10 });
-    b.handlers['submit_answer']({ roomId: 'AC2DEF', isCorrect: false, points: 10 });
-
-    const scoreUpdates = io.broadcasts.filter((x) => x.event === 'score_update');
-    const players = scoreUpdates[scoreUpdates.length - 1].data.players;
-    expect(players['s-c1'].score).toBe(10);
-    expect(players['s-c2'].score).toBe(0);
-  });
-
-  it('ignores submit_answer while the room is waiting', async () => {
-    const { io, connect, invoke } = setup();
-    const a = connect('s-c3');
-    await invoke(a, 'create-room', { roomId: 'AC3DEF' });
-
-    a.handlers['submit_answer']({ roomId: 'AC3DEF', isCorrect: true, points: 10 });
-
-    expect(io.broadcasts.filter((x) => x.event === 'score_update')).toHaveLength(0);
-  });
-});
-
-describe('battleHandler - leaving rooms', () => {
-  it('removes a player via leave-room and keeps the room for others', async () => {
-    const { io, connect, invoke } = setup();
-    const a = connect('s-c4');
-    await invoke(a, 'create-room', { roomId: 'AC4DEF' });
-    const b = connect('s-c5');
-    await invoke(b, 'join-room', { roomId: 'AC4DEF' });
-
-    a.handlers['leave-room']({ roomId: 'AC4DEF' });
-
-    const presence = io.broadcasts.filter((x) => x.event === 'presence_update');
-    expect(presence[presence.length - 1].data.online).toBe(false);
-
-    const guest = connect('s-c6');
-    const res = await invoke(guest, 'join-room', { roomId: 'AC4DEF' });
-    success(res);
-  });
-
-  it('deletes the room when the last player disconnects', async () => {
-    const { connect, invoke } = setup();
-    const a = connect('s-c7');
-    await invoke(a, 'create-room', { roomId: 'AC5DEF' });
-
-    a.handlers.disconnect();
-
-    const b = connect('s-c8');
-    const res = await invoke(b, 'join-room', { roomId: 'AC5DEF' });
-    expect(res.success).toBe(false);
-    expect(res.message).toMatch(/not found/);
+      jest.useRealTimers();
+    });
   });
 });

@@ -1,4 +1,5 @@
 import { useRef, useState, useMemo, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
@@ -99,6 +100,7 @@ const CreateStudyPlanForm = ({
   minEndDate,
   exams,
   prefillExamName,
+  isAiDisabled,
 }) => (
   <div className="max-w-xl mx-auto">
     <div className="flex items-center justify-between mb-6">
@@ -116,6 +118,13 @@ const CreateStudyPlanForm = ({
         <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
+        </div>
+      )}
+
+      {isAiDisabled && (
+        <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-750 dark:text-red-200 text-sm rounded flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>AI creation is temporarily disabled due to rate limits/quota exhaustion.</span>
         </div>
       )}
 
@@ -207,7 +216,7 @@ const CreateStudyPlanForm = ({
         </button>
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || isAiDisabled}
           className="px-6 py-2 bg-gradient-to-r from-yellow-600 to-yellow-700 text-white rounded shadow hover:shadow-lg font-medium transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? (
@@ -258,6 +267,9 @@ const StudyPlanModal = ({
   onPlanUpdate,
   syllabusPrefill,
 }) => {
+  const { aiQuotaExceededUntil } = useSelector((state) => state.auth);
+  const isAiDisabled = !!(aiQuotaExceededUntil && Date.now() < aiQuotaExceededUntil);
+
   const contentRef = useRef(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
@@ -712,6 +724,7 @@ const totalWeakCount = useMemo(() => {
                   minEndDate={minEndDate}
                   exams={exams}
                   prefillExamName={syllabusPrefill?.examName}
+                  isAiDisabled={isAiDisabled}
                 />
               ) : showTimeline ? (
                 <div className="bg-white/80 p-6 rounded-sm shadow-sm border border-[#8B4513]/10">
