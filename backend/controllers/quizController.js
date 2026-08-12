@@ -7,6 +7,8 @@ const QuizAttempt = require('../models/QuizAttempt');
 const Subject = require('../models/Subject');
 const Topic = require('../models/Topic');
 const Note = require('../models/Note');
+const PYQAnalysis = require('../models/PYQAnalysis');
+const PYQQuestion = require('../models/PYQQuestion');
 const ActivityLog = require('../models/ActivityLog');
 const Progress = require('../models/Progress');
 const QuizTelemetryEvent = require('../models/QuizTelemetryEvent');
@@ -119,6 +121,89 @@ exports.generateAIQuiz = async (req, res, next) => {
       });
     }
     // Handle Gemini API server errors
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({
+        success: false,
+        error: error.message,
+      });
+    }
+    next(error);
+  }
+};
+
+// @desc    Generate a custom revision quiz from PYQ bank
+// @route   POST /api/quizzes/generate-custom
+// @access  Private
+exports.generateCustomQuiz = async (req, res, next) => {
+  try {
+    const { subjectId, topics = [], difficulty = 'medium', years = [], count = 5, timeLimit = 20, language = 'english' } = req.body;
+
+    const subject = await Subject.findByPk(subjectId);
+    if (!subject) {
+      return res.status(404).json({ success: false, error: 'Subject not found' });
+    }
+
+    // Retrieve PYQ analyses for this subject
+    const analyses = await PYQAnalysis.findAll({ where: { subjectId } });
+    const analysisIds = analyses.map((a) => a.id);
+
+    // Retrieve matching PYQ questions
+    const whereClause = {
+      pyqAnalysisId: analysisIds,
+    };
+    if (topics.length > 0) {
+      whereClause.topicName = topics;
+    }
+    if (years.length > 0) {
+      whereClause.year = years;
+    }
+
+    const pyqQuestions = await PYQQuestion.findAll({ where: whereClause });
+    const pyqQuestionsText = pyqQuestions
+      .map((q) => `[Year: ${q.year}, Topic: ${q.topicName}, Marks: ${q.marks}] ${q.questionText}`)
+      .join('\n\n');
+
+    const difficultyLevel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+
+    // Call Gemini Service
+    const aiQuiz = await geminiService.generateCustomQuiz(
+      subject.name,
+      topics,
+      difficultyLevel,
+      count,
+      pyqQuestionsText,
+      language
+    );
+
+    // Assign unique IDs to the questions
+    const questionsWithIds = aiQuiz.questions.map((q) => ({
+      _id: uuidv4(),
+      questionText: q.questionText,
+      options: q.options,
+      correctAnswer: q.correctAnswer,
+      explanation: q.explanation || '',
+    }));
+
+    const quiz = await Quiz.create({
+      title: aiQuiz.title || `${subject.name} Custom Revision Quiz`,
+      subject: subjectId,
+      topic: null, // Covers multiple topics
+      questions: questionsWithIds,
+      type: 'AI_Generated',
+      language: language || 'english',
+      createdBy: req.user.id,
+      timeLimit: timeLimit || 20,
+    });
+
+    res.status(201).json({ success: true, data: quiz });
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
     if (error instanceof GeminiServerError) {
       return res.status(503).json({
         success: false,

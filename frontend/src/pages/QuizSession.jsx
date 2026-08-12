@@ -167,7 +167,9 @@ const fetchQuiz = useCallback(async () => {
       const res = await API.get(`/quizzes/${id}`);
       const loadedQuiz = res.data.data;
       setQuiz(loadedQuiz);
-      const totalSeconds = (loadedQuiz?.questions?.length || 0) * SECONDS_PER_QUESTION;
+      const totalSeconds = loadedQuiz?.timeLimit
+        ? loadedQuiz.timeLimit * 60
+        : (loadedQuiz?.questions?.length || 0) * SECONDS_PER_QUESTION;
       setTimeLeft(totalSeconds);
       endTimeRef.current = Date.now() + totalSeconds * 1000;
       setLoading(false);

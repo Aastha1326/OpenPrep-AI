@@ -1,5 +1,9 @@
 const express = require('express');
 const multer = require('multer');
+const upload = multer({
+  dest: 'uploads/',
+  limits: { fileSize: 15 * 1024 * 1024 }
+});
 const {
   generateAIQuiz,
   getQuizzes,
@@ -13,8 +17,9 @@ const {
   getQuizBookmarks,
   toggleQuizBookmark,
   getQuizAttemptReportPDF,
-  generateQuizFromPdf,
+  generateCustomQuiz,
 } = require('../controllers/quizController');
+const { generateQuizFromPdf } = require('../controllers/pdfQuizController');
 const { protect } = require('../middleware/auth');
 const telemetryAuth = require('../middleware/telemetryAuth');const { aiLimiter } = require('../middleware/rateLimiter');
 const { checkAiQuota } = require('../middleware/aiQuotaMiddleware');
@@ -109,6 +114,7 @@ router.post('/adaptive/next-question', protect, getNextAdaptiveQuestion);
  */
 
 router.post('/generate-ai', protect, aiLimiter, checkAiQuota, validateGenerateAIQuiz, generateAIQuiz);
+router.post('/generate-custom', protect, aiLimiter, checkAiQuota, generateCustomQuiz);
 
 /**
  * @swagger
@@ -141,7 +147,7 @@ router.post('/generate-ai', protect, aiLimiter, checkAiQuota, validateGenerateAI
  *       429:
  *         description: Rate limit exceeded
  */
-router.post('/generate-from-pdf', protect, aiLimiter, checkQuota, upload.single('pdf'), generateQuizFromPdf);
+router.post('/generate-from-pdf', protect, aiLimiter, checkAiQuota, upload.single('pdf'), generateQuizFromPdf);
 
 /**
  * @swagger
