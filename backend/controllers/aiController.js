@@ -49,3 +49,38 @@ exports.explainQuestion = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Interact with the AI study assistant (chat)
+// @route   POST /api/ai/chat
+// @access  Private
+exports.chatWithAssistant = async (req, res, next) => {
+  try {
+    const { message, history } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ success: false, error: 'Message content is required.' });
+    }
+
+    const responseText = await geminiService.generateChatResponse({
+      message,
+      history: history || [],
+    });
+
+    res.status(200).json({ success: true, text: responseText });
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({
+        success: false,
+        error: error.message,
+      });
+    }
+    next(error);
+  }
+};

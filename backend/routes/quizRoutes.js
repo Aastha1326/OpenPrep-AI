@@ -1,4 +1,9 @@
 const express = require('express');
+const multer = require('multer');
+const upload = multer({
+  dest: 'uploads/',
+  limits: { fileSize: 15 * 1024 * 1024 }
+});
 const {
   generateAIQuiz,
   getQuizzes,
@@ -12,10 +17,12 @@ const {
   getQuizBookmarks,
   toggleQuizBookmark,
   getQuizAttemptReportPDF,
+  generateCustomQuiz,
 } = require('../controllers/quizController');
+const { generateQuizFromPdf } = require('../controllers/pdfQuizController');
 const { protect } = require('../middleware/auth');
 const telemetryAuth = require('../middleware/telemetryAuth');const { aiLimiter } = require('../middleware/rateLimiter');
-const { checkQuota } = require('../middleware/quotaMiddleware');
+const { checkAiQuota } = require('../middleware/aiQuotaMiddleware');
 const {
   validateGenerateAIQuiz,
   validateSubmitQuizAttempt,
@@ -25,7 +32,10 @@ const {
 const { validateRequest, submitQuizSchema } = require('../middleware/validate');
 
 const router = express.Router();
+const { getNextAdaptiveQuestion } = require('../controllers/adaptiveQuizController');
 
+// Register adaptive route
+router.post('/adaptive/next-question', protect, getNextAdaptiveQuestion);
 /**
  * @swagger
  * tags:
@@ -103,7 +113,41 @@ const router = express.Router();
  *               $ref: '#/components/schemas/Error'
  */
 
-router.post('/generate-ai', protect, aiLimiter, checkQuota, validateGenerateAIQuiz, generateAIQuiz);
+router.post('/generate-ai', protect, aiLimiter, checkAiQuota, validateGenerateAIQuiz, generateAIQuiz);
+router.post('/generate-custom', protect, aiLimiter, checkAiQuota, generateCustomQuiz);
+
+/**
+ * @swagger
+ * /api/quizzes/generate-from-pdf:
+ *   post:
+ *     summary: Generate a practice quiz from an uploaded textbook PDF chapter
+ *     tags: [Quizzes]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - pdf
+ *             properties:
+ *               pdf:
+ *                 type: string
+ *                 format: binary
+ *                 description: Textbook chapter PDF file (max 15MB)
+ *     responses:
+ *       200:
+ *         description: Quiz generated successfully from PDF content
+ *       400:
+ *         description: Invalid file or missing PDF
+ *       401:
+ *         description: Not authenticated
+ *       429:
+ *         description: Rate limit exceeded
+ */
+router.post('/generate-from-pdf', protect, aiLimiter, checkAiQuota, upload.single('pdf'), generateQuizFromPdf);
 
 /**
  * @swagger
@@ -159,7 +203,7 @@ router.post(
   '/generate-revision-sheet',
   protect,
   aiLimiter,
-  checkQuota,
+  checkAiQuota,
   validateGenerateRevisionSheet,
   generateRevisionSheet
 );
@@ -205,7 +249,7 @@ router.post(
   '/generate-remediation-plan',
   protect,
   aiLimiter,
-  checkQuota,
+  checkAiQuota,
   validateGenerateRemediationPlan,
   generateRemediationPlan
 );
@@ -506,6 +550,6 @@ router.get('/:id/bookmarks', protect, getQuizBookmarks);
  *       404:
  *         description: Quiz not found
  */
-router.post('/:id/bookmarks/toggle', protect, validateToggleQuizBookmark, toggleQuizBookmark);
+router.post('/:id/bookmarks/toggle', protect, toggleQuizBookmark);
 
 module.exports = router;

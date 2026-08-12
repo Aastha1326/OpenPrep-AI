@@ -40,8 +40,8 @@ function createRateLimiter({ max, windowMs, prefix, message }) {
       return next();
     }
 
-    const ip = req.ip || req.connection.remoteAddress || '127.0.0.1';
-    const key = `ratelimit:${prefix}:${ip}`;
+    const identifier = req.user && req.user.id ? req.user.id : (req.ip || req.connection.remoteAddress || '127.0.0.1');
+    const key = `ratelimit:${prefix}:${identifier}`;
     const now = Date.now();
 
     let allowed = false;
@@ -121,6 +121,8 @@ function createRateLimiter({ max, windowMs, prefix, message }) {
       return res.status(429).json({
         success: false,
         error: message || 'Too many requests. Please try again later.',
+        retryInSeconds: retryAfter || Math.ceil(windowMs / 1000) || 900,
+        remainingQuota: 0,
       });
     }
 
@@ -136,10 +138,10 @@ const authRateLimiter = createRateLimiter({
 });
 
 const aiRateLimiter = createRateLimiter({
-  max: 15,
-  windowMs: 60 * 1000,
+  max: 10,
+  windowMs: 15 * 60 * 1000,
   prefix: 'ai',
-  message: 'Too many AI requests. Please wait a moment before generating more content.',
+  message: 'AI rate limit exceeded',
 });
 
 const standardGetRateLimiter = createRateLimiter({

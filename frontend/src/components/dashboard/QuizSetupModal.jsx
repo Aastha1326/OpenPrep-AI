@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertCircle, BookOpen, Loader2, Sparkles, X } from 'lucide-react';
 import API from '../../services/api';
@@ -13,6 +14,9 @@ const LANGUAGE_OPTIONS = [
 ];
 
 const QuizSetupModal = ({ isOpen, onClose, onQuizGenerated }) => {
+  const { aiQuotaExceededUntil } = useSelector((state) => state.auth);
+  const isAiDisabled = !!(aiQuotaExceededUntil && Date.now() < aiQuotaExceededUntil);
+
   const [subjects, setSubjects] = useState([]);
   const [topics, setTopics] = useState([]);
   const [subjectId, setSubjectId] = useState('');
@@ -137,6 +141,13 @@ const QuizSetupModal = ({ isOpen, onClose, onQuizGenerated }) => {
                 </div>
               )}
 
+              {isAiDisabled && (
+                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>AI quiz generation is temporarily disabled due to rate limits/quota exhaustion.</span>
+                </div>
+              )}
+
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
                   Subject
@@ -235,7 +246,7 @@ const QuizSetupModal = ({ isOpen, onClose, onQuizGenerated }) => {
                 <button
                   type="submit"
                   className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"
-                  disabled={loading || loadingSubjects || !subjectId}
+                  disabled={loading || loadingSubjects || !subjectId || isAiDisabled}
                 >
                   {loading ? (
                     <>

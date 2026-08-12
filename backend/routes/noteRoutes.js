@@ -7,6 +7,9 @@ const {
   summarizeNote,
   uploadVoiceNote,
   updateNote,
+  uploadOcrNote,
+  exportNotes,
+  importNotes,
 } = require('../controllers/noteController');
 const { protect } = require('../middleware/auth');
 const upload = require('../middleware/upload');
@@ -102,6 +105,40 @@ router.post(
   validateUploadNote,
   clearCache('notes:*'),
   uploadNote
+);
+
+/**
+ * @swagger
+ * /api/notes/ocr-upload:
+ *   post:
+ *     summary: Upload an image for OCR text extraction
+ *     tags: [Notes]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - file
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: Image file (.png, .jpg, .jpeg, .webp)
+ *     responses:
+ *       200:
+ *         description: Text extracted successfully
+ *       400:
+ *         description: Validation error or unsupported format
+ */
+router.post(
+  '/ocr-upload',
+  protect,
+  upload.single('file'),
+  uploadOcrNote
 );
 
 /**
