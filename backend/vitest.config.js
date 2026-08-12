@@ -28,5 +28,6 @@ coverage: {
       thresholds: {
         statements: 75,
       },
-    },  },
+    },
+  },
 });

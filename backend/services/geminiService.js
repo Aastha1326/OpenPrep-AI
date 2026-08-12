@@ -1695,3 +1695,71 @@ exports.generateChatResponse = async ({ message, history }) => {
     throw error;
   }
 };
+
+/**
+ * Generate AI Custom Quiz from PYQ bank
+ */
+exports.generateCustomQuiz = async (
+  subjectName,
+  topics = [],
+  difficultyLevel = 'Medium',
+  count = 5,
+  pyqQuestionsText = '',
+  language = 'english'
+) => {
+  const normalizedLanguage = normalizeQuizLanguage(language);
+
+  if (!genAI) {
+    console.warn('Gemini API key not configured. Using Mock Data for Quiz.');
+    return { _mock: true, ...getMockQuiz(subjectName, topics.join(', '), count, normalizedLanguage) };
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const prompt = `
+      Create a multiple choice custom revision quiz for the subject "${subjectName}" targeting the following topics: ${topics.join(', ')}.
+      The difficulty level of the questions should be set to: ${difficultyLevel}.
+      Generate the quiz content in ${normalizedLanguage} language. Use ${normalizedLanguage} script and vocabulary naturally.
+      
+      Here are actual past year questions (PYQs) from exams for reference and inspiration:
+      """
+      ${pyqQuestionsText}
+      """
+
+      Each question must have:
+      - Question text written in ${normalizedLanguage}
+      - 4 unique options written in ${normalizedLanguage}
+      - Correct answer index (0, 1, 2, or 3)
+      - A helpful explanation of the correct answer written in ${normalizedLanguage}
+
+      You should generate exactly ${count} questions. For each question, base it directly on or draw inspiration from the provided past year questions. Ensure the difficulty matches "${difficultyLevel}".
+
+      Return the result STRICTLY as a JSON object with this exact structure:
+      {
+        "title": "string",
+        "questions": [
+          {
+            "questionText": "string",
+            "options": ["string", "string", "string", "string"],
+            "correctAnswer": number,
+            "explanation": "string"
+          }
+        ]
+      }
+    `;
+
+    const result = await generateWithRetry(model, prompt);
+    const parsed = cleanJSON(result.response.text());
+
+    // Validate response structure
+    if (!parsed || !parsed.questions || !Array.isArray(parsed.questions)) {
+      throw new Error('Invalid JSON format from Gemini API');
+    }
+
+    return parsed;
+  } catch (err) {
+    console.error('Gemini custom quiz generator failed:', err);
+    throw err;
+  }
+};
+
