@@ -40,6 +40,11 @@ const Quiz = sequelize.define(
       type: DataTypes.UUID,
       allowNull: false,
     },
+    timeLimit: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: null,
+    },
   },
   {
     timestamps: true,
