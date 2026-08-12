@@ -374,10 +374,18 @@ exports.submitQuizAttempt = async (req, res, next) => {
       description: `Completed practice quiz: "${quiz.title}" with score ${score}%`,
     });
 
-    // Award XP for completing quiz attempt
-    const xpService = require('../services/xpService');
-    const xpEarned = Math.round(score * 1.5 + 50);
-    const progression = await xpService.addXP(req.user, xpEarned);
+    // Award XP and check gamification badges/streaks
+    const gamificationService = require('../services/gamificationService');
+    const progression = await gamificationService.awardXP(req.user.id, 100, 'quiz_complete');
+
+    const timezoneOffset = Number(req.headers['x-timezone-offset']) || 0;
+    await gamificationService.updateStreak(req.user.id, timezoneOffset);
+
+    const user = await User.findByPk(req.user.id);
+    const newBadges = await gamificationService.checkAndUnlockBadges(user, 'quiz_complete', {
+      timezoneOffsetMinutes: timezoneOffset
+    });
+    progression.newBadges = newBadges;
 
     res.status(201).json({
       success: true,

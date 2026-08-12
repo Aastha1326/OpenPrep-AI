@@ -676,3 +676,180 @@ exports.getUpcomingForecast = async (req, res, next) => {
     next(error);
   }
 };
+
+const PYQAnalysis = require('../models/PYQAnalysis');
+const PYQQuestion = require('../models/PYQQuestion');
+const pyqAnalyzerService = require('../services/pyqAnalyzerService');
+const PDFDocument = require('pdfkit');
+
+exports.analyzePYQBatch = async (req, res, next) => {
+  try {
+    const { subjectId, examName } = req.body;
+    const files = req.files;
+
+    if (!subjectId) {
+      return res.status(400).json({ success: false, error: 'subjectId is required.' });
+    }
+
+    if (!files || files.length === 0) {
+      return res.status(400).json({ success: false, error: 'Please upload at least one past exam paper PDF.' });
+    }
+
+    const subject = await Subject.findByPk(subjectId);
+    if (!subject) {
+      return res.status(404).json({ success: false, error: 'Subject not found.' });
+    }
+
+    // 1. Extract combined text from uploaded files (PDF/Image)
+    const combinedText = await pyqAnalyzerService.extractTextFromFiles(files, subject.name);
+
+    // 2. Call batch analysis via Gemini
+    const result = await pyqAnalyzerService.analyzePYQBatch(combinedText, subject.name);
+
+    // 3. Save aggregated analysis to DB
+    const analysis = await PYQAnalysis.create({
+      subjectId,
+      examName: examName || result.examName || 'Board Exams',
+      yearRange: result.yearRange,
+      weightageData: result.weightageData,
+      totalQuestions: result.totalQuestions,
+      userId: req.user.id,
+    });
+
+    // 4. Save individual questions for trend heatmaps
+    if (result.questions && result.questions.length > 0) {
+      const questionsToCreate = result.questions.map((q) => ({
+        pyqAnalysisId: analysis.id,
+        chapterName: q.chapterName || 'General',
+        topicName: q.topicName || 'General Concepts',
+        questionText: q.questionText,
+        marks: q.marks || 5,
+        year: q.year || 2024,
+      }));
+      await PYQQuestion.bulkCreate(questionsToCreate);
+    }
+
+    // Clean up local temp files uploaded by multer
+    for (const file of files) {
+      fs.unlink(file.path, (err) => {
+        if (err) console.error('Failed to delete temp file:', file.path);
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      data: {
+        id: analysis.id,
+        examName: analysis.examName,
+        yearRange: analysis.yearRange,
+        weightageData: analysis.weightageData,
+        totalQuestions: analysis.totalQuestions,
+        questions: result.questions,
+      },
+    });
+  } catch (error) {
+    // Attempt temp files cleanup on error
+    if (req.files) {
+      for (const file of req.files) {
+        fs.unlink(file.path, (err) => {});
+      }
+    }
+    next(error);
+  }
+};
+
+exports.getSubjectAnalyses = async (req, res, next) => {
+  try {
+    const { subjectId } = req.params;
+    const analyses = await PYQAnalysis.findAll({
+      where: { subjectId, userId: req.user.id },
+      order: [['createdAt', 'DESC']],
+      include: [
+        { model: PYQQuestion, as: 'questions' },
+      ],
+    });
+
+    res.status(200).json({
+      success: true,
+      data: analyses,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.exportPYQAnalysisPDF = async (req, res, next) => {
+  try {
+    const { analysisId } = req.params;
+    const analysis = await PYQAnalysis.findOne({
+      where: { id: analysisId, userId: req.user.id },
+      include: [
+        { model: PYQQuestion, as: 'questions' },
+      ],
+    });
+
+    if (!analysis) {
+      return res.status(404).json({ success: false, error: 'Analysis record not found.' });
+    }
+
+    const doc = new PDFDocument({ margin: 50 });
+    
+    // Set headers
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=PYQ_Analysis_${analysis.yearRange}.pdf`);
+    doc.pipe(res);
+
+    // Title
+    doc.fontSize(22).font('Helvetica-Bold').text('PYQ Trend Analysis Report', { align: 'center' });
+    doc.moveDown();
+
+    // Metadata
+    doc.fontSize(12).font('Helvetica').text(`Exam Category: ${analysis.examName}`);
+    doc.text(`Year Range: ${analysis.yearRange}`);
+    doc.text(`Total Questions Analyzed: ${analysis.totalQuestions}`);
+    doc.text(`Generated On: ${new Date().toLocaleDateString()}`);
+    doc.moveDown(1.5);
+
+    // Divider
+    doc.moveTo(50, doc.y).lineTo(550, doc.y).strokeColor('#e2e8f0').stroke();
+    doc.moveDown(1.5);
+
+    // Chapter Weightage
+    doc.fontSize(16).font('Helvetica-Bold').text('Chapter Marks Weightage Breakdown');
+    doc.moveDown(0.5);
+
+    const weightageList = analysis.weightageData?.chapterWeightage || [];
+    weightageList.forEach((ch, idx) => {
+      doc.fontSize(11).font('Helvetica-Bold').text(`${idx + 1}. ${ch.chapterName}`);
+      doc.fontSize(10).font('Helvetica').text(`   Weightage: ${ch.percentage}% (${ch.marks} marks over ${ch.questionCount} questions)`);
+      doc.moveDown(0.3);
+    });
+
+    doc.moveDown(1.5);
+
+    // Recurring Topics List
+    doc.fontSize(16).font('Helvetica-Bold').text('High-Yield Priorities & Topics');
+    doc.moveDown(0.5);
+
+    const topicsSeen = {};
+    (analysis.questions || []).forEach((q) => {
+      if (q.topicName) {
+        topicsSeen[q.topicName] = (topicsSeen[q.topicName] || 0) + 1;
+      }
+    });
+
+    const topTopicsList = Object.entries(topicsSeen)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
+
+    topTopicsList.forEach(([topic, count], idx) => {
+      doc.fontSize(11).font('Helvetica-Bold').text(`- ${topic}`);
+      doc.fontSize(10).font('Helvetica').text(`   Appeared in past papers: ${count} times`);
+      doc.moveDown(0.2);
+    });
+
+    doc.end();
+  } catch (error) {
+    next(error);
+  }
+};

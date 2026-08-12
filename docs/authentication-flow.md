@@ -193,9 +193,9 @@ sequenceDiagram
 
 ---
 
-## 🌐 Google OAuth 2.0 Integration (Production Setup)
+## 🌐 OAuth 2.0 Social Authentication (Google & GitHub)
 
-OpenPrep AI supports **"Continue with Google"** authentication via Google Identity Services (GIS).
+OpenPrep AI supports **"Continue with Google"** and **"Continue with GitHub"** single sign-on (SSO) options.
 
 ### Production Setup Instructions
 
@@ -203,22 +203,31 @@ OpenPrep AI supports **"Continue with Google"** authentication via Google Identi
    - Navigate to [Google Cloud Console Credentials](https://console.cloud.google.com/apis/credentials).
    - Click **Create Credentials** -> **OAuth client ID**.
    - Select **Web application**.
-   - Under **Authorized JavaScript origins**, add your frontend production URL (e.g., `https://your-domain.com`).
-   - Under **Authorized redirect URIs**, add `https://your-domain.com`.
-   - Copy your generated Client ID (ending in `.apps.googleusercontent.com`).
+   - Under **Authorized redirect URIs**, add `https://your-domain.com/api/auth/google/callback`.
+   - Copy your generated Client ID and Client Secret.
 
-2. **Configure Environment Variables**:
-   - **Frontend** (`frontend/.env` / Vercel / Netlify environment settings):
-     ```env
-     VITE_GOOGLE_CLIENT_ID=your_client_id.apps.googleusercontent.com
-     ```
-   - **Backend** (`backend/.env` / Render / Railway / Docker environment settings):
-     ```env
-     GOOGLE_CLIENT_ID=your_client_id.apps.googleusercontent.com
-     ```
+2. **Create GitHub OAuth Application**:
+   - Navigate to **GitHub Profile Settings** -> **Developer settings** -> **OAuth Apps**.
+   - Click **New OAuth App**.
+   - Under **Homepage URL**, enter your frontend homepage (e.g., `https://your-domain.com`).
+   - Under **Authorization callback URL**, enter your backend callback API `https://your-domain.com/api/auth/github/callback`.
+   - Copy the Client ID and Client Secret.
 
-3. **Authentication Handshake**:
-   - The frontend obtains an authentic Google ID Token via GIS.
-   - It posts the token to `POST /api/auth/google`.
-   - The backend validates the ID token signature and audience using `google-auth-library` (`OAuth2Client.verifyIdToken`), automatically linking or registering the user account.
+3. **Configure Environment Variables (Backend `.env`)**:
+   ```env
+   GOOGLE_CLIENT_ID=your_google_client_id
+   GOOGLE_CLIENT_SECRET=your_google_client_secret
+   GOOGLE_CALLBACK_URL=https://your-domain.com/api/auth/google/callback
+   
+   GITHUB_CLIENT_ID=your_github_client_id
+   GITHUB_CLIENT_SECRET=your_github_client_secret
+   GITHUB_CALLBACK_URL=https://your-domain.com/api/auth/github/callback
+   ```
+
+4. **Private GitHub Email Verification**:
+   - If a student's GitHub account settings restrict email publicity, the GitHub profile email field will be returned as null.
+   - The backend strategy callback catches this and returns a temporary `isTemp` indicator.
+   - The user is redirected to `/oauth-callback?prompt_email=true&githubId=...` on the frontend.
+   - The student is prompted to provide their email address. Once submitted, the backend links or registers the new account.
+
 
