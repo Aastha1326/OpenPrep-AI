@@ -23,17 +23,23 @@ const swaggerSpec = require('./config/swagger');
 const passport = require('./config/passport');
 const { getCorsMiddleware, getSocketCorsOrigin } = require('./middleware/corsHandler');
 
-// Validate required environment variables at startup
-if (!process.env.JWT_SECRET) {
-  logger.error('FATAL: JWT_SECRET is not defined in environment variables', {
-    hint: 'Set JWT_SECRET in your .env file or environment before starting the server.',
-  });
-  process.exit(1);
-}
+// Validate the whole environment against the schema in config/env.js before
+// anything else loads. Reports every problem at once and exits in production;
+// in development it warns and continues on defaults so the API still boots.
+//
+// This supersedes the ad-hoc JWT_SECRET / GEMINI_API_KEY guards that used to
+// live here: both are declared in the schema now, JWT_SECRET is additionally
+// length-checked in production, and GEMINI_API_KEY surfaces through the
+// integration summary below. Reported through the structured logger so the
+// startup report lands in the same stream as every other log line.
+const { loadEnv, summariseIntegrations } = require('./config/env');
 
-if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_gemini_api_key_here') {
-  logger.warn('GEMINI_API_KEY is not set — AI endpoints will return mock data');
-}
+const env = loadEnv(process.env, { logger });
+
+logger.info('configuration loaded', {
+  env: env.NODE_ENV,
+  integrations: summariseIntegrations(env),
+});
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
@@ -303,7 +309,8 @@ app.use(
 // Error Handler Middleware
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5000;
+// Already coerced to a validated integer by config/env.js.
+const PORT = env.PORT;
 const server = http.createServer(app);
 
 const io = new Server(server, {
