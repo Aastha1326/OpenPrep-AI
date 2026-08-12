@@ -16,9 +16,8 @@ const {
   generateQuizFromPdf,
 } = require('../controllers/quizController');
 const { protect } = require('../middleware/auth');
-const telemetryAuth = require('../middleware/telemetryAuth');
-const { aiLimiter } = require('../middleware/rateLimiter');
-const { checkQuota } = require('../middleware/quotaMiddleware');
+const telemetryAuth = require('../middleware/telemetryAuth');const { aiLimiter } = require('../middleware/rateLimiter');
+const { checkAiQuota } = require('../middleware/aiQuotaMiddleware');
 const {
   validateGenerateAIQuiz,
   validateSubmitQuizAttempt,
@@ -28,20 +27,10 @@ const {
 const { validateRequest, submitQuizSchema } = require('../middleware/validate');
 
 const router = express.Router();
+const { getNextAdaptiveQuestion } = require('../controllers/adaptiveQuizController');
 
-// Configure multer for PDF uploads (max 15MB)
-const upload = multer({
-  dest: 'uploads/',
-  limits: { fileSize: 15 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'application/pdf') {
-      cb(null, true);
-    } else {
-      cb(new Error('Only PDF files are allowed!'), false);
-    }
-  },
-});
-
+// Register adaptive route
+router.post('/adaptive/next-question', protect, getNextAdaptiveQuestion);
 /**
  * @swagger
  * tags:
@@ -119,7 +108,7 @@ const upload = multer({
  *               $ref: '#/components/schemas/Error'
  */
 
-router.post('/generate-ai', protect, aiLimiter, checkQuota, validateGenerateAIQuiz, generateAIQuiz);
+router.post('/generate-ai', protect, aiLimiter, checkAiQuota, validateGenerateAIQuiz, generateAIQuiz);
 
 /**
  * @swagger
@@ -208,7 +197,7 @@ router.post(
   '/generate-revision-sheet',
   protect,
   aiLimiter,
-  checkQuota,
+  checkAiQuota,
   validateGenerateRevisionSheet,
   generateRevisionSheet
 );
@@ -254,7 +243,7 @@ router.post(
   '/generate-remediation-plan',
   protect,
   aiLimiter,
-  checkQuota,
+  checkAiQuota,
   validateGenerateRemediationPlan,
   generateRemediationPlan
 );

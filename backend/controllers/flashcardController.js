@@ -412,9 +412,17 @@ exports.reviewFlashcard = async (req, res, next) => {
       await progress.save();
     }
 
-    const xpService = require('../services/xpService');
-    const xpEarned = quality >= 4 ? 80 : 40;
-    const progression = await xpService.addXP(req.user, xpEarned);
+    const gamificationService = require('../services/gamificationService');
+    const progression = await gamificationService.awardXP(req.user.id, 30, 'flashcard_review');
+
+    const timezoneOffset = Number(req.headers['x-timezone-offset']) || 0;
+    await gamificationService.updateStreak(req.user.id, timezoneOffset);
+
+    const user = await User.findByPk(req.user.id);
+    const newBadges = await gamificationService.checkAndUnlockBadges(user, 'flashcard_review', {
+      timezoneOffsetMinutes: timezoneOffset
+    });
+    progression.newBadges = newBadges;
 
     res.status(200).json({ success: true, data: card, progression });
   } catch (error) {

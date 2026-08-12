@@ -575,4 +575,32 @@ describe('PYQ Controller - Integration Tests', () => {
       expect(secondRes.headers['x-cache']).toBe('HIT');
     });
   });
+
+  describe('PYQ Batch Analyzer Endpoints', () => {
+    it('should upload a list of past papers and return structured weightages', async () => {
+      const pdfBuffer = createTestPdfBuffer();
+
+      const res = await request(app)
+        .post('/api/pyqs/analyze')
+        .set('Authorization', `Bearer ${authToken}`)
+        .field('subjectId', testSubject.id.toString())
+        .field('examName', 'Batch Board Exam')
+        .attach('files', pdfBuffer, { filename: 'test1.pdf', contentType: 'application/pdf' });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.yearRange).toBeDefined();
+      expect(res.body.data.weightageData.chapterWeightage).toBeInstanceOf(Array);
+    });
+
+    it('should retrieve list of historical analyses for a subject', async () => {
+      const res = await request(app)
+        .get(`/api/pyqs/subject/${testSubject.id}`)
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toBeInstanceOf(Array);
+    });
+  });
 });
