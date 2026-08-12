@@ -2,18 +2,44 @@ const express = require('express');
 const {
   uploadAndAnalyzePYQ,
   getPYQs,
+  searchPYQs,
   getPYQDetails,
   getPYQAnalysis,
   deletePYQ,
   getPYQTrends,
   getUpcomingForecast,
+  getPYQClusters,
+  analyzePYQBatch,
+  getSubjectAnalyses,
+  exportPYQAnalysisPDF,
 } = require('../controllers/pyqController');
+const express = require('express');
+const multer = require('multer');
+const { protect } = require('../middleware/auth');
+const { parsePyqPdf } = require('../controllers/pyqParserController');
+
+const router = express.Router();
+
+const upload = multer({
+  dest: 'uploads/',
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB max for large multi-page papers
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF files are allowed!'), false);
+    }
+  },
+});
+
+router.post('/parse-pyq-pdf', protect, upload.single('pdf'), parsePyqPdf);
+
+module.exports = router;
 const { protect } = require('../middleware/auth');
 const { strictAiLimiter } = require('../middleware/rateLimiter');
 const { checkQuota } = require('../middleware/quotaMiddleware');
 const upload = require('../middleware/upload');
-const { validateUploadPYQ } = require('../middleware/validators');
-
+const { validateUploadPYQ, validateGetPYQClusters } = require('../middleware/validators');
 const cacheMiddleware = require('../middleware/cache');
 const clearCache = require('../middleware/clearCache');
 
@@ -163,6 +189,40 @@ router.post(
  *               $ref: '#/components/schemas/Error'
  */
 
+/**
+ * @swagger
+ * /api/pyqs/search:
+ *   get:
+ *     summary: Full-text search for PYQ question papers and topics using tsvector/tsquery
+ *     tags: [PYQs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         schema:
+ *           type: string
+ *         description: Search query terms
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Alternative query param for search terms
+ *     responses:
+ *       200:
+ *         description: Ranked full-text search results
+ *       400:
+ *         description: Missing search query
+ *       401:
+ *         description: Not authenticated
+ */
+router.get(
+  '/search',
+  protect,
+  cacheMiddleware((req) => `pyqs:${req.user.id}:${req.originalUrl}`),
+  searchPYQs
+);
+
 router.get(
   '/',
   protect,
@@ -172,10 +232,43 @@ router.get(
 
 /**
  * @swagger
+ * /api/pyqs/clusters/{subjectId}:
+ *   get:
+ *     summary: Detect near-duplicate PYQ questions across exam years via embedding similarity
+ *     tags: [PYQs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: subjectId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Subject ID to cluster PYQ questions for
+ *     responses:
+ *       200:
+ *         description: Clustered duplicate question sets retrieved successfully
+ *       401:
+ *         description: Not authenticated
+ *       404:
+ *         description: Subject not found
+ *       429:
+ *         description: Rate limit exceeded
+ */
+router.get(
+  '/clusters/:subjectId',
+  protect,
+  strictAiLimiter,
+  validateGetPYQClusters,
+  getPYQClusters
+);
+
+/**
+ * @swagger
  * /api/pyqs/{id}:
  *   get:
- *     summary: Get PYQ details
- *     tags: [PYQs]
+ *     summary: Get PYQ details *     tags: [PYQs]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -326,5 +419,9 @@ router.post(
  */
 
 router.delete('/:id', protect, clearCache('pyqs:*'), deletePYQ);
+
+router.post('/analyze', protect, upload.array('files', 10), analyzePYQBatch);
+router.get('/subject/:subjectId', protect, getSubjectAnalyses);
+router.get('/analysis/:analysisId/export', protect, exportPYQAnalysisPDF);
 
 module.exports = router;

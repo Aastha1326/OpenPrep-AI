@@ -8,16 +8,42 @@ import {
   FaArrowLeft,
   FaBrain,
   FaFilePdf,
+  FaBookmark,
+  FaRegBookmark,
+  FaSpinner,
 } from 'react-icons/fa';
 import API from '../services/api';
 import MathRenderer from '../components/common/MathRenderer';
+import { exportAsCSV, exportAsJSON } from '../utils/exportUtils';
+import useVoiceControl from '../hooks/useVoiceControl';
+import VoiceModeToggle from '../components/VoiceModeToggle';
+import AudioWaveform from '../components/AudioWaveform';
+import BadgeUnlockModal from '../components/gamification/BadgeUnlockModal';
+import LevelUpModal from '../components/gamification/LevelUpModal';
+import RevisionSheetModal from '../components/dashboard/RevisionSheetModal';
+import RemediationPlanModal from '../components/dashboard/RemediationPlanModal';
+import QuestionExplanation from '../components/dashboard/QuestionExplanation';
 
+const REVIEW_FILTERS = [
+  { key: 'all', label: 'All Questions' },
+  { key: 'incorrect', label: 'Incorrect Only' },
+  { key: 'bookmarked', label: 'Bookmarked' },
+  { key: 'correct', label: 'Correct' },
+];
+import { createQuizTelemetryQueue } from '../utils/quizTelemetry';
 const SECONDS_PER_QUESTION = 60;
 
 const formatTime = (seconds) => {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+};
+
+const resolveUserAnswerIndex = (question, rawAnswer) => {
+  if (rawAnswer === undefined || rawAnswer === null) return null;
+  if (typeof rawAnswer === 'number') return rawAnswer;
+  const idx = question.options.indexOf(rawAnswer);
+  return idx === -1 ? null : idx;
 };
 
 const buildQuizResultRows = (quiz, answers) =>
@@ -37,21 +63,64 @@ const QuizSession = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const [activeBadgeUnlock, setActiveBadgeUnlock] = useState(null);
+  const [levelUpLevel, setLevelUpLevel] = useState(null);
+  const [showLevelUpModal, setShowLevelUpModal] = useState(false);
+
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState({}); // { questionId: selectedOption }
+  const [bookmarkedIds, setBookmarkedIds] = useState(new Set());
+  const [reviewFilter, setReviewFilter] = useState('all');
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState(null);
   const [isRevisionModalOpen, setIsRevisionModalOpen] = useState(false);
+  const [isRemediationModalOpen, setIsRemediationModalOpen] = useState(false);
 
   const [timeLeft, setTimeLeft] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
-  const submittingRef = useRef(false);
 
-  // Absolute deadline timestamp reference to prevent background tab timer throttling drift
+  const submittingRef = useRef(false);
+  // Unique idempotency key for this session's submission — reused across retries
+  // so the backend can drop duplicate submissions (#762).
+  const submissionIdRef = useRef(null);
+  const getSubmissionId = () => {
+    if (!submissionIdRef.current) {
+      // Always a real v4 UUID: crypto.randomUUID (secure contexts), with a
+      // spec-compliant fallback for non-secure contexts (e.g. http:// over LAN)
+      // so the backend's uuid() validation never rejects the idempotency key.
+      const uuidv4 = () => {
+        // Degrade gracefully if crypto is entirely unavailable (ancient
+        // browsers) — the format stays spec-compliant v4 either way so the
+        // backend's uuid() validation never rejects the idempotency key.
+        const hasCrypto =
+          typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function';
+        const bytes = hasCrypto
+          ? crypto.getRandomValues(new Uint8Array(16))
+          : Array.from({ length: 16 }, () => Math.floor(Math.random() * 256));
+        bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+        bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 10
+        const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+        return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+      };
+      submissionIdRef.current =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : uuidv4();
+    }
+    return submissionIdRef.current;
+  };
+
+// Absolute deadline timestamp reference to prevent background tab timer throttling drift
   const endTimeRef = useRef(null);
   const autoSubmittedRef = useRef(false);
+  // Roving-tabindex refs for the review filter tabs (was an undeclared reference on main)
+  const filterTabRefs = useRef([]);
 
+  // Client-side telemetry buffer: batches question timing/option-selection
+  // events instead of sending an HTTP request per interaction.
+  const telemetryRef = useRef(null);
+  const questionEnteredAtRef = useRef(0);
   const handleExportResultsCSV = () => {
     const rows = buildQuizResultRows(quiz, answers);
     exportAsCSV(
@@ -74,23 +143,26 @@ const QuizSession = () => {
     );
   };
 
-  const handleExportResultsPDF = () => {
-    const element = document.getElementById('quiz-results-container');
-    const opt = {
-      margin: 0.5,
-      filename: `quiz-result-${quiz.title}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
-    html2pdf().from(element).set(opt).save();
+  const handleDownloadPDFReport = async () => {
+    try {
+      const response = await API.get(`/quizzes/attempts/${result.id}/pdf`, {
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `quiz-report-${result.id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      console.error('Failed to download PDF report:', err);
+      alert('Failed to generate and download PDF report. Please try again.');
+    }
   };
 
-  useEffect(() => {
-    fetchQuiz();
-  }, [id]);
-
-  const fetchQuiz = async () => {
+const fetchQuiz = useCallback(async () => {
     try {
       const res = await API.get(`/quizzes/${id}`);
       const loadedQuiz = res.data.data;
@@ -99,23 +171,48 @@ const QuizSession = () => {
       setTimeLeft(totalSeconds);
       endTimeRef.current = Date.now() + totalSeconds * 1000;
       setLoading(false);
+
+      telemetryRef.current = createQuizTelemetryQueue(id);
+      telemetryRef.current.startAutoFlush();
+      questionEnteredAtRef.current = Date.now();
     } catch (err) {
+      console.error(err);
       setError('Failed to load quiz details.');
       setLoading(false);
     }
-  };
+  }, [id]);
 
-  const handleOptionSelect = (questionId, option) => {
+  useEffect(() => {
+    fetchQuiz();
+  }, [id, fetchQuiz]);
+  const timeElapsed = timeLeft === 0 && !submitted;
+
+const handleOptionSelect = useCallback((questionId, option) => {
     if (submitted || timeElapsed || submitting) return;
     setAnswers((prevAnswers) => ({
       ...prevAnswers,
       [questionId]: option,
     }));
+    telemetryRef.current?.enqueue('option_select', {
+      questionId,
+      questionIndex: currentQuestionIndex,
+      selectedOption: option,
+    });
+  }, [submitted, timeElapsed, submitting, currentQuestionIndex]);
+
+  const recordQuestionView = () => {
+    telemetryRef.current?.enqueue('question_view', {
+      questionId: quiz.questions[currentQuestionIndex]?._id,
+      questionIndex: currentQuestionIndex,
+      timeSpentMs: Date.now() - questionEnteredAtRef.current,
+    });
+    questionEnteredAtRef.current = Date.now();
   };
 
   const handleNext = () => {
     if (timeElapsed) return;
     if (currentQuestionIndex < quiz.questions.length - 1) {
+      recordQuestionView();
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     }
   };
@@ -123,11 +220,52 @@ const QuizSession = () => {
   const handlePrevious = () => {
     if (timeElapsed) return;
     if (currentQuestionIndex > 0) {
+      recordQuestionView();
       setCurrentQuestionIndex(currentQuestionIndex - 1);
     }
   };
 
-  const submitQuiz = useCallback(async () => {
+  const handleVoiceCommand = useCallback((command) => {
+    const q = quiz?.questions?.[currentQuestionIndex];
+    if (!q) return;
+    let optionIndex = -1;
+    if (command === 'OPTION_0') optionIndex = 0;
+    else if (command === 'OPTION_1') optionIndex = 1;
+    else if (command === 'OPTION_2') optionIndex = 2;
+    else if (command === 'OPTION_3') optionIndex = 3;
+
+    if (optionIndex !== -1 && q.options[optionIndex]) {
+      handleOptionSelect(q._id, q.options[optionIndex]);
+    }
+  }, [quiz, currentQuestionIndex, handleOptionSelect]);
+
+  const {
+    isSupported,
+    isEnabled,
+    isPaused,
+    status,
+    errorMsg,
+    toggleVoiceMode,
+    speak,
+    cancelSpeech
+  } = useVoiceControl({
+    onCommand: handleVoiceCommand,
+  });
+
+  useEffect(() => {
+    cancelSpeech();
+    const q = quiz?.questions?.[currentQuestionIndex];
+    if (isEnabled && !isPaused && !submitted && q) {
+      const optionLabels = ['A', 'B', 'C', 'D'];
+      let text = q.questionText + '. ';
+      q.options.forEach((opt, idx) => {
+        if (idx < 4) text += `Option ${optionLabels[idx]}: ${opt}. `;
+      });
+      speak(text);
+    }
+  }, [quiz, currentQuestionIndex, isEnabled, isPaused, submitted, speak, cancelSpeech]);
+
+const submitQuiz = useCallback(async () => {
     if (submittingRef.current) return;
     submittingRef.current = true;
     setSubmitting(true);
@@ -139,7 +277,26 @@ const QuizSession = () => {
         selectedAnswer: selected,
       }));
 
-      const res = await API.post(`/quizzes/${id}/submit`, { answers: formattedAnswers });
+      telemetryRef.current?.enqueue('quiz_submit', { questionIndex: currentQuestionIndex });
+      telemetryRef.current?.stopAutoFlush();
+      telemetryRef.current?.flush();
+
+      const timezoneOffset = new Date().getTimezoneOffset();
+      const res = await API.post(`/quizzes/${id}/submit`, {
+        answers: formattedAnswers,
+        submissionId: getSubmissionId(),
+      }, {
+        headers: { 'x-timezone-offset': String(timezoneOffset) }
+      });
+      
+      if (res.data?.progression?.newBadges?.length > 0) {
+        setActiveBadgeUnlock(res.data.progression.newBadges[0]);
+      }
+      if (res.data?.progression?.leveledUp) {
+        setLevelUpLevel(res.data.progression.level);
+        setShowLevelUpModal(true);
+      }
+
       setResult(res.data.data);
       setSubmitted(true);
     } catch (err) {
@@ -149,8 +306,7 @@ const QuizSession = () => {
       submittingRef.current = false;
       setSubmitting(false);
     }
-  }, [answers, id]);
-
+  }, [answers, id, currentQuestionIndex]);
   // Countdown using absolute timestamps and visibilitychange recalibration to fix tab-switching throttling (#518)
   useEffect(() => {
     if (!quiz || submitted || !endTimeRef.current) return;
@@ -181,7 +337,7 @@ const QuizSession = () => {
     };
   }, [quiz, submitted]);
 
-  // When the countdown reaches zero, freeze input and submit automatically.
+// When the countdown reaches zero, freeze input and submit automatically.
   useEffect(() => {
     if (!quiz || submitted || timeLeft !== 0) return;
     if (autoSubmittedRef.current) return;
@@ -189,6 +345,72 @@ const QuizSession = () => {
     submitQuiz();
   }, [quiz, submitted, timeLeft, submitQuiz]);
 
+  // Load previously saved bookmarks once results are shown, so Review Mode
+  // reflects bookmarks made in earlier visits to this quiz's results.
+  useEffect(() => {
+    if (!submitted) return;
+    const loadBookmarks = async () => {
+      try {
+        const res = await API.get(`/quizzes/${id}/bookmarks`);
+        setBookmarkedIds(new Set(res.data?.data || []));
+      } catch (err) {
+        console.error('Failed to load bookmarks:', err);
+      }
+    };
+    loadBookmarks();
+  }, [submitted, id]);
+
+  const handleToggleBookmark = async (questionId) => {
+    const wasBookmarked = bookmarkedIds.has(questionId);
+    setBookmarkedIds((prev) => {
+      const next = new Set(prev);
+      wasBookmarked ? next.delete(questionId) : next.add(questionId);
+      return next;
+    });
+    try {
+      await API.post(`/quizzes/${id}/bookmarks/toggle`, { questionId });
+    } catch (err) {
+      console.error('Failed to toggle bookmark:', err);
+      setBookmarkedIds((prev) => {
+        const next = new Set(prev);
+        wasBookmarked ? next.add(questionId) : next.delete(questionId);
+        return next;
+      });
+    }
+  };
+
+  // Roving-tabindex arrow-key navigation across the review filter tabs
+  const handleFilterKeyDown = (event, index) => {
+    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+    event.preventDefault();
+    const direction = event.key === 'ArrowRight' ? 1 : -1;
+    const nextIndex = (index + direction + REVIEW_FILTERS.length) % REVIEW_FILTERS.length;
+    setReviewFilter(REVIEW_FILTERS[nextIndex].key);
+    filterTabRefs.current[nextIndex]?.focus();
+  };
+  // Reliably flush buffered telemetry on tab close / navigation using
+  // navigator.sendBeacon (fires-and-forgets even as the page unloads),
+  // plus a best-effort flush on unmount.
+  useEffect(() => {
+    const flushOnExit = () => {
+      telemetryRef.current?.flush({ useBeacon: true });
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushOnExit();
+      }
+    };
+
+    window.addEventListener('beforeunload', flushOnExit);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', flushOnExit);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      telemetryRef.current?.stopAutoFlush();
+      telemetryRef.current?.flush();
+    };
+  }, []);
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">
@@ -232,13 +454,29 @@ const QuizSession = () => {
     );
   }
 
-  const currentQuestion = quiz.questions[currentQuestionIndex];
+const currentQuestion = quiz.questions[currentQuestionIndex];
   const isLastQuestion = currentQuestionIndex === quiz.questions.length - 1;
-  const timeElapsed = timeLeft === 0 && !submitted;
+  
   const lowTime = timeLeft > 0 && timeLeft <= 30;
 
+  const reviewCounts = { all: quiz.questions.length, correct: 0, incorrect: 0, bookmarked: 0 };
+  quiz.questions.forEach((q) => {
+    if (answers[q._id] === q.correctAnswer) reviewCounts.correct += 1;
+    else reviewCounts.incorrect += 1;
+    if (bookmarkedIds.has(q._id)) reviewCounts.bookmarked += 1;
+  });
+
+  const filteredQuestions = quiz.questions
+    .map((q, idx) => ({ q, idx }))
+    .filter(({ q }) => {
+      const isCorrect = answers[q._id] === q.correctAnswer;
+      if (reviewFilter === 'incorrect') return !isCorrect;
+      if (reviewFilter === 'correct') return isCorrect;
+      if (reviewFilter === 'bookmarked') return bookmarkedIds.has(q._id);
+      return true;
+    });
   return (
-    <div className="min-h-screen bg-slate-900 text-white font-sans py-10 px-4 md:px-20">
+    <div className="min-h-screen bg-slate-900 text-white py-10 px-4 md:px-20">
       {timeElapsed && !submitted && (
         <div
           role="alert"
@@ -273,6 +511,15 @@ const QuizSession = () => {
           <h1 className="text-2xl font-bold text-slate-100">{quiz.title}</h1>
           {!submitted && (
             <div className="flex items-center gap-3">
+              <AudioWaveform status={status} />
+              <VoiceModeToggle
+                isSupported={isSupported}
+                isEnabled={isEnabled}
+                isPaused={isPaused}
+                toggleVoiceMode={toggleVoiceMode}
+                errorMsg={errorMsg}
+                status={status}
+              />
               <span
                 role="timer"
                 aria-label={`Time remaining: ${formatTime(timeLeft)}`}
@@ -292,7 +539,7 @@ const QuizSession = () => {
         {/* Quiz Content */}
         {!submitted ? (
           <div className="bg-slate-800 rounded-xl p-6 md:p-8 shadow-xl border border-slate-700">
-            <h2 className="text-xl font-semibold mb-6 leading-relaxed">
+            <h2 className="text-xl font-semibold mb-6 leading-relaxed break-words whitespace-pre-wrap">
               <MathRenderer text={currentQuestion.questionText} />
             </h2>
 
@@ -315,7 +562,9 @@ const QuizSession = () => {
                     >
                       {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-indigo-400"></div>}
                     </div>
-                    <span><MathRenderer text={option} /></span>
+                    <span>
+                      <MathRenderer text={option} />
+                    </span>
                   </button>
                 );
               })}
@@ -339,7 +588,15 @@ const QuizSession = () => {
                   }
                   className="flex items-center px-6 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold shadow-lg shadow-emerald-500/20 transition-all"
                 >
-                  Submit Quiz <FaCheckCircle className="ml-2" />
+                  {submitting ? (
+                    <>
+                      <FaSpinner className="ml-2 animate-spin" /> Submitting...
+                    </>
+                  ) : (
+                    <>
+                      Submit Quiz <FaCheckCircle className="ml-2" />
+                    </>
+                  )}
                 </button>
               ) : (
                 <button
@@ -354,7 +611,10 @@ const QuizSession = () => {
           </div>
         ) : (
           /* Results View */
-          <div id="quiz-results-container" className="bg-slate-800 rounded-xl p-8 shadow-xl border border-slate-700">
+          <div
+            id="quiz-results-container"
+            className="bg-slate-800 rounded-xl p-8 shadow-xl border border-slate-700"
+          >
             <div className="text-center mb-10">
               <div className="inline-flex items-center justify-center w-20 h-20 bg-emerald-500/10 rounded-full mb-4">
                 <FaTrophy className="text-4xl text-emerald-400" />
@@ -378,26 +638,67 @@ const QuizSession = () => {
                 >
                   Export as JSON
                 </button>
-                <button
-                  onClick={handleExportResultsPDF}
-                  className="px-4 py-2 text-sm bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 rounded-lg font-medium transition-colors flex items-center gap-2"
-                >
-                  <FaFilePdf /> Download PDF Summary
-                </button>
+                 <button
+                   onClick={handleDownloadPDFReport}
+                   className="px-4 py-2 text-sm bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 rounded-lg font-medium transition-colors flex items-center gap-2"
+                 >
+                   <FaFilePdf /> Download PDF Report
+                 </button>
               </div>
             </div>
-            <div className="space-y-6">
+<div className="space-y-6">
               <h3 className="text-xl font-semibold border-b border-slate-700 pb-2 mb-4">
                 Review Answers
               </h3>
-              {quiz.questions.map((q, idx) => {
+
+              <div role="tablist" aria-label="Filter review questions" className="flex flex-wrap gap-2 mb-6">
+                {REVIEW_FILTERS.map((f, i) => (
+                  <button
+                    key={f.key}
+                    role="tab"
+                    id={`review-tab-${f.key}`}
+                    aria-selected={reviewFilter === f.key}
+                    aria-controls="quiz-review-list"
+                    tabIndex={reviewFilter === f.key ? 0 : -1}
+                    ref={(el) => (filterTabRefs.current[i] = el)}
+                    onClick={() => setReviewFilter(f.key)}
+                    onKeyDown={(e) => handleFilterKeyDown(e, i)}
+                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                      reviewFilter === f.key
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    {f.label} <span className="ml-1 text-xs opacity-75">({reviewCounts[f.key]})</span>
+                  </button>
+                ))}
+              </div>
+
+              {filteredQuestions.length === 0 && (
+                <p className="text-sm text-slate-400 italic text-center py-6">
+                  No questions match this filter.
+                </p>
+              )}
+
+              {filteredQuestions.map(({ q, idx }) => {
                 const userAnswer = answers[q._id];
                 const isCorrect = userAnswer === q.correctAnswer;
+                const isBookmarked = bookmarkedIds.has(q._id);
 
                 return (
-                  <div key={q._id} className="p-5 bg-slate-900/50 rounded-lg border border-slate-700">
-                    <p className="font-medium text-slate-200 mb-3"><span className="text-slate-400 mr-2">{idx + 1}.</span><MathRenderer text={q.questionText} /></p>
-                    
+                  <div key={q._id} id="quiz-review-list" className="p-5 bg-slate-900/50 rounded-lg border border-slate-700">
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <p className="font-medium text-slate-200"><span className="text-slate-400 mr-2">{idx + 1}.</span><MathRenderer text={q.questionText} /></p>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleBookmark(q._id)}
+                        aria-pressed={isBookmarked}
+                        aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark this question'}
+                        className="flex-shrink-0 text-lg text-amber-400 hover:text-amber-300"
+                      >
+                        {isBookmarked ? <FaBookmark /> : <FaRegBookmark />}
+                      </button>
+                    </div>                    
                     <div className="space-y-2 mb-4">
                       {q.options.map((opt, oIdx) => {
                         let btnClass =
@@ -413,9 +714,15 @@ const QuizSession = () => {
 
                         return (
                           <div key={oIdx} className={btnClass}>
-                            <span><MathRenderer text={opt} /></span>
-                            {opt === q.correctAnswer && <FaCheckCircle className="text-emerald-400" />}
-                            {opt === userAnswer && !isCorrect && <FaTimesCircle className="text-red-400" />}
+                            <span>
+                              <MathRenderer text={opt} />
+                            </span>
+                            {opt === q.correctAnswer && (
+                              <FaCheckCircle className="text-emerald-400" />
+                            )}
+                            {opt === userAnswer && !isCorrect && (
+                              <FaTimesCircle className="text-red-400" />
+                            )}
                           </div>
                         );
                       })}
@@ -423,15 +730,37 @@ const QuizSession = () => {
 
                     {q.explanation && (
                       <div className="bg-indigo-900/30 p-3 rounded border border-indigo-500/30">
-                        <p className="text-sm text-indigo-200"><span className="font-semibold">Explanation:</span> <MathRenderer text={q.explanation} /></p>
+                        <p className="text-sm text-indigo-200">
+                          <span className="font-semibold">Explanation:</span>{' '}
+                          <MathRenderer text={q.explanation} />
+                        </p>
                       </div>
                     )}
+
+                    <QuestionExplanation
+                      question={q.questionText}
+                      options={q.options}
+                      correctAnswer={q.correctAnswer}
+                      userAnswer={resolveUserAnswerIndex(q, userAnswer)}
+                      explanation={q.explanation || ''}
+                      subjectName={quiz.subject?.name || ''}
+                      topicName={quiz.topic?.name || ''}
+                    />
                   </div>
                 );
               })}
             </div>
 
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+              {result?.score < 80 && (
+                <button
+                  onClick={() => setIsRemediationModalOpen(true)}
+                  className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 rounded-lg font-semibold shadow-lg shadow-orange-500/20 flex items-center justify-center gap-2 transition-all"
+                >
+                  <FaBrain className="text-yellow-200" /> Generate 3-Day Remediation Plan
+                </button>
+              )}
+
               <button
                 onClick={() => setIsRevisionModalOpen(true)}
                 className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-lg font-semibold shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2 transition-all"
@@ -447,6 +776,15 @@ const QuizSession = () => {
               </button>
             </div>
 
+            <RemediationPlanModal
+              isOpen={isRemediationModalOpen}
+              onClose={() => setIsRemediationModalOpen(false)}
+              quizAttemptId={result?.id || result?._id}
+              subjectId={quiz.subject?.id || quiz.subject}
+              topicId={quiz.topic?.id || quiz.topic}
+              topicName={quiz.topic?.name}
+            />
+
             <RevisionSheetModal
               isOpen={isRevisionModalOpen}
               onClose={() => setIsRevisionModalOpen(false)}
@@ -458,6 +796,20 @@ const QuizSession = () => {
           </div>
         )}
       </div>
+
+      {/* --- GAMIFICATION CELEBRATION MODALS --- */}
+      <BadgeUnlockModal
+        isOpen={!!activeBadgeUnlock}
+        title={activeBadgeUnlock?.title}
+        description={activeBadgeUnlock?.description}
+        onClose={() => setActiveBadgeUnlock(null)}
+      />
+
+      <LevelUpModal
+        level={levelUpLevel}
+        isOpen={showLevelUpModal}
+        onClose={() => setShowLevelUpModal(false)}
+      />
     </div>
   );
 };

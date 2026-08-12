@@ -1,8 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
-import { loginUser, clearError } from '../store/slices/authSlice';
+import { motion } from 'framer-motion';
+import { Mail, Lock, Eye, EyeOff, AlertCircle, BookOpen } from 'lucide-react';
+import GoogleLoginButton from '../components/auth/GoogleLoginButton';
+import GitHubLoginButton from '../components/auth/GitHubLoginButton';
+import { loginUser, loadUser, clearError } from '../store/slices/authSlice';
+import ThemeToggle from '../components/ThemeToggle';
+import SoundToggle from '../components/SoundToggle';
+import ForgotPasswordModal from '../components/auth/ForgotPasswordModal';
 
 const Login = () => {
   const dispatch = useDispatch();
@@ -11,134 +17,330 @@ const Login = () => {
 
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
+  
+  // New state for handling 2FA step
+  const [requires2FA, setRequires2FA] = useState(false);
+  const [totpToken, setTotpToken] = useState('');
+  const [verifying2FA, setVerifying2FA] = useState(false);
+  const [twoFaError, setTwoFaError] = useState('');
+
+  const [oauthError, setOauthError] = useState(null);
 
   useEffect(() => {
     if (isAuthenticated) navigate('/dashboard', { replace: true });
   }, [isAuthenticated, navigate]);
 
   useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const errorParam = searchParams.get('error');
+
+    if (errorParam) {
+      if (errorParam === 'oauth_cancelled') {
+        setOauthError('Social authentication was cancelled.');
+      } else {
+        setOauthError(decodeURIComponent(errorParam));
+      }
+    }
+  }, [navigate]);
+
+  useEffect(() => {
     return () => { dispatch(clearError()); };
   }, [dispatch]);
+
+  const loginWithGoogle = useGoogleLogin({
+    onSuccess: handleGoogleSuccess,
+    onError: (err) => {
+      console.warn('Google OAuth popup blocked or failed, redirecting:', err);
+      window.location.href = googleAuthUrl;
+    },
+  });
 
   const handleChange = (e) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    dispatch(loginUser(formData));
+    setTwoFaError('');
+    
+    // Dispatch login action
+    const resultAction = await dispatch(loginUser(formData));
+    if (loginUser.fulfilled.match(resultAction)) {
+      // Check if backend indicates 2FA is required
+      if (resultAction.payload?.requires2FA) {
+        setRequires2FA(true);
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
+    }
+  };
+
+  const handleVerify2FA = async (e) => {
+    e.preventDefault();
+    setVerifying2FA(true);
+    setTwoFaError('');
+
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/auth/2fa/verify-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email, token: totpToken }),
+      });
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        localStorage.setItem('token', data.token);
+        if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
+        dispatch(loadUser());
+        navigate('/dashboard', { replace: true });
+      } else {
+        setTwoFaError(data.error || 'Invalid 2FA code or backup code.');
+      }
+    } catch (err) {
+      setTwoFaError('An error occurred during 2FA verification.');
+    } finally {
+      setVerifying2FA(false);
+    }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-amber-900 via-stone-900 to-stone-950 p-4">
-      <div className="w-full max-w-md bg-gradient-to-br from-amber-50 to-amber-100 rounded-sm shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-amber-700/50 p-8">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold font-playfair text-stone-900">Welcome Back</h1>
-          <p className="text-stone-600 mt-2 text-sm">Sign in to continue your learning journey</p>
-        </div>
+    <div className="h-screen w-screen max-h-screen overflow-hidden flex items-center justify-center p-3 sm:p-6 bg-[#FFFBE9] dark:bg-[#000000] text-[#1F150C] dark:text-[#E1DCC9] font-inter relative select-none">
+      {/* Background Ambient Glows */}
+      <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(circle_at_70%_20%,rgba(173,139,115,0.12),transparent_50%)] pointer-events-none" />
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-sm p-3 mb-6 flex items-start gap-2 text-sm text-red-700">
-            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Email */}
-          <div>
-            <label htmlFor="login-email" className="block text-sm font-semibold text-stone-700 mb-1">Email</label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
-              <input
-                id="login-email"
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                placeholder="you@example.com"
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-stone-300 rounded-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:border-transparent text-sm"
-              />
-            </div>
-          </div>
-
-          {/* Password */}
-          <div>
-            <label htmlFor="login-password" className="block text-sm font-semibold text-stone-700 mb-1">Password</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
-              <input
-                id="login-password"
-                type={showPassword ? 'text' : 'password'}
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                placeholder="Enter your password"
-                className="w-full pl-10 pr-10 py-2.5 bg-white border border-stone-300 rounded-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:border-transparent text-sm"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
-          </div>
-
-          <div className="flex justify-end">
-            <Link to="/forgot-password" className="text-sm text-amber-700 hover:text-amber-800 font-medium">
-              Forgot Password?
+      {/* Main Split Card Container */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="w-full max-w-5xl h-full max-h-[640px] sm:max-h-[680px] bg-[#FFFBE9] dark:bg-[#16120E] rounded-3xl border border-[#CEAB93]/60 dark:border-[#412D15] shadow-2xl overflow-hidden flex flex-col md:flex-row relative z-10"
+      >
+        {/* ── LEFT COLUMN: Sign In Form Panel (55% Width) ── */}
+        <div className="w-full md:w-[55%] flex flex-col justify-between p-6 sm:p-8 md:p-10 bg-[#FFFBE9] dark:bg-[#16120E] text-[#1F150C] dark:text-[#E1DCC9] overflow-y-auto md:overflow-hidden">
+          {/* Top Logo / Mobile Controls */}
+          <div className="flex items-center justify-between">
+            <Link to="/" className="flex items-center gap-2 group">
+              <div className="bg-[#AD8B73] dark:bg-[#1F150C] p-2 rounded-xl border border-[#CEAB93]/50 dark:border-[#412D15] group-hover:scale-105 transition-transform">
+                <BookOpen className="h-5 w-5 text-[#FFFBE9] dark:text-[#E1DCC9]" />
+              </div>
+              <span className="font-playfair text-lg font-bold text-[#1F150C] dark:text-[#E1DCC9]">
+                OpenPrep AI
+              </span>
             </Link>
+            <div className="flex md:hidden items-center gap-2">
+              <SoundToggle />
+              <ThemeToggle />
+            </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            aria-busy={loading}
-            aria-label="Sign in"
-            className="w-full bg-amber-700 hover:bg-amber-800 disabled:bg-amber-400 text-amber-50 font-semibold py-2.5 rounded-sm transition-colors flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <span className="w-4 h-4 border-2 border-amber-200 border-t-transparent rounded-full animate-spin" aria-hidden="true" />
-            ) : (
-              'Sign In'
+          {/* Form Content */}
+          <div className="my-auto py-2">
+            <div className="mb-6">
+              <h1 className="text-2xl sm:text-3xl font-extrabold font-playfair tracking-tight text-[#1F150C] dark:text-[#E1DCC9]">
+                {requires2FA ? 'Two-Factor Authentication' : 'Sign in'}
+              </h1>
+              <p className="text-[#412D15] dark:text-[#C4BA9D] mt-1.5 text-xs sm:text-sm font-medium leading-relaxed">
+                {requires2FA 
+                  ? 'Please enter the 6-digit code from your authenticator app or a recovery code.'
+                  : <>Welcome back! Sign in to access your personalized dashboard. Don't have an account?{' '}
+                    <Link to="/register" className="font-bold text-[#AD8B73] hover:underline dark:text-[#E1DCC9]">
+                      Sign up here
+                    </Link></>
+                }
+              </p>
+            </div>
+
+            {(error || oauthError) && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 mb-4 flex items-center gap-2 text-xs text-red-700 dark:text-red-300 font-medium">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{error || oauthError}</span>
+              </div>
             )}
-          </button>
-        </form>
 
-        <div className="mt-6 flex items-center justify-center space-x-2">
-          <span className="h-px w-full bg-stone-300"></span>
-          <span className="text-sm text-stone-500 font-medium">OR</span>
-          <span className="h-px w-full bg-stone-300"></span>
+            {!requires2FA ? (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Email Address */}
+                <div>
+                  <label htmlFor="login-email" className="block text-xs font-bold text-[#1F150C] dark:text-[#E1DCC9] mb-1">
+                    Email address
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8C6A53] dark:text-[#C4BA9D]" />
+                    <input
+                      id="login-email"
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      required
+                      placeholder="Provide your email address"
+                      className="w-full pl-10 pr-4 py-2.5 bg-[#FFFBE9] dark:bg-[#251D17] border border-[#CEAB93] dark:border-[#412D15] rounded-xl text-[#1F150C] dark:text-[#E1DCC9] placeholder-[#8C6A53]/60 dark:placeholder-[#C4BA9D]/40 focus:outline-none focus:ring-2 focus:ring-[#AD8B73] dark:focus:ring-[#E1DCC9] text-xs sm:text-sm transition-all shadow-sm font-medium"
+                    />
+                  </div>
+                </div>
+
+                {/* Password */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label htmlFor="login-password" className="block text-xs font-bold text-[#1F150C] dark:text-[#E1DCC9]">
+                      Password
+                    </label>
+                    <Link to="/forgot-password" className="text-xs font-semibold text-[#AD8B73] hover:underline dark:text-[#E1DCC9]">
+                      Forgot password?
+                    </Link>
+                  </div>
+                  <div className="relative">
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8C6A53] dark:text-[#C4BA9D]" />
+                    <input
+                      id="login-password"
+                      type={showPassword ? 'text' : 'password'}
+                      name="password"
+                      value={formData.password}
+                      onChange={handleChange}
+                      required
+                      placeholder="Enter your password"
+                      className="w-full pl-10 pr-10 py-2.5 bg-[#FFFBE9] dark:bg-[#251D17] border border-[#CEAB93] dark:border-[#412D15] rounded-xl text-[#1F150C] dark:text-[#E1DCC9] placeholder-[#8C6A53]/60 dark:placeholder-[#C4BA9D]/40 focus:outline-none focus:ring-2 focus:ring-[#AD8B73] dark:focus:ring-[#E1DCC9] text-xs sm:text-sm transition-all shadow-sm font-medium"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#8C6A53] hover:text-[#1F150C] dark:text-[#C4BA9D] dark:hover:text-[#E1DCC9] transition"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Submit CTA */}
+                <motion.button
+                  whileHover={{ scale: 1.015 }}
+                  whileTap={{ scale: 0.985 }}
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3 rounded-xl btn-primary-theme font-bold shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 text-sm mt-2"
+                >
+                  {loading ? (
+                    <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    'Sign In'
+                  )}
+                </motion.button>
+              </form>
+            ) : (
+              <form onSubmit={handleVerify2FA} className="space-y-4">
+                <div>
+                  <label htmlFor="totp-token" className="block text-xs font-bold text-[#1F150C] dark:text-[#E1DCC9] mb-1">
+                    Authentication Code
+                  </label>
+                  <div className="relative">
+                    <ShieldCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8C6A53] dark:text-[#C4BA9D]" />
+                    <input
+                      id="totp-token"
+                      type="text"
+                      maxLength="8"
+                      value={totpToken}
+                      onChange={(e) => setTotpToken(e.target.value)}
+                      required
+                      placeholder="Enter 6-digit code or backup code"
+                      className="w-full pl-10 pr-4 py-2.5 bg-[#FFFBE9] dark:bg-[#251D17] border border-[#CEAB93] dark:border-[#412D15] rounded-xl text-[#1F150C] dark:text-[#E1DCC9] placeholder-[#8C6A53]/60 dark:placeholder-[#C4BA9D]/40 focus:outline-none focus:ring-2 focus:ring-[#AD8B73] dark:focus:ring-[#E1DCC9] text-sm tracking-widest transition-all shadow-sm font-semibold"
+                    />
+                  </div>
+                </div>
+
+                <motion.button
+                  whileHover={{ scale: 1.015 }}
+                  whileTap={{ scale: 0.985 }}
+                  type="submit"
+                  disabled={verifying2FA}
+                  className="w-full py-3 rounded-xl btn-primary-theme font-bold shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 text-sm mt-2"
+                >
+                  {verifying2FA ? (
+                    <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    'Verify Code'
+                  )}
+                </motion.button>
+
+                <button
+                  type="button"
+                  onClick={() => setRequires2FA(false)}
+                  className="w-full text-center text-xs text-[#AD8B73] dark:text-[#C4BA9D] hover:underline font-semibold mt-2"
+                >
+                  Back to standard sign in
+                </button>
+              </form>
+            )}
+
+            {/* Social OAuth Buttons */}
+            <div className="space-y-3">
+              <GoogleLoginButton />
+              <GitHubLoginButton />
+            </div>
+          </div>
+
+          {/* Legal Terms Footer */}
+          <p className="text-center text-[11px] text-[#8C6A53] dark:text-[#C4BA9D]/80 font-medium">
+            By signing in you agree to OpenPrep's{' '}
+            <a href="#" className="underline font-semibold hover:text-[#1F150C] dark:hover:text-[#E1DCC9]">Privacy Policy</a> and{' '}
+            <a href="#" className="underline font-semibold hover:text-[#1F150C] dark:hover:text-[#E1DCC9]">Terms of Service</a>
+          </p>
         </div>
 
-        <div className="mt-6">
-          <a
-            href="http://localhost:5000/api/auth/google"
-            className="w-full flex items-center justify-center gap-2 bg-white border border-stone-300 hover:bg-stone-50 text-stone-700 font-semibold py-2.5 rounded-sm transition-colors"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-              <path fill="none" d="M1 1h22v22H1z" />
-            </svg>
-            Continue with Google
-          </a>
-        </div>
+        {/* ── RIGHT COLUMN: Hero Visual & Brand Panel (45% Width) ── */}
+        <div className="hidden md:flex md:w-[45%] flex-col justify-between p-8 md:p-10 relative overflow-hidden bg-[#0D0A08] text-[#E1DCC9] border-l border-[#CEAB93]/30 dark:border-[#412D15]">
+          {/* Abstract Hero Image Background */}
+          <img
+            src="/assets/abstract_hero.png"
+            alt="OpenPrep Abstract Sculpture"
+            className="absolute inset-0 w-full h-full object-cover opacity-80 mix-blend-screen scale-105 -z-0"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0D0A08] via-[#0D0A08]/40 to-[#0D0A08]/70 -z-0" />
 
-        <p className="text-center text-sm text-stone-600 mt-6">
-          Don't have an account?{' '}
-          <Link to="/register" className="text-amber-700 hover:text-amber-800 font-semibold">
-            Create One
-          </Link>
-        </p>
-      </div>
+          {/* Top Brand Header & Controls */}
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-[#AD8B73] dark:bg-[#1F150C] border border-[#CEAB93]/40 dark:border-[#412D15] flex items-center justify-center shadow-lg">
+                <BookOpen className="w-4 h-4 text-[#FFFBE9] dark:text-[#E1DCC9]" />
+              </div>
+              <span className="font-playfair text-xl font-extrabold tracking-wide text-white">
+                OpenPrep
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <SoundToggle />
+              <ThemeToggle />
+            </div>
+          </div>
+
+          {/* Center Tagline */}
+          <div className="relative z-10 my-auto py-6">
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <h2 className="text-2xl sm:text-3xl font-extrabold font-playfair leading-tight text-white drop-shadow-md">
+                Realize the potential of AI-Powered Exam Preparation
+              </h2>
+              <p className="mt-3 text-xs sm:text-sm text-[#C4BA9D] leading-relaxed font-medium">
+                Personalized study schedules, real-time PYQ analytics, interactive flashcards, and instant AI tutoring.
+              </p>
+            </motion.div>
+          </div>
+
+          {/* Bottom Support Footer */}
+          <div className="relative z-10 text-xs text-[#C4BA9D]/90">
+            <p className="font-medium">Experiencing issues?</p>
+            <p className="mt-0.5">
+              Get assistance via{' '}
+              <a href="mailto:support@openprep.ai" className="underline font-bold text-white hover:text-[#CEAB93] transition">
+                support@openprep.ai
+              </a>
+            </p>
+          </div>
+        </div>
+      </motion.div>
+      <ForgotPasswordModal isOpen={isForgotPasswordOpen} onClose={() => setIsForgotPasswordOpen(false)} />
     </div>
   );
 };

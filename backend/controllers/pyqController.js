@@ -2,13 +2,17 @@ const fs = require('fs');
 const path = require('path');
 const pdfParse = require('pdf-parse');
 const { Op } = require('sequelize');
+const { sequelize } = require('../config/db');
 const PYQ = require('../models/PYQ');
 const Subject = require('../models/Subject');
 const Topic = require('../models/Topic');
 const ActivityLog = require('../models/ActivityLog');
 const geminiService = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
+const { clusterByCosineSimilarity } = require('../utils/vectorUtils');
 
+// Cosine similarity cutoff above which two questions are treated as duplicates
+const PYQ_SIMILARITY_THRESHOLD = 0.85;
 // A simple concurrency limiter to prevent OOM on concurrent large PDF uploads
 class Semaphore {
   constructor(max) {
@@ -39,9 +43,10 @@ const pdfParseSemaphore = new Semaphore(2);
 // @access  Private
 exports.uploadAndAnalyzePYQ = async (req, res, next) => {
   try {
-const { examId, subjectId, year, title, difficulty } = req.body;
-    if (!req.file) {
-      return res.status(400).json({ success: false, error: 'Please upload a question paper PDF' });
+    const { examId, subjectId, year, title, difficulty, extractedText: ocrText, fileUrl: ocrFileUrl } = req.body;
+    
+    if (!req.file && !ocrText) {
+      return res.status(400).json({ success: false, error: 'Please upload a question paper PDF or provide extracted text' });
     }
 
     const subject = await Subject.findByPk(subjectId);
@@ -49,20 +54,25 @@ const { examId, subjectId, year, title, difficulty } = req.body;
       return res.status(404).json({ success: false, error: 'Subject not found' });
     }
 
-    // Read PDF and extract text
-    let extractedText = '';
-    try {
-      await pdfParseSemaphore.acquire();
+    // Read PDF and extract text if no OCR text provided
+    let extractedText = ocrText || '';
+    let fileUrl = ocrFileUrl || '';
+
+    if (!ocrText && req.file) {
+      fileUrl = `/uploads/${req.file.filename}`;
       try {
-        const dataBuffer = await fs.promises.readFile(req.file.path);
-        const pdfData = await pdfParse(dataBuffer);
-        extractedText = pdfData.text;
-      } finally {
-        pdfParseSemaphore.release();
+        await pdfParseSemaphore.acquire();
+        try {
+          const dataBuffer = await fs.promises.readFile(req.file.path);
+          const pdfData = await pdfParse(dataBuffer);
+          extractedText = pdfData.text;
+        } finally {
+          pdfParseSemaphore.release();
+        }
+      } catch (parseError) {
+        console.error('PDF parsing error:', parseError);
+        extractedText = `Mock exam paper text for ${subject.name} - Year ${year}. Dynamic Program, caching, time complexity analysis.`;
       }
-    } catch (parseError) {
-      console.error('PDF parsing error:', parseError);
-      extractedText = `Mock exam paper text for ${subject.name} - Year ${year}. Dynamic Program, caching, time complexity analysis.`;
     }
 
     // Call Gemini API for structure analysis
@@ -80,7 +90,7 @@ const { examId, subjectId, year, title, difficulty } = req.body;
       year: parseInt(year),
       difficulty: ['Easy', 'Medium', 'Hard'].includes(difficulty) ? difficulty : 'Medium',
       chapters,
-      fileUrl: `/uploads/${req.file.filename}`,
+      fileUrl: fileUrl,
       analyzed: true,
       analysisResults: analysis,
       user: req.user.id,
@@ -164,16 +174,106 @@ const { examId, subjectId, year, title, difficulty } = req.body;
       const filePath = path.join(__dirname, '..', 'uploads', req.file.filename);
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     }
+next(error);
+  }
+};
+
+// @desc    Detect near-duplicate / repeated PYQ questions across exam years
+//          using Gemini text embeddings + cosine similarity clustering
+// @route   GET /api/pyqs/clusters/:subjectId
+// @access  Private
+exports.getPYQClusters = async (req, res, next) => {
+  try {
+    const { subjectId } = req.params;
+
+    const subject = await Subject.findByPk(subjectId);
+    if (!subject) {
+      return res.status(404).json({ success: false, error: 'Subject not found' });
+    }
+
+    const pyqs = await PYQ.findAll({
+      where: { subject: subjectId, user: req.user.id, analyzed: true },
+      order: [['year', 'ASC']],
+    });
+
+    // Flatten every previously-detected repeated question from each paper's
+    // own analysis into one candidate list, tagging each with the years
+    // it's linked to (its paper's year, plus any years Gemini already noted).
+    const candidates = [];
+    for (const pyq of pyqs) {
+      const repeatedQuestions = pyq.analysisResults?.repeatedQuestions || [];
+      for (const rq of repeatedQuestions) {
+        if (!rq?.questionText) continue;
+        const years = new Set(Array.isArray(rq.years) ? rq.years : []);
+        years.add(pyq.year);
+        candidates.push({ questionText: rq.questionText.trim(), years });
+      }
+    }
+
+    if (candidates.length === 0) {
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        data: [],
+        message: 'No repeated question patterns found yet. Upload and analyze more PYQ papers for this subject.',
+      });
+    }
+
+    // Compute (cached) embeddings for each candidate question
+    const embeddedCandidates = [];
+    for (const candidate of candidates) {
+      const embedding = await geminiService.generateEmbedding(candidate.questionText);
+      if (embedding && embedding.length > 0) {
+        embeddedCandidates.push({ ...candidate, embedding });
+      }
+    }
+
+    const clusters = clusterByCosineSimilarity(embeddedCandidates, PYQ_SIMILARITY_THRESHOLD);
+
+    // Only surface clusters genuinely repeated across MULTIPLE distinct years
+    const data = clusters
+      .map((cluster) => {
+        const years = new Set();
+        cluster.forEach((c) => c.years.forEach((y) => years.add(y)));
+        return {
+          questionText: cluster[0].questionText,
+          years: Array.from(years).sort((a, b) => a - b),
+          occurrences: cluster.length,
+        };
+      })
+      .filter((cluster) => cluster.years.length > 1)
+      .sort((a, b) => b.years.length - a.years.length);
+
+    res.status(200).json({ success: true, count: data.length, data });
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({ success: false, error: error.message });
+    }
     next(error);
   }
 };
 
-// @desc    Get all PYQs
-// @route   GET /api/pyqs
+// @desc    Full-text search for PYQ question papers & contents
+//          Uses PostgreSQL tsvector / tsquery & GIN index ranking when available
+// @route   GET /api/pyqs/search
 // @access  Private
-exports.getPYQs = async (req, res, next) => {
+exports.searchPYQs = async (req, res, next) => {
+  const startTime = process.hrtime.bigint();
   try {
-    const { subjectId, courseId, year, difficulty, chapter } = req.query;
+    const { q, search, subjectId, courseId, year, difficulty, chapter } = req.query;
+    const searchQuery = (q || search || '').trim();
+
+    if (!searchQuery) {
+      return res.status(400).json({ success: false, error: 'Search query is required' });
+    }
+
     const targetId = subjectId || courseId;
     if (targetId) {
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -191,7 +291,115 @@ exports.getPYQs = async (req, res, next) => {
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const offset = (page - 1) * limit;
 
-const filter = { user: req.user.id };
+    const filter = { user: req.user.id };
+    if (targetId) filter.subject = targetId;
+    if (year) filter.year = parseInt(year, 10);
+    if (difficulty) {
+      const difficultyList = difficulty.split(',').filter((d) => ['Easy', 'Medium', 'Hard'].includes(d));
+      if (difficultyList.length > 0) filter.difficulty = { [Op.in]: difficultyList };
+    }
+    if (chapter) filter.chapters = { [Op.contains]: [chapter] };
+
+    // Format multi-keyword search terms
+    const cleanWords = searchQuery
+      .replace(/[':\*\&\|\!\(\)]/g, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length > 0);
+
+    let order = [['year', 'DESC']];
+
+    const dialect = sequelize ? sequelize.getDialect() : 'postgres';
+    if (dialect === 'postgres' && cleanWords.length > 0) {
+      const tsqueryStr = cleanWords.map((w) => `${w}:*`).join(' & ');
+      const escapedTsquery = sequelize.escape(tsqueryStr);
+
+      filter[Op.and] = filter[Op.and] || [];
+      filter[Op.and].push(
+        sequelize.literal(
+          `coalesce("searchVector", to_tsvector('english', coalesce(title, '') || ' ' || coalesce(array_to_string(chapters, ' '), '') || ' ' || coalesce("analysisResults"::text, ''))) @@ to_tsquery('english', ${escapedTsquery})`
+        )
+      );
+
+      order = [
+        [
+          sequelize.literal(
+            `ts_rank(coalesce("searchVector", to_tsvector('english', coalesce(title, '') || ' ' || coalesce(array_to_string(chapters, ' '), '') || ' ' || coalesce("analysisResults"::text, ''))), to_tsquery('english', ${escapedTsquery}))`
+          ),
+          'DESC',
+        ],
+        ['year', 'DESC'],
+      ];
+    } else if (cleanWords.length > 0) {
+      // In-memory / SQLite fallback for unit testing environments
+      const searchConditions = cleanWords.map((word) => {
+        const pattern = `%${word}%`;
+        const searchOp = Op.iLike || Op.like;
+        return {
+          [Op.or]: [
+            { title: { [searchOp]: pattern } },
+            sequelize.where(sequelize.fn('LOWER', sequelize.col('title')), 'LIKE', pattern.toLowerCase()),
+            sequelize.where(sequelize.fn('LOWER', sequelize.col('chapters')), 'LIKE', pattern.toLowerCase()),
+            sequelize.where(sequelize.fn('LOWER', sequelize.col('analysisResults')), 'LIKE', pattern.toLowerCase()),
+          ],
+        };
+      });
+      filter[Op.and] = [...(filter[Op.and] || []), ...searchConditions];
+    }
+
+    const { count: total, rows: pyqs } = await PYQ.findAndCountAll({
+      where: filter,
+      order,
+      offset,
+      limit,
+    });
+
+    const endTime = process.hrtime.bigint();
+    const queryExecutionTimeMs = Number(endTime - startTime) / 1e6;
+
+    res.status(200).json({
+      success: true,
+      count: pyqs.length,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+      queryExecutionTimeMs: Math.round(queryExecutionTimeMs * 100) / 100,
+      data: pyqs,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get all PYQs for the authenticated user (with optional search)
+// @route   GET /api/pyqs
+// @access  Private
+exports.getPYQs = async (req, res, next) => {
+  try {
+    const { subjectId, courseId, year, difficulty, chapter, search, q } = req.query;
+    const searchQuery = (q || search || '').trim();
+
+    if (searchQuery) {
+      return exports.searchPYQs(req, res, next);
+    }
+
+    const targetId = subjectId || courseId;
+    if (targetId) {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(targetId)) {
+        return res.status(400).json({ success: false, error: 'Invalid ID format' });
+      }
+
+      const subjectExists = await Subject.findByPk(targetId);
+      if (!subjectExists) {
+        return res.status(404).json({ success: false, error: 'Course/Subject not found' });
+      }
+    }
+
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const offset = (page - 1) * limit;
+
+    const filter = { user: req.user.id };
     if (targetId) filter.subject = targetId;
     if (year) filter.year = parseInt(year, 10);
     if (difficulty) {
@@ -464,6 +672,183 @@ exports.getUpcomingForecast = async (req, res, next) => {
       success: true,
       data: forecast,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const PYQAnalysis = require('../models/PYQAnalysis');
+const PYQQuestion = require('../models/PYQQuestion');
+const pyqAnalyzerService = require('../services/pyqAnalyzerService');
+const PDFDocument = require('pdfkit');
+
+exports.analyzePYQBatch = async (req, res, next) => {
+  try {
+    const { subjectId, examName } = req.body;
+    const files = req.files;
+
+    if (!subjectId) {
+      return res.status(400).json({ success: false, error: 'subjectId is required.' });
+    }
+
+    if (!files || files.length === 0) {
+      return res.status(400).json({ success: false, error: 'Please upload at least one past exam paper PDF.' });
+    }
+
+    const subject = await Subject.findByPk(subjectId);
+    if (!subject) {
+      return res.status(404).json({ success: false, error: 'Subject not found.' });
+    }
+
+    // 1. Extract combined text from uploaded files (PDF/Image)
+    const combinedText = await pyqAnalyzerService.extractTextFromFiles(files, subject.name);
+
+    // 2. Call batch analysis via Gemini
+    const result = await pyqAnalyzerService.analyzePYQBatch(combinedText, subject.name);
+
+    // 3. Save aggregated analysis to DB
+    const analysis = await PYQAnalysis.create({
+      subjectId,
+      examName: examName || result.examName || 'Board Exams',
+      yearRange: result.yearRange,
+      weightageData: result.weightageData,
+      totalQuestions: result.totalQuestions,
+      userId: req.user.id,
+    });
+
+    // 4. Save individual questions for trend heatmaps
+    if (result.questions && result.questions.length > 0) {
+      const questionsToCreate = result.questions.map((q) => ({
+        pyqAnalysisId: analysis.id,
+        chapterName: q.chapterName || 'General',
+        topicName: q.topicName || 'General Concepts',
+        questionText: q.questionText,
+        marks: q.marks || 5,
+        year: q.year || 2024,
+      }));
+      await PYQQuestion.bulkCreate(questionsToCreate);
+    }
+
+    // Clean up local temp files uploaded by multer
+    for (const file of files) {
+      fs.unlink(file.path, (err) => {
+        if (err) console.error('Failed to delete temp file:', file.path);
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      data: {
+        id: analysis.id,
+        examName: analysis.examName,
+        yearRange: analysis.yearRange,
+        weightageData: analysis.weightageData,
+        totalQuestions: analysis.totalQuestions,
+        questions: result.questions,
+      },
+    });
+  } catch (error) {
+    // Attempt temp files cleanup on error
+    if (req.files) {
+      for (const file of req.files) {
+        fs.unlink(file.path, (err) => {});
+      }
+    }
+    next(error);
+  }
+};
+
+exports.getSubjectAnalyses = async (req, res, next) => {
+  try {
+    const { subjectId } = req.params;
+    const analyses = await PYQAnalysis.findAll({
+      where: { subjectId, userId: req.user.id },
+      order: [['createdAt', 'DESC']],
+      include: [
+        { model: PYQQuestion, as: 'questions' },
+      ],
+    });
+
+    res.status(200).json({
+      success: true,
+      data: analyses,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.exportPYQAnalysisPDF = async (req, res, next) => {
+  try {
+    const { analysisId } = req.params;
+    const analysis = await PYQAnalysis.findOne({
+      where: { id: analysisId, userId: req.user.id },
+      include: [
+        { model: PYQQuestion, as: 'questions' },
+      ],
+    });
+
+    if (!analysis) {
+      return res.status(404).json({ success: false, error: 'Analysis record not found.' });
+    }
+
+    const doc = new PDFDocument({ margin: 50 });
+    
+    // Set headers
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=PYQ_Analysis_${analysis.yearRange}.pdf`);
+    doc.pipe(res);
+
+    // Title
+    doc.fontSize(22).font('Helvetica-Bold').text('PYQ Trend Analysis Report', { align: 'center' });
+    doc.moveDown();
+
+    // Metadata
+    doc.fontSize(12).font('Helvetica').text(`Exam Category: ${analysis.examName}`);
+    doc.text(`Year Range: ${analysis.yearRange}`);
+    doc.text(`Total Questions Analyzed: ${analysis.totalQuestions}`);
+    doc.text(`Generated On: ${new Date().toLocaleDateString()}`);
+    doc.moveDown(1.5);
+
+    // Divider
+    doc.moveTo(50, doc.y).lineTo(550, doc.y).strokeColor('#e2e8f0').stroke();
+    doc.moveDown(1.5);
+
+    // Chapter Weightage
+    doc.fontSize(16).font('Helvetica-Bold').text('Chapter Marks Weightage Breakdown');
+    doc.moveDown(0.5);
+
+    const weightageList = analysis.weightageData?.chapterWeightage || [];
+    weightageList.forEach((ch, idx) => {
+      doc.fontSize(11).font('Helvetica-Bold').text(`${idx + 1}. ${ch.chapterName}`);
+      doc.fontSize(10).font('Helvetica').text(`   Weightage: ${ch.percentage}% (${ch.marks} marks over ${ch.questionCount} questions)`);
+      doc.moveDown(0.3);
+    });
+
+    doc.moveDown(1.5);
+
+    // Recurring Topics List
+    doc.fontSize(16).font('Helvetica-Bold').text('High-Yield Priorities & Topics');
+    doc.moveDown(0.5);
+
+    const topicsSeen = {};
+    (analysis.questions || []).forEach((q) => {
+      if (q.topicName) {
+        topicsSeen[q.topicName] = (topicsSeen[q.topicName] || 0) + 1;
+      }
+    });
+
+    const topTopicsList = Object.entries(topicsSeen)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
+
+    topTopicsList.forEach(([topic, count], idx) => {
+      doc.fontSize(11).font('Helvetica-Bold').text(`- ${topic}`);
+      doc.fontSize(10).font('Helvetica').text(`   Appeared in past papers: ${count} times`);
+      doc.moveDown(0.2);
+    });
+
+    doc.end();
   } catch (error) {
     next(error);
   }

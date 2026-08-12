@@ -12,3 +12,12 @@ export const socket = io(URL, {
   reconnectionDelay: 1000,
   reconnectionDelayMax: 5000,
 });
+
+export const connectSocket = () => {
+  socket.auth = {
+    token: localStorage.getItem('token'),
+  };
+  if (!socket.connected) {
+    socket.connect();
+  }
+};

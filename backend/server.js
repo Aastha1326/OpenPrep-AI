@@ -7,6 +7,8 @@ const cookieParser = require('cookie-parser');
 const csrf = require('csurf');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const http = require('http');
+const { Server } = require('socket.io');
 const { connectDB } = require('./config/db');
 const errorHandler = require('./middleware/error');
 const { protect } = require('./middleware/auth');
@@ -14,12 +16,26 @@ const fs = require('fs');
 const PYQ = require('./models/PYQ');
 const Note = require('./models/Note');
 const Achievement = require('./models/Achievement');
-const http = require('http');
-const { Server } = require('socket.io');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
 const passport = require('./config/passport');
 const { getCorsMiddleware, getSocketCorsOrigin } = require('./middleware/corsHandler');
+const http = require('http');
+const { Server } = require('socket.io');
+const app = require('./app'); // Your Express app
+const setupQuizBattleSocket = require('./sockets/quizBattleSocket');
+
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: { origin: '*', methods: ['GET', 'POST'] },
+});
+
+setupQuizBattleSocket(io);
+
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
 // Validate required environment variables at startup
 if (!process.env.JWT_SECRET) {
   console.error('FATAL ERROR: JWT_SECRET is not defined in environment variables.');
@@ -43,6 +59,11 @@ const progressRoutes = require('./routes/progressRoutes');
 const communityRoutes = require('./routes/communityRoutes');
 const userRoutes = require('./routes/userRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const aiRoutes = require('./routes/aiRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
+const calendarRoutes = require('./routes/calendarRoutes');
+const gamificationRoutes = require('./routes/gamificationRoutes');
+const battleRoutes = require('./routes/battleRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 initNotificationCron();
@@ -62,30 +83,62 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // Security Middlewares
-app.use(
-  helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://fonts.googleapis.com"],
-        imgSrc: ["'self'", 'data:', 'https:'],
-        connectSrc: ["'self'"],
-        fontSrc: ["'self'", 'https:', 'data:', "https://fonts.gstatic.com"],
-        objectSrc: ["'none'"],
-        frameAncestors: ["'none'"],
-        upgradeInsecureRequests: [],
-      },
+// Directives shared by every response. Gemini calls happen server-side (see
+// services/geminiService.js) but the API host is still explicitly
+// allow-listed here in case a client ever needs to reach it directly.
+const baseCspDirectives = {
+  defaultSrc: ["'self'"],
+  styleSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://fonts.googleapis.com'],
+  imgSrc: ["'self'", 'data:', 'https:'],
+  connectSrc: ["'self'", 'https://generativelanguage.googleapis.com'],
+  fontSrc: ["'self'", 'https:', 'data:', 'https://fonts.gstatic.com'],
+  objectSrc: ["'none'"],
+  frameAncestors: ["'none'"],
+  upgradeInsecureRequests: [],
+};
+
+const hstsOptions = {
+  maxAge: 63072000, // 2 years
+  includeSubDomains: true,
+  preload: true,
+};
+
+// Strict CSP for every route: no 'unsafe-inline' in script-src, which is
+// what security-header scanners (e.g. Mozilla Observatory) require for a
+// Grade A score.
+const securityHeaders = helmet({
+  contentSecurityPolicy: {
+    directives: {
+      ...baseCspDirectives,
+      scriptSrc: ["'self'", 'https://cdn.jsdelivr.net'],
     },
-    hsts: {
-      maxAge: 63072000, // 2 years
-      includeSubDomains: true,
-      preload: true,
+  },
+  hsts: hstsOptions,
+  xContentTypeOptions: true,
+  xFrameOptions: { action: 'deny' },
+});
+
+// swagger-ui-express renders its page with an inline bootstrap <script>, so
+// /api-docs needs 'unsafe-inline' in script-src or the docs page breaks.
+// Every other route keeps the strict policy above.
+const docsSecurityHeaders = helmet({
+  contentSecurityPolicy: {
+    directives: {
+      ...baseCspDirectives,
+      scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
     },
-    xContentTypeOptions: true,
-  })
-);
-app.use(getCorsMiddleware());
+  },
+  hsts: hstsOptions,
+  xContentTypeOptions: true,
+  xFrameOptions: { action: 'deny' },
+});
+
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api-docs')) {
+    return docsSecurityHeaders(req, res, next);
+  }
+  return securityHeaders(req, res, next);
+});app.use(getCorsMiddleware());
 app.use(passport.initialize());
 
 // Cookie parser (required for csurf cookie-based tokens)
@@ -93,8 +146,16 @@ app.use(cookieParser());
 
 // CSRF protection middleware
 const csrfProtection = csrf({ cookie: true });
-app.use(csrfProtection);
-
+// The batched quiz-telemetry endpoint is flushed via navigator.sendBeacon()
+// on tab close/navigation, which cannot attach a CSRF header. It's already
+// protected by its own JWT-based auth (see middleware/telemetryAuth.js), so
+// CSRF protection is skipped only for this one route.
+app.use((req, res, next) => {
+  if (req.path === '/api/quiz/telemetry/batch' || req.path === '/api/quizzes/telemetry/batch') {
+    return next();
+  }
+  return csrfProtection(req, res, next);
+});
 // CSRF Token Endpoint for frontend clients
 app.get('/api/csrf-token', (req, res) => {
   res.json({ csrfToken: req.csrfToken() });
@@ -105,6 +166,17 @@ app.use(compression());
 
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+
+// Mount Redis-backed distributed rate limiters
+const { authRateLimiter, aiRateLimiter, standardGetRateLimiter } = require('./middleware/redisRateLimiter');
+app.use('/api/auth', authRateLimiter);
+app.use('/api/ai', aiRateLimiter);
+app.use('/api', (req, res, next) => {
+  if (req.method === 'GET' && !req.path.startsWith('/auth') && !req.path.startsWith('/ai')) {
+    return standardGetRateLimiter(req, res, next);
+  }
+  next();
+});
 
 // General API rate limiter: 100 requests per 15 minutes per IP
 // Auth routes have tighter per-route limits defined in authRoutes.js
@@ -129,7 +201,7 @@ app.get('/uploads/:filename', protect, async (req, res, next) => {
   try {
     const filename = req.params.filename;
     const fileUrl = `/uploads/${filename}`;
-    
+
     let record = await Note.findOne({ where: { fileUrl } });
     let isPublic = false;
     let owner = null;
@@ -162,6 +234,11 @@ app.get('/uploads/:filename', protect, async (req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/academic', academicRoutes);
 app.use('/api/pyqs', pyqRoutes);
+app.use('/api/pyq', pyqRoutes);
+app.use('/api/community', communityRoutes);
+app.use('/api/study', fatigueRoutes);
+app.use('/api/documents', pdfRoutes);
+app.use('/api/sync', syncRoutes);
 app.use('/api/study-plans', studyPlanRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/quiz', quizRoutes);
@@ -170,33 +247,62 @@ app.use('/api/notes', noteRoutes);
 app.use('/api/progress', progressRoutes);
 app.use('/api/community', communityRoutes);
 app.use('/api/users', userRoutes);
+app.get('/api/user/quota', protect, require('./controllers/userController').getQuota);
+app.use('/api/ai', aiRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/calendar', calendarRoutes);
+app.use('/api/gamification', gamificationRoutes);
+app.use('/api/battles', battleRoutes);
 
 // Base Route
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to OpenPrep AI Backend REST API API Services' });
 });
 
-// Health Check Route
+// Health Check Routes
+app.get(['/api/v1/health', '/api/health'], async (req, res) => {
+  try {
+    const { sequelize } = require('./config/db');
+    await sequelize.authenticate();
+    res.status(200).json({
+      status: 'ok',
+      db: 'connected',
+      uptime: process.uptime(),
+      memoryUsage: process.memoryUsage(),
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      db: 'disconnected',
+      error: error.message,
+    });
+  }
+});
+
 app.get('/healthz', (req, res) => {
   res.status(200).send('OK');
 });
 
 // Swagger UI Documentation
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-  customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: 'OpenPrep AI API Documentation',
-  swaggerOptions: {
-    persistAuthorization: true,
-    displayRequestDuration: true,
-  },
-}));
+app.use(
+  '/api-docs',
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec, {
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: 'OpenPrep AI API Documentation',
+    swaggerOptions: {
+      persistAuthorization: true,
+      displayRequestDuration: true,
+    },
+  })
+);
 
 // Error Handler Middleware
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
-
+const server = http.createServer(app);
 
 const server = http.createServer(app);
 
@@ -205,7 +311,7 @@ const io = new Server(server, {
     origin: getSocketCorsOrigin(),
     methods: ['GET', 'POST'],
     credentials: true,
-  },  // Longer timeouts tolerate throttled timers in backgrounded/idle browser
+  }, // Longer timeouts tolerate throttled timers in backgrounded/idle browser
   // tabs, so active lobby players aren't disconnected on a missed heartbeat.
   pingTimeout: 60000,
   pingInterval: 25000,
@@ -221,3 +327,42 @@ startScheduler();
 server.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
 });
+
+// Graceful Shutdown Logic
+const gracefulShutdown = (signal) => {
+  console.log(`Received ${signal}. Starting graceful shutdown...`);
+
+  // Force exit timeout (10 seconds maximum connection drain)
+  const forceExitTimeout = setTimeout(() => {
+    console.error('Graceful shutdown timed out. Forcing database connection termination and server exit.');
+    process.exit(1);
+  }, 10000);
+
+  server.close(async () => {
+    console.log('HTTP connections drained. Closing resource pools...');
+    clearTimeout(forceExitTimeout);
+
+    try {
+      const { sequelize } = require('./config/db');
+      await sequelize.close();
+      console.log('Sequelize PostgreSQL connection pool closed.');
+    } catch (dbErr) {
+      console.error('Error closing database pool:', dbErr.message);
+    }
+
+    try {
+      const redisService = require('./services/redisService');
+      if (redisService.client) {
+        await redisService.client.quit();
+        console.log('Redis client connection closed.');
+      }
+    } catch (redisErr) {
+      console.error('Error closing Redis connection:', redisErr.message);
+    }
+
+    process.exit(0);
+  });
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

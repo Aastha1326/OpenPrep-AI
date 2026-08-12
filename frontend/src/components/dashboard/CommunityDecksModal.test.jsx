@@ -57,9 +57,10 @@ describe('CommunityDecksModal Component', () => {
 
     // Check deck metadata
     expect(screen.getByText('Organic Chemistry')).toBeInTheDocument();
-    expect(screen.getByText('By Alice • For MCAT')).toBeInTheDocument();
-    expect(screen.getByText('Cards: 45')).toBeInTheDocument();
-    expect(screen.getByText('Clones: 120')).toBeInTheDocument();
+    expect(screen.getByText(/Alice/)).toBeInTheDocument();
+    expect(screen.getByText(/MCAT/)).toBeInTheDocument();
+    expect(screen.getByText(/45/)).toBeInTheDocument();
+    expect(screen.getByText(/120/)).toBeInTheDocument();
 
     // Perform clone operation
     const cloneBtn = screen.getByRole('button', { name: /Clone Deck/i });

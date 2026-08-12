@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Brain, ArrowLeft, RotateCw, CheckCircle2, Volume2, VolumeX, AlertCircle, Settings } from 'lucide-react';
 import API from '../services/api';
+import useVoiceControl from '../hooks/useVoiceControl';
+import VoiceModeToggle from '../components/VoiceModeToggle';
+import AudioWaveform from '../components/AudioWaveform';
 
 const STORAGE_KEY = 'flashcardReviewSession';
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -141,7 +144,6 @@ const FlashcardReview = () => {
     hard: 0, // quality < 3
   });
 
-  const [isSpeaking, setIsSpeaking] = useState(false);
   const [speechRate, setSpeechRate] = useState(1);
 
   const [submitting, setSubmitting] = useState(false);
@@ -150,18 +152,6 @@ const FlashcardReview = () => {
   const reviewCardIdRef = useRef(null);
   const isMountedRef = useRef(true);
   const sessionStatsRef = useRef(sessionStats);
-
-  // Cancel speech synthesis and reset the speaking flag when the card or
-  // flip state changes (render-phase reset keeps the flag in sync).
-  const speechKey = `${currentIndex}:${isFlipped}`;
-  const [prevSpeechKey, setPrevSpeechKey] = useState(speechKey);
-  if (prevSpeechKey !== speechKey) {
-    setPrevSpeechKey(speechKey);
-    setIsSpeaking(false);
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
-  }
 
   const fetchDueCards = async () => {
     try {
@@ -191,6 +181,18 @@ const FlashcardReview = () => {
   const currentCard = cards[currentIndex];
   const isSessionComplete = !loading && cards.length > 0 && currentIndex >= cards.length;
   const noCardsDue = !loading && cards.length === 0;
+
+  const lastFlipTimeRef = useRef(0);
+
+  const handleCardFlip = useCallback((e) => {
+    const now = Date.now();
+    if (now - lastFlipTimeRef.current < 250) {
+      if (e && e.preventDefault) e.preventDefault();
+      return;
+    }
+    lastFlipTimeRef.current = now;
+    setIsFlipped((prev) => !prev);
+  }, []);
 
   const handleReview = useCallback(async (quality) => {
     if (!currentCard || submittingRef.current) return;
@@ -239,29 +241,52 @@ const FlashcardReview = () => {
     navigate('/dashboard');
   }, [navigate]);
 
-  const speakText = (text, rate) => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
-    if (!text) return;
+  const handleVoiceCommand = useCallback((command) => {
+    if (command === 'FLIP' && !isFlipped) {
+      handleCardFlip();
+    } else if (isFlipped) {
+      if (command === 'RATE_0') handleReview(0);
+      else if (command === 'RATE_1') handleReview(1);
+      else if (command === 'RATE_2') handleReview(2);
+      else if (command === 'RATE_3') handleReview(3);
+      else if (command === 'RATE_4') handleReview(4);
+      else if (command === 'RATE_5') handleReview(5);
+    }
+  }, [isFlipped, handleCardFlip, handleReview]);
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = rate;
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-    setIsSpeaking(true);
-    window.speechSynthesis.speak(utterance);
-  };
+  const {
+    isSupported,
+    isEnabled,
+    isPaused,
+    status,
+    errorMsg,
+    toggleVoiceMode,
+    speak,
+    cancelSpeech
+  } = useVoiceControl({
+    onCommand: handleVoiceCommand,
+    speechRate
+  });
+
+  const isSpeaking = status === 'SPEAKING';
+
+  // Cancel speech synthesis when card or flip state changes
+  const speechKey = `${currentIndex}:${isFlipped}`;
+  useEffect(() => {
+    cancelSpeech();
+    if (isEnabled && !isPaused && currentCard) {
+       const textToRead = isFlipped ? currentCard.back : currentCard.front;
+       speak(textToRead);
+    }
+  }, [speechKey, isEnabled, isPaused, currentCard, speak, cancelSpeech]);
 
   const handleSpeak = (e) => {
     e.stopPropagation();
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-
     if (isSpeaking) {
-      window.speechSynthesis.cancel();
-      setIsSpeaking(false);
+      cancelSpeech();
     } else {
       const textToRead = isFlipped ? currentCard?.back : currentCard?.front;
-      speakText(textToRead, speechRate);
+      speak(textToRead);
     }
   };
 
@@ -273,8 +298,11 @@ const FlashcardReview = () => {
     setSpeechRate(nextRate);
 
     if (isSpeaking) {
-      const textToRead = isFlipped ? currentCard?.back : currentCard?.front;
-      speakText(textToRead, nextRate);
+      cancelSpeech();
+      setTimeout(() => {
+        const textToRead = isFlipped ? currentCard?.back : currentCard?.front;
+        speak(textToRead); // Will use the newly set rate implicitly because hook deps update
+      }, 50);
     }
   };
 
@@ -419,7 +447,16 @@ const FlashcardReview = () => {
           <span>SM-2 Review Queue</span>
         </div>
         <div className="flex items-center gap-3">
-          <div className="text-sm font-semibold text-neutral-500 dark:text-neutral-400">
+          <AudioWaveform status={status} />
+          <VoiceModeToggle
+            isSupported={isSupported}
+            isEnabled={isEnabled}
+            isPaused={isPaused}
+            toggleVoiceMode={toggleVoiceMode}
+            errorMsg={errorMsg}
+            status={status}
+          />
+          <div className="text-sm font-semibold text-neutral-500 dark:text-neutral-400 border-l border-neutral-300 dark:border-slate-700 pl-3">
             {currentIndex + 1} <span className="text-neutral-300 dark:text-neutral-600">/</span> {cards.length}
           </div>
           <button
@@ -443,7 +480,7 @@ const FlashcardReview = () => {
       </div>
 
       {/* Flashcard Area */}
-      <div className="w-full max-w-3xl flex-1 flex flex-col items-center justify-start perspective-1000 mb-20">
+      <div className="w-full max-w-3xl flex-1 flex flex-col items-center justify-start perspective-1000 mb-20 select-none touch-action-manipulation">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentCard.id}
@@ -452,13 +489,28 @@ const FlashcardReview = () => {
             animate={{ opacity: 1, y: 0, rotateY: isFlipped ? 180 : 0 }}
             exit={{ opacity: 0, x: -100, transition: { duration: 0.2 } }}
             transition={{ duration: 0.6, type: 'spring', stiffness: 200, damping: 20 }}
-            style={{ transformStyle: 'preserve-3d' }}
-            onClick={() => !isFlipped && setIsFlipped(true)}
+            style={{
+              transformStyle: 'preserve-3d',
+              WebkitTransformStyle: 'preserve-3d',
+              willChange: 'transform',
+              WebkitTapHighlightColor: 'transparent',
+              touchAction: 'manipulation',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+            }}
+            onClick={() => !isFlipped && handleCardFlip()}
           >
             {/* Front */}
             <div
               className={`absolute inset-0 bg-white dark:bg-slate-800 shadow-xl border border-neutral-200 dark:border-slate-700 rounded-2xl p-8 flex flex-col justify-center items-center backface-hidden ${isFlipped ? 'pointer-events-none' : ''}`}
-              style={{ backfaceVisibility: 'hidden' }}
+              style={{
+                backfaceVisibility: 'hidden',
+                WebkitBackfaceVisibility: 'hidden',
+                WebkitTapHighlightColor: 'transparent',
+                transformStyle: 'preserve-3d',
+                WebkitTransformStyle: 'preserve-3d',
+                isolation: 'isolate',
+              }}
             >
               <div className="absolute top-4 left-6 flex items-center gap-2 text-xs font-bold text-neutral-400 uppercase tracking-widest">
                 <span className="w-2 h-2 rounded-full bg-blue-500"></span>
@@ -499,7 +551,16 @@ const FlashcardReview = () => {
             {/* Back */}
             <div
               className={`absolute inset-0 bg-primary-50 dark:bg-primary-900/10 shadow-xl border border-primary-200 dark:border-primary-800/50 rounded-2xl p-8 flex flex-col items-center overflow-y-auto backface-hidden ${!isFlipped ? 'pointer-events-none' : ''}`}
-              style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+              style={{
+                backfaceVisibility: 'hidden',
+                WebkitBackfaceVisibility: 'hidden',
+                WebkitTapHighlightColor: 'transparent',
+                transformStyle: 'preserve-3d',
+                WebkitTransformStyle: 'preserve-3d',
+                transform: 'rotateY(180deg)',
+                WebkitTransform: 'rotateY(180deg)',
+                isolation: 'isolate',
+              }}
             >
               <div className="w-full flex justify-between items-center mb-6">
                 <div className="flex items-center gap-2 text-xs font-bold text-primary-600 dark:text-primary-400 uppercase tracking-widest">

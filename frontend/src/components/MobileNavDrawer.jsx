@@ -8,6 +8,7 @@ const NAV_LINKS = [
   { to: '/flashcards/review', label: 'Flashcards' },
   { to: '/battle', label: 'Battle Arena' },
   { to: '/study-group', label: 'Study Group' },
+  { to: '/ai-assistant', label: 'AI Mentor Chat' },
   { to: '/settings', label: 'Settings' },
 ];
 

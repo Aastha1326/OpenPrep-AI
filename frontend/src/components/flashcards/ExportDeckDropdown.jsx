@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Download, FileJson, FileText, Database, ChevronDown, Globe, Share2, ShieldAlert } from 'lucide-react';
+import { Download, FileJson, FileText, Database, ChevronDown, Globe, Share2, ShieldAlert, Upload } from 'lucide-react';
 import API from '../../services/api';
 import ExportModal from '../common/ExportModal';
 import { buildFlashcardDocument, buildFlashcardChapters, exportHTMLToPDF, exportToEPUB } from '../../utils/exportDocs';
 
-const ExportDeckDropdown = ({ subjectId = null }) => {
+const ExportDeckDropdown = ({ subjectId = null, onImported = null }) => {
+  const [isImporting, setIsImporting] = useState(false);
+  const importInputRef = useRef(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isPublic, setIsPublic] = useState(false);
@@ -135,6 +137,35 @@ const ExportDeckDropdown = ({ subjectId = null }) => {
     }
   };
 
+  const handleImportFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = ''; // allow re-selecting the same file later
+    const resolvedSubjectId = subjectId && typeof subjectId === 'object' ? subjectId.id : subjectId;
+    if (!file || !resolvedSubjectId) return;
+
+    setIsOpen(false);
+    setIsImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await API.post(`/flashcards/import?subjectId=${resolvedSubjectId}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const { imported = 0, skipped = 0 } = res.data || {};
+      alert(
+        skipped > 0
+          ? `Imported ${imported} card(s). Skipped ${skipped} invalid row(s).`
+          : `Imported ${imported} card(s) successfully.`
+      );
+      onImported?.(imported);
+    } catch (err) {
+      console.error('Failed to import flashcards:', err);
+      alert(err?.response?.data?.error || 'Failed to import flashcards. Check the file format and try again.');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   const handleToggleShare = async () => {
     const resolvedSubjectId = subjectId && typeof subjectId === 'object' ? subjectId.id : subjectId;
     if (!resolvedSubjectId) return;
@@ -165,13 +196,12 @@ const ExportDeckDropdown = ({ subjectId = null }) => {
         type="button"
         className="inline-flex justify-center items-center w-full rounded-lg border border-gray-300 dark:border-slate-700 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-sm font-medium text-gray-700 dark:text-neutral-200 hover:bg-gray-50 dark:hover:bg-slate-700 focus:outline-none transition-colors"
         onClick={() => setIsOpen(!isOpen)}
-        disabled={isExporting}
+        disabled={isExporting || isImporting}
       >
         <Download className="w-4 h-4 mr-2" />
-        {isExporting ? 'Exporting...' : 'Deck Actions'}
+        {isExporting ? 'Exporting...' : isImporting ? 'Importing...' : 'Deck Actions'}
         <ChevronDown className="w-4 h-4 ml-2" />
       </button>
-
       {isOpen && (
         <div className="origin-top-right absolute right-0 mt-2 w-52 rounded-md shadow-lg bg-white dark:bg-slate-800 ring-1 ring-black ring-opacity-5 dark:ring-slate-700 z-50 overflow-hidden">
           <div className="py-1 border-b border-gray-100 dark:border-slate-700">
@@ -207,6 +237,29 @@ const ExportDeckDropdown = ({ subjectId = null }) => {
               Formatted PDF / EPUB
             </button>
           </div>
+
+          {subjectId && (
+            <div className="py-1 border-b border-gray-100 dark:border-slate-700">
+              <div className="px-4 py-1.5 text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">
+                Import Deck
+              </div>
+              <button
+                onClick={() => importInputRef.current?.click()}
+                disabled={isImporting}
+                className="group flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-slate-700 disabled:opacity-50"
+              >
+                <Upload className="mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500" />
+                {isImporting ? 'Importing...' : 'Import CSV / Anki CSV'}
+              </button>
+              <input
+                ref={importInputRef}
+                type="file"
+                accept=".csv,.json"
+                onChange={handleImportFile}
+                className="hidden"
+              />
+            </div>
+          )}
 
           {subjectId && (
             <div className="py-1">

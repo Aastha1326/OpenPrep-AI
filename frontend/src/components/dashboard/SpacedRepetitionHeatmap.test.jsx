@@ -74,4 +74,4 @@ describe('SpacedRepetitionHeatmap Component', () => {
   });
 });
 
-const weekdaysList = () => ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+const weekdaysList = () => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];

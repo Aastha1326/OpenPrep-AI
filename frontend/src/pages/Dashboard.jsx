@@ -1,7 +1,9 @@
+import Skeleton from '../components/dashboard/Skeleton';
 import { useState, useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import SecuritySettings from '../components/SecuritySettings';
 import {
   Flame,
   Play,
@@ -24,9 +26,13 @@ import {
   MessageSquare,
   Shield,
   Globe,
-} from 'lucide-react';
-import API from '../services/api';
+  PlaySquare as Youtube,
+  Video,
+  Brain,
+  Bot,
+} from 'lucide-react';import API from '../services/api';
 import { toDateOnlyString } from '../utils/dateUtils';
+import SkillTree from '../components/dashboard/SkillTree';
 import {
   LineChart,
   Line,
@@ -49,12 +55,15 @@ import PomodoroTimer from '../components/dashboard/PomodoroTimer';
 import FlashcardWidget from '../components/dashboard/FlashcardWidget';
 import BadgeGrid from '../components/dashboard/BadgeGrid';
 import PinnedTasks from '../components/dashboard/PinnedTasks';
+import FatigueMonitor from '../components/dashboard/FatigueMonitor';
+import UploadMaterial from '../components/dashboard/UploadMaterial';
 import CreateNoteModal from '../components/dashboard/CreateNoteModal';
 import StudyPlanModal from '../components/dashboard/StudyPlanModal';
 import PyqAnalysisModal from '../components/dashboard/PyqAnalysisModal';
 import WeaknessDashboardWidget from '../components/dashboard/WeaknessDashboardWidget';
 import SubjectMasteryWidget from '../components/dashboard/SubjectMasteryWidget';
 import FocusEfficiencyWidget from '../components/dashboard/FocusEfficiencyWidget';
+import ActivityHeatmap from '../components/dashboard/ActivityHeatmap';
 import LeaderboardWidget from '../components/dashboard/LeaderboardWidget';
 import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
 import TargetExamOverviewWidget from '../components/dashboard/TargetExamOverviewWidget';
@@ -64,8 +73,14 @@ import NotesWidget from '../components/dashboard/NotesWidget';
 import ThemeToggle from '../components/ThemeToggle';
 import BadgesList from '../components/BadgesList';
 import SM2SettingsModal from '../components/dashboard/SM2SettingsModal';
+import LevelProgressBar from '../components/gamification/LevelProgressBar';
+import StreakWidget from '../components/gamification/StreakWidget';
+import BadgeCard from '../components/gamification/BadgeCard';
+import BadgeUnlockModal from '../components/gamification/BadgeUnlockModal';
+import LevelUpModal from '../components/gamification/LevelUpModal';
 import CommunityDecksModal from '../components/dashboard/CommunityDecksModal';
-
+import QuizSetupModal from '../components/dashboard/QuizSetupModal';
+import GenerateFlashcardsFromYouTubeModal from '../components/dashboard/GenerateFlashcardsFromYouTubeModal';
 import {
   fetchDashboardStats,
   fetchSubjectBreakdown,
@@ -73,7 +88,7 @@ import {
   fetchDueFlashcards,
   reviewFlashcard,
 } from '../store/slices/dashboardSlice';
-import { logout } from '../store/slices/authSlice';
+import { logout, loadUser } from '../store/slices/authSlice';
 
 // ── Helpers ──
 
@@ -135,20 +150,17 @@ const achievements = [
   },
 ];
 
-// ── Loading Skeleton ──
-const Shimmer = ({ className = '' }) => (
-  <div className={`animate-pulse bg-neutral-300/60 rounded ${className}`} />
-);
+
 
 // ── Stats Card Skeleton ──
 const StatsCardSkeleton = () => (
   <VintagePaper className="border-t-4 border-t-neutral-400">
     <div className="flex justify-between items-start mb-2">
-      <Shimmer className="h-5 w-28" />
-      <Shimmer className="h-5 w-5" />
+      <Skeleton className="h-5 w-28" />
+      <Skeleton className="h-5 w-5" />
     </div>
-    <Shimmer className="h-9 w-20 mt-2" />
-    <Shimmer className="h-4 w-32 mt-3" />
+    <Skeleton className="h-9 w-20 mt-2" />
+    <Skeleton className="h-4 w-32 mt-3" />
   </VintagePaper>
 );
 
@@ -178,22 +190,6 @@ const EmptyState = ({ icon: Icon = Lightbulb, message = 'No data yet' }) => (
   </div>
 );
 
-// ── Analytics Charts Skeleton (shown while recharts chunk loads) ──
-const AnalyticsChartsFallback = () => (
-  <div className="bg-wood-desk rounded-lg shadow-inner border border-black/50 p-6 relative overflow-hidden grid grid-cols-1 lg:grid-cols-2 gap-8">
-    <div className="absolute inset-0 shadow-[inset_0_0_50px_rgba(0,0,0,0.8)] pointer-events-none" />
-    {[0, 1].map((i) => (
-      <VintagePaper
-        key={i}
-        animate={false}
-        className="w-full h-full p-6 shadow-[0_10px_30px_rgba(0,0,0,0.5)]"
-      >
-        <Shimmer className="h-7 w-48 mb-6" />
-        <Shimmer className="h-64 w-full" />
-      </VintagePaper>
-    ))}
-  </div>
-);
 
 // ── Main Component ──
 const Dashboard = () => {
@@ -201,6 +197,30 @@ const Dashboard = () => {
   const navigate = useNavigate();
 
   const { user } = useSelector((state) => state.auth);
+
+  const [gamificationData, setGamificationData] = useState(null);
+  const [loadingGamification, setLoadingGamification] = useState(false);
+  const [activeBadgeUnlock, setActiveBadgeUnlock] = useState(null);
+  const [isFreezing, setIsFreezing] = useState(false);
+
+  const fetchGamification = useCallback(async () => {
+    try {
+      setLoadingGamification(true);
+      const res = await API.get('/gamification/summary');
+      if (res.data?.success) {
+        setGamificationData(res.data.data);
+      }
+    } catch (e) {
+      console.error('Failed to load gamification summary:', e);
+    } finally {
+      setLoadingGamification(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchGamification();
+  }, [fetchGamification]);
+
   const {
     stats,
     weeklyChartData,
@@ -224,6 +244,7 @@ const Dashboard = () => {
       dispatch(fetchSubjectBreakdown());
       dispatch(fetchActivePlan());
       dispatch(fetchDueFlashcards());
+      fetchGamification();
     };
 
     fetchAll();
@@ -248,10 +269,20 @@ const Dashboard = () => {
     const backendTaskId = task.meta?.taskId || task.id;
     setToggleError(null);
     try {
-      await API.put(`/study-plans/${planId}/tasks/${backendTaskId}`, {
+      const timezoneOffset = new Date().getTimezoneOffset();
+      const res = await API.put(`/study-plans/${planId}/tasks/${backendTaskId}`, {
         completed: !task.completed,
         studyTimeMinutes: 25,
+      }, {
+        headers: { 'x-timezone-offset': String(timezoneOffset) }
       });
+      
+      fetchGamification();
+      if (res.data?.progression?.newBadges?.length > 0) {
+        setActiveBadgeUnlock(res.data.progression.newBadges[0]);
+      }
+      
+      dispatch(loadUser());
       dispatch(fetchActivePlan());
       dispatch(fetchDashboardStats());
       dispatch(fetchSubjectBreakdown());
@@ -279,7 +310,9 @@ const Dashboard = () => {
   };
 
   // ── Note & PYQ Modal State ──
-  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
+const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
+  const [isQuizSetupOpen, setIsQuizSetupOpen] = useState(false);
+  const [isYoutubeFlashcardModalOpen, setIsYoutubeFlashcardModalOpen] = useState(false);
   const [isStudyPlanOpen, setIsStudyPlanOpen] = useState(false);
   const [isPyqModalOpen, setIsPyqModalOpen] = useState(false);
   const [isBundleModalOpen, setIsBundleModalOpen] = useState(false);
@@ -288,7 +321,52 @@ const Dashboard = () => {
   const [isCommunityDecksOpen, setIsCommunityDecksOpen] = useState(false);
   const [syllabusPrefill, setSyllabusPrefill] = useState(null);
   const [comingSoon, setComingSoon] = useState(null);
+  const [sessionStartTime] = useState(Date.now());
   const [isExporting, setIsExporting] = useState(false);
+  const [isSkillTreeOpen, setIsSkillTreeOpen] = useState(false);
+  const [showLevelUpModal, setShowLevelUpModal] = useState(false);
+  const [levelUpLevel, setLevelUpLevel] = useState(null);
+  const [prevLevel, setPrevLevel] = useState(null);
+
+  useEffect(() => {
+    if (user?.level) {
+      if (prevLevel && user.level > prevLevel) {
+        setLevelUpLevel(user.level);
+        setShowLevelUpModal(true);
+        import('canvas-confetti').then((module) => {
+          const confetti = module.default;
+          confetti({
+            particleCount: 200,
+            spread: 100,
+            origin: { y: 0.6 },
+            colors: ['#3b82f6', '#10b981', '#f5a623', '#ffffff'],
+          });
+        });
+      }
+      setPrevLevel(user.level);
+    }
+  }, [user?.level, prevLevel]);
+
+  const handleUseStreakFreeze = async () => {
+    try {
+      setIsFreezing(true);
+      const timezoneOffset = new Date().getTimezoneOffset();
+      const res = await API.post('/gamification/streak-freeze/use', {}, {
+        headers: { 'x-timezone-offset': String(timezoneOffset) }
+      });
+      if (res.data.success) {
+        alert('Streak Freeze Shield activated successfully!');
+        fetchGamification();
+        dispatch(loadUser());
+        dispatch(fetchDashboardStats());
+      }
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.error || 'Failed to activate Streak Freeze shield.');
+    } finally {
+      setIsFreezing(false);
+    }
+  };
 
   const handleGoToStudyPlanFromImport = (prefill) => {
     if (prefill) setSyllabusPrefill(prefill);
@@ -377,24 +455,20 @@ const Dashboard = () => {
       };
     });
   })();
+  const regularTasks = todayTasks.filter((t) => !t.isBonus);
+  const completedTasksCount = todayTasks.filter((t) => t.completed).length;
+  const targetTasksCount = regularTasks.length;
 
-  const tasksProgress = (() => {
-    if (todayTasks.length === 0) return 0;
-    const regularTasks = todayTasks.filter((t) => !t.isBonus);
-    const completedTasksCount = todayTasks.filter((t) => t.completed).length;
-    const targetTasksCount = regularTasks.length;
+  const tasksProgress =
+    targetTasksCount > 0
+      ? Math.min(100, Math.round((completedTasksCount / targetTasksCount) * 100))
+      : 0;
 
-    let percentage = 0;
-    if (targetTasksCount > 0) {
-      percentage = Math.round((completedTasksCount / targetTasksCount) * 100);
-    } else {
-      const completedBonusCount = todayTasks.filter((t) => t.completed).length;
-      percentage = Math.round((completedBonusCount / todayTasks.length) * 100);
-    }
-    return Math.min(100, Math.max(0, percentage));
-  })();
+  const completedBonusCount = todayTasks.filter(
+    (t) => t.isBonus && t.completed
+  ).length;
 
-  const completedBonusCount = todayTasks.filter((t) => t.isBonus && t.completed).length;
+
 
   const firstDueCard = dueFlashcards.length > 0 ? dueFlashcards[0] : null;
 
@@ -428,7 +502,7 @@ const Dashboard = () => {
           icon={Play}
           label="Start Quiz"
           delay={0.1}
-          onClick={() => setComingSoon('Quiz feature coming soon!')}
+          onClick={() => setIsQuizSetupOpen(true)}
         />
         <GoldTabButton
           icon={FileText}
@@ -466,6 +540,12 @@ const Dashboard = () => {
           delay={0.48}
           onClick={() => setIsCommunityDecksOpen(true)}
         />
+        <GoldTabButton
+          icon={Bot}
+          label="AI Study Assistant"
+          delay={0.5}
+          onClick={() => navigate('/ai-assistant')}
+        />
         <button
           onClick={() => {
             setIsNoteModalOpen(true);
@@ -479,21 +559,31 @@ const Dashboard = () => {
         </button>
       </div>
 
-      <div className="pl-4 md:pl-16 pr-4 lg:pr-8 py-8 space-y-12">
+      <div className="pl-4 md:pl-16 pr-4 lg:pr-8 pt-16 sm:pt-8 pb-8 space-y-12">
         {/* --- HERO SECTION --- */}
         <div className="flex flex-col md:flex-row justify-between items-start border-b border-black/20 pb-8 gap-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
-            className="flex-1"
-          >
-            <h1 className="text-5xl md:text-6xl font-bold text-gold-foil mb-2 font-playfair tracking-tight">
-              Welcome back{user?.name ? `, ${user.name}` : ', Scholar'}.
+            className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10"
+        >
+          <div>
+            <h1 className="text-3xl font-playfair font-bold text-stone-800 dark:text-stone-100 mb-2">
+              Welcome back, <span className="text-amber-600 dark:text-amber-500">{user?.name?.split(' ')[0] || 'Scholar'}</span>
             </h1>
             <p className="text-amber-100/70 text-lg italic font-playfair">
               &ldquo;The roots of education are bitter, but the fruit is sweet.&rdquo; – Aristotle
             </p>
+
+            {/* --- XP PROGRESS BAR --- */}
+            <div className="mt-4 max-w-md">
+              <LevelProgressBar
+                xp={gamificationData?.xp || user?.xp || 0}
+                level={gamificationData?.level || user?.level || 1}
+                nextLevelXP={gamificationData?.nextLevelXP || 100}
+              />
+            </div>
 
             {/* --- EXAM COUNTDOWN WIDGET --- */}
             {activePlan?.exam?.date && (
@@ -509,7 +599,9 @@ const Dashboard = () => {
                 />
               </motion.div>
             )}
+          </div>
           </motion.div>
+        </motion.div>
 
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
@@ -522,9 +614,21 @@ const Dashboard = () => {
                 <Download className="w-4 h-4" /> Export Analytics
               </button>
               <div className="absolute right-0 top-full mt-2 w-40 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
-                <button onClick={() => handleExport('7days')} className="w-full text-left block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200">Last 7 Days</button>
-                <button onClick={() => handleExport('30days')} className="w-full text-left block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200">Last 30 Days</button>
-                <button onClick={() => handleExport('all')} className="w-full text-left block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200">All Time</button>
+                <button
+                  onClick={() => handleExportReport('csv')}
+                  className="w-full text-left block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200"
+                >
+                  CSV
+                </button>
+
+                <button
+                  onClick={() => handleExportReport('pdf')}
+                  className="w-full text-left block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200"
+                >
+                  PDF
+                </button>
+
+
               </div>
             </div>
 
@@ -539,31 +643,28 @@ const Dashboard = () => {
                 SM-2 Settings
               </div>
             </button>
-            <div className="flex flex-col items-center">
-              <div className="relative">
-                <Flame
-                  className="w-12 h-12 text-orange-500 animate-pulse-glow"
-                  fill="currentColor"
-                />
-                <div className="absolute inset-0 blur-md bg-orange-500/30 rounded-full" />
-              </div>
-              <span className="text-gold-foil font-bold text-2xl">{streakDays} Day</span>
-              <span className="text-amber-200/50 text-xs uppercase tracking-widest">Streak</span>
-            </div>
 
-            {streakFreezes > 0 && (
-              <div className="flex flex-col items-center ml-2">
-                <div className="relative group cursor-pointer" title="Streak Freeze Shield">
-                  <Shield
-                    className="w-10 h-10 text-cyan-400 animate-pulse"
-                    fill="currentColor"
-                  />
-                  <div className="absolute inset-0 blur-md bg-cyan-400/30 rounded-full" />
-                </div>
-                <span className="text-cyan-300 font-bold text-xl">{streakFreezes}</span>
-                <span className="text-cyan-200/50 text-[10px] uppercase tracking-widest">Freezes</span>
+            <button
+              onClick={() => setIsSkillTreeOpen(true)}
+              className="bg-neutral-800 text-yellow-500 border border-yellow-700/50 hover:bg-neutral-700 p-2.5 rounded-sm shadow-[0_4px_10px_rgba(0,0,0,0.4)] flex items-center justify-center relative group"
+              aria-label="Skill Tree"
+            >
+              <Brain className="w-5 h-5 transition-transform duration-300 group-hover:scale-110" />
+              <div className="absolute top-full mt-2 px-2 py-1 bg-neutral-800 text-yellow-500 text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                Skill Tree
               </div>
-            )}
+            </button>
+
+            {/* --- STREAK WIDGET --- */}
+            <div className="w-80">
+              <StreakWidget
+                currentStreak={gamificationData?.currentStreak ?? user?.currentStreak ?? 0}
+                longestStreak={gamificationData?.longestStreak ?? user?.longestStreak ?? 0}
+                streakFreezesAvailable={gamificationData?.streakFreezesAvailable ?? user?.streakFreezesAvailable ?? 0}
+                onUseStreakFreeze={handleUseStreakFreeze}
+                isFreezing={isFreezing}
+              />
+            </div>
 
             <button
               onClick={() => navigate('/settings')}
@@ -578,15 +679,16 @@ const Dashboard = () => {
 
             <button
               onClick={handleLogout}
-              className="bg-gradient-to-br from-red-700 to-red-900 text-red-50 px-4 py-3 rounded-sm border border-red-500/50 shadow-[0_4px_15px_rgba(0,0,0,0.5)] hover:shadow-[0_6px_20px_rgba(220,50,50,0.3)] transition-all flex items-center gap-2 group"
-              aria-label="Log out"
+              className="bg-stone-800 text-amber-500 px-4 py-2 rounded-lg font-bold hover:bg-stone-700 transition shadow-lg border border-amber-900/30 flex items-center gap-2"
             >
               <LogOut className="w-5 h-5 group-hover:text-white" />
               <span className="font-playfair font-bold text-sm tracking-wide group-hover:text-white hidden sm:inline">
-                Logout
+                Log out
               </span>
             </button>
+            <ThemeToggle />
           </motion.div>
+        </motion.div>
         </div>
 
         {/* --- TARGET EXAM COMPOSITE BUNDLE OVERVIEW --- */}
@@ -715,7 +817,7 @@ const Dashboard = () => {
               <div className="h-64 w-full" style={{ minHeight: '250px', minWidth: '100%' }}>
                 {loadingStats ? (
                   <div className="flex items-center justify-center h-full">
-                    <Shimmer className="w-full h-48" />
+                    <Skeleton className="w-full h-48" />
                   </div>
                 ) : errorStats ? (
                   <div className="flex flex-col items-center justify-center h-full text-neutral-500">
@@ -763,7 +865,7 @@ const Dashboard = () => {
               <div className="h-64 w-full" style={{ minHeight: '250px', minWidth: '100%' }}>
                 {loadingSubjects ? (
                   <div className="flex items-center justify-center h-full">
-                    <Shimmer className="w-full h-48" />
+                    <Skeleton className="w-full h-48" />
                   </div>
                 ) : errorSubjects ? (
                   <div className="flex flex-col items-center justify-center h-full text-neutral-500">
@@ -815,7 +917,7 @@ const Dashboard = () => {
           <div className="flex justify-center">
             <PomodoroTimer />
           </div>
-          <div>
+<div>
             <FlashcardWidget
               flashcard={firstDueCard}
               loading={loadingFlashcards}
@@ -824,11 +926,50 @@ const Dashboard = () => {
               onRetry={handleRetry(fetchDueFlashcards)}
               onReview={handleReviewCard}
             />
+            <button
+              onClick={() => setIsYoutubeFlashcardModalOpen(true)}
+              className="mt-3 w-full flex items-center justify-center gap-2 text-sm px-4 py-2 rounded-lg border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+            >
+              <Youtube className="w-4 h-4" /> Generate Flashcards from YouTube
+            </button>
           </div>
-
           {/* BADGES / GAMIFICATION */}
           <div className="md:col-span-2 mt-6">
-            <BadgeGrid />
+            {/* --- DYNAMIC GAMIFICATION ACHIEVEMENT BADGES --- */}
+            <div className="bg-neutral-900/40 border border-neutral-800 rounded-2xl p-6 shadow-inner">
+              <div className="flex items-center gap-2 mb-6">
+                <Award className="h-6 w-6 text-amber-500 animate-pulse" />
+                <h3 className="text-xl font-bold font-playfair text-stone-100">
+                  Achievement Badges
+                </h3>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <BadgeCard
+                  badgeCode="seven_day_streak"
+                  title="7-Day Streak 🔥"
+                  description="Studied consistently for 7 consecutive days."
+                  isUnlocked={!!gamificationData?.badges?.some(b => b.badgeCode === 'seven_day_streak')}
+                  unlockedAt={gamificationData?.badges?.find(b => b.badgeCode === 'seven_day_streak')?.unlockedAt}
+                />
+
+                <BadgeCard
+                  badgeCode="night_owl"
+                  title="Night Owl 🦉"
+                  description="Completed a study task between 11 PM and 4 AM."
+                  isUnlocked={!!gamificationData?.badges?.some(b => b.badgeCode === 'night_owl')}
+                  unlockedAt={gamificationData?.badges?.find(b => b.badgeCode === 'night_owl')?.unlockedAt}
+                />
+
+                <BadgeCard
+                  badgeCode="quiz_master"
+                  title="Quiz Master 🎓"
+                  description="Successfully finished 10 quiz attempts."
+                  isUnlocked={!!gamificationData?.badges?.some(b => b.badgeCode === 'quiz_master')}
+                  unlockedAt={gamificationData?.badges?.find(b => b.badgeCode === 'quiz_master')?.unlockedAt}
+                />
+              </div>
+            </div>
           </div>
 
           <div className="flex justify-center">
@@ -865,8 +1006,9 @@ const Dashboard = () => {
           <FocusEfficiencyWidget />
         </div>
         <div className="my-6">
-          <BadgesList achievements={user?.achievements || []} />
+          <ActivityHeatmap />
         </div>
+
 
         {/* --- AI REVISION SUMMARIES + AUDIO READER --- */}
         <div className="my-6">
@@ -884,8 +1026,8 @@ const Dashboard = () => {
               <div className="space-y-6">
                 {[1, 2, 3, 4].map((i) => (
                   <div key={i}>
-                    <Shimmer className="h-4 w-36 mb-1" />
-                    <Shimmer className="h-4 w-full" />
+                    <Skeleton className="h-4 w-36 mb-1" />
+                    <Skeleton className="h-4 w-full" />
                   </div>
                 ))}
               </div>
@@ -926,10 +1068,10 @@ const Dashboard = () => {
                 <div className="space-y-4">
                   {[1, 2, 3].map((i) => (
                     <div key={i} className="flex items-center gap-4">
-                      <Shimmer className="w-10 h-10 rounded-full shrink-0" />
+                      <Skeleton className="w-10 h-10 rounded-full shrink-0" />
                       <div className="flex-1">
-                        <Shimmer className="h-5 w-48 mb-1" />
-                        <Shimmer className="h-3 w-24" />
+                        <Skeleton className="h-5 w-48 mb-1" />
+                        <Skeleton className="h-3 w-24" />
                       </div>
                     </div>
                   ))}
@@ -1064,13 +1206,23 @@ const Dashboard = () => {
           </VintagePaper>
         </div>
       </div>
-      {/* --- CREATE NOTE MODAL --- */}
+{/* --- CREATE NOTE MODAL --- */}
       <CreateNoteModal
         isOpen={isNoteModalOpen}
         onClose={() => setIsNoteModalOpen(false)}
         onNoteCreated={() => setIsNoteModalOpen(false)}
       />
 
+      {/* --- YOUTUBE FLASHCARD DECK MODAL --- */}
+      {isYoutubeFlashcardModalOpen && (
+        <GenerateFlashcardsFromYouTubeModal
+          onClose={() => setIsYoutubeFlashcardModalOpen(false)}
+          onImported={() => {
+            setIsYoutubeFlashcardModalOpen(false);
+            dispatch(fetchDueFlashcards());
+          }}
+        />
+      )}
       {/* --- STUDY PLAN MODAL --- */}
       <StudyPlanModal
         isOpen={isStudyPlanOpen}
@@ -1083,6 +1235,17 @@ const Dashboard = () => {
         onPlanUpdate={() => dispatch(fetchActivePlan())}
         onPlanCreated={() => dispatch(fetchActivePlan())}
         onBumpTime={handleBumpStudyTime}
+      />
+
+      {/* --- QUIZ SETUP MODAL --- */}
+      <QuizSetupModal
+        isOpen={isQuizSetupOpen}
+        onClose={() => setIsQuizSetupOpen(false)}
+        onQuizGenerated={(quiz) => {
+          if (quiz?.id) {
+            navigate(`/quiz/${quiz.id}`);
+          }
+        }}
       />
 
       {/* --- PYQ ANALYSIS MODAL --- */}
@@ -1134,6 +1297,9 @@ const Dashboard = () => {
         onClose={() => setIsSettingsModalOpen(false)}
       />
 
+      {/* --- FATIGUE MONITOR --- */}
+      <FatigueMonitor sessionStartTime={sessionStartTime} />
+
       {/* --- COMING SOON TOAST --- */}
 
       <AnimatePresence>
@@ -1155,8 +1321,77 @@ const Dashboard = () => {
           </motion.div>
         )}
       </AnimatePresence>
+      </div>
+
+      {/* --- SKILL TREE MODAL --- */}
+      <AnimatePresence>
+        {isSkillTreeOpen && (
+          <SkillTree onClose={() => setIsSkillTreeOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* --- LEVEL UP MODAL --- */}
+      <AnimatePresence>
+        {showLevelUpModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.8, y: 50 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.8, y: 50 }}
+              className="bg-stone-950 border-2 border-amber-500 rounded-3xl p-8 max-w-sm text-center shadow-[0_0_50px_rgba(245,158,11,0.3)] relative overflow-hidden"
+            >
+              {/* Glow element */}
+              <div className="absolute -inset-10 bg-amber-500/10 blur-xl rounded-full" />
+              
+              <div className="relative z-10 space-y-6">
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ repeat: Infinity, duration: 10, ease: 'linear' }}
+                  className="w-24 h-24 mx-auto rounded-full bg-amber-500/20 border-2 border-amber-500 flex items-center justify-center shadow-lg"
+                >
+                  <Award className="w-12 h-12 text-amber-400" />
+                </motion.div>
+                
+                <h2 className="text-3xl font-playfair font-bold text-amber-500">LEVEL UP!</h2>
+                
+                <p className="text-stone-300">
+                  Congratulations! You have reached <strong className="text-white">Level {levelUpLevel}</strong>!
+                </p>
+                
+                <div className="bg-stone-900 border border-stone-800 p-3 rounded-lg text-sm text-amber-200">
+                  +1 Skill Point awarded! Spend it in the Skill Tree.
+                </div>
+
+                <button
+                  onClick={() => setShowLevelUpModal(false)}
+                  className="w-full bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-700 hover:to-amber-600 text-stone-950 font-bold py-2.5 rounded-lg transition-all"
+                >
+                  Awesome!
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* --- BADGE UNLOCK MODAL --- */}
+      <BadgeUnlockModal
+        isOpen={!!activeBadgeUnlock}
+        title={activeBadgeUnlock?.title}
+        description={activeBadgeUnlock?.description}
+        onClose={() => setActiveBadgeUnlock(null)}
+      />
     </LeatherBoard>
   );
 };
+{/* --- SECURITY SETTINGS (2FA) --- */}
+<div className="my-6">
+  <SecuritySettings />
+</div>
 
 export default Dashboard;

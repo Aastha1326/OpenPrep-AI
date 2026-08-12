@@ -9,10 +9,13 @@ const {
   rescheduleAdaptivePlan,
   rescheduleOverdueTasks,
   exportStudyPlanIcs,
+  getRecentPlan,
+  getStudyPlanICS,
+  rebalanceStudyPlan,
 } = require('../controllers/studyPlanController');
 const { protect } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
-const { checkQuota } = require('../middleware/quotaMiddleware');
+const { checkAiQuota } = require('../middleware/aiQuotaMiddleware');
 const {
   validateGenerateAIPlan,
   validateToggleTask,
@@ -96,7 +99,7 @@ const router = express.Router();
  *               $ref: '#/components/schemas/Error'
  */
 
-router.post('/generate-ai', protect, aiLimiter, checkQuota, validateGenerateAIPlan, generateAIPlan);
+router.post('/generate-ai', protect, aiLimiter, checkAiQuota, validateGenerateAIPlan, generateAIPlan);
 router.get('/:id/export-ics', protect, exportStudyPlanIcs);
 
 /**
@@ -135,6 +138,12 @@ router.get('/:id/export-ics', protect, exportStudyPlanIcs);
  */
 
 router.get('/active', protect, getActivePlan);
+
+// Get recent active plan for dashboard
+router.get('/recent', protect, getRecentPlan);
+
+// Download ICS
+router.get('/:id/ics', protect, getStudyPlanICS);
 
 /**
  * @swagger
@@ -387,6 +396,56 @@ router.put('/:planId/tasks/:taskId/date', protect, validateMoveTaskDate, moveTas
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/:id/reschedule', protect, aiLimiter, checkQuota, rescheduleOverdueTasks);
+router.post('/:id/reschedule', protect, aiLimiter, checkAiQuota, rescheduleOverdueTasks);
+
+/**
+ * @swagger
+ * /api/study-plans/rebalance:
+ *   post:
+ *     summary: Predict syllabus completion date and evenly rebalance pending tasks across remaining study days
+ *     tags: [Study Plans]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               examId:
+ *                 type: string
+ *                 format: uuid
+ *     responses:
+ *       200:
+ *         description: Forecast computed and pending tasks rebalanced (if any)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/StudyPlan'
+ *                 forecast:
+ *                   type: object
+ *                 rebalanced:
+ *                   type: boolean
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: No active study plan found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.post('/rebalance', protect, rebalanceStudyPlan);
 
 module.exports = router;

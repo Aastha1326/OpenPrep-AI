@@ -61,6 +61,10 @@ const Progress = sequelize.define(
         name: 'progress_user_subject_idx',
         fields: ['user', 'subject'],
       },
+      {
+        name: 'progress_user_updated_idx',
+        fields: ['user', 'updatedAt'],
+      },
     ],
   }
 );

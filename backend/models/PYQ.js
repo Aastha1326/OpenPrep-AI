@@ -59,6 +59,10 @@ const PYQ = sequelize.define(
       type: DataTypes.UUID,
       allowNull: false,
     },
+    searchVector: {
+      type: DataTypes.TSVECTOR,
+      allowNull: true,
+    },
   },
   {
     timestamps: true,
@@ -83,6 +87,23 @@ const PYQ = sequelize.define(
       {
         name: 'pyq_subject_year_difficulty_idx',
         fields: ['subject', 'year', 'difficulty'],
+      },
+      {
+        name: 'pyq_exam_year_subject_idx',
+        fields: ['exam', 'year', 'subject'],
+      },
+      {
+        name: 'pyq_user_exam_created_idx',
+        fields: ['user', 'exam', 'createdAt'],
+      },
+      {
+        name: 'pyq_user_subject_year_idx',
+        fields: ['user', 'subject', 'year'],
+      },
+      {
+        name: 'pyq_search_vector_idx',
+        using: 'GIN',
+        fields: ['searchVector'],
       },
     ],
     hooks: {

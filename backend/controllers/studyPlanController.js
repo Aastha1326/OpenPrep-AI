@@ -6,11 +6,12 @@ const Subject = require('../models/Subject');
 const Topic = require('../models/Topic');
 const ActivityLog = require('../models/ActivityLog');
 const User = require('../models/User');
+const QuizAttempt = require('../models/QuizAttempt');
 const geminiService = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
 const { toDateOnlyString, toLocalDateString } = require('../utils/dateUtils');
 const { generateMilestones } = require('../services/milestoneGeneratorService');
-
+const schedulePredictorService = require('../services/schedulePredictorService');
 // @desc    Generate AI Study Plan
 // @route   POST /api/study-plans/generate-ai
 // @access  Private
@@ -188,12 +189,16 @@ exports.getActivePlan = async (req, res, next) => {
       })),
     }));
 
-    const planJson = plan.toJSON();
+const planJson = plan.toJSON();
     planJson.exam = planJson.examRef; // populate parity
     planJson.dailyGoals = resolvedGoals;
+    planJson.completionForecast = schedulePredictorService.getCompletionForecast({
+      dailyGoals: plan.dailyGoals,
+      referenceDateStr: toLocalDateString(new Date()),
+      examDateStr: plan.examRef ? plan.examRef.date : null,
+    });
 
-    res.status(200).json({ success: true, data: planJson });
-  } catch (error) {
+    res.status(200).json({ success: true, data: planJson });  } catch (error) {
     next(error);
   }
 };
@@ -241,6 +246,21 @@ exports.toggleTaskCompletion = async (req, res, next) => {
     //   false -> true : add hours (task was just completed)
     //   true  -> false: subtract hours (task was unmarked)
     //   same state    : no change (prevents double-counting)
+    let progression = null;
+    if (completed && !wasCompleted) {
+      const gamificationService = require('../services/gamificationService');
+      progression = await gamificationService.awardXP(req.user.id, 50, 'task_complete');
+
+      const timezoneOffset = Number(req.headers['x-timezone-offset']) || 0;
+      await gamificationService.updateStreak(req.user.id, timezoneOffset);
+
+      const user = await User.findByPk(req.user.id);
+      const newBadges = await gamificationService.checkAndUnlockBadges(user, 'task_complete', {
+        timezoneOffsetMinutes: timezoneOffset
+      });
+      progression.newBadges = newBadges;
+    }
+
     if (studyTimeMinutes) {
       const hours = studyTimeMinutes / 60;
 
@@ -262,7 +282,7 @@ exports.toggleTaskCompletion = async (req, res, next) => {
       // If state unchanged (completed === wasCompleted), do nothing
     }
 
-    res.status(200).json({ success: true, data: plan });
+    res.status(200).json({ success: true, data: plan, progression });
   } catch (error) {
     next(error);
   }
@@ -672,9 +692,81 @@ exports.exportStudyPlanIcs = async (req, res, next) => {
 
     const icsContent = icsLines.join('\r\n');
 
-    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="study-plan-${id}.ics"`);
     return res.status(200).send(icsContent);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Predict syllabus completion date and evenly rebalance pending tasks
+//          across the remaining study days
+// @route   POST /api/study-plans/rebalance
+// @access  Private
+exports.rebalanceStudyPlan = async (req, res, next) => {
+  try {
+    const { examId } = req.body;
+    const filter = { user: req.user.id, status: 'active' };
+    if (examId) filter.exam = examId;
+
+    const plan = await StudyPlan.findOne({ where: filter, include: [{ model: Exam, as: 'examRef' }] });
+    if (!plan) {
+      return res.status(404).json({ success: false, error: 'No active study plan found' });
+    }
+
+    const exam = plan.examRef;
+    if (!exam) {
+      return res.status(404).json({ success: false, error: 'Associated exam not found' });
+    }
+
+    const referenceDateStr = toLocalDateString(new Date());
+    const examDateStr = toDateOnlyString(exam.date);
+
+    // Fold in recent quiz accuracy (last 14 days) so a slipping quiz score
+    // pulls the projected pace down even if tasks are still being checked off.
+    const windowStart = new Date();
+    windowStart.setDate(windowStart.getDate() - schedulePredictorService.DEFAULT_VELOCITY_WINDOW_DAYS);
+    const recentAttempts = await QuizAttempt.findAll({
+      where: { user: req.user.id, createdAt: { [Op.gte]: windowStart } },
+    });
+    const quizAccuracy = recentAttempts.length
+      ? recentAttempts.reduce((sum, a) => sum + (a.score || 0), 0) / recentAttempts.length / 100
+      : null;
+
+    const forecast = schedulePredictorService.getCompletionForecast({
+      dailyGoals: plan.dailyGoals,
+      referenceDateStr,
+      examDateStr,
+      quizAccuracy,
+    });
+
+    const { dailyGoals, remainingDays, pendingTaskCount, rebalanced, reason } =
+      schedulePredictorService.rebalanceScheduleEvenly({
+        dailyGoals: plan.dailyGoals,
+        referenceDateStr,
+        examDateStr,
+      });
+
+    if (rebalanced) {
+      plan.dailyGoals = dailyGoals;
+      await plan.save();
+
+      await ActivityLog.create({
+        user: req.user.id,
+        activityType: 'study_plan_reschedule',
+        description: `Rebalanced ${pendingTaskCount} pending task(s) across ${remainingDays} remaining day(s) for exam: ${exam.name}`,
+      });
+    }
+
+    let message = 'No pending tasks to rebalance';
+    if (rebalanced) {
+      message = `Rebalanced ${pendingTaskCount} pending task(s) across ${remainingDays} remaining day(s)`;
+    } else if (reason === 'NO_DAYS_REMAINING') {
+      message = 'No study days remain before the exam date';
+    }
+
+    res.status(200).json({ success: true, data: plan, forecast, rebalanced, reason, message });
   } catch (error) {
     next(error);
   }

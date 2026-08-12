@@ -1,4 +1,5 @@
 const express = require('express');
+const multer = require('multer');
 const {
   generateAIQuiz,
   getQuizzes,
@@ -6,20 +7,30 @@ const {
   submitQuizAttempt,
   getAttemptHistory,
   generateRevisionSheet,
+  generateRemediationPlan,
   getCalibrationReport,
+  submitTelemetryBatch,
+  getQuizBookmarks,
+  toggleQuizBookmark,
+  getQuizAttemptReportPDF,
+  generateQuizFromPdf,
 } = require('../controllers/quizController');
 const { protect } = require('../middleware/auth');
-const { aiLimiter } = require('../middleware/rateLimiter');
-const { checkQuota } = require('../middleware/quotaMiddleware');
+const telemetryAuth = require('../middleware/telemetryAuth');const { aiLimiter } = require('../middleware/rateLimiter');
+const { checkAiQuota } = require('../middleware/aiQuotaMiddleware');
 const {
   validateGenerateAIQuiz,
   validateSubmitQuizAttempt,
   validateGenerateRevisionSheet,
+  validateGenerateRemediationPlan,
 } = require('../middleware/validators');
 const { validateRequest, submitQuizSchema } = require('../middleware/validate');
 
 const router = express.Router();
+const { getNextAdaptiveQuestion } = require('../controllers/adaptiveQuizController');
 
+// Register adaptive route
+router.post('/adaptive/next-question', protect, getNextAdaptiveQuestion);
 /**
  * @swagger
  * tags:
@@ -97,8 +108,58 @@ const router = express.Router();
  *               $ref: '#/components/schemas/Error'
  */
 
-router.post('/generate-ai', protect, aiLimiter, checkQuota, validateGenerateAIQuiz, generateAIQuiz);
+router.post('/generate-ai', protect, aiLimiter, checkAiQuota, validateGenerateAIQuiz, generateAIQuiz);
 
+/**
+ * @swagger
+ * /api/quizzes/generate-from-pdf:
+ *   post:
+ *     summary: Generate a practice quiz from an uploaded textbook PDF chapter
+ *     tags: [Quizzes]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - pdf
+ *             properties:
+ *               pdf:
+ *                 type: string
+ *                 format: binary
+ *                 description: Textbook chapter PDF file (max 15MB)
+ *     responses:
+ *       200:
+ *         description: Quiz generated successfully from PDF content
+ *       400:
+ *         description: Invalid file or missing PDF
+ *       401:
+ *         description: Not authenticated
+ *       429:
+ *         description: Rate limit exceeded
+ */
+router.post('/generate-from-pdf', protect, aiLimiter, checkQuota, upload.single('pdf'), generateQuizFromPdf);
+
+/**
+ * @swagger
+ * /api/quiz/telemetry/batch:
+ *   post:
+ *     summary: Submit a batch of buffered quiz telemetry events (question views, option selections, flag toggles)
+ *     tags: [Quizzes]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201:
+ *         description: Telemetry batch accepted
+ *       400:
+ *         description: Missing or invalid events array
+ *       401:
+ *         description: Not authenticated
+ */
+router.post('/telemetry/batch', telemetryAuth, submitTelemetryBatch);
 router.get('/admin/calibration-report', protect, getCalibrationReport);
 
 /**
@@ -136,9 +197,55 @@ router.post(
   '/generate-revision-sheet',
   protect,
   aiLimiter,
-  checkQuota,
+  checkAiQuota,
   validateGenerateRevisionSheet,
   generateRevisionSheet
+);
+
+/**
+ * @swagger
+ * /api/quizzes/generate-remediation-plan:
+ *   post:
+ *     summary: Generate a 3-day AI remediation plan for weak concepts from failed quiz questions
+ *     tags: [Quizzes]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               quizAttemptId:
+ *                 type: string
+ *                 format: uuid
+ *               mistookQuestions:
+ *                 type: array
+ *               weakTopics:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               saveToNotes:
+ *                 type: boolean
+ *                 default: true
+ *     responses:
+ *       201:
+ *         description: Remediation plan generated successfully
+ *       400:
+ *         description: No failed questions found
+ *       401:
+ *         description: Not authenticated
+ *       429:
+ *         description: Rate limit exceeded
+ */
+router.post(
+  '/generate-remediation-plan',
+  protect,
+  aiLimiter,
+  checkAiQuota,
+  validateGenerateRemediationPlan,
+  generateRemediationPlan
 );
 
 /**
@@ -256,6 +363,7 @@ router.get('/', protect, getQuizzes);
  */
 
 router.get('/attempts/history', protect, getAttemptHistory);
+router.get('/attempts/:attemptId/pdf', protect, getQuizAttemptReportPDF);
 
 /**
  * @swagger
@@ -348,6 +456,10 @@ router.get('/:id', protect, getQuizDetails);
  *                 minimum: 0
  *                 maximum: 86400
  *                 description: Time spent in seconds (optional)
+ *               submissionId:
+ *                 type: string
+ *                 format: uuid
+ *                 description: Unique client-generated idempotency key for this submission (optional)
  *     responses:
  *       201:
  *         description: Quiz attempt submitted successfully
@@ -357,6 +469,21 @@ router.get('/:id', protect, getQuizDetails);
  *               type: object
  *               properties:
  *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/QuizAttempt'
+ *       200:
+ *         description: Duplicate submission detected — returns the original attempt without creating a new one
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 duplicate:
  *                   type: boolean
  *                   example: true
  *                 data:
@@ -382,5 +509,41 @@ router.get('/:id', protect, getQuizDetails);
  */
 
 router.post('/:id/submit', protect, validateRequest(submitQuizSchema), submitQuizAttempt);
+
+/**
+ * @swagger
+ * /api/quizzes/{id}/bookmarks:
+ *   get:
+ *     summary: Get the current user's bookmarked question IDs for a quiz
+ *     tags: [Quizzes]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of bookmarked question IDs
+ *       404:
+ *         description: Quiz not found
+ */
+router.get('/:id/bookmarks', protect, getQuizBookmarks);
+
+/**
+ * @swagger
+ * /api/quizzes/{id}/bookmarks/toggle:
+ *   post:
+ *     summary: Toggle bookmark on a single quiz question
+ *     tags: [Quizzes]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Bookmark removed
+ *       201:
+ *         description: Bookmark added
+ *       400:
+ *         description: Question not found in this quiz
+ *       404:
+ *         description: Quiz not found
+ */
+router.post('/:id/bookmarks/toggle', protect, toggleQuizBookmark);
 
 module.exports = router;
