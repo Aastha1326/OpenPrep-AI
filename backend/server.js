@@ -11,6 +11,8 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { connectDB } = require('./config/db');
 const errorHandler = require('./middleware/error');
+const logger = require('./utils/logger');
+const requestLogger = require('./middleware/requestLogger');
 const { protect } = require('./middleware/auth');
 const fs = require('fs');
 const PYQ = require('./models/PYQ');
@@ -23,13 +25,14 @@ const { getCorsMiddleware, getSocketCorsOrigin } = require('./middleware/corsHan
 
 // Validate required environment variables at startup
 if (!process.env.JWT_SECRET) {
-  console.error('FATAL ERROR: JWT_SECRET is not defined in environment variables.');
-  console.error('Set JWT_SECRET in your .env file or environment before starting the server.');
+  logger.error('FATAL: JWT_SECRET is not defined in environment variables', {
+    hint: 'Set JWT_SECRET in your .env file or environment before starting the server.',
+  });
   process.exit(1);
 }
 
 if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_gemini_api_key_here') {
-  console.warn('WARNING: GEMINI_API_KEY is not set. AI endpoints will return mock data.');
+  logger.warn('GEMINI_API_KEY is not set — AI endpoints will return mock data');
 }
 
 // Import routes
@@ -69,6 +72,11 @@ const app = express();
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
+
+// Mounted first so every request — including ones rejected by CORS, CSRF or
+// the rate limiters below — carries a correlation ID and gets an access log
+// line. Health probes and static avatars are skipped by default.
+app.use(requestLogger());
 
 // Security Middlewares
 // Directives shared by every response. Gemini calls happen server-side (see
@@ -318,7 +326,11 @@ startScheduler();
 
 if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   server.listen(PORT, () => {
-    console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+    logger.info('server started', {
+      port: PORT,
+      env: process.env.NODE_ENV || 'development',
+      logLevel: logger.getLevel(),
+    });
   });
 }
 
@@ -327,34 +339,34 @@ module.exports = app;
 
 // Graceful Shutdown Logic
 const gracefulShutdown = (signal) => {
-  console.log(`Received ${signal}. Starting graceful shutdown...`);
+  logger.info('graceful shutdown started', { signal });
 
   // Force exit timeout (10 seconds maximum connection drain)
   const forceExitTimeout = setTimeout(() => {
-    console.error('Graceful shutdown timed out. Forcing database connection termination and server exit.');
+    logger.error('graceful shutdown timed out — forcing exit', { timeoutMs: 10000 });
     process.exit(1);
   }, 10000);
 
   server.close(async () => {
-    console.log('HTTP connections drained. Closing resource pools...');
+    logger.info('HTTP connections drained, closing resource pools');
     clearTimeout(forceExitTimeout);
 
     try {
       const { sequelize } = require('./config/db');
       await sequelize.close();
-      console.log('Sequelize PostgreSQL connection pool closed.');
+      logger.info('postgres connection pool closed');
     } catch (dbErr) {
-      console.error('Error closing database pool:', dbErr.message);
+      logger.error('error closing database pool', { err: dbErr });
     }
 
     try {
       const redisService = require('./services/redisService');
       if (redisService.client) {
         await redisService.client.quit();
-        console.log('Redis client connection closed.');
+        logger.info('redis connection closed');
       }
     } catch (redisErr) {
-      console.error('Error closing Redis connection:', redisErr.message);
+      logger.error('error closing redis connection', { err: redisErr });
     }
 
     process.exit(0);
