@@ -285,7 +285,8 @@ router.post(
 
 /**
  * @swagger
- * /api/flashcards/export: *   get:
+ * /api/flashcards/export:
+ *   get:
  *     summary: Export flashcards as JSON
  *     tags: [Flashcards]
  *     security:

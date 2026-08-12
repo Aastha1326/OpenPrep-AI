@@ -14,8 +14,8 @@ import {
   FaDownload,
   FaCompass,
   FaTrophy,
-  FaSparkles,
 } from 'react-icons/fa';
+import { Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const PYQAnalytics = () => {

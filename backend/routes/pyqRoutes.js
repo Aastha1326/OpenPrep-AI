@@ -268,7 +268,8 @@ router.get(
  * @swagger
  * /api/pyqs/{id}:
  *   get:
- *     summary: Get PYQ details *     tags: [PYQs]
+ *     summary: Get PYQ details
+ *     tags: [PYQs]
  *     security:
  *       - bearerAuth: []
  *     parameters:
