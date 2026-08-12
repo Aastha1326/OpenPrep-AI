@@ -3,7 +3,7 @@ const { explainQuestion, chatWithAssistant } = require('../controllers/aiControl
 const { protect } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
 const { checkAiQuota } = require('../middleware/aiQuotaMiddleware');
-const { validateExplainQuestion } = require('../middleware/validators');
+
 
 const router = express.Router();
 
@@ -129,7 +129,6 @@ router.post(
   protect,
   aiLimiter,
   checkAiQuota,
-  validateExplainQuestion,
   explainQuestion
 );
 
