@@ -13,18 +13,23 @@ const SkillTree = ({ onClose }) => {
 
   const [loading, setLoading] = useState(true);
 
-  // Mock initial fetch
   useEffect(() => {
-    // In a real app we'd fetch this from /api/progress/xp/status
-    setTimeout(() => {
-      setProgression({
-        level: 5,
-        totalXP: 5400,
-        skillPoints: 3,
-        unlockedNodes: ['root']
+    api.get('/progress/xp/status')
+      .then(res => {
+        if (res.data.success) {
+          setProgression({
+            level: res.data.level,
+            totalXP: res.data.totalXP,
+            skillPoints: res.data.skillPoints,
+            unlockedNodes: res.data.unlockedNodes || ['root']
+          });
+        }
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setLoading(false);
       });
-      setLoading(false);
-    }, 500);
   }, []);
 
   const handleUnlock = async (nodeId, cost) => {

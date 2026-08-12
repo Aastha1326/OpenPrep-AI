@@ -246,6 +246,21 @@ exports.toggleTaskCompletion = async (req, res, next) => {
     //   false -> true : add hours (task was just completed)
     //   true  -> false: subtract hours (task was unmarked)
     //   same state    : no change (prevents double-counting)
+    let progression = null;
+    if (completed && !wasCompleted) {
+      const gamificationService = require('../services/gamificationService');
+      progression = await gamificationService.awardXP(req.user.id, 50, 'task_complete');
+
+      const timezoneOffset = Number(req.headers['x-timezone-offset']) || 0;
+      await gamificationService.updateStreak(req.user.id, timezoneOffset);
+
+      const user = await User.findByPk(req.user.id);
+      const newBadges = await gamificationService.checkAndUnlockBadges(user, 'task_complete', {
+        timezoneOffsetMinutes: timezoneOffset
+      });
+      progression.newBadges = newBadges;
+    }
+
     if (studyTimeMinutes) {
       const hours = studyTimeMinutes / 60;
 
@@ -267,7 +282,7 @@ exports.toggleTaskCompletion = async (req, res, next) => {
       // If state unchanged (completed === wasCompleted), do nothing
     }
 
-    res.status(200).json({ success: true, data: plan });
+    res.status(200).json({ success: true, data: plan, progression });
   } catch (error) {
     next(error);
   }

@@ -139,3 +139,13 @@ jobs:
 
       - name: Audit with Lighthouse CI
         run: npx @lhci/cli@0.14.x autorun --config=./.lighthouserc.json
+
+        - name: Run Backend npm audit
+        run: |
+          cd backend
+          npm audit --audit-level=high
+
+      - name: Run Frontend npm audit
+        run: |
+          cd frontend
+          npm audit --audit-level=high

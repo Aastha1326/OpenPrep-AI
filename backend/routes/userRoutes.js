@@ -1,6 +1,11 @@
 const express = require('express');
-const { updateAvatar, deleteAvatar } = require('../controllers/userController');
-const { protect } = require('../middleware/auth');
+const {
+  updateAvatar,
+  deleteAvatar,
+  getQuota,
+  getExamCountdownPreferences,
+  updateExamCountdownPreferences,
+} = require('../controllers/userController');const { protect } = require('../middleware/auth');
 const avatarUpload = require('../middleware/avatarUpload');
 
 const router = express.Router();
@@ -10,6 +15,19 @@ const router = express.Router();
  * tags:
  *   name: Users
  *   description: User profile management endpoints
+ */
+
+/**
+ * @swagger
+ * /api/users/quota:
+ *   get:
+ *     summary: Get remaining daily AI requests quota
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Quota retrieved successfully
  */
 
 /**
@@ -77,6 +95,11 @@ const router = express.Router();
  *               $ref: '#/components/schemas/Error'
  */
 
+// Get remaining daily AI requests quota
+router.get('/quota', protect, getQuota);
+// Exam countdown preferences
+router.get('/exam-countdown', protect, getExamCountdownPreferences);
+router.put('/exam-countdown', protect, updateExamCountdownPreferences);
 // Upload/replace the authenticated user's avatar
 router.put('/avatar', protect, avatarUpload.single('avatar'), updateAvatar);
 

@@ -7,6 +7,8 @@ const cookieParser = require('cookie-parser');
 const csrf = require('csurf');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const http = require('http');
+const { Server } = require('socket.io');
 const { connectDB } = require('./config/db');
 const errorHandler = require('./middleware/error');
 const { protect } = require('./middleware/auth');
@@ -14,12 +16,26 @@ const fs = require('fs');
 const PYQ = require('./models/PYQ');
 const Note = require('./models/Note');
 const Achievement = require('./models/Achievement');
-const http = require('http');
-const { Server } = require('socket.io');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
 const passport = require('./config/passport');
 const { getCorsMiddleware, getSocketCorsOrigin } = require('./middleware/corsHandler');
+const http = require('http');
+const { Server } = require('socket.io');
+const app = require('./app'); // Your Express app
+const setupQuizBattleSocket = require('./sockets/quizBattleSocket');
+
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: { origin: '*', methods: ['GET', 'POST'] },
+});
+
+setupQuizBattleSocket(io);
+
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
 // Validate required environment variables at startup
 if (!process.env.JWT_SECRET) {
   console.error('FATAL ERROR: JWT_SECRET is not defined in environment variables.');
@@ -45,6 +61,12 @@ const userRoutes = require('./routes/userRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const fatigueRoutes = require('./routes/fatigueRoutes');
+const pdfRoutes = require('./routes/pdfRoutes');
+const syncRoutes = require('./routes/syncRoutes');
+const calendarRoutes = require('./routes/calendarRoutes');
+const gamificationRoutes = require('./routes/gamificationRoutes');
+const battleRoutes = require('./routes/battleRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 initNotificationCron();
@@ -215,6 +237,7 @@ app.get('/uploads/:filename', protect, async (req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/academic', academicRoutes);
 app.use('/api/pyqs', pyqRoutes);
+app.use('/api/pyq', pyqRoutes);
 app.use('/api/community', communityRoutes);
 app.use('/api/study', fatigueRoutes);
 app.use('/api/documents', pdfRoutes);
@@ -225,11 +248,14 @@ app.use('/api/quiz', quizRoutes);
 app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/progress', progressRoutes);
-app.use('/api/community', communityRoutes);
 app.use('/api/users', userRoutes);
+app.get('/api/user/quota', protect, require('./controllers/userController').getQuota);
 app.use('/api/ai', aiRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/calendar', calendarRoutes);
+app.use('/api/gamification', gamificationRoutes);
+app.use('/api/battles', battleRoutes);
 
 // Base Route
 app.get('/', (req, res) => {
@@ -278,6 +304,7 @@ app.use(
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
+const server = http.createServer(app);
 
 const server = http.createServer(app);
 

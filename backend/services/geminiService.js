@@ -1664,3 +1664,102 @@ exports.predictUpcomingExamTrends = async (subjectName, history, forceRefresh = 
     return getMockUpcomingTrends(subjectName);
   }
 };
+
+/**
+ * AI Study Chat Assistant - generate message response with history context
+ */
+exports.generateChatResponse = async ({ message, history }) => {
+  if (!genAI) {
+    console.warn('Gemini API key not configured. Using Mock AI Response.');
+    return `This is a helpful mock explanation from your AI Study Mentor. To get real live responses, please configure your GEMINI_API_KEY in the backend .env file.\n\nHere is your query resolved: "${message}"`;
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const formattedHistory = (history || []).map((h) => ({
+      role: h.role === 'user' ? 'user' : 'model',
+      parts: [{ text: h.parts || h.text || '' }],
+    }));
+
+    const chat = model.startChat({
+      history: formattedHistory,
+      generationConfig: {
+        maxOutputTokens: 1000,
+      },
+    });
+
+    const result = await chat.sendMessage(message);
+    return result.response.text();
+  } catch (error) {
+    console.error('Gemini Chat generation failed:', error);
+    throw error;
+  }
+};
+
+/**
+ * Generate AI Custom Quiz from PYQ bank
+ */
+exports.generateCustomQuiz = async (
+  subjectName,
+  topics = [],
+  difficultyLevel = 'Medium',
+  count = 5,
+  pyqQuestionsText = '',
+  language = 'english'
+) => {
+  const normalizedLanguage = normalizeQuizLanguage(language);
+
+  if (!genAI) {
+    console.warn('Gemini API key not configured. Using Mock Data for Quiz.');
+    return { _mock: true, ...getMockQuiz(subjectName, topics.join(', '), count, normalizedLanguage) };
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const prompt = `
+      Create a multiple choice custom revision quiz for the subject "${subjectName}" targeting the following topics: ${topics.join(', ')}.
+      The difficulty level of the questions should be set to: ${difficultyLevel}.
+      Generate the quiz content in ${normalizedLanguage} language. Use ${normalizedLanguage} script and vocabulary naturally.
+      
+      Here are actual past year questions (PYQs) from exams for reference and inspiration:
+      """
+      ${pyqQuestionsText}
+      """
+
+      Each question must have:
+      - Question text written in ${normalizedLanguage}
+      - 4 unique options written in ${normalizedLanguage}
+      - Correct answer index (0, 1, 2, or 3)
+      - A helpful explanation of the correct answer written in ${normalizedLanguage}
+
+      You should generate exactly ${count} questions. For each question, base it directly on or draw inspiration from the provided past year questions. Ensure the difficulty matches "${difficultyLevel}".
+
+      Return the result STRICTLY as a JSON object with this exact structure:
+      {
+        "title": "string",
+        "questions": [
+          {
+            "questionText": "string",
+            "options": ["string", "string", "string", "string"],
+            "correctAnswer": number,
+            "explanation": "string"
+          }
+        ]
+      }
+    `;
+
+    const result = await generateWithRetry(model, prompt);
+    const parsed = cleanJSON(result.response.text());
+
+    // Validate response structure
+    if (!parsed || !parsed.questions || !Array.isArray(parsed.questions)) {
+      throw new Error('Invalid JSON format from Gemini API');
+    }
+
+    return parsed;
+  } catch (err) {
+    console.error('Gemini custom quiz generator failed:', err);
+    throw err;
+  }
+};
+

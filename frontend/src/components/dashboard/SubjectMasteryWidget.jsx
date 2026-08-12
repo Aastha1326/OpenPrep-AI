@@ -230,7 +230,7 @@ const SubjectMasteryWidget = () => {
             Retry
           </button>
         </div>
-      ) : !data || data.subjects.length === 0 ? (
+      ) : !data || !data.subjects || data.subjects.length === 0 ? (
         <div className="py-8 text-center text-xs text-neutral-500 italic">
           Add subjects and start studying to unlock mastery badges.
         </div>

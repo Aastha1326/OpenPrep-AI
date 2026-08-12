@@ -1,17 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useParams, Link, Navigate } from 'react-router-dom';
-import { Lock, Eye, EyeOff, AlertCircle, CheckCircle, Loader } from 'lucide-react';
+import { Lock, Eye, EyeOff, AlertCircle, CheckCircle, Loader, BookOpen } from 'lucide-react';
 import { resetPassword, clearError, clearMessage } from '../store/slices/authSlice';
-
-// Password validation criteria (synced with backend validators.js)
-const PASSWORD_CRITERIA = [
-  { label: 'At least 8 characters', test: (pw) => pw.length >= 8 },
-  { label: 'One uppercase letter (A-Z)', test: (pw) => /[A-Z]/.test(pw) },
-  { label: 'One lowercase letter (a-z)', test: (pw) => /[a-z]/.test(pw) },
-  { label: 'One number (0-9)', test: (pw) => /[0-9]/.test(pw) },
-  { label: 'One special character (!@#$%^&* etc.)', test: (pw) => /[^A-Za-z0-9]/.test(pw) },
-];
+import ThemeToggle from '../components/ThemeToggle';
+import SoundToggle from '../components/SoundToggle';
 
 const ResetPassword = () => {
   const { token } = useParams();
@@ -27,7 +20,6 @@ const ResetPassword = () => {
     return () => { dispatch(clearError()); dispatch(clearMessage()); };
   }, [dispatch]);
 
-  // If authenticated after reset, go to dashboard
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
   }
@@ -50,46 +42,70 @@ const ResetPassword = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-amber-900 via-stone-900 to-stone-950 p-4">
-      <div className="w-full max-w-md bg-gradient-to-br from-amber-50 to-amber-100 rounded-sm shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-amber-700/50 p-8">
+    <div className="min-h-screen flex flex-col justify-between bg-[#FFFBE9] dark:bg-[#000000] text-[#1F150C] dark:text-[#E1DCC9] p-4 sm:p-6 transition-colors duration-300 font-inter relative overflow-hidden">
+      {/* Glow Effects */}
+      <div className="absolute top-1/4 right-1/3 w-96 h-96 bg-[#AD8B73]/10 dark:bg-[#412D15]/30 rounded-full blur-3xl -z-10 animate-pulse-glow" />
+
+      {/* Top Header */}
+      <div className="w-full max-w-6xl mx-auto flex items-center justify-between py-2">
+        <Link to="/" className="flex items-center gap-2.5">
+          <div className="bg-[#AD8B73] dark:bg-[#1F150C] p-2 rounded-xl border border-[#CEAB93]/40 dark:border-[#412D15] flex items-center justify-center">
+            <BookOpen className="h-5 w-5 text-[#FFFBE9] dark:text-[#E1DCC9]" />
+          </div>
+          <span className="font-playfair text-lg font-bold text-[#1F150C] dark:text-[#E1DCC9]">
+            OpenPrep AI
+          </span>
+        </Link>
+
+        <div className="flex items-center gap-2">
+          <SoundToggle />
+          <ThemeToggle />
+        </div>
+      </div>
+
+      {/* Main Card */}
+      <div className="w-full max-w-md mx-auto my-auto bg-[#E3CAA5]/60 dark:bg-[#1F150C] rounded-2xl border border-[#CEAB93] dark:border-[#412D15] shadow-2xl p-6 sm:p-8 transition-colors duration-300">
         {message ? (
-          <>
-            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="w-8 h-8 text-green-600" />
+          <div className="text-center">
+            <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center mx-auto mb-4 border border-emerald-500/20">
+              <CheckCircle className="w-8 h-8" />
             </div>
-            <h1 className="text-xl font-bold font-playfair text-stone-900 text-center">Password Reset!</h1>
-            <p className="text-stone-600 mt-2 text-sm text-center">{message}</p>
+            <h1 className="text-2xl font-extrabold font-playfair text-[#1F150C] dark:text-[#E1DCC9]">Password Reset!</h1>
+            <p className="text-[#412D15] dark:text-[#C4BA9D] mt-2 text-sm font-medium">{message}</p>
             <Link
               to="/login"
-              className="block text-center mt-6 bg-amber-700 hover:bg-amber-800 text-amber-50 font-semibold px-6 py-2.5 rounded-sm transition-colors"
+              className="w-full py-3.5 rounded-xl btn-primary-theme font-bold shadow-lg transition-all inline-block mt-6 text-sm text-center"
             >
-              Go to Login
+              Go to Sign In
             </Link>
-          </>
+          </div>
         ) : loading ? (
           <div className="text-center py-8">
-            <Loader className="w-12 h-12 text-amber-600 animate-spin mx-auto mb-4" />
-            <p className="text-stone-600 text-sm">Resetting your password...</p>
+            <Loader className="w-10 h-10 text-[#AD8B73] dark:text-[#E1DCC9] animate-spin mx-auto mb-4" />
+            <p className="text-[#412D15] dark:text-[#C4BA9D] text-sm font-medium">Resetting your password...</p>
           </div>
         ) : (
           <>
             <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold font-playfair text-stone-900">Set New Password</h1>
-              <p className="text-stone-600 mt-2 text-sm">Choose a strong password for your account</p>
+              <h1 className="text-2xl font-extrabold font-playfair text-[#1F150C] dark:text-[#E1DCC9]">Set New Password</h1>
+              <p className="text-[#412D15] dark:text-[#C4BA9D] mt-1.5 text-sm font-medium">Choose a strong password for your account</p>
             </div>
 
             {(error || localError) && (
-              <div className="bg-red-50 border border-red-200 rounded-sm p-3 mb-6 flex items-start gap-2 text-sm text-red-700">
-                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3.5 mb-6 flex items-start gap-2.5 text-sm text-red-700 dark:text-red-300 font-medium">
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-red-600 dark:text-red-400" />
                 <span>{localError || error}</span>
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* New Password Input Group */}
               <div>
-                <label htmlFor="reset-password" className="block text-sm font-semibold text-stone-700 mb-1">New Password</label>
+                <label htmlFor="reset-password" className="block text-xs font-bold uppercase tracking-wider text-[#1F150C] dark:text-[#E1DCC9] mb-1.5">
+                  New Password
+                </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8C6A53] dark:text-[#C4BA9D]" />
                   <input
                     id="reset-password"
                     type={showPassword ? 'text' : 'password'}
@@ -97,51 +113,34 @@ const ResetPassword = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     minLength={8}
-                    placeholder="Min. 8 chars, upper, lower, number, special"
-                    className="w-full pl-10 pr-10 py-2.5 bg-white border border-stone-300 rounded-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:border-transparent text-sm"
+                    placeholder="••••••••"
+                    className="w-full pl-10 pr-10 py-3 bg-[#FFFBE9] dark:bg-[#2C1E16] border border-[#CEAB93] dark:border-[#412D15] rounded-xl text-[#1F150C] dark:text-[#E1DCC9] placeholder-[#8C6A53]/70 dark:placeholder-[#C4BA9D]/50 focus:outline-none focus:ring-2 focus:ring-[#AD8B73] dark:focus:ring-[#E1DCC9] focus:border-transparent text-sm transition-all shadow-sm"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#8C6A53] hover:text-[#1F150C] dark:text-[#C4BA9D] dark:hover:text-[#E1DCC9] transition"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                {/* Real-time password criteria checklist */}
-                {password.length > 0 && (
-                  <ul className="mt-2 space-y-1">
-                    {PASSWORD_CRITERIA.map((rule, idx) => {
-                      const passed = rule.test(password);
-                      return (
-                        <li key={idx} className={`flex items-center gap-1.5 text-xs ${passed ? 'text-green-700' : 'text-stone-400'}`}>
-                          {passed ? (
-                            <CheckCircle className="w-3.5 h-3.5 text-green-600 shrink-0" />
-                          ) : (
-                            <span className="w-3.5 h-3.5 rounded-full border border-stone-300 shrink-0" />
-                          )}
-                          {rule.label}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
               </div>
 
+              {/* Confirm Password Input Group */}
               <div>
-                <label htmlFor="reset-confirm-password" className="block text-sm font-semibold text-stone-700 mb-1">Confirm Password</label>
+                <label htmlFor="confirm-password" className="block text-xs font-bold uppercase tracking-wider text-[#1F150C] dark:text-[#E1DCC9] mb-1.5">
+                  Confirm New Password
+                </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8C6A53] dark:text-[#C4BA9D]" />
                   <input
-                    id="reset-confirm-password"
+                    id="confirm-password"
                     type={showPassword ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
-                    minLength={8}
-                    placeholder="Repeat your password"
-                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-stone-300 rounded-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:border-transparent text-sm"
+                    placeholder="••••••••"
+                    className="w-full pl-10 pr-4 py-3 bg-[#FFFBE9] dark:bg-[#2C1E16] border border-[#CEAB93] dark:border-[#412D15] rounded-xl text-[#1F150C] dark:text-[#E1DCC9] placeholder-[#8C6A53]/70 dark:placeholder-[#C4BA9D]/50 focus:outline-none focus:ring-2 focus:ring-[#AD8B73] dark:focus:ring-[#E1DCC9] focus:border-transparent text-sm transition-all shadow-sm"
                   />
                 </div>
               </div>
@@ -149,18 +148,21 @@ const ResetPassword = () => {
               <button
                 type="submit"
                 disabled={loading}
-                aria-busy={loading}
-                aria-label="Reset password"
-                className="w-full bg-amber-700 hover:bg-amber-800 disabled:bg-amber-400 text-amber-50 font-semibold py-2.5 rounded-sm transition-colors"
+                className="w-full py-3.5 rounded-xl btn-primary-theme font-bold shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 text-sm cursor-pointer mt-2"
               >
-                {loading ? <Loader className="w-5 h-5 animate-spin mx-auto" aria-hidden="true" /> : 'Reset Password'}
+                {loading ? 'Updating Password...' : 'Reset Password'}
               </button>
             </form>
           </>
         )}
       </div>
+
+      {/* Footer copyright */}
+      <div className="text-center text-xs text-[#8C6A53] dark:text-[#C4BA9D] py-2">
+        © {new Date().getFullYear()} OpenPrep AI. All rights reserved.
+      </div>
     </div>
   );
 };
-
 export default ResetPassword;
+

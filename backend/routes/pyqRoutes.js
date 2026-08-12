@@ -9,7 +9,32 @@ const {
   getPYQTrends,
   getUpcomingForecast,
   getPYQClusters,
+  analyzePYQBatch,
+  getSubjectAnalyses,
+  exportPYQAnalysisPDF,
 } = require('../controllers/pyqController');
+const express = require('express');
+const multer = require('multer');
+const { protect } = require('../middleware/auth');
+const { parsePyqPdf } = require('../controllers/pyqParserController');
+
+const router = express.Router();
+
+const upload = multer({
+  dest: 'uploads/',
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB max for large multi-page papers
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF files are allowed!'), false);
+    }
+  },
+});
+
+router.post('/parse-pyq-pdf', protect, upload.single('pdf'), parsePyqPdf);
+
+module.exports = router;
 const { protect } = require('../middleware/auth');
 const { strictAiLimiter } = require('../middleware/rateLimiter');
 const { checkQuota } = require('../middleware/quotaMiddleware');
@@ -394,5 +419,9 @@ router.post(
  */
 
 router.delete('/:id', protect, clearCache('pyqs:*'), deletePYQ);
+
+router.post('/analyze', protect, upload.array('files', 10), analyzePYQBatch);
+router.get('/subject/:subjectId', protect, getSubjectAnalyses);
+router.get('/analysis/:analysisId/export', protect, exportPYQAnalysisPDF);
 
 module.exports = router;

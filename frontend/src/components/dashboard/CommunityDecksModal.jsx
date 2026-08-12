@@ -68,6 +68,31 @@ const CommunityDecksModal = ({ isOpen, onClose, onCloneSuccess }) => {
     }
   };
 
+  const handleStar = async (deckId) => {
+    try {
+      const res = await API.post(`/flashcards/decks/${deckId}/star`, {});
+      if (res.data?.success) {
+        fetchDecks();
+      }
+    } catch (err) {
+      console.error('Starring deck failed:', err);
+    }
+  };
+
+  const handleRate = async (deckId, ratingValue) => {
+    try {
+      const res = await API.post(`/flashcards/decks/${deckId}/rate`, { rating: ratingValue });
+      if (res.data?.success) {
+        alert(`You rated this deck ${ratingValue} stars!`);
+        fetchDecks();
+      }
+    } catch (err) {
+      console.error('Rating deck failed:', err);
+      const errMsg = err.response?.data?.error || 'Failed to submit rating. Please try again.';
+      alert(errMsg);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -202,16 +227,38 @@ const CommunityDecksModal = ({ isOpen, onClose, onCloneSuccess }) => {
                       <h4 className="text-lg font-bold text-slate-100 font-inter">
                         {deck.name}
                       </h4>
-                      <div className="flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded text-amber-400 font-bold text-xs shrink-0">
-                        <Star className="w-3.5 h-3.5 fill-current" />
-                        {deck.rating?.toFixed(1) || '4.5'}
-                      </div>
+                      <button
+                        onClick={() => handleStar(deck.id)}
+                        className="flex items-center gap-1 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 rounded text-amber-400 font-bold text-xs shrink-0 transition-colors"
+                        title="Star this deck"
+                      >
+                        <Star className="w-3.5 h-3.5 fill-current text-amber-400" />
+                        {deck.starCount || 0}
+                      </button>
                     </div>
 
                     {/* Subheader: Creator & Exam */}
                     <p className="text-slate-400 text-xs mt-1">
                       By <span className="text-slate-300 font-semibold">{deck.ownerName}</span> • For <span className="text-slate-300 font-semibold">{deck.examName}</span>
                     </p>
+
+                    {/* Interactive Peer Rating */}
+                    <div className="flex items-center gap-1 mt-2 text-xs text-slate-400">
+                      <span>Rate:</span>
+                      <div className="flex items-center gap-0.5">
+                        {[1, 2, 3, 4, 5].map((starVal) => (
+                          <button
+                            key={starVal}
+                            onClick={() => handleRate(deck.id, starVal)}
+                            className="text-slate-600 hover:text-amber-400 transition-colors"
+                            title={`Rate ${starVal} Stars`}
+                          >
+                            <Star className="w-3.5 h-3.5 fill-current" />
+                          </button>
+                        ))}
+                      </div>
+                      <span className="ml-1 text-[10px]">({deck.rating?.toFixed(1) || '0.0'} / 5)</span>
+                    </div>
 
                     {/* AI-Generated Summary Tags */}
                     {deck.tags && deck.tags.length > 0 && (
