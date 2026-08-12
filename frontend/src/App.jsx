@@ -10,6 +10,7 @@ import MobileNavDrawer from './components/MobileNavDrawer';
 import PageSkeleton from './components/PageSkeleton';
 import SessionTimeoutModal from './components/SessionTimeoutModal';
 import QuotaExceededModal from './components/dashboard/QuotaExceededModal';
+import CommandPalette from './components/CommandPalette';
 import './App.css';
 
 const Landing = lazy(() => import('./pages/Landing'));
@@ -110,6 +111,7 @@ function App() {
       <ScrollToTop />
       <MobileNavDrawer />
       <QuotaExceededModal />
+      <CommandPalette />
       <Suspense fallback={<PageSkeleton />}>
         <Routes>
           <Route path="/" element={<Landing />} />
