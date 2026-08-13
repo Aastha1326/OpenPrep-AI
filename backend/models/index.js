@@ -19,6 +19,7 @@ const Achievement = require('./Achievement');
 const FocusSession = require('./FocusSession');
 const QuizTelemetryEvent = require('./QuizTelemetryEvent');
 const QuizBookmark = require('./QuizBookmark');
+const DeckRating = require('./DeckRating');
 const UserBadge = require('./UserBadge');
 const BattleSession = require('./BattleSession');
 const BattleParticipant = require('./BattleParticipant');
@@ -26,6 +27,12 @@ const PYQAnalysis = require('./PYQAnalysis');
 const PYQQuestion = require('./PYQQuestion');
 const Notification = require('./Notification');
 const PushSubscription = require('./PushSubscription');
+
+// DeckRating associations
+DeckRating.belongsTo(Subject, { foreignKey: 'deckId', as: 'deckRef', onDelete: 'CASCADE' });
+DeckRating.belongsTo(User, { foreignKey: 'userId', as: 'userRef', onDelete: 'CASCADE' });
+Subject.hasMany(DeckRating, { foreignKey: 'deckId', as: 'ratings', onDelete: 'CASCADE' });
+User.hasMany(DeckRating, { foreignKey: 'userId', as: 'ratings', onDelete: 'CASCADE' });
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -156,7 +163,9 @@ Notification.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 User.hasMany(PushSubscription, { foreignKey: 'user', onDelete: 'CASCADE' });
 PushSubscription.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 
-module.exports = {  sequelize,  User,
+module.exports = {
+  sequelize,
+  User,
   Exam,
   Subject,
   Topic,
@@ -171,10 +180,11 @@ module.exports = {  sequelize,  User,
   ActivityLog,
   UsageQuota,
   Achievement,
-  UserBadge,
   FocusSession,
   QuizTelemetryEvent,
   QuizBookmark,
+  DeckRating,
+  UserBadge,
   BattleSession,
   BattleParticipant,
   PYQAnalysis,

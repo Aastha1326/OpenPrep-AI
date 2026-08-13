@@ -949,7 +949,7 @@ exports.shareFlashcardDeck = async (req, res, next) => {
 // @access  Private
 exports.getCommunityDecks = async (req, res, next) => {
   try {
-    const { search, subject, exam, rating } = req.query;
+    const { search, subject, subjectId, exam, rating, sort } = req.query;
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const offset = (page - 1) * limit;
@@ -968,8 +968,30 @@ exports.getCommunityDecks = async (req, res, next) => {
       filter.name = { [Op.like]: `%${subject}%` };
     }
 
+    if (subjectId) {
+      filter.id = subjectId;
+    }
+
     if (rating) {
       filter.rating = { [Op.gte]: parseFloat(rating) };
+    }
+
+    let orderClause = [
+      ['cloneCount', 'DESC'],
+      ['rating', 'DESC'],
+    ];
+    if (sort === 'popular') {
+      orderClause = [
+        ['cloneCount', 'DESC'],
+        ['rating', 'DESC'],
+      ];
+    } else if (sort === 'rating') {
+      orderClause = [
+        ['rating', 'DESC'],
+        ['cloneCount', 'DESC'],
+      ];
+    } else if (sort === 'newest') {
+      orderClause = [['createdAt', 'DESC']];
     }
 
     const { count: total, rows: decks } = await Subject.findAndCountAll({
@@ -1008,6 +1030,7 @@ exports.getCommunityDecks = async (req, res, next) => {
         clonedFromId: deck.clonedFromId,
         cloneCount: deck.cloneCount,
         rating: deck.rating,
+        ratingsCount: deck.ratingsCount || 0,
         starCount: deck.starCount || 0,
         tags: deck.tags ? JSON.parse(deck.tags) : [],
         cardCount,

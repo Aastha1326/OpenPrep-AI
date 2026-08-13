@@ -4,7 +4,9 @@ const {
   getFeedbackList,
   upvoteFeedback,
   getPublicRoadmap,
+  rateCommunityDeck,
 } = require('../controllers/communityController');
+const { getCommunityDecks, cloneCommunityDeck } = require('../controllers/flashcardController');
 const { protect } = require('../middleware/auth');
 const { validateSubmitFeedback } = require('../middleware/validators');
 const cacheMiddleware = require('../middleware/cache');
@@ -79,7 +81,13 @@ const router = express.Router();
  *               $ref: '#/components/schemas/Error'
  */
 
-router.post('/feedback', protect, validateSubmitFeedback, clearCache('community:*'), submitFeedback);
+router.post(
+  '/feedback',
+  protect,
+  validateSubmitFeedback,
+  clearCache('community:*'),
+  submitFeedback
+);
 
 /**
  * @swagger
@@ -112,7 +120,12 @@ router.post('/feedback', protect, validateSubmitFeedback, clearCache('community:
  *               $ref: '#/components/schemas/Error'
  */
 
-router.get('/feedback', protect, cacheMiddleware(req => `community:feedback:${req.originalUrl}`, 900), getFeedbackList);
+router.get(
+  '/feedback',
+  protect,
+  cacheMiddleware((req) => `community:feedback:${req.originalUrl}`, 900),
+  getFeedbackList
+);
 
 /**
  * @swagger
@@ -206,5 +219,10 @@ router.put('/feedback/:id/upvote', protect, clearCache('community:*'), upvoteFee
  */
 
 router.get('/roadmap', protect, cacheMiddleware('community:roadmap', 900), getPublicRoadmap);
+
+// Community Flashcard Decks routes
+router.get('/decks', protect, getCommunityDecks);
+router.post('/decks/:subjectId/fork', protect, cloneCommunityDeck);
+router.post('/decks/:id/rate', protect, rateCommunityDeck);
 
 module.exports = router;

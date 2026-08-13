@@ -9,6 +9,7 @@ const NAV_LINKS = [
   { to: '/battle', label: 'Battle Arena', preload: () => import('../pages/BattleArena') },
   { to: '/study-group', label: 'Study Group', preload: () => import('../pages/StudyGroupChat') },
   { to: '/ai-assistant', label: 'AI Mentor Chat', preload: () => import('../pages/AiAssistant') },
+  { to: '/community/decks', label: 'Community Library', preload: () => import('../pages/CommunityDecks') },
   { to: '/settings', label: 'Settings', preload: () => import('../pages/Settings') },
 ];
 
