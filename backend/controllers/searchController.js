@@ -2,7 +2,7 @@ const { Op } = require('sequelize');
 const Note = require('../models/Note');
 const PYQ = require('../models/PYQ');
 const Flashcard = require('../models/Flashcard');
-const Syllabus = require('../models/Syllabus');
+const Subject = require('../models/Subject');
 
 exports.universalSearch = async (req, res, next) => {
   const startTime = Date.now();

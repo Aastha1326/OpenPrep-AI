@@ -4,12 +4,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
 
 const NAV_LINKS = [
-  { to: '/dashboard', label: 'Dashboard' },
-  { to: '/flashcards/review', label: 'Flashcards' },
-  { to: '/battle', label: 'Battle Arena' },
-  { to: '/study-group', label: 'Study Group' },
-  { to: '/ai-assistant', label: 'AI Mentor Chat' },
-  { to: '/settings', label: 'Settings' },
+  { to: '/dashboard', label: 'Dashboard', preload: () => import('../pages/Dashboard') },
+  { to: '/study-planner', label: 'Study Planner', preload: () => import('../pages/StudyPlanner') },
+  { to: '/flashcards/review', label: 'Flashcards', preload: () => import('../pages/FlashcardReview') },
+  { to: '/battle', label: 'Battle Arena', preload: () => import('../pages/BattleArena') },
+  { to: '/study-group', label: 'Study Group', preload: () => import('../pages/StudyGroupChat') },
+  { to: '/ai-assistant', label: 'AI Mentor Chat', preload: () => import('../pages/AiAssistant') },
+  { to: '/community/decks', label: 'Community Library', preload: () => import('../pages/CommunityDecks') },
+  { to: '/settings', label: 'Settings', preload: () => import('../pages/Settings') },
 ];
 
 const MobileNavDrawer = () => {
@@ -48,6 +50,7 @@ const MobileNavDrawer = () => {
                 <Link
                   key={link.to}
                   to={link.to}
+                  onMouseEnter={() => link.preload()}
                   className="text-lg font-medium text-slate-100 hover:text-indigo-400"
                 >
                   {link.label}

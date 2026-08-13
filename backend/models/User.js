@@ -1,7 +1,7 @@
-import speakeasy from 'speakeasy';
-import QRCode from 'qrcode';
-import crypto from 'crypto';
-
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/db');
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const User = sequelize.define(
   'User',
   {
@@ -29,9 +29,10 @@ const User = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
       validate: {
-        len: {
-          args: [8],
-          msg: 'Password must be at least 8 characters long',
+        isValidPassword(value) {
+          if (value && value.length < 8) {
+            throw new Error('Password must be at least 8 characters long');
+          }
         },
       },
     },
@@ -174,11 +175,19 @@ const User = sequelize.define(
       type: DataTypes.JSONB,
       allowNull: true,
     },
-    dailyReminderTime: {
-      type: DataTypes.STRING,
-      defaultValue: '09:00',
-    },
-    dailyAiUsageCount: {
+dailyReminderTime: {
+  type: DataTypes.STRING,
+  defaultValue: '09:00',
+},
+examCountdownPreferences: {
+  type: DataTypes.JSONB,
+  allowNull: false,
+  defaultValue: {
+    targetExamDate: null,
+    targetScore: null,
+    milestones: [],
+  },
+},    dailyAiUsageCount: {
       type: DataTypes.INTEGER,
       defaultValue: 0,
     },
@@ -250,9 +259,4 @@ User.prototype.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-    const qrCodeUrl = await QRCode.toDataURL(secret.otpauth_url);
-    res.status(200).json({ success: true, secret: secret.base32, qrCodeUrl, backupCodes });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
+module.exports = User;

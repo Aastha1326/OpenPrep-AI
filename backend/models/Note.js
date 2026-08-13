@@ -54,6 +54,18 @@ const Note = sequelize.define(
       type: DataTypes.JSONB,
       allowNull: true,
     },
+    tags: {
+      type: DataTypes.ARRAY(DataTypes.STRING),
+      defaultValue: [],
+    },
+    docState: {
+      type: DataTypes.BLOB,
+      allowNull: true,
+    },
+    isCollaborative: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
   },
   {
     timestamps: true,

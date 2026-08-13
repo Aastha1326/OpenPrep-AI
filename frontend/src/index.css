@@ -467,6 +467,12 @@ html.dark .custom-cursor-ring {
   overflow-wrap: break-word;
 }
 
+.katex-display, .katex {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+}
+
 /* ───────── COLOR HUNT DARK THEME (#000000, #1F150C, #412D15, #E1DCC9) ───────── */
 html.dark,
 .dark {

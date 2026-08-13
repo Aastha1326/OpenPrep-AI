@@ -1,7 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 const CONFIDENCE_THRESHOLD = 0.6;
-
+const SUPPORTED_LANGUAGES = [
+  { value: 'en-US', label: 'English (US)' },
+  { value: 'en-GB', label: 'English (UK)' },
+  { value: 'hi-IN', label: 'Hindi' },
+  { value: 'mr-IN', label: 'Marathi' },
+];
 // Helper to map spoken words to numbers or commands
 const parseCommand = (transcript) => {
   const normalized = transcript.toLowerCase().trim();
@@ -30,8 +35,12 @@ const parseCommand = (transcript) => {
   return null;
 };
 
-export const useVoiceControl = ({ onCommand, speechRate = 1 }) => {
-  const [isSupported, setIsSupported] = useState(true);
+export const useVoiceControl = ({
+  onCommand,
+  onTranscript,
+  speechRate = 1,
+  language = 'en-US',
+}) => {  const [isSupported, setIsSupported] = useState(true);
   const [isEnabled, setIsEnabled] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [status, setStatus] = useState('IDLE'); // IDLE, LISTENING, PROCESSING, SPEAKING, ERROR
@@ -52,8 +61,7 @@ export const useVoiceControl = ({ onCommand, speechRate = 1 }) => {
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = false;
-    recognition.lang = 'en-US';
-
+recognition.lang = language;
     recognition.onstart = () => {
       isListeningRef.current = true;
       if (!isSpeakingRef.current && status !== 'PROCESSING') {
@@ -68,7 +76,9 @@ export const useVoiceControl = ({ onCommand, speechRate = 1 }) => {
       const lastResult = event.results[event.results.length - 1];
       const transcript = lastResult[0].transcript;
       const confidence = lastResult[0].confidence;
-
+      if (confidence > CONFIDENCE_THRESHOLD && onTranscript) {
+        onTranscript(transcript.trim(), confidence);
+      }
       if (confidence > CONFIDENCE_THRESHOLD) {
         const command = parseCommand(transcript);
         if (command) {
@@ -96,14 +106,41 @@ export const useVoiceControl = ({ onCommand, speechRate = 1 }) => {
 
     recognition.onerror = (event) => {
       console.error('Speech recognition error', event.error);
-      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-        setErrorMsg('Microphone permission denied.');
-        setIsEnabled(false);
-      }
-      setStatus('ERROR');
-    };
 
-    recognition.onend = () => {
+      if (
+        event.error === 'not-allowed' ||
+        event.error === 'service-not-allowed'
+      ) {
+        setErrorMsg(
+          'Microphone permission was denied. Allow microphone access in your browser settings, or continue with manual flashcard controls.'
+        );
+        setIsEnabled(false);
+        setStatus('ERROR');
+        return;
+      }
+
+      if (event.error === 'audio-capture') {
+        setErrorMsg(
+          'No microphone was detected. You can continue reviewing manually.'
+        );
+        setIsEnabled(false);
+        setStatus('ERROR');
+        return;
+      }
+
+      if (event.error === 'no-speech') {
+        setErrorMsg(
+          'No speech was detected. Try speaking again or use the manual controls.'
+        );
+        setStatus('LISTENING');
+        return;
+      }
+
+      setErrorMsg(
+        'Voice recognition encountered a problem. You can continue with manual controls.'
+      );
+      setStatus('ERROR');
+    };    recognition.onend = () => {
       isListeningRef.current = false;
       // Automatically restart if enabled and not speaking (continuous mode)
       if (isEnabled && !isSpeakingRef.current) {
@@ -123,8 +160,7 @@ export const useVoiceControl = ({ onCommand, speechRate = 1 }) => {
       recognition.abort();
       if (synthRef.current) synthRef.current.cancel();
     };
-  }, [isEnabled, isPaused, onCommand, status]);
-
+  }, [isEnabled, isPaused, onCommand, onTranscript, language, status]);
   const toggleVoiceMode = useCallback(() => {
     if (!isSupported) return;
     
@@ -165,7 +201,7 @@ export const useVoiceControl = ({ onCommand, speechRate = 1 }) => {
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = speechRate;
-    
+        utterance.lang = language;
     utterance.onend = () => {
       isSpeakingRef.current = false;
       if (isEnabled && !isPaused) {
@@ -187,8 +223,7 @@ export const useVoiceControl = ({ onCommand, speechRate = 1 }) => {
     };
 
     synthRef.current.speak(utterance);
-  }, [isEnabled, isPaused, isSupported, speechRate]);
-
+  }, [isEnabled, isPaused, isSupported, speechRate, language]);
   return {
     isSupported,
     isEnabled,
@@ -197,8 +232,8 @@ export const useVoiceControl = ({ onCommand, speechRate = 1 }) => {
     errorMsg,
     toggleVoiceMode,
     speak,
-    cancelSpeech: () => {
-        synthRef.current?.cancel();
+    supportedLanguages: SUPPORTED_LANGUAGES,
+    cancelSpeech: () => {        synthRef.current?.cancel();
         isSpeakingRef.current = false;
         if(isEnabled && !isPaused) {
             setStatus('LISTENING');
