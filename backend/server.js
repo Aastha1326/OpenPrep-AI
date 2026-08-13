@@ -11,6 +11,8 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { connectDB } = require('./config/db');
 const errorHandler = require('./middleware/error');
+const logger = require('./utils/logger');
+const requestLogger = require('./middleware/requestLogger');
 const { protect } = require('./middleware/auth');
 const fs = require('fs');
 const PYQ = require('./models/PYQ');
@@ -20,20 +22,24 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
 const passport = require('./config/passport');
 const { getCorsMiddleware, getSocketCorsOrigin } = require('./middleware/corsHandler');
-const app = require('./app'); // Your Express app
-const setupQuizBattleSocket = require('./sockets/quizBattleSocket');
 
+// Validate the whole environment against the schema in config/env.js before
+// anything else loads. Reports every problem at once and exits in production;
+// in development it warns and continues on defaults so the API still boots.
+//
+// This supersedes the ad-hoc JWT_SECRET / GEMINI_API_KEY guards that used to
+// live here: both are declared in the schema now, JWT_SECRET is additionally
+// length-checked in production, and GEMINI_API_KEY surfaces through the
+// integration summary below. Reported through the structured logger so the
+// startup report lands in the same stream as every other log line.
+const { loadEnv, summariseIntegrations } = require('./config/env');
 
-// Validate required environment variables at startup
-if (!process.env.JWT_SECRET) {
-  console.error('FATAL ERROR: JWT_SECRET is not defined in environment variables.');
-  console.error('Set JWT_SECRET in your .env file or environment before starting the server.');
-  process.exit(1);
-}
+const env = loadEnv(process.env, { logger });
 
-if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_gemini_api_key_here') {
-  console.warn('WARNING: GEMINI_API_KEY is not set. AI endpoints will return mock data.');
-}
+logger.info('configuration loaded', {
+  env: env.NODE_ENV,
+  integrations: summariseIntegrations(env),
+});
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
@@ -49,13 +55,19 @@ const userRoutes = require('./routes/userRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const fatigueRoutes = require('./routes/fatigueRoutes');
+const pdfRoutes = require('./routes/pdfRoutes');
+const syncRoutes = require('./routes/syncRoutes');
 const calendarRoutes = require('./routes/calendarRoutes');
 const gamificationRoutes = require('./routes/gamificationRoutes');
 const battleRoutes = require('./routes/battleRoutes');
-const folderRoutes = require('./routes/folderRoutes');
+const readinessRoutes = require('./routes/readinessRoutes');
+const podcastRoutes = require('./routes/podcastRoutes');
+const syllabusRoutes = require('./routes/syllabusRoutes');
+const vivaRoutes = require('./routes/vivaRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
-initNotificationCron();
+
 initDifficultyCalibratorCron();
 
 // Connect to Database
@@ -70,6 +82,11 @@ redisService.connect();
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
+
+// Mounted first so every request — including ones rejected by CORS, CSRF or
+// the rate limiters below — carries a correlation ID and gets an access log
+// line. Health probes and static avatars are skipped by default.
+app.use(requestLogger());
 
 // Security Middlewares
 // Directives shared by every response. Gemini calls happen server-side (see
@@ -151,7 +168,10 @@ app.get('/api/csrf-token', (req, res) => {
 });
 
 // Response compression (skip binary uploads via default filter)
-app.use(compression());
+app.use(compression({
+  level: 6, // balanced gzip compression
+  threshold: 0,
+}));
 
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
@@ -181,7 +201,10 @@ app.use('/api/', apiLimiter);
 
 // Serve avatar images publicly — profile pictures are displayed to other
 // users (e.g. in community features) and aren't sensitive like notes/PYQs.
-app.use('/uploads/avatars', express.static(path.join(__dirname, 'uploads/avatars')));
+app.use('/uploads/avatars', express.static(path.join(__dirname, 'uploads/avatars'), {
+  maxAge: '1y',
+  immutable: true
+}));
 
 // Set Static Folder for File Uploads (Protected)
 // protect, Note, PYQ already imported at top of file
@@ -202,6 +225,12 @@ app.get('/uploads/:filename', protect, async (req, res, next) => {
       record = await PYQ.findOne({ where: { fileUrl } });
       if (record) {
         owner = record.user;
+      } else {
+        const { PodcastEpisode } = require('./models');
+        record = await PodcastEpisode.findOne({ where: { audioUrl: fileUrl } });
+        if (record) {
+          owner = record.userId;
+        }
       }
     }
 
@@ -213,6 +242,7 @@ app.get('/uploads/:filename', protect, async (req, res, next) => {
       return res.status(403).json({ success: false, error: 'Not authorized to access this file' });
     }
 
+    res.set('Cache-Control', 'private, max-age=86400'); // 1 day cache for protected assets
     res.sendFile(path.join(__dirname, 'uploads', filename));
   } catch (error) {
     next(error);
@@ -226,7 +256,7 @@ app.use('/api/pyqs', pyqRoutes);
 app.use('/api/pyq', pyqRoutes);
 app.use('/api/community', communityRoutes);
 app.use('/api/study', fatigueRoutes);
-app.use('/api/documents', pdfRoutes);
+app.use('/api/documents', pdfAnnotationRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/study-plans', studyPlanRoutes);
 app.use('/api/quizzes', quizRoutes);
@@ -234,12 +264,16 @@ app.use('/api/quiz', quizRoutes);
 app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/progress', progressRoutes);
-app.use('/api/community', communityRoutes);
 app.use('/api/users', userRoutes);
 app.get('/api/user/quota', protect, require('./controllers/userController').getQuota);
 app.use('/api/ai', aiRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/readiness', readinessRoutes);
+app.use('/api/podcast', podcastRoutes);
+app.use('/api/syllabus', syllabusRoutes);
+app.use('/api/viva', vivaRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/dashboard', analyticsRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/gamification', gamificationRoutes);
 app.use('/api/battles', battleRoutes);
@@ -291,9 +325,8 @@ app.use(
 // Error Handler Middleware
 app.use(errorHandler);
 
-
-
-const PORT = process.env.PORT || 5000;
+// Already coerced to a validated integer by config/env.js.
+const PORT = env.PORT;
 const server = http.createServer(app);
 
 const io = new Server(server, {
@@ -309,46 +342,67 @@ const io = new Server(server, {
 // Initialize socket handlers
 require('./sockets/battleHandler')(io);
 require('./sockets/chatHandler')(io);
-setupQuizBattleSocket(io);
+require('./sockets/crdtHandler')(io);
 
-// Start weekly digest background scheduler
+// User notification room listener
+io.on('connection', (socket) => {
+  socket.on('join_user_room', (userId) => {
+    if (userId) {
+      socket.join(`user:${userId}`);
+    }
+  });
+});
+
+// Start background schedulers
 const { startScheduler } = require('./services/weeklyDigestService');
 startScheduler();
 
-server.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
-});
+const { initStudyReminderCron } = require('./jobs/studyReminderCron');
+initStudyReminderCron(io);
+
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+  server.listen(PORT, () => {
+    logger.info('server started', {
+      port: PORT,
+      env: process.env.NODE_ENV || 'development',
+      logLevel: logger.getLevel(),
+    });
+  });
+}
+
+module.exports = app;
+
 
 // Graceful Shutdown Logic
 const gracefulShutdown = (signal) => {
-  console.log(`Received ${signal}. Starting graceful shutdown...`);
+  logger.info('graceful shutdown started', { signal });
 
   // Force exit timeout (10 seconds maximum connection drain)
   const forceExitTimeout = setTimeout(() => {
-    console.error('Graceful shutdown timed out. Forcing database connection termination and server exit.');
+    logger.error('graceful shutdown timed out — forcing exit', { timeoutMs: 10000 });
     process.exit(1);
   }, 10000);
 
   server.close(async () => {
-    console.log('HTTP connections drained. Closing resource pools...');
+    logger.info('HTTP connections drained, closing resource pools');
     clearTimeout(forceExitTimeout);
 
     try {
       const { sequelize } = require('./config/db');
       await sequelize.close();
-      console.log('Sequelize PostgreSQL connection pool closed.');
+      logger.info('postgres connection pool closed');
     } catch (dbErr) {
-      console.error('Error closing database pool:', dbErr.message);
+      logger.error('error closing database pool', { err: dbErr });
     }
 
     try {
       const redisService = require('./services/redisService');
       if (redisService.client) {
         await redisService.client.quit();
-        console.log('Redis client connection closed.');
+        logger.info('redis connection closed');
       }
     } catch (redisErr) {
-      console.error('Error closing Redis connection:', redisErr.message);
+      logger.error('error closing redis connection', { err: redisErr });
     }
 
     process.exit(0);

@@ -10,6 +10,7 @@ const {
   getMe,
   forgotPassword,
   verifyEmail,
+  resendVerification,
   resetPassword,
   verifyOtp,
   resetPasswordOtp,

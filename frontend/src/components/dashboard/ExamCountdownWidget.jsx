@@ -1,8 +1,16 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Zap, CalendarClock, TimerOff } from 'lucide-react';
-
+import {
+  Zap,
+  CalendarClock,
+  TimerOff,
+  Settings,
+  Target,
+  CheckCircle2,
+  Circle,
+} from 'lucide-react';
+import API from '../../services/api';
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
@@ -68,7 +76,33 @@ function getUrgencyTheme(totalDays) {
     labelColor: 'text-red-400',
   };
 }
+const MOTIVATION_QUOTES = [
+  'Small progress every day becomes a big result.',
+  'Your future self is built by what you study today.',
+  'Consistency beats intensity when preparation is long.',
+  'One focused session today is one step closer to your goal.',
+  'Keep going. Every revision makes you stronger.',
+];
 
+function getProgressPercentage(startDate, examDate) {
+  const start = new Date(startDate).getTime();
+  const end = new Date(examDate).getTime();
+  const now = Date.now();
+
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return 0;
+
+  return Math.min(100, Math.max(0, ((now - start) / (end - start)) * 100));
+}
+
+function getMilestoneState(milestone) {
+  const diff = new Date(milestone.date).getTime() - Date.now();
+
+  if (milestone.completed) return 'completed';
+  if (diff < 0) return 'overdue';
+  if (diff <= 7 * 24 * 60 * 60 * 1000) return 'approaching';
+
+  return 'upcoming';
+}
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 const DigitBlock = ({ value, label, accentClass }) => (
@@ -100,29 +134,116 @@ const Separator = ({ accentClass }) => (
  *   - examName  {string}         Human-readable exam name
  */
 const ExamCountdownWidget = ({ examDate, examName }) => {
+  const [preferences, setPreferences] = useState(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [quoteIndex, setQuoteIndex] = useState(0);
   const navigate = useNavigate();
+
+  const configuredExamDate = preferences?.targetExamDate || examDate;
+  const configuredExamName = examName || 'Target Exam';
+
   const [countdown, setCountdown] = useState(() =>
-    examDate ? computeCountdown(examDate) : null
+    configuredExamDate ? computeCountdown(configuredExamDate) : null
   );
 
   useEffect(() => {
-    if (!examDate) return;
-    // Recalculate once immediately on mount / examDate change
-    setCountdown(computeCountdown(examDate));
+    const loadPreferences = async () => {
+      try {
+        const response = await API.get('/users/exam-countdown');
+        const data = response.data?.data;
 
-    const timer = setInterval(() => {
-      setCountdown(computeCountdown(examDate));
+        if (data) {
+          setPreferences(data);
+          localStorage.setItem('examCountdownPreferences', JSON.stringify(data));
+        }
+      } catch (error) {
+        const cached = localStorage.getItem('examCountdownPreferences');
+
+        if (cached) {
+          setPreferences(JSON.parse(cached));
+        }
+      }
+    };
+
+    const cached = localStorage.getItem('examCountdownPreferences');
+
+    if (cached) {
+      try {
+        setPreferences(JSON.parse(cached));
+      } catch {
+        localStorage.removeItem('examCountdownPreferences');
+      }
+    }
+
+    loadPreferences();
+  }, []);
+
+  useEffect(() => {
+    if (!configuredExamDate) return;
+    setCountdown(computeCountdown(configuredExamDate));
+    const id = setInterval(() => {
+      setCountdown(computeCountdown(configuredExamDate));
     }, 1000);
+    return () => clearInterval(id);
+  }, [configuredExamDate]);
 
-    return () => clearInterval(timer);
-  }, [examDate]);
+  useEffect(() => {
+    if (!configuredExamDate) return;
+    const id = setInterval(() => {
+      setQuoteIndex((i) => (i + 1) % MOTIVATION_QUOTES.length);
+    }, 30000);
+    return () => clearInterval(id);
+  }, [configuredExamDate]);
 
-  // If no exam is set, render nothing
-  if (!examDate || !countdown) return null;
+  const savePreferences = async (nextPreferences) => {
+    setSaving(true);
+    try {
+      setPreferences(nextPreferences);
+      localStorage.setItem('examCountdownPreferences', JSON.stringify(nextPreferences));
+      await API.put('/users/exam-countdown', nextPreferences);
+      setShowSettings(false);
+    } catch (error) {
+      console.error('Failed to save exam countdown preferences', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // If no exam is set, render a prompt button
+  if (!countdown) {
+    return (
+      <div className="relative rounded-lg border border-amber-600/40 bg-neutral-900/80 p-4">
+        <button
+          type="button"
+          onClick={() => setShowSettings(true)}
+          className="w-full flex items-center justify-center gap-2 text-amber-300 text-sm font-semibold"
+        >
+          <CalendarClock className="w-4 h-4" />
+          Set your target exam
+        </button>
+      </div>
+    );
+  }
 
   const { days, hours, minutes, seconds, isPast } = countdown;
   const theme = getUrgencyTheme(days);
   const isCritical = days < 7 && !isPast;
+  const startDate =
+    preferences?.createdAt ||
+    localStorage.getItem('examCountdownStartedAt') ||
+    new Date().toISOString();
+
+  if (!localStorage.getItem('examCountdownStartedAt') && configuredExamDate) {
+    localStorage.setItem('examCountdownStartedAt', new Date().toISOString());
+  }
+
+  const timeProgress = getProgressPercentage(startDate, configuredExamDate);
+  const milestones = preferences?.milestones || [];
+  const completedMilestones = milestones.filter((m) => m.completed).length;
+  const milestoneProgress = milestones.length
+    ? Math.round((completedMilestones / milestones.length) * 100)
+    : 0;
 
   return (
     <AnimatePresence>
@@ -137,20 +258,37 @@ const ExamCountdownWidget = ({ examDate, examName }) => {
           ring-1 ${theme.ring} ${theme.border} ${theme.glowClass}
           flex flex-col gap-3 min-w-[280px]
         `}
-        aria-label={`Exam countdown: ${examName}`}
+        aria-label={`Exam countdown: ${configuredExamName}`}
         role="timer"
       >
         {/* Header row */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <CalendarClock className={`w-4 h-4 shrink-0 ${theme.accent}`} />
-            <span className="text-neutral-300 text-xs font-semibold tracking-wide uppercase truncate max-w-[160px]">
-              {examName || 'Target Exam'}
-            </span>
+            <div className="flex flex-col">
+              <span className="text-neutral-300 text-xs font-semibold tracking-wide uppercase truncate max-w-[160px]">
+                {configuredExamName}
+              </span>
+              {preferences?.targetScore != null && (
+                <span className="text-[10px] text-neutral-500">
+                  Target score: {preferences.targetScore}
+                </span>
+              )}
+            </div>
           </div>
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${theme.badge}`}>
-            {theme.label}
-          </span>
+          <div className="flex items-center gap-1">
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${theme.badge}`}>
+              {theme.label}
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowSettings(true)}
+              className="p-1.5 rounded-md text-neutral-400 hover:text-amber-300 hover:bg-neutral-800 transition-colors"
+              aria-label="Edit exam countdown settings"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Countdown digits */}
@@ -161,17 +299,119 @@ const ExamCountdownWidget = ({ examDate, examName }) => {
           </div>
         ) : (
           <div className="flex items-center gap-1 justify-center py-1">
-            <DigitBlock value={days}    label="Days"    accentClass={theme.accent} />
+            <DigitBlock value={days}    label="Days" accentClass={theme.accent} />
             <Separator accentClass={theme.accent} />
-            <DigitBlock value={hours}   label="Hrs"     accentClass={theme.accent} />
+            <DigitBlock value={hours}   label="Hrs"  accentClass={theme.accent} />
             <Separator accentClass={theme.accent} />
-            <DigitBlock value={minutes} label="Min"     accentClass={theme.accent} />
+            <DigitBlock value={minutes} label="Min"  accentClass={theme.accent} />
             <Separator accentClass={theme.accent} />
-            <DigitBlock value={seconds} label="Sec"     accentClass={theme.accent} />
+            <DigitBlock value={seconds} label="Sec"  accentClass={theme.accent} />
           </div>
         )}
 
-        {/* 7-Day Sprint CTA – only when < 7 days remain */}
+        {/* Progress rings */}
+        <div className="grid grid-cols-2 gap-4 pt-2">
+          <div className="flex flex-col items-center">
+            <div
+              className="relative w-20 h-20 rounded-full flex items-center justify-center"
+              style={{
+                background: `conic-gradient(currentColor ${timeProgress}%, rgb(38 38 38) ${timeProgress}% 100%)`,
+              }}
+            >
+              <div className="absolute inset-1 rounded-full bg-neutral-900 flex items-center justify-center">
+                <span className={`text-sm font-bold ${theme.accent}`}>
+                  {Math.round(timeProgress)}%
+                </span>
+              </div>
+            </div>
+            <span className="text-[10px] text-neutral-400 mt-1">Time elapsed</span>
+          </div>
+
+          <div className="flex flex-col items-center">
+            <div
+              className="relative w-20 h-20 rounded-full flex items-center justify-center"
+              style={{
+                background: `conic-gradient(currentColor ${milestoneProgress}%, rgb(38 38 38) ${milestoneProgress}% 100%)`,
+              }}
+            >
+              <div className="absolute inset-1 rounded-full bg-neutral-900 flex items-center justify-center">
+                <span className="text-sm font-bold text-amber-400">
+                  {milestoneProgress}%
+                </span>
+              </div>
+            </div>
+            <span className="text-[10px] text-neutral-400 mt-1">Milestones</span>
+          </div>
+        </div>
+
+        {/* Milestones */}
+        {milestones.length > 0 && (
+          <div className="border-t border-neutral-800 pt-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] uppercase tracking-widest text-neutral-400">
+                Study milestones
+              </span>
+              <span className="text-[10px] text-neutral-500">
+                {completedMilestones}/{milestones.length}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {milestones.map((milestone) => {
+                const state = getMilestoneState(milestone);
+                return (
+                  <div
+                    key={milestone.id}
+                    className="flex items-center justify-between gap-2 text-xs"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      {state === 'completed' ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      ) : (
+                        <Circle className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
+                      )}
+                      <span className="truncate text-neutral-300">{milestone.title}</span>
+                    </div>
+                    <span
+                      className={
+                        state === 'overdue'
+                          ? 'text-red-400'
+                          : state === 'approaching'
+                          ? 'text-amber-400'
+                          : state === 'completed'
+                          ? 'text-emerald-400'
+                          : 'text-neutral-500'
+                      }
+                    >
+                      {state === 'overdue'
+                        ? 'Overdue'
+                        : state === 'approaching'
+                        ? 'Soon'
+                        : state === 'completed'
+                        ? 'Done'
+                        : new Date(milestone.date).toLocaleDateString()}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Motivation quote */}
+        <div className="border-t border-neutral-800 pt-3">
+          <p className="text-xs text-neutral-400 italic text-center">
+            "{MOTIVATION_QUOTES[quoteIndex]}"
+          </p>
+          <button
+            type="button"
+            onClick={() => setQuoteIndex((i) => (i + 1) % MOTIVATION_QUOTES.length)}
+            className="block mx-auto mt-1 text-[10px] text-amber-400 hover:text-amber-300"
+          >
+            New motivation
+          </button>
+        </div>
+
+        {/* 7-Day Sprint CTA */}
         {isCritical && (
           <motion.button
             id="launch-7-day-sprint-btn"
@@ -187,8 +427,7 @@ const ExamCountdownWidget = ({ examDate, examName }) => {
               shadow-[0_0_12px_rgba(239,68,68,0.4)]
               hover:shadow-[0_0_20px_rgba(239,68,68,0.6)]
               hover:from-red-600 hover:to-red-600
-              transition-all duration-200 cursor-pointer
-              animate-pulse
+              transition-all duration-200 cursor-pointer animate-pulse
             "
             aria-label="Launch 7-Day Sprint Revision"
           >
@@ -201,4 +440,4 @@ const ExamCountdownWidget = ({ examDate, examName }) => {
   );
 };
 
-export default ExamCountdownWidget;
+export default ExamCountdownWidget;

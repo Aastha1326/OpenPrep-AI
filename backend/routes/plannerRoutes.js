@@ -1,9 +1,9 @@
 const express = require('express');
 const { protect } = require('../middleware/auth');
-const { getSubjectReadiness } = require('../controllers/readinessController');
+const { rescheduleOverdueTasks } = require('../controllers/studyPlannerController');
 
 const router = express.Router();
 
-router.get('/', protect, getSubjectReadiness);
+router.post('/reschedule', protect, rescheduleOverdueTasks);
 
 module.exports = router;

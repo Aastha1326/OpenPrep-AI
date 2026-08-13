@@ -7,9 +7,11 @@ import AdminRoute from './components/AdminRoute';
 import CustomCursor from './components/CustomCursor';
 import ScrollToTop from './components/ScrollToTop';
 import MobileNavDrawer from './components/MobileNavDrawer';
-import PageLoader from './components/PageLoader';
+import PageSkeleton from './components/PageSkeleton';
 import SessionTimeoutModal from './components/SessionTimeoutModal';
 import QuotaExceededModal from './components/dashboard/QuotaExceededModal';
+import CommandPalette from './components/CommandPalette';
+import OfflineBanner from './components/common/OfflineBanner';
 import './App.css';
 
 const Landing = lazy(() => import('./pages/Landing'));
@@ -24,12 +26,17 @@ const NotFound = lazy(() => import('./pages/NotFound'));
 const FlashcardReview = lazy(() => import('./pages/FlashcardReview'));
 const PyqDashboard = lazy(() => import('./pages/PyqDashboard'));
 const Settings = lazy(() => import('./pages/Settings'));
+const Flashcards = lazy(() => import('./pages/Flashcards'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const StudyGroupChat = lazy(() => import('./pages/StudyGroupChat'));
 const AiAssistant = lazy(() => import('./pages/AiAssistant'));
 const OAuthCallback = lazy(() => import('./pages/OAuthCallback'));
 const PYQAnalytics = lazy(() => import('./pages/PYQAnalytics'));
 const QuizSession = lazy(() => import('./pages/QuizSession'));
+const MindMapViewer = lazy(() => import('./pages/MindMapViewer'));
+const StudyPlanner = lazy(() => import('./pages/StudyPlanner'));
+const VivaSimulator = lazy(() => import('./pages/VivaSimulator'));
+const CollaborativeNoteView = lazy(() => import('./pages/CollaborativeNoteView'));
 
 function App() {
   const dispatch = useDispatch();
@@ -106,11 +113,13 @@ function App() {
           <span>AI features are temporarily locked due to rate limit/quota limits.</span>
         </div>
       )}
+      <OfflineBanner />
       <CustomCursor />
       <ScrollToTop />
       <MobileNavDrawer />
       <QuotaExceededModal />
-      <Suspense fallback={<PageLoader />}>
+      <CommandPalette />
+      <Suspense fallback={<PageSkeleton />}>
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/register" element={<Register />} />
@@ -133,6 +142,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <FlashcardReview />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/flashcards"
+            element={
+              <ProtectedRoute>
+                <Flashcards />
               </ProtectedRoute>
             }
           />
@@ -188,10 +205,46 @@ function App() {
           />
 
           <Route
+            path="/study-planner"
+            element={
+              <ProtectedRoute>
+                <StudyPlanner />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/viva-simulator"
+            element={
+              <ProtectedRoute>
+                <VivaSimulator />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/notes/collaborative/:noteId"
+            element={
+              <ProtectedRoute>
+                <CollaborativeNoteView />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/quiz/:id"
             element={
               <ProtectedRoute>
                 <QuizSession />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/mind-map"
+            element={
+              <ProtectedRoute>
+                <MindMapViewer />
               </ProtectedRoute>
             }
           />

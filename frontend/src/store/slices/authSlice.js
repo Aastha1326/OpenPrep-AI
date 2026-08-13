@@ -55,15 +55,18 @@ export const loginUser = createAsyncThunk(
   }
 );
 
-/** Login / Register using Google ID token. Backend returns { token, refreshToken, user }. */
+/** Login / Register using Google ID token or OAuth access token. Backend returns { token, refreshToken, user }. */
 export const googleLoginUser = createAsyncThunk(
   'auth/googleLogin',
-  async (credential, { rejectWithValue }) => {
+  async (payload, { rejectWithValue }) => {
     try {
-      const response = await API.post('/auth/google', { credential });
+      const body = typeof payload === 'string' ? { credential: payload } : payload;
+      const response = await API.post('/auth/google', body);
       const { token, refreshToken } = response.data;
-      localStorage.setItem('token', token);
-      localStorage.setItem('refreshToken', refreshToken);
+      if (token) {
+        localStorage.setItem('token', token);
+        localStorage.setItem('refreshToken', refreshToken);
+      }
       return response.data;
     } catch (err) {
       const message = err.response?.data?.error || 'Google login failed';

@@ -40,13 +40,10 @@ const Quiz = sequelize.define(
       type: DataTypes.UUID,
       allowNull: false,
     },
-    folderId: {
-      type: DataTypes.UUID,
+    timeLimit: {
+      type: DataTypes.INTEGER,
       allowNull: true,
-    },
-    tags: {
-      type: DataTypes.ARRAY(DataTypes.STRING),
-      defaultValue: [],
+      defaultValue: null,
     },
   },
   {

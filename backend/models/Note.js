@@ -54,13 +54,17 @@ const Note = sequelize.define(
       type: DataTypes.JSONB,
       allowNull: true,
     },
-    folderId: {
-      type: DataTypes.UUID,
-      allowNull: true,
-    },
     tags: {
       type: DataTypes.ARRAY(DataTypes.STRING),
       defaultValue: [],
+    },
+    docState: {
+      type: DataTypes.BLOB,
+      allowNull: true,
+    },
+    isCollaborative: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
     },
   },
   {

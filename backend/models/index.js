@@ -19,13 +19,20 @@ const Achievement = require('./Achievement');
 const FocusSession = require('./FocusSession');
 const QuizTelemetryEvent = require('./QuizTelemetryEvent');
 const QuizBookmark = require('./QuizBookmark');
+const DeckRating = require('./DeckRating');
 const UserBadge = require('./UserBadge');
 const BattleSession = require('./BattleSession');
 const BattleParticipant = require('./BattleParticipant');
 const PYQAnalysis = require('./PYQAnalysis');
 const PYQQuestion = require('./PYQQuestion');
-const Folder = require('./Folder');
+const Notification = require('./Notification');
+const PushSubscription = require('./PushSubscription');
 
+// DeckRating associations
+DeckRating.belongsTo(Subject, { foreignKey: 'deckId', as: 'deckRef', onDelete: 'CASCADE' });
+DeckRating.belongsTo(User, { foreignKey: 'userId', as: 'userRef', onDelete: 'CASCADE' });
+Subject.hasMany(DeckRating, { foreignKey: 'deckId', as: 'ratings', onDelete: 'CASCADE' });
+User.hasMany(DeckRating, { foreignKey: 'userId', as: 'ratings', onDelete: 'CASCADE' });
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -150,22 +157,16 @@ PYQAnalysis.belongsTo(Subject, { foreignKey: 'subjectId', as: 'subjectRef' });
 PYQAnalysis.hasMany(PYQQuestion, { foreignKey: 'pyqAnalysisId', onDelete: 'CASCADE' });
 PYQQuestion.belongsTo(PYQAnalysis, { foreignKey: 'pyqAnalysisId', as: 'analysisRef' });
 
-// Folder associations
-Folder.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
-Folder.belongsTo(Folder, { foreignKey: 'parentId', as: 'parent' });
-Folder.hasMany(Folder, { foreignKey: 'parentId', as: 'children', onDelete: 'CASCADE' });
+// Notification & PushSubscription associations
+User.hasMany(Notification, { foreignKey: 'user', onDelete: 'CASCADE' });
+Notification.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 
-Folder.hasMany(Note, { foreignKey: 'folderId', onDelete: 'SET NULL' });
-Note.belongsTo(Folder, { foreignKey: 'folderId', as: 'folderRef' });
+User.hasMany(PushSubscription, { foreignKey: 'user', onDelete: 'CASCADE' });
+PushSubscription.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 
-Folder.hasMany(Flashcard, { foreignKey: 'folderId', onDelete: 'SET NULL' });
-Flashcard.belongsTo(Folder, { foreignKey: 'folderId', as: 'folderRef' });
-
-Folder.hasMany(Quiz, { foreignKey: 'folderId', onDelete: 'SET NULL' });
-Quiz.belongsTo(Folder, { foreignKey: 'folderId', as: 'folderRef' });
-
-
-module.exports = {  sequelize,  User,
+module.exports = {
+  sequelize,
+  User,
   Exam,
   Subject,
   Topic,
@@ -178,15 +179,17 @@ module.exports = {  sequelize,  User,
   Progress,
   Feedback,
   ActivityLog,
-UsageQuota,
+  UsageQuota,
   Achievement,
-  UserBadge,
   FocusSession,
   QuizTelemetryEvent,
   QuizBookmark,
+  DeckRating,
+  UserBadge,
   BattleSession,
   BattleParticipant,
   PYQAnalysis,
   PYQQuestion,
-  Folder,
+  Notification,
+  PushSubscription,
 };
