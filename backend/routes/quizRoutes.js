@@ -4,6 +4,8 @@ const upload = multer({
   dest: 'uploads/',
   limits: { fileSize: 15 * 1024 * 1024 }
 });
+const { getEnhancedExplanation } = require('../controllers/solutionExplainerController');
+
 const {
   generateAIQuiz,
   getQuizzes,
@@ -18,6 +20,7 @@ const {
   toggleQuizBookmark,
   getQuizAttemptReportPDF,
   generateCustomQuiz,
+  evaluateSubjectiveAnswer,
 } = require('../controllers/quizController');
 const { generateQuizFromPdf } = require('../controllers/pdfQuizController');
 const { protect } = require('../middleware/auth');
@@ -25,6 +28,7 @@ const telemetryAuth = require('../middleware/telemetryAuth');const { aiLimiter }
 const { checkAiQuota } = require('../middleware/aiQuotaMiddleware');
 const {
   validateGenerateAIQuiz,
+  validateEvaluateSubjective,
   validateSubmitQuizAttempt,
   validateGenerateRevisionSheet,
   validateGenerateRemediationPlan,
@@ -34,8 +38,49 @@ const { validateRequest, submitQuizSchema } = require('../middleware/validate');
 const router = express.Router();
 const { getNextAdaptiveQuestion } = require('../controllers/adaptiveQuizController');
 
+// Register solution explainer route
+router.get('/questions/:questionId/explanation', protect, getEnhancedExplanation);
+
 // Register adaptive route
 router.post('/adaptive/next-question', protect, getNextAdaptiveQuestion);
+
+/**
+ * @swagger
+ * /api/quizzes/evaluate-subjective:
+ *   post:
+ *     summary: Evaluate student's written response for a subjective question against a rubric using Gemini 1.5 API
+ *     tags: [Quizzes]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userAnswerText
+ *             properties:
+ *               questionId:
+ *                 type: string
+ *                 format: uuid
+ *               quizId:
+ *                 type: string
+ *                 format: uuid
+ *               userAnswerText:
+ *                 type: string
+ *                 example: "The core principle of this algorithm..."
+ *     responses:
+ *       200:
+ *         description: Subjective answer evaluation completed
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Not authenticated
+ *       429:
+ *         description: Rate limit exceeded
+ */
+router.post('/evaluate-subjective', protect, aiLimiter, checkAiQuota, validateEvaluateSubjective, evaluateSubjectiveAnswer);
 /**
  * @swagger
  * tags:

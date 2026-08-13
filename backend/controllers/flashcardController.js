@@ -12,6 +12,8 @@ const geminiService = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
 const { YoutubeTranscript } = require('youtube-transcript');
 const { fromBuffer } = require('file-type');
+const { adjustIntervalByConfidence } = require('../utils/confidenceScheduler');
+
 /**
  * Extract an 11-character YouTube video ID from common URL formats
  * (watch?v=, youtu.be/, embed/, shorts/).
@@ -465,7 +467,7 @@ exports.getFlashcards = async (req, res, next) => {
 // @access  Private
 exports.reviewFlashcard = async (req, res, next) => {
   try {
-    const { quality } = req.body; // quality rating: 0 to 5
+    const { quality, confidence } = req.body;
     if (quality === undefined || quality < 0 || quality > 5) {
       return res
         .status(400)
@@ -497,7 +499,7 @@ exports.reviewFlashcard = async (req, res, next) => {
       repetitions = 0;
       interval = step1Interval;
     }
-
+    interval = adjustIntervalByConfidence({ interval, confidence });
     // Adjust E-Factor
     const deltaEF = (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
     efactor = efactor + deltaEF * easyFactorModifier;

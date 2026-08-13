@@ -32,34 +32,15 @@ try {
 }
 
 async function getCache(key) {
-  if (!isRedisConnected) return null;
-  try {
-    const data = await redisClient.get(key);
-    return data ? JSON.parse(data) : null;
-  } catch (err) {
-    return null;
-  }
+  return await redisService.get(key);
 }
 
 async function setCache(key, value, ttlSeconds = 86400) {
-  if (!isRedisConnected) return;
-  try {
-    await redisClient.setEx(key, ttlSeconds, JSON.stringify(value));
-  } catch (err) {
-    // Ignore cache write errors
-  }
+  return await redisService.set(key, value, ttlSeconds);
 }
 
 async function invalidateCache(pattern) {
-  if (!isRedisConnected) return;
-  try {
-    const keys = await redisClient.keys(pattern);
-    if (keys.length > 0) {
-      await redisClient.del(keys);
-    }
-  } catch (err) {
-    // Ignore cache invalidation errors
-  }
+  return await redisService.del(pattern);
 }
 
 module.exports = { getCache, setCache, invalidateCache };
