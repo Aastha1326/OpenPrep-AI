@@ -13,7 +13,7 @@ export default defineConfig({
     },
     testTimeout: 30000,
     hookTimeout: 30000,
-coverage: {
+    coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],
       include: [

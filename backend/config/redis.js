@@ -43,4 +43,4 @@ async function invalidateCache(pattern) {
   return await redisService.del(pattern);
 }
 
-module.exports = { getCache, setCache, invalidateCache };
+module.exports = { getCache, setCache, invalidateCache, isRedisConnected: () => isRedisConnected };

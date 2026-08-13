@@ -20,6 +20,7 @@ const {
   batchSyncOfflineReviews,
 } = require('../controllers/flashcardController');
 const { protect } = require('../middleware/auth');
+const cacheMiddleware = require('../middleware/cacheMiddleware');
 const { aiLimiter } = require('../middleware/rateLimiter');
 const { checkQuota } = require('../middleware/quotaMiddleware');
 const flashcardUpload = require('../middleware/flashcardUpload');
@@ -548,7 +549,7 @@ router.post('/', protect, validateCreateFlashcard, createFlashcard);
  *               $ref: '#/components/schemas/Error'
  */
 
-router.get('/', protect, getFlashcards);
+router.get('/', protect, cacheMiddleware(900), getFlashcards);
 
 /**
  * @swagger
