@@ -4,6 +4,10 @@ const upload = multer({
   dest: 'uploads/',
   limits: { fileSize: 15 * 1024 * 1024 }
 });
+const { getEnhancedExplanation } = require('../controllers/solutionExplainerController');
+
+// Register solution explainer route
+router.get('/questions/:questionId/explanation', protect, getEnhancedExplanation);
 const {
   generateAIQuiz,
   getQuizzes,
