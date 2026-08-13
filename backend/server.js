@@ -61,9 +61,9 @@ const syncRoutes = require('./routes/syncRoutes');
 const calendarRoutes = require('./routes/calendarRoutes');
 const gamificationRoutes = require('./routes/gamificationRoutes');
 const battleRoutes = require('./routes/battleRoutes');
-const { initNotificationCron } = require('./services/notificationService');
+
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
-initNotificationCron();
+
 initDifficultyCalibratorCron();
 
 // Connect to Database

@@ -1,6 +1,6 @@
 const { GoogleGenAI } = require('@google/genai');
-const StudyTask = require('../models/StudyTask');
-const UserSettings = require('../models/UserSettings');
+const StudyPlan = require('../models/StudyPlan');
+const User = require('../models/User');
 const { Op } = require('sequelize');
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });

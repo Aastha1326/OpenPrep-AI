@@ -15,7 +15,8 @@ import {
 
 const getBaseUrl = () => {
   if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
+    const url = import.meta.env.VITE_API_URL.replace(/\/$/, '');
+    return url.endsWith('/api') ? url : `${url}/api`;
   }
   if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
     return '/api';
@@ -289,5 +290,12 @@ export const getNotifications = () => API.get('/notifications');
 export const markNotificationRead = (id) => API.patch(`/notifications/${id}/read`);
 export const markAllNotificationsRead = () => API.patch('/notifications/read-all');
 export const subscribePushNotifications = (payload) => API.post('/notifications/subscribe-push', payload);
+
+/**
+ * Evaluate a student's written response for a subjective question.
+ * POST /api/quizzes/evaluate-subjective
+ */
+export const evaluateSubjectiveAnswer = ({ questionId, quizId, userAnswerText }) =>
+  API.post('/quizzes/evaluate-subjective', { questionId, quizId, userAnswerText });
 
 export default API;

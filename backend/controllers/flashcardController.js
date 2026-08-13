@@ -1003,7 +1003,10 @@ exports.getCommunityDecks = async (req, res, next) => {
       ],
       offset,
       limit,
-      order: orderClause,
+      order: [
+        ['cloneCount', 'DESC'],
+        ['rating', 'DESC'],
+      ],
     });
 
     // If filtering by exam specifically after loading relationships

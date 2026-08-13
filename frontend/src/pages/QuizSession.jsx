@@ -12,7 +12,7 @@ import {
   FaRegBookmark,
   FaSpinner,
 } from 'react-icons/fa';
-import API from '../services/api';
+import API, { evaluateSubjectiveAnswer } from '../services/api';
 import MathRenderer from '../components/common/MathRenderer';
 import { exportAsCSV, exportAsJSON } from '../utils/exportUtils';
 import useVoiceControl from '../hooks/useVoiceControl';
@@ -24,7 +24,6 @@ import RevisionSheetModal from '../components/dashboard/RevisionSheetModal';
 import RemediationPlanModal from '../components/dashboard/RemediationPlanModal';
 import QuestionExplanation from '../components/dashboard/QuestionExplanation';
 import SubjectiveQuestionView from '../components/quiz/SubjectiveQuestionView';
-import { evaluateSubjectiveAnswer } from '../services/api';
 
 const REVIEW_FILTERS = [
   { key: 'all', label: 'All Questions' },
@@ -541,7 +540,8 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
         </div>
         {/* Quiz Content */}
         {!submitted ? (
-          currentQuestion.questionType === 'SUBJECTIVE' || (!currentQuestion.options && currentQuestion.idealAnswer) ? (
+          <>
+          {currentQuestion.questionType === 'SUBJECTIVE' || (!currentQuestion.options && currentQuestion.idealAnswer) ? (
             <SubjectiveQuestionView
               question={currentQuestion}
               questionIndex={currentQuestionIndex}
@@ -600,45 +600,45 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
               })}
             </div>
           </div>
-          )
-        }
-
-        {/* Global Quiz Question Navigation Bar */}
-        <div className="flex justify-between items-center mt-6">
-          <button
-            onClick={handlePrevious}
-            disabled={currentQuestionIndex === 0 || timeElapsed}
-            className="flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors text-slate-200"
-          >
-            <FaArrowLeft className="mr-2" /> Previous
-          </button>
-
-          {isLastQuestion ? (
-            <button
-              onClick={() => submitQuiz()}
-              disabled={submitting || timeElapsed}
-              className="flex items-center px-6 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold shadow-lg shadow-emerald-500/20 transition-all text-white"
-            >
-              {submitting ? (
-                <>
-                  <FaSpinner className="ml-2 animate-spin" /> Submitting...
-                </>
-              ) : (
-                <>
-                  Submit Quiz <FaCheckCircle className="ml-2" />
-                </>
-              )}
-            </button>
-          ) : (
-            <button
-              onClick={handleNext}
-              disabled={timeElapsed}
-              className="flex items-center px-6 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-medium transition-colors text-white"
-            >
-              Next <FaArrowRight className="ml-2" />
-            </button>
           )}
-        </div>
+
+          {/* Global Quiz Question Navigation Bar */}
+          <div className="flex justify-between items-center mt-6">
+            <button
+              onClick={handlePrevious}
+              disabled={currentQuestionIndex === 0 || timeElapsed}
+              className="flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors text-slate-200"
+            >
+              <FaArrowLeft className="mr-2" /> Previous
+            </button>
+
+            {isLastQuestion ? (
+              <button
+                onClick={() => submitQuiz()}
+                disabled={submitting || timeElapsed}
+                className="flex items-center px-6 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold shadow-lg shadow-emerald-500/20 transition-all text-white"
+              >
+                {submitting ? (
+                  <>
+                    <FaSpinner className="ml-2 animate-spin" /> Submitting...
+                  </>
+                ) : (
+                  <>
+                    Submit Quiz <FaCheckCircle className="ml-2" />
+                  </>
+                )}
+              </button>
+            ) : (
+              <button
+                onClick={handleNext}
+                disabled={timeElapsed}
+                className="flex items-center px-6 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-medium transition-colors text-white"
+              >
+                Next <FaArrowRight className="ml-2" />
+              </button>
+            )}
+          </div>
+          </>
         ) : (
           /* Results View */
           <div
