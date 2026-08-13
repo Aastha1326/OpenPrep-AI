@@ -152,3 +152,30 @@ An interactive Recharts Radar Chart mapping ERI masteries across enrolled subjec
 ### 3. Trajectory Score Forecast
 Plots projected readiness progression up to the target exam date based on daily study plan goals, helping students visualize their revision progress.
 
+---
+
+## 🎧 Audio Flashcard Podcast Generator
+
+Converts visual flashcard decks into structured audio podcasts to support hands-free revision.
+
+### 1. Audio Episode Timing & Layout
+The generator builds a unified MP3 stream structured with conversational audio intervals:
+* **Podcast Intro**: A verbal coach welcome introducing the deck title and total card count.
+* **Question Prompt**: "Card [Index]. Question: [Question Text]"
+* **Recall Window**: A 3.5-second silent audio pause allowing active student recall before the explanation is read.
+* **Answer Prompt**: "Answer: [Answer Text] (with Hints if applicable)"
+* **Card Transition**: A 0.8-second brief silence gap before proceeding to the next card.
+* **Podcast Outro**: A verbal coach wrap-up encouraging consistent study habits.
+
+### 2. Conversational Audio Synthesis & Stitching
+* Uses public Translate Text-to-Speech endpoints with custom User-Agents.
+* Handles long text boundaries by automatically splitting card text blocks into <= 160 character fragments to prevent request timeouts or characters truncation.
+* Generates silent pauses programmatically by duplicating a base64 encoded silent LAME-encoded frame buffer.
+* Concatenates output audio buffers directly on the backend to construct a valid, playable MP3 file stored locally on disk under `/uploads`.
+
+### 3. Interactive Playlist Controller
+Provides a responsive frontend AudioPlayer overlay:
+* Supports standard controls: Play, Pause, volume slides.
+* Includes a 15-second skip/rewind toggle.
+* Adjusts playback speeds dynamically (0.8x to 1.5x) using the HTML5 audio element API.
+* Displays screen-reader accessible scrolling transcripts matching the active audio cues.

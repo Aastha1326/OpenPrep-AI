@@ -62,6 +62,7 @@ const calendarRoutes = require('./routes/calendarRoutes');
 const gamificationRoutes = require('./routes/gamificationRoutes');
 const battleRoutes = require('./routes/battleRoutes');
 const readinessRoutes = require('./routes/readinessRoutes');
+const podcastRoutes = require('./routes/podcastRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 initNotificationCron();
@@ -222,6 +223,12 @@ app.get('/uploads/:filename', protect, async (req, res, next) => {
       record = await PYQ.findOne({ where: { fileUrl } });
       if (record) {
         owner = record.user;
+      } else {
+        const { PodcastEpisode } = require('./models');
+        record = await PodcastEpisode.findOne({ where: { audioUrl: fileUrl } });
+        if (record) {
+          owner = record.userId;
+        }
       }
     }
 
@@ -260,6 +267,7 @@ app.get('/api/user/quota', protect, require('./controllers/userController').getQ
 app.use('/api/ai', aiRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/readiness', readinessRoutes);
+app.use('/api/podcast', podcastRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/gamification', gamificationRoutes);
