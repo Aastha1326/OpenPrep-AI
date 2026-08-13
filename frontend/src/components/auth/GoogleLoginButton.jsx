@@ -1,12 +1,28 @@
+/**
+ * GoogleLoginButton
+ *
+ * Redirects the browser to the backend's Passport Google OAuth2 route.
+ * The backend URL is resolved from the VITE_API_URL build-time env var,
+ * which must be set to the deployed backend origin in production
+ * (e.g. https://openprep-ai.onrender.com/api).
+ *
+ * Never use a relative '/api' path — when the frontend is hosted separately
+ * (Vercel SPA) the relative path hits the frontend server, not the backend.
+ */
+
+const getApiBase = () => {
+  // VITE_API_URL is injected at build time by Vite from the .env file or
+  // the hosting provider's environment variable settings.
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL.replace(/\/$/, '');
+  }
+  // Local development fallback — backend runs on port 5000.
+  return 'http://localhost:5000/api';
+};
+
 const GoogleLoginButton = () => {
   const handleLogin = () => {
-    let base = '';
-    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      base = '/api';
-    } else {
-      base = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-    }
-    window.location.href = `${base.replace(/\/$/, '')}/auth/google`;
+    window.location.href = `${getApiBase()}/auth/google`;
   };
 
   return (
