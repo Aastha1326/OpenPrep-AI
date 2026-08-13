@@ -191,6 +191,107 @@ describe('POST /api/flashcards/from-audio', () => {
       expect(res.status).toBe(200);
       expect(res.body.count).toBe(1);
     });
+
+    it('should support pagination (page, limit, totalCount)', async () => {
+      for (let i = 1; i <= 25; i++) {
+        await Flashcard.create({
+          user: testUser.id,
+          subject: testSubject.id,
+          front: `Front ${i}`,
+          back: `Back ${i}`,
+        });
+      }
+
+      const res = await request(app)
+        .get('/api/flashcards')
+        .set('Authorization', `Bearer ${authToken}`)
+        .query({ page: 2, limit: 10 });
+
+      expect(res.status).toBe(200);
+      expect(res.body.count).toBe(10);
+      expect(res.body.total).toBe(25);
+      expect(res.body.page).toBe(2);
+      expect(res.body.limit).toBe(10);
+      expect(res.body.totalPages).toBe(3);
+      expect(res.body.pagination).toBeDefined();
+      expect(res.body.pagination.total).toBe(25);
+      expect(res.body.flashcards).toBeDefined();
+    });
+
+    it('should filter flashcards by search query', async () => {
+      await Flashcard.create({
+        user: testUser.id,
+        subject: testSubject.id,
+        front: 'Photosynthesis question',
+        back: 'Plant bio',
+      });
+      await Flashcard.create({
+        user: testUser.id,
+        subject: testSubject.id,
+        front: 'Mitosis question',
+        back: 'Cell division',
+      });
+
+      const res = await request(app)
+        .get('/api/flashcards')
+        .set('Authorization', `Bearer ${authToken}`)
+        .query({ search: 'photosynthesis' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.count).toBe(1);
+      expect(res.body.data[0].front).toContain('Photosynthesis');
+    });
+
+    it('should filter flashcards by topicId', async () => {
+      await Flashcard.create({
+        user: testUser.id,
+        subject: testSubject.id,
+        topic: testTopic.id,
+        front: 'Q with topic',
+        back: 'A with topic',
+      });
+      await Flashcard.create({
+        user: testUser.id,
+        subject: testSubject.id,
+        front: 'Q without topic',
+        back: 'A without topic',
+      });
+
+      const res = await request(app)
+        .get('/api/flashcards')
+        .set('Authorization', `Bearer ${authToken}`)
+        .query({ topicId: testTopic.id.toString() });
+
+      expect(res.status).toBe(200);
+      expect(res.body.count).toBe(1);
+      expect(res.body.data[0].topic.id).toBe(testTopic.id.toString());
+    });
+
+    it('should support sorting by sortBy and order', async () => {
+      await Flashcard.create({
+        user: testUser.id,
+        subject: testSubject.id,
+        front: 'Apple',
+        back: 'Fruit',
+        nextReviewDate: new Date(Date.now() + 100000),
+      });
+      await Flashcard.create({
+        user: testUser.id,
+        subject: testSubject.id,
+        front: 'Zebra',
+        back: 'Animal',
+        nextReviewDate: new Date(Date.now() - 100000),
+      });
+
+      const res = await request(app)
+        .get('/api/flashcards')
+        .set('Authorization', `Bearer ${authToken}`)
+        .query({ sortBy: 'front', order: 'DESC' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data[0].front).toBe('Zebra');
+      expect(res.body.data[1].front).toBe('Apple');
+    });
   });
 
   describe('PUT /api/flashcards/:id/review (SM-2 Algorithm)', () => {
@@ -504,7 +605,7 @@ describe('POST /api/flashcards/from-audio', () => {
       expect(res.body.data.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('should clone a community deck into user\'s personal library and increment cloneCount', async () => {
+    it("should clone a community deck into user's personal library and increment cloneCount", async () => {
       // Create another user to clone from to represent a peer clone
       const otherUser = await User.create({
         name: 'Peer Student',
@@ -513,6 +614,7 @@ describe('POST /api/flashcards/from-audio', () => {
       });
       const otherExam = await Exam.create({
         name: 'Peer Exam',
+        date: new Date(),
         user: otherUser.id,
       });
       const otherSubject = await Subject.create({
