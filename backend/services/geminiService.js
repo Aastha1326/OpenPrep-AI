@@ -1708,6 +1708,11 @@ function getMockEmbedding(text) {
   }
   return vector;
 }
+
+exports.generateQuestionExplanation = async ({ question, options, correctAnswer, userAnswer, mode }) => {
+  return { mode, markdown: 'Mock explanation' };
+};
+
 function getMockRecommendations() {  return {
     weakSubjects: ['Computer Architecture', 'Data Structures'],
     recommendations: [

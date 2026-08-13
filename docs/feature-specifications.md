@@ -223,3 +223,22 @@ Calculates four key academic assessment indicators:
 * Leverages Web Speech API for real-time speech-to-text translation.
 * Automatically reads examiner questions aloud using window.speechSynthesis to simulate a natural academic oral examination setting.
 * Provides full manual text keyboard input fallback for environments without microphone support.
+
+---
+
+## 👥 Multi-User Study Notes Real-Time Collaboration
+
+Enables concurrent rich co-editing of lecture notes and study guides with peer presence and automatic conflict resolution.
+
+### 1. Conflict-Free Replicated Data Types (CRDT)
+* Powered by Yjs, document contents are modeled as replicated character vectors (`Y.Text`).
+* Simultaneous edits from multiple clients are merged deterministically in real-time, preventing text loss, duplicate insertions, or cursor jumps.
+* Base64 encoded update steps are transmitted over WebSockets, minimizing network payload sizing (<1KB per typing event).
+
+### 2. Presence & Cursors Awareness
+* Syncs peer collaborator cursor character offsets over the WebSocket channel.
+* Displays distinct colored cursor carets and collaborator initial icons in the note editor canvas.
+
+### 3. Asynchronous Database Synchronization
+* Syncs document states to PostgreSQL on a 2-second idle debounce delay.
+* Binary Y.Doc state updates are saved to the `docState` BLOB column while matching raw synchronized text is written to the `content` TEXT column for compatibility with other analytics modules.
