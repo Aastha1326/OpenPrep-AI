@@ -1193,4 +1193,87 @@ exports.starCommunityDeck = async (req, res, next) => {
     next(error);
   }
 };
+// @desc    Batch sync offline flashcard reviews (SM-2 updates)
+// @route   POST /api/flashcards/batch-sync
+// @access  Private
+exports.batchSyncOfflineReviews = async (req, res, next) => {
+  try {
+    const { reviews } = req.body;
+    if (!Array.isArray(reviews) || reviews.length === 0) {
+      return res.status(400).json({ success: false, error: 'Provide a non-empty reviews array' });
+    }
 
+    const results = { synced: 0, skipped: 0, errors: [] };
+
+    for (const review of reviews) {
+      const { cardId, score, reviewedAt } = review;
+
+      if (score === undefined || score < 0 || score > 5) {
+        results.errors.push({ cardId, reason: 'Invalid score' });
+        results.skipped += 1;
+        continue;
+      }
+
+      const card = await Flashcard.findOne({ where: { id: cardId, user: req.user.id } });
+      if (!card) {
+        // Card deleted server-side while offline — skip gracefully
+        results.skipped += 1;
+        continue;
+      }
+
+      // Reject stale reviews: if reviewedAt is older than the card's last review date, skip
+      if (reviewedAt && card.updatedAt && new Date(reviewedAt) < new Date(card.updatedAt)) {
+        results.skipped += 1;
+        continue;
+      }
+
+      // SM-2 algorithm
+      let { interval, repetitions, efactor } = card;
+      const quality = score;
+      if (quality >= 3) {
+        if (repetitions === 0) {
+          interval = 1;
+        } else if (repetitions === 1) {
+          interval = 6;
+        } else {
+          interval = Math.round(interval * efactor);
+        }
+        repetitions += 1;
+      } else {
+        repetitions = 0;
+        interval = 1;
+      }
+
+      const deltaEF = 0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02);
+      efactor = Math.max(1.3, efactor + deltaEF);
+
+      card.interval = interval;
+      card.repetitions = repetitions;
+      card.efactor = efactor;
+      card.nextReviewDate = new Date(Date.now() + interval * 24 * 60 * 60 * 1000);
+      await card.save();
+
+      if (quality >= 4) {
+        const [progress] = await Progress.findOrCreate({
+          where: { user: req.user.id, subject: card.subject, topic: card.topic || null },
+          defaults: {
+            user: req.user.id,
+            subject: card.subject,
+            topic: card.topic || null,
+            flashcardsMastered: 0,
+            completionPercentage: 0,
+            studyHours: 0,
+          },
+        });
+        progress.flashcardsMastered += 1;
+        await progress.save();
+      }
+
+      results.synced += 1;
+    }
+
+    res.status(200).json({ success: true, data: results });
+  } catch (error) {
+    next(error);
+  }
+};

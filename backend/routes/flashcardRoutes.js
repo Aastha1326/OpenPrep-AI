@@ -17,6 +17,7 @@ const {
   cloneCommunityDeck,
   rateCommunityDeck,
   starCommunityDeck,
+  batchSyncOfflineReviews,
 } = require('../controllers/flashcardController');
 const { protect } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
@@ -777,6 +778,7 @@ router.put('/decks/:subjectId/share', protect, shareFlashcardDeck);
 router.post('/decks/:subjectId/clone', protect, cloneCommunityDeck);
 router.post('/decks/:subjectId/rate', protect, rateCommunityDeck);
 router.post('/decks/:subjectId/star', protect, starCommunityDeck);
+router.post('/batch-sync', protect, batchSyncOfflineReviews);
 
 router.delete('/:id', protect, deleteFlashcard);
 
