@@ -24,7 +24,8 @@ function extractYouTubeVideoId(url) {
     /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/
   );
   return match ? match[1] : null;
-}const { default: Exporter } = require('anki-apkg-export');
+}
+const { default: Exporter } = require('anki-apkg-export');
 const { calculateSM2 } = require('../utils/sm2');
 const { parseCSV, validateCSVHeaders } = require('../utils/csvParser');
 
@@ -57,9 +58,7 @@ exports.generateAIFlashcards = async (req, res, next) => {
     }
     let notesText = '';
     if (notes && notes.length > 0) {
-      notesText = notes
-        .map((n) => n.content || '')
-        .join('\n');
+      notesText = notes.map((n) => n.content || '').join('\n');
     }
 
     // Call Gemini
@@ -138,7 +137,8 @@ exports.autoTagFlashcard = async (req, res, next) => {
 // @desc    Preview AI-generated flashcards from a note's content (not saved)
 // @route   POST /api/flashcards/generate-from-note
 // @access  Private
-exports.generateFlashcardsFromNote = async (req, res, next) => {  try {
+exports.generateFlashcardsFromNote = async (req, res, next) => {
+  try {
     const { noteId, count } = req.body;
 
     const note = await Note.findOne({
@@ -184,7 +184,7 @@ exports.generateFlashcardsFromNote = async (req, res, next) => {  try {
         retryAfter: error.retryAfter,
       });
     }
-if (error instanceof GeminiServerError) {
+    if (error instanceof GeminiServerError) {
       return res.status(503).json({ success: false, error: error.message });
     }
     next(error);
@@ -200,7 +200,9 @@ exports.generateFlashcardsFromYouTube = async (req, res, next) => {
 
     const videoId = extractYouTubeVideoId(youtubeUrl);
     if (!videoId) {
-      return res.status(400).json({ success: false, error: 'Please provide a valid YouTube video URL' });
+      return res
+        .status(400)
+        .json({ success: false, error: 'Please provide a valid YouTube video URL' });
     }
 
     let transcriptItems;
@@ -213,7 +215,10 @@ exports.generateFlashcardsFromYouTube = async (req, res, next) => {
       });
     }
 
-    const transcriptText = (transcriptItems || []).map((item) => item.text).join(' ').trim();
+    const transcriptText = (transcriptItems || [])
+      .map((item) => item.text)
+      .join(' ')
+      .trim();
     if (!transcriptText) {
       return res.status(422).json({
         success: false,
@@ -264,7 +269,8 @@ exports.generateFlashcardsFromYouTube = async (req, res, next) => {
 
 // @desc    Create manual Flashcard// @route   POST /api/flashcards
 // @access  Private
-exports.createFlashcard = async (req, res, next) => {  try {
+exports.createFlashcard = async (req, res, next) => {
+  try {
     const { subjectId, topicId, front, back, tags, difficulty } = req.body;
     const card = await Flashcard.create({
       user: req.user.id,
@@ -274,7 +280,8 @@ exports.createFlashcard = async (req, res, next) => {  try {
       back,
       tags: tags || [],
       difficulty: difficulty || null,
-    });    res.status(201).json({ success: true, data: card });
+    });
+    res.status(201).json({ success: true, data: card });
   } catch (error) {
     next(error);
   }
@@ -285,7 +292,7 @@ exports.createFlashcard = async (req, res, next) => {  try {
 // @access  Private
 exports.getFlashcards = async (req, res, next) => {
   try {
-    const { subjectId, dueOnly } = req.query;
+    const { subjectId, topicId, dueOnly, search, sortBy, order } = req.query;
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const offset = (page - 1) * limit;
@@ -293,8 +300,29 @@ exports.getFlashcards = async (req, res, next) => {
     const filter = { user: req.user.id };
 
     if (subjectId) filter.subject = subjectId;
+    if (topicId) filter.topic = topicId;
+
     if (dueOnly === 'true') {
       filter.nextReviewDate = { [Op.lte]: new Date() };
+    }
+
+    if (search) {
+      filter[Op.or] = [
+        { front: { [Op.iLike]: `%${search}%` } },
+        { back: { [Op.iLike]: `%${search}%` } },
+      ];
+    }
+
+    const allowedSortFields = ['nextReviewDate', 'createdAt', 'front', 'back', 'id'];
+    const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'nextReviewDate';
+    const sortOrder = (order || 'ASC').toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+
+    const orderClause = [[sortField, sortOrder]];
+    if (sortField !== 'createdAt') {
+      orderClause.push(['createdAt', 'ASC']);
+    }
+    if (sortField !== 'id') {
+      orderClause.push(['id', 'ASC']);
     }
 
     const { count: total, rows: cards } = await Flashcard.findAndCountAll({
@@ -304,11 +332,7 @@ exports.getFlashcards = async (req, res, next) => {
         { model: Subject, as: 'subjectRef' },
         { model: Topic, as: 'topicRef' },
       ],
-      order: [
-        ['nextReviewDate', 'ASC'],
-        ['createdAt', 'ASC'],
-        ['id', 'ASC'],
-      ],
+      order: orderClause,
       offset,
       limit,
       subQuery: false,
@@ -329,6 +353,13 @@ exports.getFlashcards = async (req, res, next) => {
       limit,
       totalPages: Math.ceil(total / limit),
       data: populatedCards,
+      flashcards: populatedCards,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
     });
   } catch (error) {
     next(error);
@@ -374,7 +405,7 @@ exports.reviewFlashcard = async (req, res, next) => {
     }
 
     // Adjust E-Factor
-    const deltaEF = (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
+    const deltaEF = 0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02);
     efactor = efactor + deltaEF * easyFactorModifier;
     if (efactor < 1.3) efactor = 1.3;
 
@@ -466,7 +497,9 @@ exports.exportFlashcards = async (req, res, next) => {
     const { subjectId, format = 'json' } = req.query;
 
     if (!['json', 'csv', 'apkg'].includes(format)) {
-      return res.status(400).json({ success: false, error: 'format must be "json", "csv", or "apkg"' });
+      return res
+        .status(400)
+        .json({ success: false, error: 'format must be "json", "csv", or "apkg"' });
     }
 
     const filter = { user: req.user.id };
@@ -481,7 +514,7 @@ exports.exportFlashcards = async (req, res, next) => {
       order: [['createdAt', 'ASC']],
     });
 
-const payload = cards.map((c) => ({
+    const payload = cards.map((c) => ({
       front: c.front,
       back: c.back,
       subject: c.subjectRef ? c.subjectRef.name : null,
@@ -489,7 +522,7 @@ const payload = cards.map((c) => ({
       tags: Array.isArray(c.tags) ? c.tags.join(' ') : '',
       hint: c.hint || '',
     }));
-if (format === 'csv') {
+    if (format === 'csv') {
       const header = 'front,back,subject,topic,tags,hint';
       const rows = payload.map(
         (p) =>
@@ -503,21 +536,21 @@ if (format === 'csv') {
 
     if (format === 'apkg') {
       const exporter = new Exporter('OpenPrep Flashcards');
-      
-      payload.forEach(c => {
+
+      payload.forEach((c) => {
         const tags = [];
         if (c.subject) tags.push(c.subject.replace(/\s+/g, '_'));
         if (c.topic) tags.push(c.topic.replace(/\s+/g, '_'));
-        
+
         // Add basic HTML formatting for cards
         const frontHtml = `<div style="text-align:center;font-size:24px;">${c.front}</div>`;
         const backHtml = `<div style="text-align:center;font-size:20px;">${c.back}</div>`;
-        
+
         exporter.addCard(frontHtml, backHtml, { tags });
       });
 
       const zipBuffer = await exporter.save();
-      
+
       res.setHeader('Content-Type', 'application/octet-stream');
       res.setHeader('Content-Disposition', 'attachment; filename="flashcards.apkg"');
       return res.status(200).send(zipBuffer);
@@ -544,7 +577,9 @@ exports.importFlashcards = async (req, res, next) => {
 
     if (!subjectId) {
       if (req.file) fs.unlinkSync(req.file.path);
-      return res.status(400).json({ success: false, error: 'subjectId query parameter is required' });
+      return res
+        .status(400)
+        .json({ success: false, error: 'subjectId query parameter is required' });
     }
 
     const subject = await Subject.findOne({
@@ -570,7 +605,7 @@ exports.importFlashcards = async (req, res, next) => {
           return res.status(400).json({ success: false, error: 'Invalid JSON file' });
         }
         records = Array.isArray(parsed) ? parsed : parsed.data || [];
-} else {
+      } else {
         // CSV (supports standard Anki CSV exports, including their
         // leading "#"-prefixed metadata lines)
         records = parseCSV(raw);
@@ -579,7 +614,8 @@ exports.importFlashcards = async (req, res, next) => {
           return res.status(400).json({ success: false, error: csvError });
         }
       }
-    } else if (req.body && Array.isArray(req.body.cards)) {      // Raw JSON body fallback
+    } else if (req.body && Array.isArray(req.body.cards)) {
+      // Raw JSON body fallback
       records = req.body.cards;
     } else {
       return res.status(400).json({
@@ -592,7 +628,7 @@ exports.importFlashcards = async (req, res, next) => {
     const valid = [];
     const invalid = [];
 
-for (let i = 0; i < records.length; i++) {
+    for (let i = 0; i < records.length; i++) {
       const r = records[i];
       const front = typeof r.front === 'string' ? r.front.trim() : '';
       const back = typeof r.back === 'string' ? r.back.trim() : '';
@@ -616,7 +652,8 @@ for (let i = 0; i < records.length; i++) {
       }
 
       const hintRaw = typeof r.hint === 'string' ? r.hint : r.hints;
-      const hint = typeof hintRaw === 'string' && hintRaw.trim() ? hintRaw.trim().slice(0, 1000) : null;
+      const hint =
+        typeof hintRaw === 'string' && hintRaw.trim() ? hintRaw.trim().slice(0, 1000) : null;
 
       valid.push({
         user: req.user.id,
@@ -653,7 +690,11 @@ for (let i = 0; i < records.length; i++) {
     });
   } catch (error) {
     if (req.file) {
-      try { fs.unlinkSync(req.file.path); } catch { /* ignore */ }
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch {
+        /* ignore */
+      }
     }
     next(error);
   }
@@ -666,7 +707,7 @@ exports.getReviewForecast = async (req, res, next) => {
   try {
     const userId = req.user.id;
     const now = new Date();
-    
+
     // We want to forecast the next 30 days starting from today.
     const forecast = [];
     const dateCounts = {};
@@ -694,7 +735,7 @@ exports.getReviewForecast = async (req, res, next) => {
 
     cards.forEach((card) => {
       if (!card.nextReviewDate) return;
-      
+
       const cardDate = new Date(card.nextReviewDate);
       const cardDateStr = cardDate.toISOString().split('T')[0];
 
@@ -735,13 +776,15 @@ exports.shareFlashcardDeck = async (req, res, next) => {
     if (isPublic) {
       const cards = await Flashcard.findAll({ where: { subject: subjectId } });
       if (!cards || cards.length === 0) {
-        return res.status(400).json({ success: false, error: 'Cannot share an empty flashcard deck' });
+        return res
+          .status(400)
+          .json({ success: false, error: 'Cannot share an empty flashcard deck' });
       }
 
       // Automatically generate summary tags and description via Gemini AI
       const review = await geminiService.reviewFlashcardDeck(
         subject.name,
-        cards.map(c => ({ front: c.front, back: c.back }))
+        cards.map((c) => ({ front: c.front, back: c.back }))
       );
 
       subject.isPublic = true;
@@ -803,15 +846,19 @@ exports.getCommunityDecks = async (req, res, next) => {
       ],
       offset,
       limit,
-      order: [['cloneCount', 'DESC'], ['rating', 'DESC']],
+      order: [
+        ['cloneCount', 'DESC'],
+        ['rating', 'DESC'],
+      ],
     });
 
     // If filtering by exam specifically after loading relationships
     let filteredDecks = decks;
     if (exam) {
-      filteredDecks = decks.filter(deck => 
-        (deck.examRef && deck.examRef.name.toLowerCase().includes(exam.toLowerCase())) ||
-        deck.exam === exam
+      filteredDecks = decks.filter(
+        (deck) =>
+          (deck.examRef && deck.examRef.name.toLowerCase().includes(exam.toLowerCase())) ||
+          deck.exam === exam
       );
     }
 
@@ -856,7 +903,9 @@ exports.cloneCommunityDeck = async (req, res, next) => {
 
     const sourceSubject = await Subject.findByPk(subjectId);
     if (!sourceSubject || (!sourceSubject.isPublic && sourceSubject.user !== req.user.id)) {
-      return res.status(404).json({ success: false, error: 'Flashcard deck not found or not public' });
+      return res
+        .status(404)
+        .json({ success: false, error: 'Flashcard deck not found or not public' });
     }
 
     // Resolve user's exam to place cloned subject under
@@ -880,13 +929,13 @@ exports.cloneCommunityDeck = async (req, res, next) => {
         user: req.user.id,
         clonedFromId: subjectId,
         exam: targetExamId,
-      }
+      },
     });
 
     if (existingClone) {
       return res.status(400).json({
         success: false,
-        error: 'You have already cloned this flashcard deck to your selected exam'
+        error: 'You have already cloned this flashcard deck to your selected exam',
       });
     }
 

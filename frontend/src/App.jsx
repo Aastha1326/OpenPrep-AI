@@ -23,6 +23,7 @@ const NotFound = lazy(() => import('./pages/NotFound'));
 const FlashcardReview = lazy(() => import('./pages/FlashcardReview'));
 const PyqDashboard = lazy(() => import('./pages/PyqDashboard'));
 const Settings = lazy(() => import('./pages/Settings'));
+const Flashcards = lazy(() => import('./pages/Flashcards'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const StudyGroupChat = lazy(() => import('./pages/StudyGroupChat'));
 const AiAssistant = lazy(() => import('./pages/AiAssistant'));
@@ -83,6 +84,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <FlashcardReview />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/flashcards"
+            element={
+              <ProtectedRoute>
+                <Flashcards />
               </ProtectedRoute>
             }
           />
