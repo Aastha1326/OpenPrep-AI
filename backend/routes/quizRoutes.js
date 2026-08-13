@@ -21,6 +21,7 @@ const {
   getQuizAttemptReportPDF,
   generateCustomQuiz,
   evaluateSubjectiveAnswer,
+  generateRemediationQuiz,
 } = require('../controllers/quizController');
 const { generateQuizFromPdf } = require('../controllers/pdfQuizController');
 const { protect } = require('../middleware/auth');
@@ -32,6 +33,7 @@ const {
   validateSubmitQuizAttempt,
   validateGenerateRevisionSheet,
   validateGenerateRemediationPlan,
+  validateGenerateRemediationQuiz,
 } = require('../middleware/validators');
 const { validateRequest, submitQuizSchema } = require('../middleware/validate');
 
@@ -160,6 +162,51 @@ router.post('/evaluate-subjective', protect, aiLimiter, checkAiQuota, validateEv
 
 router.post('/generate-ai', protect, aiLimiter, checkAiQuota, validateGenerateAIQuiz, generateAIQuiz);
 router.post('/generate-custom', protect, aiLimiter, checkAiQuota, generateCustomQuiz);
+
+/**
+ * @swagger
+ * /api/quizzes/generate-remediation:
+ *   post:
+ *     summary: Generate a targeted AI diagnostic quiz from forgotten flashcards
+ *     tags: [Quizzes]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - deckId
+ *               - failedCardIds
+ *             properties:
+ *               deckId:
+ *                 type: string
+ *                 format: uuid
+ *                 description: Subject/deck ID the failed cards belong to
+ *               failedCardIds:
+ *                 type: array
+ *                 minItems: 2
+ *                 items:
+ *                   type: string
+ *                   format: uuid
+ *               count:
+ *                 type: integer
+ *                 minimum: 5
+ *                 maximum: 10
+ *                 default: 5
+ *     responses:
+ *       201:
+ *         description: Remediation quiz generated successfully
+ *       400:
+ *         description: Fewer than 2 failed cards provided
+ *       404:
+ *         description: Deck not found or access denied
+ *       429:
+ *         description: Rate limit exceeded
+ */
+router.post('/generate-remediation', protect, aiLimiter, checkAiQuota, validateGenerateRemediationQuiz, generateRemediationQuiz);
 
 /**
  * @swagger

@@ -16,6 +16,7 @@ import useVoiceControl from '../hooks/useVoiceControl';
 import VoiceModeToggle from '../components/VoiceModeToggle';
 import AudioWaveform from '../components/AudioWaveform';
 import GenerateFlashcardsFromAudioModal from '../components/dashboard/GenerateFlashcardsFromAudioModal';
+import RemediationQuizModal from '../components/flashcards/RemediationQuizModal';
 const STORAGE_KEY = 'flashcardReviewSession';
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -154,6 +155,10 @@ const FlashcardReview = () => {
     hard: 0, // quality < 3
   });
 
+  // Track individual failed cards for remediation quiz generation
+  const [failedCards, setFailedCards] = useState(() => savedSession?.failedCards || []);
+  const failedCardsRef = useRef(failedCards);
+
   const [speechRate, setSpeechRate] = useState(1);
 const [speechLanguage, setSpeechLanguage] = useState('en-US');
 const [voiceAnswer, setVoiceAnswer] = useState('');
@@ -233,11 +238,20 @@ const [isVoiceAnswerListening, setIsVoiceAnswerListening] = useState(false);
         mastered: sessionStatsRef.current.mastered + (quality >= 4 ? 1 : 0),
         hard: sessionStatsRef.current.hard + (quality < 3 ? 1 : 0),
       };
+
+      // Track failed cards for remediation quiz
+      if (quality < 3 && currentCard) {
+        const failedEntry = { id: currentCard.id, front: currentCard.front, back: currentCard.back };
+        const nextFailed = [...failedCardsRef.current, failedEntry];
+        failedCardsRef.current = nextFailed;
+        setFailedCards(nextFailed);
+      }
+
       sessionStatsRef.current = nextStats;
       setSessionStats(nextStats);
       setCurrentIndex(nextIndex);
       setIsFlipped(false);
-      persistSession({ cards, currentIndex: nextIndex, sessionStats: nextStats });
+      persistSession({ cards, currentIndex: nextIndex, sessionStats: nextStats, failedCards: failedCardsRef.current });
     } catch (err) {
       if (!isMountedRef.current) return;
       console.error("Failed to update flashcard", err);
@@ -502,6 +516,16 @@ useEffect(() => {
                 <div className="text-xs text-orange-600/70 dark:text-orange-400/70 uppercase tracking-wider mt-1">Hard</div>
               </div>
             </div>
+          )}
+
+          {/* Remediation quiz banner — shown when ≥30% cards failed and we have a deckId */}
+          {!noCardsDue && cards[0]?.subject && (
+            <RemediationQuizModal
+              deckId={cards[0].subject}
+              failedCards={failedCards}
+              totalReviewed={sessionStats.reviewed}
+              onDismiss={() => {}}
+            />
           )}
 
           <div className="flex gap-4">

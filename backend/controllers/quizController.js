@@ -16,6 +16,8 @@ const QuizBookmark = require('../models/QuizBookmark');const geminiService = req
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
 const { runCalibration } = require('../services/difficultyCalibrator');
 const { calculateTopicProficiency, getDifficultyLevel } = require('../services/proficiencyService');
+const Flashcard = require('../models/Flashcard');
+const remediationService = require('../services/remediationService');
 
 // Window (ms) during which duplicate quiz submissions for the same quiz are ignored.
 // Prevents double-click on "Submit Quiz" from creating duplicate attempt records.
@@ -454,9 +456,6 @@ exports.submitQuizAttempt = async (req, res, next) => {
     weaknessAggregatorService.aggregateUserWeakness(req.user.id)
       .then(() => weaknessAggregatorService.rescheduleAdaptivePlanner(req.user.id))
       .catch((err) => console.error('Background weakness aggregation error:', err));
-
-    const { recalculateReadinessInBackground } = require('./readinessController');
-    recalculateReadinessInBackground(req.user.id).catch((err) => console.error('Background readiness calculation error:', err));
 
     // Update Progress (supports both topic-level and subject-level quizzes)
     const progressWhere = {
@@ -1135,3 +1134,89 @@ exports.evaluateSubjectiveAnswer = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Generate a targeted MCQ diagnostic quiz from forgotten flashcards
+// @route   POST /api/quizzes/generate-remediation
+// @access  Private
+exports.generateRemediationQuiz = async (req, res, next) => {
+  try {
+    const { deckId, failedCardIds, count = 5 } = req.body;
+
+    // Validate deck ownership
+    const subject = await Subject.findOne({ where: { id: deckId, user: req.user.id } });
+    if (!subject) {
+      return res.status(404).json({ success: false, error: 'Flashcard deck not found or access denied' });
+    }
+
+    // Edge case: fewer than 2 failed cards → fallback message
+    if (!Array.isArray(failedCardIds) || failedCardIds.length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: 'At least 2 failed card IDs are required to generate a remediation quiz.',
+        fallback: 'standard_revision',
+      });
+    }
+
+    // Retrieve and validate that the caller owns all provided card IDs
+    const weakCards = await Flashcard.findAll({
+      where: { id: failedCardIds, user: req.user.id, subject: deckId },
+      attributes: ['id', 'front', 'back'],
+    });
+
+    if (weakCards.length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: 'Fewer than 2 valid failed cards found for this deck. Standard revision recommended.',
+        fallback: 'standard_revision',
+      });
+    }
+
+    const forceRefresh = req.query.refresh === 'true';
+    const aiQuiz = await remediationService.generateRemediationQuiz({
+      userId: req.user.id,
+      deckId,
+      subjectName: subject.name,
+      weakCards: weakCards.map((c) => ({ id: c.id, front: c.front, back: c.back })),
+      count,
+      forceRefresh,
+    });
+
+    const questionsWithIds = (aiQuiz.questions || []).map((q) => ({
+      _id: uuidv4(),
+      questionType: 'MCQ',
+      questionText: q.questionText,
+      options: q.options || [],
+      correctAnswer: q.correctAnswer !== undefined ? q.correctAnswer : null,
+      explanation: q.explanation || '',
+    }));
+
+    const quiz = await Quiz.create({
+      title: aiQuiz.title || `Remediation Quiz: ${subject.name}`,
+      subject: deckId,
+      topic: null,
+      questions: questionsWithIds,
+      type: 'AI_Generated',
+      sourceType: 'REMEDIATION',
+      linkedDeckId: deckId,
+      language: 'english',
+      createdBy: req.user.id,
+      timeLimit: 10,
+    });
+
+    await ActivityLog.create({
+      user: req.user.id,
+      activityType: 'quiz_attempt',
+      description: `Generated remediation diagnostic quiz for deck: "${subject.name}" targeting ${weakCards.length} weak cards`,
+    });
+
+    res.status(201).json({ success: true, data: quiz });
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({ success: false, error: error.message, retryAfter: error.retryAfter });
+    }
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({ success: false, error: error.message });
+    }
+    next(error);
+  }
+};
