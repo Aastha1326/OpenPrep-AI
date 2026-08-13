@@ -137,6 +137,8 @@ async function updateStreak(userId, timezoneOffsetMinutes = 0) {
   );
 
   user.lastActivityDate = todayStr;
+  user.streakCount = user.currentStreak;
+  user.streakLastActive = now;
 
   await user.save();
 
