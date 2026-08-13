@@ -201,6 +201,10 @@ const validateReviewFlashcard = [
   body('quality')
     .isFloat({ min: 0, max: 5 })
     .withMessage('Quality must be a number between 0 and 5'),
+  body('confidence')
+    .optional()
+    .isIn(['very_unsure', 'unsure', 'confident', 'very_confident'])
+    .withMessage('Confidence must be one of: very_unsure, unsure, confident, very_confident'),
   handleValidationErrors,
 ];
 
