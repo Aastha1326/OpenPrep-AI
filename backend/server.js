@@ -66,7 +66,7 @@ const podcastRoutes = require('./routes/podcastRoutes');
 const syllabusRoutes = require('./routes/syllabusRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
-initNotificationCron();
+
 initDifficultyCalibratorCron();
 
 // Connect to Database

@@ -1,22 +1,56 @@
 const { GoogleGenAI } = require('@google/genai');
-const Question = require('../models/Question');
+const { Op } = require('sequelize');
+const Quiz = require('../models/Quiz');
+const PYQQuestion = require('../models/PYQQuestion');
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 exports.getEnhancedExplanation = async (req, res, next) => {
   try {
     const { questionId } = req.params;
-    const question = await Question.findByPk(questionId);
+    let questionText = null;
+    let correctAnswer = null;
+    let explanationText = null;
 
-    if (!question) {
+    // 1. Try to find inside Quiz JSONB array
+    const quizWithQ = await Quiz.findOne({
+      where: {
+        questions: {
+          [Op.contains]: [{ _id: questionId }]
+        }
+      }
+    });
+
+    if (quizWithQ) {
+      const q = quizWithQ.questions.find(q => q._id === questionId);
+      if (q) {
+        questionText = q.questionText;
+        if (q.questionType === 'SUBJECTIVE') {
+          correctAnswer = q.correctAnswer || q.explanation || "Detailed subjective explanation required.";
+        } else {
+          correctAnswer = (q.options && q.correctOption !== undefined) ? q.options[q.correctOption] : (q.correctAnswer || '');
+        }
+        explanationText = q.explanation;
+      }
+    } else {
+      // 2. Try PYQQuestion
+      const pyqQ = await PYQQuestion.findByPk(questionId);
+      if (pyqQ) {
+        questionText = pyqQ.questionText;
+        correctAnswer = "Refer to standard solution guidelines for PYQ.";
+      }
+    }
+
+    if (!questionText) {
       return res.status(404).json({ success: false, error: 'Question not found' });
     }
 
     const prompt = `
       You are an expert academic educator in STEM subjects (Physics, Chemistry, Computer Science).
       Provide a rich, detailed solution explanation for the following question:
-      Question: "${question.questionText}"
-      Correct Answer: "${question.correctAnswer}"
+      Question: "${questionText}"
+      Correct Answer: "${correctAnswer}"
+      Original Explanation Context: "${explanationText || 'None provided'}"
 
       Requirements:
       1. Provide a step-by-step breakdown of the concept.
