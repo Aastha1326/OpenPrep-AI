@@ -11,6 +11,7 @@ import PageSkeleton from './components/PageSkeleton';
 import SessionTimeoutModal from './components/SessionTimeoutModal';
 import QuotaExceededModal from './components/dashboard/QuotaExceededModal';
 import CommandPalette from './components/CommandPalette';
+import OfflineBanner from './components/common/OfflineBanner';
 import './App.css';
 
 const Landing = lazy(() => import('./pages/Landing'));
@@ -108,6 +109,7 @@ function App() {
           <span>AI features are temporarily locked due to rate limit/quota limits.</span>
         </div>
       )}
+      <OfflineBanner />
       <CustomCursor />
       <ScrollToTop />
       <MobileNavDrawer />
