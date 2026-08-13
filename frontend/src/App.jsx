@@ -24,6 +24,7 @@ const FlashcardReview = lazy(() => import('./pages/FlashcardReview'));
 const PyqDashboard = lazy(() => import('./pages/PyqDashboard'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Flashcards = lazy(() => import('./pages/Flashcards'));
+const CommunityDecks = lazy(() => import('./pages/CommunityDecks'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const StudyGroupChat = lazy(() => import('./pages/StudyGroupChat'));
 const AiAssistant = lazy(() => import('./pages/AiAssistant'));
@@ -92,6 +93,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Flashcards />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/community/decks"
+            element={
+              <ProtectedRoute>
+                <CommunityDecks />
               </ProtectedRoute>
             }
           />

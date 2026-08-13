@@ -9,6 +9,7 @@ const NAV_LINKS = [
   { to: '/battle', label: 'Battle Arena' },
   { to: '/study-group', label: 'Study Group' },
   { to: '/ai-assistant', label: 'AI Mentor Chat' },
+  { to: '/community/decks', label: 'Community Library' },
   { to: '/settings', label: 'Settings' },
 ];
 

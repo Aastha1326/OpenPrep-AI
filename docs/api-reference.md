@@ -901,3 +901,101 @@ This document catalogs the REST API endpoints available in the **OpenPrep AI** b
   "error": "Not authorized, no token"
 }
 ```
+
+---
+
+## 👥 Community Flashcard Decks Endpoints
+
+### 1. Get Community Decks Catalog
+
+- **Method**: `GET`
+- **Path**: `/community/decks`
+- **Headers**: `Authorization: Bearer <token>`
+- **Query Parameters**:
+  - `search` (optional): search term matching deck title, description, or tags.
+  - `subjectId` (optional): filter by a specific deck ID.
+  - `rating` (optional): minimum star rating (e.g. `3` or `4`).
+  - `sort` (optional): sorting criteria (`popular`, `rating`, `newest`).
+- **Success Response (200 OK)**:
+
+```json
+{
+  "success": true,
+  "count": 1,
+  "total": 1,
+  "page": 1,
+  "limit": 12,
+  "totalPages": 1,
+  "data": [
+    {
+      "id": "uuid-deck-123",
+      "name": "Organic Chemistry Fundamentals",
+      "description": "Essential mechanisms and reactions.",
+      "isPublic": true,
+      "clonedFromId": null,
+      "cloneCount": 14,
+      "rating": 4.8,
+      "ratingsCount": 5,
+      "tags": ["chemistry", "organic"],
+      "cardCount": 42,
+      "ownerName": "Alice Smith",
+      "examName": "MCAT Prep"
+    }
+  ]
+}
+```
+
+### 2. Fork Community Deck
+
+- **Method**: `POST`
+- **Path**: `/community/decks/:subjectId/fork`
+- **Headers**: `Authorization: Bearer <token>`
+- **Description**: Clones the specified public community deck and all its flashcards into the authenticated user's library.
+- **Success Response (200 OK)**:
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "cloned-deck-uuid",
+    "name": "Organic Chemistry Fundamentals",
+    "exam": "user-exam-uuid",
+    "user": "authenticated-user-uuid",
+    "clonedFromId": "uuid-deck-123"
+  }
+}
+```
+
+### 3. Rate Community Deck
+
+- **Method**: `POST`
+- **Path**: `/community/decks/:id/rate`
+- **Headers**: `Authorization: Bearer <token>`
+- **Request Body**:
+
+```json
+{
+  "stars": 5,
+  "comment": "Incredible high quality cards!"
+}
+```
+
+- **Success Response (200 OK)**:
+
+```json
+{
+  "success": true,
+  "data": {
+    "rating": {
+      "id": "rating-uuid",
+      "deckId": "uuid-deck-123",
+      "userId": "authenticated-user-uuid",
+      "stars": 5,
+      "comment": "Incredible high quality cards!"
+    },
+    "deckRating": 4.8,
+    "deckRatingsCount": 5
+  }
+}
+```
+
