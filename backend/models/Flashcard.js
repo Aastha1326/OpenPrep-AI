@@ -84,4 +84,24 @@ difficulty: {
   }
 );
 
+const cacheManager = require('../utils/cacheManager');
+
+Flashcard.afterSave(async (flashcard, options) => {
+  try {
+    const pattern = `user_${flashcard.user}:*`;
+    await cacheManager.invalidate(pattern);
+  } catch (err) {
+    console.error('Error invalidating cache after Flashcard save:', err);
+  }
+});
+
+Flashcard.afterDestroy(async (flashcard, options) => {
+  try {
+    const pattern = `user_${flashcard.user}:*`;
+    await cacheManager.invalidate(pattern);
+  } catch (err) {
+    console.error('Error invalidating cache after Flashcard destroy:', err);
+  }
+});
+
 module.exports = Flashcard;

@@ -10,7 +10,7 @@ export default defineConfig({
     fileParallelism: false,
     testTimeout: 30000,
     hookTimeout: 30000,
-coverage: {
+    coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],
       include: [
@@ -28,5 +28,6 @@ coverage: {
       thresholds: {
         statements: 75,
       },
-    },  },
+    },
+  },
 });

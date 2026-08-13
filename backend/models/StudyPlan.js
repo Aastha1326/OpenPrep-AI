@@ -61,4 +61,24 @@ const StudyPlan = sequelize.define(
   }
 );
 
+const cacheManager = require('../utils/cacheManager');
+
+StudyPlan.afterSave(async (studyPlan, options) => {
+  try {
+    const pattern = `user_${studyPlan.user}:*`;
+    await cacheManager.invalidate(pattern);
+  } catch (err) {
+    console.error('Error invalidating cache after StudyPlan save:', err);
+  }
+});
+
+StudyPlan.afterDestroy(async (studyPlan, options) => {
+  try {
+    const pattern = `user_${studyPlan.user}:*`;
+    await cacheManager.invalidate(pattern);
+  } catch (err) {
+    console.error('Error invalidating cache after StudyPlan destroy:', err);
+  }
+});
+
 module.exports = StudyPlan;
