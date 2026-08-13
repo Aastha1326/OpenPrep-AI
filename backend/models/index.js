@@ -2,6 +2,7 @@ const { sequelize } = require('../config/db');
 
 // Import all models
 const User = require('./User');
+const Folder = require('./Folder');
 const Exam = require('./Exam');
 const Subject = require('./Subject');
 const Topic = require('./Topic');

@@ -25,7 +25,7 @@ const AiDiagnosisPanel = ({ recommendation }) => {
 
         <div className="flex gap-2 items-start text-[10px] text-stone-500 font-semibold bg-stone-950/40 p-3 rounded-xl border border-neutral-850">
           <FaRegLightbulb className="text-amber-500 shrink-0 text-xs mt-0.5" />
-          <span>Tips: Reviewing flashcards daily and achieving >80% accuracy in quizzes will dramatically improve memory stability scores.</span>
+          <span>Tips: Reviewing flashcards daily and achieving &gt;80% accuracy in quizzes will dramatically improve memory stability scores.</span>
         </div>
       </div>
     </div>
