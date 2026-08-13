@@ -26,6 +26,7 @@ const PYQAnalysis = require('./PYQAnalysis');
 const PYQQuestion = require('./PYQQuestion');
 const Notification = require('./Notification');
 const PushSubscription = require('./PushSubscription');
+const ReadinessSnapshot = require('./ReadinessSnapshot');
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -156,6 +157,12 @@ Notification.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 User.hasMany(PushSubscription, { foreignKey: 'user', onDelete: 'CASCADE' });
 PushSubscription.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 
+User.hasMany(ReadinessSnapshot, { foreignKey: 'userId', onDelete: 'CASCADE' });
+ReadinessSnapshot.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+Subject.hasMany(ReadinessSnapshot, { foreignKey: 'subjectId', onDelete: 'CASCADE' });
+ReadinessSnapshot.belongsTo(Subject, { foreignKey: 'subjectId', as: 'subjectRef' });
+
 module.exports = {  sequelize,  User,
   Exam,
   Subject,
@@ -181,4 +188,5 @@ module.exports = {  sequelize,  User,
   PYQQuestion,
   Notification,
   PushSubscription,
+  ReadinessSnapshot,
 };

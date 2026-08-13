@@ -71,6 +71,7 @@ import CompositeBundleModal from '../components/dashboard/CompositeBundleModal';
 import SyllabusImportModal from '../components/dashboard/SyllabusImportModal';
 import NotesWidget from '../components/dashboard/NotesWidget';
 import ThemeToggle from '../components/ThemeToggle';
+import ReadinessWidget from '../components/dashboard/ReadinessWidget';
 import BadgesList from '../components/BadgesList';
 import SM2SettingsModal from '../components/dashboard/SM2SettingsModal';
 import LevelProgressBar from '../components/gamification/LevelProgressBar';
@@ -772,8 +773,13 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           )}
         </div>
 
+        {/* --- AI EXAM READINESS SECTION --- */}
+        <div className="space-y-4 pt-6">
+          <ReadinessWidget />
+        </div>
+
         {/* --- ANALYTICS SECTION (WOODEN DESK) --- */}
-        <div className="space-y-4">
+        <div className="space-y-4 pt-6">
           <div className="flex justify-between items-center px-1">
             <h2 className="text-2xl font-bold font-playfair text-amber-100 flex items-center gap-2">
               <TrendingUp className="w-6 h-6 text-yellow-500" /> Performance Analytics

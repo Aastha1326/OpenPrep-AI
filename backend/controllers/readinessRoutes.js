@@ -1,9 +1,3 @@
-const express = require('express');
-const { protect } = require('../middleware/auth');
-const { getSubjectReadiness } = require('../controllers/readinessController');
-
-const router = express.Router();
-
-router.get('/', protect, getSubjectReadiness);
-
-module.exports = router;
+// DEPRECATED: This file was created in controllers/ by error in upstream merge.
+// The active routes are located in backend/routes/readinessRoutes.js instead.
+module.exports = require('../routes/readinessRoutes');
