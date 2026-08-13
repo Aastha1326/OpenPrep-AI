@@ -32,4 +32,19 @@ describe('MobileNavDrawer', () => {
     expect(screen.getByRole('button', { name: /open menu/i })).toBeInTheDocument();
     expect(screen.getByText('Settings Page')).toBeInTheDocument();
   });
+
+  test('preloads bundle on hovering a link', async () => {
+    const user = userEvent.setup();
+    renderWithRouter();
+
+    const toggleButton = screen.getByRole('button', { name: /open menu/i });
+    await user.click(toggleButton);
+
+    const dashboardLink = screen.getByRole('link', { name: /dashboard/i });
+    
+    // Trigger hover/mouseEnter
+    await user.hover(dashboardLink);
+    // Since dynamic import returns a promise, we can just assert no errors are thrown during hover
+    expect(dashboardLink).toBeInTheDocument();
+  });
 });

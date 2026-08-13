@@ -53,6 +53,8 @@ describe('authSlice', () => {
         error: null,
         message: null,
         sessionExpired: false,
+        aiQuotaExceededUntil: null,
+        aiQuotaErrorMsg: null,
       });
     });
 
