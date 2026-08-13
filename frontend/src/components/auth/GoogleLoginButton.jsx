@@ -14,7 +14,8 @@ const getApiBase = () => {
   // VITE_API_URL is injected at build time by Vite from the .env file or
   // the hosting provider's environment variable settings.
   if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL.replace(/\/$/, '');
+    const url = import.meta.env.VITE_API_URL.replace(/\/$/, '');
+    return url.endsWith('/api') ? url : `${url}/api`;
   }
   // Local development fallback — backend runs on port 5000.
   return 'http://localhost:5000/api';
