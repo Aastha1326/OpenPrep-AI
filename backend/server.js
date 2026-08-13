@@ -62,9 +62,6 @@ const calendarRoutes = require('./routes/calendarRoutes');
 const gamificationRoutes = require('./routes/gamificationRoutes');
 const battleRoutes = require('./routes/battleRoutes');
 const readinessRoutes = require('./routes/readinessRoutes');
-const podcastRoutes = require('./routes/podcastRoutes');
-const syllabusRoutes = require('./routes/syllabusRoutes');
-const vivaRoutes = require('./routes/vivaRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 
@@ -269,9 +266,6 @@ app.get('/api/user/quota', protect, require('./controllers/userController').getQ
 app.use('/api/ai', aiRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/readiness', readinessRoutes);
-app.use('/api/podcast', podcastRoutes);
-app.use('/api/syllabus', syllabusRoutes);
-app.use('/api/viva', vivaRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/dashboard', analyticsRoutes);
 app.use('/api/calendar', calendarRoutes);

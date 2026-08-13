@@ -27,12 +27,7 @@ const PYQAnalysis = require('./PYQAnalysis');
 const PYQQuestion = require('./PYQQuestion');
 const Notification = require('./Notification');
 const PushSubscription = require('./PushSubscription');
-
-// DeckRating associations
-DeckRating.belongsTo(Subject, { foreignKey: 'deckId', as: 'deckRef', onDelete: 'CASCADE' });
-DeckRating.belongsTo(User, { foreignKey: 'userId', as: 'userRef', onDelete: 'CASCADE' });
-Subject.hasMany(DeckRating, { foreignKey: 'deckId', as: 'ratings', onDelete: 'CASCADE' });
-User.hasMany(DeckRating, { foreignKey: 'userId', as: 'ratings', onDelete: 'CASCADE' });
+const ReadinessSnapshot = require('./ReadinessSnapshot');
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -163,9 +158,13 @@ Notification.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 User.hasMany(PushSubscription, { foreignKey: 'user', onDelete: 'CASCADE' });
 PushSubscription.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 
-module.exports = {
-  sequelize,
-  User,
+User.hasMany(ReadinessSnapshot, { foreignKey: 'userId', onDelete: 'CASCADE' });
+ReadinessSnapshot.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+Subject.hasMany(ReadinessSnapshot, { foreignKey: 'subjectId', onDelete: 'CASCADE' });
+ReadinessSnapshot.belongsTo(Subject, { foreignKey: 'subjectId', as: 'subjectRef' });
+
+module.exports = {  sequelize,  User,
   Exam,
   Subject,
   Topic,
@@ -191,4 +190,5 @@ module.exports = {
   PYQQuestion,
   Notification,
   PushSubscription,
+  ReadinessSnapshot,
 };
