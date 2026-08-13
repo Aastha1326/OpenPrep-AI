@@ -1,8 +1,10 @@
+const express = require('express');
 const { explainQuestion, chatWithAssistant } = require('../controllers/aiController');
 const { generateMindMap, getMindMapById, getUserMindMaps } = require('../controllers/mindMapController');
 const { protect } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
 const { checkAiQuota } = require('../middleware/aiQuotaMiddleware');
+const { validateGenerateMindMap } = require('../middleware/validators');
 
 
 const router = express.Router();

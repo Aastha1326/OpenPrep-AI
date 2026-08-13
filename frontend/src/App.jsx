@@ -26,6 +26,7 @@ const NotFound = lazy(() => import('./pages/NotFound'));
 const FlashcardReview = lazy(() => import('./pages/FlashcardReview'));
 const PyqDashboard = lazy(() => import('./pages/PyqDashboard'));
 const Settings = lazy(() => import('./pages/Settings'));
+const Flashcards = lazy(() => import('./pages/Flashcards'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const StudyGroupChat = lazy(() => import('./pages/StudyGroupChat'));
 const AiAssistant = lazy(() => import('./pages/AiAssistant'));
@@ -33,6 +34,9 @@ const OAuthCallback = lazy(() => import('./pages/OAuthCallback'));
 const PYQAnalytics = lazy(() => import('./pages/PYQAnalytics'));
 const QuizSession = lazy(() => import('./pages/QuizSession'));
 const MindMapViewer = lazy(() => import('./pages/MindMapViewer'));
+const StudyPlanner = lazy(() => import('./pages/StudyPlanner'));
+const VivaSimulator = lazy(() => import('./pages/VivaSimulator'));
+const CollaborativeNoteView = lazy(() => import('./pages/CollaborativeNoteView'));
 
 function App() {
   const dispatch = useDispatch();
@@ -142,6 +146,14 @@ function App() {
             }
           />
           <Route
+            path="/flashcards"
+            element={
+              <ProtectedRoute>
+                <Flashcards />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/battle"
             element={
               <ProtectedRoute>
@@ -188,6 +200,33 @@ function App() {
             element={
               <ProtectedRoute>
                 <PYQAnalytics />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/study-planner"
+            element={
+              <ProtectedRoute>
+                <StudyPlanner />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/viva-simulator"
+            element={
+              <ProtectedRoute>
+                <VivaSimulator />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/notes/collaborative/:noteId"
+            element={
+              <ProtectedRoute>
+                <CollaborativeNoteView />
               </ProtectedRoute>
             }
           />

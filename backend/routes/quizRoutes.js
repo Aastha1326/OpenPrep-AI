@@ -6,8 +6,6 @@ const upload = multer({
 });
 const { getEnhancedExplanation } = require('../controllers/solutionExplainerController');
 
-// Register solution explainer route
-router.get('/questions/:questionId/explanation', protect, getEnhancedExplanation);
 const {
   generateAIQuiz,
   getQuizzes,
@@ -39,6 +37,9 @@ const { validateRequest, submitQuizSchema } = require('../middleware/validate');
 
 const router = express.Router();
 const { getNextAdaptiveQuestion } = require('../controllers/adaptiveQuizController');
+
+// Register solution explainer route
+router.get('/questions/:questionId/explanation', protect, getEnhancedExplanation);
 
 // Register adaptive route
 router.post('/adaptive/next-question', protect, getNextAdaptiveQuestion);

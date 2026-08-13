@@ -6,6 +6,7 @@ const communityRoutes = require('../../routes/communityRoutes');
 const errorHandler = require('../../middleware/error');
 const User = require('../../models/User');
 const Feedback = require('../../models/Feedback');
+const cacheService = require('../../services/cacheService');
 
 const app = express();
 app.use(express.json());
@@ -34,6 +35,7 @@ describe('Community Controller - Feedback List Pagination', () => {
 
   beforeEach(async () => {
     await Feedback.destroy({ where: {} });
+    await cacheService.del('community:*');
   });
 
   describe('GET /api/community/feedback', () => {

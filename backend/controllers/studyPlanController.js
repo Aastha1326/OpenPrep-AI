@@ -282,6 +282,9 @@ exports.toggleTaskCompletion = async (req, res, next) => {
       // If state unchanged (completed === wasCompleted), do nothing
     }
 
+    const { recalculateReadinessInBackground } = require('./readinessController');
+    recalculateReadinessInBackground(req.user.id).catch((err) => console.error('Background readiness recalculation error:', err));
+
     res.status(200).json({ success: true, data: plan, progression });
   } catch (error) {
     next(error);
