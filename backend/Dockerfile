@@ -2,8 +2,11 @@
 FROM node:20-alpine AS build
 
 WORKDIR /app
-COPY package*.json ./
-RUN npm install
+# Enable pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+COPY package.json pnpm-lock.yaml* ./
+RUN pnpm install
 COPY . .
 
 # Production stage
@@ -24,4 +27,4 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD wget -qO- http://localhost:5000/api/v1/health || exit 1
 
-CMD ["node", "server.js"]
+ENTRYPOINT ["sh", "scripts/docker-entrypoint.sh"]
