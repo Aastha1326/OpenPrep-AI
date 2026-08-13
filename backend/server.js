@@ -4,8 +4,8 @@ const compression = require('compression');
 const cors = require('cors');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
-const csrf = require('csurf');
-const rateLimit = require('express-rate-limit');
+const { doubleCsrfProtection, generateCsrfToken, csrfErrorHandler } = require('./middleware/securityMiddleware');
+const { authRateLimiter, aiRateLimiter, generalRateLimiter } = require('./middleware/rateLimitMiddleware');
 const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -145,7 +145,6 @@ app.use(passport.initialize());
 app.use(cookieParser());
 
 // CSRF protection middleware
-const csrfProtection = csrf({ cookie: true });
 // The batched quiz-telemetry endpoint is flushed via navigator.sendBeacon()
 // on tab close/navigation, which cannot attach a CSRF header. It's already
 // protected by its own JWT-based auth (see middleware/telemetryAuth.js), so
@@ -154,11 +153,12 @@ app.use((req, res, next) => {
   if (req.path === '/api/quiz/telemetry/batch' || req.path === '/api/quizzes/telemetry/batch') {
     return next();
   }
-  return csrfProtection(req, res, next);
+  return doubleCsrfProtection(req, res, next);
 });
 // CSRF Token Endpoint for frontend clients
 app.get('/api/csrf-token', (req, res) => {
-  res.json({ csrfToken: req.csrfToken() });
+  const token = generateCsrfToken(req, res);
+  res.json({ csrfToken: token });
 });
 
 // Response compression (skip binary uploads via default filter)
@@ -167,28 +167,10 @@ app.use(compression());
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
-// Mount Redis-backed distributed rate limiters
-const { authRateLimiter, aiRateLimiter, standardGetRateLimiter } = require('./middleware/redisRateLimiter');
+// Mount distributed rate limiters
 app.use('/api/auth', authRateLimiter);
 app.use('/api/ai', aiRateLimiter);
-app.use('/api', (req, res, next) => {
-  if (req.method === 'GET' && !req.path.startsWith('/auth') && !req.path.startsWith('/ai')) {
-    return standardGetRateLimiter(req, res, next);
-  }
-  next();
-});
-
-// General API rate limiter: 100 requests per 15 minutes per IP
-// Auth routes have tighter per-route limits defined in authRoutes.js
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  skip: () => process.env.NODE_ENV === 'test',
-  message: { success: false, error: 'Too many requests. Please try again later.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-app.use('/api/', apiLimiter);
+app.use('/api/', generalRateLimiter);
 
 // Serve avatar images publicly — profile pictures are displayed to other
 // users (e.g. in community features) and aren't sensitive like notes/PYQs.
@@ -299,6 +281,7 @@ app.use(
 );
 
 // Error Handler Middleware
+app.use(csrfErrorHandler);
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
