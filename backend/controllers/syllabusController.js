@@ -1,4 +1,3 @@
-const Syllabus = require('../models/Syllabus');
 const Subject = require('../models/Subject');
 const { getCache, setCache } = require('../config/redis');
 
