@@ -24,6 +24,7 @@ const BattleSession = require('./BattleSession');
 const BattleParticipant = require('./BattleParticipant');
 const PYQAnalysis = require('./PYQAnalysis');
 const PYQQuestion = require('./PYQQuestion');
+const PDFAnnotation = require('./PDFAnnotation');
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -147,6 +148,9 @@ PYQAnalysis.belongsTo(Subject, { foreignKey: 'subjectId', as: 'subjectRef' });
 PYQAnalysis.hasMany(PYQQuestion, { foreignKey: 'pyqAnalysisId', onDelete: 'CASCADE' });
 PYQQuestion.belongsTo(PYQAnalysis, { foreignKey: 'pyqAnalysisId', as: 'analysisRef' });
 
+// PDFAnnotation associations
+User.hasMany(PDFAnnotation, { foreignKey: 'userId', onDelete: 'CASCADE' });
+PDFAnnotation.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 module.exports = {  sequelize,  User,
   Exam,
   Subject,
@@ -170,4 +174,5 @@ UsageQuota,
   BattleParticipant,
   PYQAnalysis,
   PYQQuestion,
+  PDFAnnotation,
 };
