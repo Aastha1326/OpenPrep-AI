@@ -1,10 +1,30 @@
+const logger = require('../utils/logger');
+
+/**
+ * Attach the correlation ID to an error payload so a user can quote it in a
+ * bug report and a maintainer can grep straight to the failing request.
+ * Omitted entirely when no ID is present, so response shapes asserted by
+ * existing tests are unchanged.
+ */
+const withRequestId = (req, body) => (req && req.id ? { ...body, requestId: req.id } : body);
+
 const errorHandler = (err, req, res, next) => {
   let error = { ...err };
   error.message = err.message;
   error.statusCode = err.statusCode || err.status;
 
-  // Log to console for developer
-  console.error(err);
+  // Log through the structured logger rather than console.error: the entry
+  // carries the request correlation ID, and sensitive fields (SQL parameters
+  // on Sequelize errors, auth headers) are redacted before they reach stdout.
+  const log = (req && req.log) || logger;
+  const loggedStatus = error.statusCode || 500;
+  log[loggedStatus >= 500 ? 'error' : 'warn']('request failed', {
+    requestId: req && req.id,
+    method: req && req.method,
+    path: req && (req.originalUrl ? req.originalUrl.split('?')[0] : req.path),
+    status: loggedStatus,
+    err,
+  });
 
   // Sequelize validation error — model-level validation failures
   if (err.name === 'SequelizeValidationError') {
@@ -43,12 +63,14 @@ if (err.name === 'MulterError') {
   if (err.code === 'LIMIT_FILE_SIZE') {
     const isAudioUpload = req.path.includes('/flashcards/from-audio');
 
-    return res.status(400).json({
-      success: false,
-      error: isAudioUpload
-        ? 'Audio file too large. Maximum allowed size is 25MB.'
-        : 'File too large. Maximum allowed size is 15MB.',
-    });
+    return res.status(400).json(
+      withRequestId(req, {
+        success: false,
+        error: isAudioUpload
+          ? 'Audio file too large. Maximum allowed size is 25MB.'
+          : 'File too large. Maximum allowed size is 15MB.',
+      })
+    );
   }    error = new Error(err.message);
     error.statusCode = 400;
   }
@@ -60,18 +82,22 @@ if (err.name === 'MulterError') {
 
   // JWT Errors
   if (err.name === 'TokenExpiredError') {
-    return res.status(401).json({
-      success: false,
-      message: 'Token expired',
-      error: 'Token expired',
-    });
+    return res.status(401).json(
+      withRequestId(req, {
+        success: false,
+        message: 'Token expired',
+        error: 'Token expired',
+      })
+    );
   }
   if (err.name === 'JsonWebTokenError') {
-    return res.status(401).json({
-      success: false,
-      message: 'Invalid token',
-      error: 'Not authorized to access this route',
-    });
+    return res.status(401).json(
+      withRequestId(req, {
+        success: false,
+        message: 'Invalid token',
+        error: 'Not authorized to access this route',
+      })
+    );
   }
 
   // Timeout error handling
@@ -80,10 +106,13 @@ if (err.name === 'MulterError') {
     error.message = err.message || 'Request processing timed out. Please try again with a smaller file.';
   }
 
-  res.status(error.statusCode || 500).json({
-    success: false,
-    error: error.message || 'Server Error',
-  });
+  res.status(error.statusCode || 500).json(
+    withRequestId(req, {
+      success: false,
+      error: error.message || 'Server Error',
+    })
+  );
 };
 
 module.exports = errorHandler;
+module.exports.withRequestId = withRequestId;
