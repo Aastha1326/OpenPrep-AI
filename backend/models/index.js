@@ -30,6 +30,7 @@ const ReadinessSnapshot = require('./ReadinessSnapshot');
 const PodcastEpisode = require('./PodcastEpisode');
 const Syllabus = require('./Syllabus');
 const SyllabusTopic = require('./SyllabusTopic');
+const VivaSession = require('./VivaSession');
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -181,6 +182,12 @@ SyllabusTopic.belongsTo(Syllabus, { foreignKey: 'syllabusId', as: 'syllabusRef' 
 Note.hasMany(SyllabusTopic, { foreignKey: 'linkedNoteId', onDelete: 'SET NULL' });
 SyllabusTopic.belongsTo(Note, { foreignKey: 'linkedNoteRef', as: 'linkedNoteRef' });
 
+User.hasMany(VivaSession, { foreignKey: 'userId', onDelete: 'CASCADE' });
+VivaSession.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+Subject.hasMany(VivaSession, { foreignKey: 'subjectId', onDelete: 'CASCADE' });
+VivaSession.belongsTo(Subject, { foreignKey: 'subjectId', as: 'subjectRef' });
+
 module.exports = {  sequelize,  User,
   Exam,
   Subject,
@@ -210,4 +217,5 @@ module.exports = {  sequelize,  User,
   PodcastEpisode,
   Syllabus,
   SyllabusTopic,
+  VivaSession,
 };

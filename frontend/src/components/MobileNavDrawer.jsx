@@ -10,6 +10,7 @@ const NAV_LINKS = [
   { to: '/battle', label: 'Battle Arena', preload: () => import('../pages/BattleArena') },
   { to: '/study-group', label: 'Study Group', preload: () => import('../pages/StudyGroupChat') },
   { to: '/ai-assistant', label: 'AI Mentor Chat', preload: () => import('../pages/AiAssistant') },
+  { to: '/viva-simulator', label: 'AI Viva Simulator', preload: () => import('../pages/VivaSimulator') },
   { to: '/settings', label: 'Settings', preload: () => import('../pages/Settings') },
 ];
 
