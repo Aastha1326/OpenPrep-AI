@@ -28,6 +28,8 @@ const Notification = require('./Notification');
 const PushSubscription = require('./PushSubscription');
 const ReadinessSnapshot = require('./ReadinessSnapshot');
 const PodcastEpisode = require('./PodcastEpisode');
+const Syllabus = require('./Syllabus');
+const SyllabusTopic = require('./SyllabusTopic');
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -170,6 +172,15 @@ PodcastEpisode.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 Subject.hasMany(PodcastEpisode, { foreignKey: 'subjectId', onDelete: 'CASCADE' });
 PodcastEpisode.belongsTo(Subject, { foreignKey: 'subjectId', as: 'subjectRef' });
 
+User.hasMany(Syllabus, { foreignKey: 'userId', onDelete: 'CASCADE' });
+Syllabus.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+Syllabus.hasMany(SyllabusTopic, { foreignKey: 'syllabusId', onDelete: 'CASCADE' });
+SyllabusTopic.belongsTo(Syllabus, { foreignKey: 'syllabusId', as: 'syllabusRef' });
+
+Note.hasMany(SyllabusTopic, { foreignKey: 'linkedNoteId', onDelete: 'SET NULL' });
+SyllabusTopic.belongsTo(Note, { foreignKey: 'linkedNoteRef', as: 'linkedNoteRef' });
+
 module.exports = {  sequelize,  User,
   Exam,
   Subject,
@@ -197,4 +208,6 @@ module.exports = {  sequelize,  User,
   PushSubscription,
   ReadinessSnapshot,
   PodcastEpisode,
+  Syllabus,
+  SyllabusTopic,
 };

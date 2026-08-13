@@ -33,6 +33,7 @@ const OAuthCallback = lazy(() => import('./pages/OAuthCallback'));
 const PYQAnalytics = lazy(() => import('./pages/PYQAnalytics'));
 const QuizSession = lazy(() => import('./pages/QuizSession'));
 const MindMapViewer = lazy(() => import('./pages/MindMapViewer'));
+const StudyPlanner = lazy(() => import('./pages/StudyPlanner'));
 
 function App() {
   const dispatch = useDispatch();
@@ -188,6 +189,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <PYQAnalytics />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/study-planner"
+            element={
+              <ProtectedRoute>
+                <StudyPlanner />
               </ProtectedRoute>
             }
           />

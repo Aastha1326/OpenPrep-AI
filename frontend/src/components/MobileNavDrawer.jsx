@@ -5,6 +5,7 @@ import { Menu, X } from 'lucide-react';
 
 const NAV_LINKS = [
   { to: '/dashboard', label: 'Dashboard', preload: () => import('../pages/Dashboard') },
+  { to: '/study-planner', label: 'Study Planner', preload: () => import('../pages/StudyPlanner') },
   { to: '/flashcards/review', label: 'Flashcards', preload: () => import('../pages/FlashcardReview') },
   { to: '/battle', label: 'Battle Arena', preload: () => import('../pages/BattleArena') },
   { to: '/study-group', label: 'Study Group', preload: () => import('../pages/StudyGroupChat') },
