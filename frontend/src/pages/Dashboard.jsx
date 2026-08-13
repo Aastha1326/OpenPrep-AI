@@ -566,27 +566,26 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
-            className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10"
-        >
-          <div>
-            <h1 className="text-3xl font-playfair font-bold text-stone-800 dark:text-stone-100 mb-2">
-              Welcome back, <span className="text-amber-600 dark:text-amber-500">{user?.name?.split(' ')[0] || 'Scholar'}</span>
-            </h1>
-            <p className="text-amber-100/70 text-lg italic font-playfair">
-              &ldquo;The roots of education are bitter, but the fruit is sweet.&rdquo; – Aristotle
-            </p>
+            className="flex flex-col gap-4 relative z-10"
+          >
+            <div>
+              <h1 className="text-3xl font-playfair font-bold text-stone-800 dark:text-stone-100 mb-2">
+                Welcome back, <span className="text-amber-600 dark:text-amber-500">{user?.name?.split(' ')[0] || 'Scholar'}</span>
+              </h1>
+              <p className="text-amber-100/70 text-lg italic font-playfair">
+                &ldquo;The roots of education are bitter, but the fruit is sweet.&rdquo; – Aristotle
+              </p>
 
-            {/* --- XP PROGRESS BAR --- */}
-            <div className="mt-4 max-w-md">
-              <LevelProgressBar
-                xp={gamificationData?.xp || user?.xp || 0}
-                level={gamificationData?.level || user?.level || 1}
-                nextLevelXP={gamificationData?.nextLevelXP || 100}
-              />
-            </div>
+              {/* --- XP PROGRESS BAR --- */}
+              <div className="mt-4 max-w-md">
+                <LevelProgressBar
+                  xp={gamificationData?.xp || user?.xp || 0}
+                  level={gamificationData?.level || user?.level || 1}
+                  nextLevelXP={gamificationData?.nextLevelXP || 100}
+                />
+              </div>
 
-            {/* --- EXAM COUNTDOWN WIDGET --- */}
-            {activePlan?.exam?.date && (
+              {/* --- EXAM COUNTDOWN WIDGET --- */}
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -594,15 +593,12 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
                 className="mt-5"
               >
                 <ExamCountdownWidget
-                  examDate={activePlan.exam.date}
-                  examName={activePlan.exam.name}
+                  examDate={activePlan?.exam?.date}
+                  examName={activePlan?.exam?.name}
                 />
               </motion.div>
-            )}
-          </div>
+            </div>
           </motion.div>
-        </motion.div>
-
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -688,7 +684,6 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             </button>
             <ThemeToggle />
           </motion.div>
-        </motion.div>
         </div>
 
         {/* --- TARGET EXAM COMPOSITE BUNDLE OVERVIEW --- */}
@@ -1205,7 +1200,6 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             </p>
           </VintagePaper>
         </div>
-      </div>
 {/* --- CREATE NOTE MODAL --- */}
       <CreateNoteModal
         isOpen={isNoteModalOpen}
@@ -1321,7 +1315,6 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           </motion.div>
         )}
       </AnimatePresence>
-      </div>
 
       {/* --- SKILL TREE MODAL --- */}
       <AnimatePresence>
@@ -1386,12 +1379,14 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
         description={activeBadgeUnlock?.description}
         onClose={() => setActiveBadgeUnlock(null)}
       />
-    </LeatherBoard>
+
+      {/* --- SECURITY SETTINGS (2FA) --- */}
+      <div className="my-6">
+        <SecuritySettings />
+      </div>
+    </div>
+  </LeatherBoard>
   );
 };
-{/* --- SECURITY SETTINGS (2FA) --- */}
-<div className="my-6">
-  <SecuritySettings />
-</div>
 
 export default Dashboard;

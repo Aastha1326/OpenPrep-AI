@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { CalendarDays, Download, RefreshCw, LogOut } from 'lucide-react';
-import API from '../../services/api'; // Or use studyPlanService when available
+import API from '../services/api'; // Or use studyPlanService when available
 
 const CalendarExportDropdown = ({ activePlanId, isSyncingCalendar, setIsSyncingCalendar, onExportIcs }) => {
   const [isOpen, setIsOpen] = useState(false);

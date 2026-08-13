@@ -18,7 +18,6 @@ import {
   List,
   Gauge,
   Sparkles,
-} from 'lucide-react';
   Loader,
 } from 'lucide-react';
 import CalendarExportDropdown from '../CalendarExportDropdown';

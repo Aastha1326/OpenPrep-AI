@@ -7,9 +7,11 @@ import AdminRoute from './components/AdminRoute';
 import CustomCursor from './components/CustomCursor';
 import ScrollToTop from './components/ScrollToTop';
 import MobileNavDrawer from './components/MobileNavDrawer';
-import PageLoader from './components/PageLoader';
+import PageSkeleton from './components/PageSkeleton';
 import SessionTimeoutModal from './components/SessionTimeoutModal';
 import QuotaExceededModal from './components/dashboard/QuotaExceededModal';
+import CommandPalette from './components/CommandPalette';
+import OfflineBanner from './components/common/OfflineBanner';
 import './App.css';
 
 const Landing = lazy(() => import('./pages/Landing'));
@@ -30,6 +32,7 @@ const AiAssistant = lazy(() => import('./pages/AiAssistant'));
 const OAuthCallback = lazy(() => import('./pages/OAuthCallback'));
 const PYQAnalytics = lazy(() => import('./pages/PYQAnalytics'));
 const QuizSession = lazy(() => import('./pages/QuizSession'));
+const MindMapViewer = lazy(() => import('./pages/MindMapViewer'));
 
 function App() {
   const dispatch = useDispatch();
@@ -106,11 +109,13 @@ function App() {
           <span>AI features are temporarily locked due to rate limit/quota limits.</span>
         </div>
       )}
+      <OfflineBanner />
       <CustomCursor />
       <ScrollToTop />
       <MobileNavDrawer />
       <QuotaExceededModal />
-      <Suspense fallback={<PageLoader />}>
+      <CommandPalette />
+      <Suspense fallback={<PageSkeleton />}>
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/register" element={<Register />} />
@@ -192,6 +197,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <QuizSession />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/mind-map"
+            element={
+              <ProtectedRoute>
+                <MindMapViewer />
               </ProtectedRoute>
             }
           />

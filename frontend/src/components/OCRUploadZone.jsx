@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { UploadCloud, FileImage, AlertCircle, Loader2, X } from 'lucide-react';
-import API from '../../services/api';
+import API from '../services/api';
 
 const OCRUploadZone = ({ onTextExtracted }) => {
   const [file, setFile] = useState(null);

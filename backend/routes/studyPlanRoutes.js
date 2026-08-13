@@ -9,8 +9,6 @@ const {
   rescheduleAdaptivePlan,
   rescheduleOverdueTasks,
   exportStudyPlanIcs,
-  getRecentPlan,
-  getStudyPlanICS,
   rebalanceStudyPlan,
 } = require('../controllers/studyPlanController');
 const { protect } = require('../middleware/auth');
@@ -139,11 +137,6 @@ router.get('/:id/export-ics', protect, exportStudyPlanIcs);
 
 router.get('/active', protect, getActivePlan);
 
-// Get recent active plan for dashboard
-router.get('/recent', protect, getRecentPlan);
-
-// Download ICS
-router.get('/:id/ics', protect, getStudyPlanICS);
 
 /**
  * @swagger
