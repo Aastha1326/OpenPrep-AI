@@ -340,6 +340,7 @@ const io = new Server(server, {
 // Initialize socket handlers
 require('./sockets/battleHandler')(io);
 require('./sockets/chatHandler')(io);
+require('./sockets/crdtHandler')(io);
 
 // User notification room listener
 io.on('connection', (socket) => {

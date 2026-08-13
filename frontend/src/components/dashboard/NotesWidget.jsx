@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   FileText,
   Volume2,
@@ -11,6 +12,7 @@ import {
   Mic,
   Play,
   Pause,
+  Users,
 } from 'lucide-react';
 import API from '../../services/api';
 import VintagePaper from './VintagePaper';
@@ -103,6 +105,7 @@ const VoiceNotePlayer = ({ fileUrl }) => {
 };
 
 const NotesWidget = ({ limit = 5 }) => {
+  const navigate = useNavigate();
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -263,6 +266,13 @@ const NotesWidget = ({ limit = 5 }) => {
                       className="flex items-center gap-1 px-2.5 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-800 text-xs font-bold rounded transition-colors"
                     >
                       <Layers className="w-3.5 h-3.5" /> Generate AI Flashcards
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/notes/collaborative/${note.id}`)}
+                      className="flex items-center gap-1 px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-bold rounded transition-colors"
+                    >
+                      <Users className="w-3.5 h-3.5" /> Collaborate
                     </button>
                   </div>
                 </div>
