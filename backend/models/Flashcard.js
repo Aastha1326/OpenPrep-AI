@@ -51,7 +51,7 @@ const Flashcard = sequelize.define(
       defaultValue: DataTypes.NOW,
     },
     tags: {
-      type: DataTypes.JSONB,
+      type: DataTypes.ARRAY(DataTypes.STRING),
       defaultValue: [],
     },
     difficulty: {

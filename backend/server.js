@@ -74,7 +74,7 @@ connectDB();
 const redisService = require('./services/redisService');
 redisService.connect();
 
-const app = express();
+
 
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
@@ -271,6 +271,7 @@ app.use('/api/dashboard', analyticsRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/gamification', gamificationRoutes);
 app.use('/api/battles', battleRoutes);
+app.use('/api/folders', folderRoutes);
 
 // Base Route
 app.get('/', (req, res) => {
