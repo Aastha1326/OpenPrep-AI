@@ -1,0 +1,14 @@
+{
+  "welcome": "مرحباً بعودتك",
+  "dashboard": "لوحة القيادة",
+  "settings": "الإعدادات",
+  "logout": "تسجيل الخروج",
+  "export_analytics": "تصدير التحليلات",
+  "sm2_settings": "إعدادات SM-2",
+  "skill_tree": "شجرة المهارات",
+  "study_group": "مجموعة الدراسة",
+  "ai_assistant": "مساعد الذكاء الاصطناعي",
+  "pyqs": "الأسئلة السابقة",
+  "flashcards": "بطاقات الاستذكار",
+  "select_language": "اختر اللغة"
+}

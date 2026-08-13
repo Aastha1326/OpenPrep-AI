@@ -1,0 +1,14 @@
+{
+  "welcome": "Bienvenido de nuevo",
+  "dashboard": "Tablero",
+  "settings": "Ajustes",
+  "logout": "Cerrar sesión",
+  "export_analytics": "Exportar Análisis",
+  "sm2_settings": "Ajustes de SM-2",
+  "skill_tree": "Árbol de Habilidades",
+  "study_group": "Grupo de Estudio",
+  "ai_assistant": "Asistente de IA",
+  "pyqs": "PYQs",
+  "flashcards": "Tarjetas de estudio",
+  "select_language": "Seleccionar idioma"
+}
