@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, Eye, EyeOff, AlertCircle, BookOpen } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, AlertCircle, BookOpen, ShieldCheck } from 'lucide-react';
 import GoogleLoginButton from '../components/auth/GoogleLoginButton';
 import GitHubLoginButton from '../components/auth/GitHubLoginButton';
 import { loginUser, loadUser, clearError } from '../store/slices/authSlice';
@@ -235,6 +235,12 @@ const Login = () => {
               </form>
             ) : (
               <form onSubmit={handleVerify2FA} className="space-y-4">
+                {twoFaError && (
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 flex items-center gap-2 text-xs text-red-700 dark:text-red-300 font-medium">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{twoFaError}</span>
+                  </div>
+                )}
                 <div>
                   <label htmlFor="totp-token" className="block text-xs font-bold text-[#1F150C] dark:text-[#E1DCC9] mb-1">
                     Authentication Code
@@ -277,6 +283,13 @@ const Login = () => {
                 </button>
               </form>
             )}
+
+            {/* Divider */}
+            <div className="my-3 flex items-center justify-center space-x-2">
+              <span className="h-px w-full bg-[#CEAB93]/50 dark:bg-[#412D15]"></span>
+              <span className="text-[10px] text-[#8C6A53] dark:text-[#C4BA9D] font-bold tracking-wider uppercase">OR</span>
+              <span className="h-px w-full bg-[#CEAB93]/50 dark:bg-[#412D15]"></span>
+            </div>
 
             {/* Social OAuth Buttons */}
             <div className="space-y-3">
