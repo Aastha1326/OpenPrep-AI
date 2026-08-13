@@ -1,30 +1,35 @@
-const { createClient } = require('redis');
-
-const redisClient = createClient({
-  url: process.env.REDIS_URL || 'redis://localhost:6379',
-  socket: {
-    reconnectStrategy: (retries) => Math.min(retries * 50, 2000),
-  },
-});
-
-redisClient.on('error', (err) => {
-  console.warn('⚠️ Redis Client Error (Graceful fallback to DB active):', err.message);
-});
-
+let createClient;
+let redisClient = null;
 let isRedisConnected = false;
 
-async function connectRedis() {
-  try {
-    await redisClient.connect();
-    isRedisConnected = true;
-    console.log('✅ Connected to Redis successfully');
-  } catch (err) {
-    isRedisConnected = false;
-    console.warn('⚠️ Redis connection failed. System will degrade gracefully using database reads.');
-  }
-}
+try {
+  createClient = require('redis').createClient;
+  redisClient = createClient({
+    url: process.env.REDIS_URL || 'redis://localhost:6379',
+    socket: {
+      reconnectStrategy: (retries) => Math.min(retries * 50, 2000),
+    },
+  });
 
-connectRedis();
+  redisClient.on('error', (err) => {
+    console.warn('⚠️ Redis Client Error (Graceful fallback to DB active):', err.message);
+  });
+
+  async function connectRedis() {
+    try {
+      await redisClient.connect();
+      isRedisConnected = true;
+      console.log('✅ Connected to Redis successfully');
+    } catch (err) {
+      isRedisConnected = false;
+      console.warn('⚠️ Redis connection failed. System will degrade gracefully using database reads.');
+    }
+  }
+
+  connectRedis();
+} catch (err) {
+  isRedisConnected = false;
+}
 
 async function getCache(key) {
   if (!isRedisConnected) return null;

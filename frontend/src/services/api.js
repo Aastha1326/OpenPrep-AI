@@ -202,4 +202,6 @@ API.interceptors.response.use(
   }
 );
 
+export const getReadinessProjection = (params) => API.get('/dashboard/readiness-projection', { params });
+
 export default API;

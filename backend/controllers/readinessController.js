@@ -4,6 +4,7 @@ const Flashcard = require('../models/Flashcard');
 const PYQ = require('../models/PYQ');
 const Subject = require('../models/Subject');
 const { getCache, setCache } = require('../config/redis');
+const { calculateReadinessProjection } = require('../utils/predictiveModel');
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -74,6 +75,36 @@ exports.getSubjectReadiness = async (req, res, next) => {
       success: true,
       source: 'database',
       data: responsePayload,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.getReadinessProjection = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { targetExamDate, dailyHours, targetScore } = req.query;
+
+    const attempts = await QuizAttempt.findAll({
+      where: { user: userId },
+      order: [['createdAt', 'ASC']],
+      limit: 100,
+    });
+
+    const subjects = await Subject.findAll();
+
+    const projectionData = calculateReadinessProjection({
+      attempts,
+      topics: subjects,
+      targetExamDate,
+      dailyHours: Number(dailyHours) || 2,
+      targetScore: Number(targetScore) || 85,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: projectionData,
     });
   } catch (error) {
     next(error);
