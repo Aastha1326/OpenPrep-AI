@@ -12,7 +12,7 @@ const sequelize = new Sequelize(
       idle: parseInt(process.env.DB_POOL_IDLE, 10) || 10000
     },
     dialectOptions: {
-      ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes('supabase.co')
+      ssl: process.env.NODE_ENV === 'production' && process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('localhost')
         ? { require: true, rejectUnauthorized: false }
         : false,
       statement_timeout: parseInt(process.env.DB_STATEMENT_TIMEOUT, 10) || 15000,
