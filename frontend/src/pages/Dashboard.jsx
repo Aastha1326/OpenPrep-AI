@@ -2,6 +2,8 @@ import Skeleton from '../components/dashboard/Skeleton';
 import { useState, useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import LanguageSelector from '../components/LanguageSelector';
 import { motion, AnimatePresence } from 'framer-motion';
 import SecuritySettings from '../components/SecuritySettings';
 import {
@@ -193,6 +195,7 @@ const EmptyState = ({ icon: Icon = Lightbulb, message = 'No data yet' }) => (
 
 // ── Main Component ──
 const Dashboard = () => {
+  const { t } = useTranslation();
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
@@ -570,7 +573,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
         >
           <div>
             <h1 className="text-3xl font-playfair font-bold text-stone-800 dark:text-stone-100 mb-2">
-              Welcome back, <span className="text-amber-600 dark:text-amber-500">{user?.name?.split(' ')[0] || 'Scholar'}</span>
+              {t('welcome')}, <span className="text-amber-600 dark:text-amber-500">{user?.name?.split(' ')[0] || 'Scholar'}</span>
             </h1>
             <p className="text-amber-100/70 text-lg italic font-playfair">
               &ldquo;The roots of education are bitter, but the fruit is sweet.&rdquo; – Aristotle
@@ -611,7 +614,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           >
             <div className="relative group z-50">
               <button className="bg-neutral-800 text-gold-foil border border-yellow-700/50 hover:bg-neutral-700 px-4 py-2 rounded-sm shadow-[0_4px_15px_rgba(0,0,0,0.5)] flex items-center gap-2 font-playfair font-bold text-sm tracking-wide">
-                <Download className="w-4 h-4" /> Export Analytics
+                <Download className="w-4 h-4" /> {t('export_analytics')}
               </button>
               <div className="absolute right-0 top-full mt-2 w-40 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
                 <button
@@ -640,7 +643,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             >
               <Settings className="w-5 h-5 transition-transform duration-300 group-hover:rotate-45" />
               <div className="absolute top-full mt-2 px-2 py-1 bg-neutral-800 text-yellow-500 text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
-                SM-2 Settings
+                {t('sm2_settings')}
               </div>
             </button>
 
@@ -651,7 +654,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             >
               <Brain className="w-5 h-5 transition-transform duration-300 group-hover:scale-110" />
               <div className="absolute top-full mt-2 px-2 py-1 bg-neutral-800 text-yellow-500 text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
-                Skill Tree
+                {t('skill_tree')}
               </div>
             </button>
 
@@ -673,7 +676,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             >
               <Settings className="w-5 h-5" />
               <span className="font-playfair font-bold text-sm tracking-wide hidden sm:inline">
-                Settings
+                {t('settings')}
               </span>
             </button>
 
@@ -683,9 +686,10 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             >
               <LogOut className="w-5 h-5 group-hover:text-white" />
               <span className="font-playfair font-bold text-sm tracking-wide group-hover:text-white hidden sm:inline">
-                Log out
+                {t('logout')}
               </span>
             </button>
+            <LanguageSelector />
             <ThemeToggle />
           </motion.div>
         </motion.div>
