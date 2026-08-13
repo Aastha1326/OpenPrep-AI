@@ -391,36 +391,75 @@ const totalWeakCount = useMemo(() => {
     }
   };
 
-  const handleExportIcs = async () => {
-    if (!activePlan?.id) return;
-    setIsSyncingCalendar(true);
+const handleExportIcs = async () => {
+  if (!activePlan?.id) {
+    return;
+  }
 
-    try {
-      const response = await API.get(`/study-plans/${activePlan.id}/export-ics`, {
+  setIsSyncingCalendar(true);
+
+  try {
+    const timeZone =
+      Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    const response = await API.get(
+      `/study-plans/${activePlan.id}/export-ics`,
+      {
         responseType: 'blob',
-      });
+        headers: {
+          'x-timezone': timeZone,
+        },
+      }
+    );
 
-      const blob = new Blob([response.data], { type: 'text/calendar;charset=utf-8' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `study-plan-${activePlan.id}.ics`);
-      document.body.appendChild(link);
-      link.click();
-      link.parentNode.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('iCal export failed:', err);
-      setRescheduleMessage({
-        type: 'error',
-        text: err.response?.data?.error || 'Failed to export calendar .ics file',
-      });
-      setTimeout(() => setRescheduleMessage(null), 4000);
-    } finally {
-      setIsSyncingCalendar(false);
-    }
-  };
+    const blob = new Blob(
+      [response.data],
+      {
+        type: 'text/calendar;charset=utf-8',
+      }
+    );
 
+    const url =
+      window.URL.createObjectURL(blob);
+
+    const link =
+      document.createElement('a');
+
+    link.href = url;
+
+    link.setAttribute(
+      'download',
+      `study-plan-${activePlan.id}.ics`
+    );
+
+    document.body.appendChild(link);
+
+    link.click();
+
+    link.parentNode.removeChild(link);
+
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error(
+      'iCal export failed:',
+      err
+    );
+
+    setRescheduleMessage({
+      type: 'error',
+      text:
+        err.response?.data?.error ||
+        'Failed to export calendar .ics file',
+    });
+
+    setTimeout(
+      () => setRescheduleMessage(null),
+      4000
+    );
+  } finally {
+    setIsSyncingCalendar(false);
+  }
+};
   const handleReschedule = async () => {
     if (!activePlan?.id) return;
 

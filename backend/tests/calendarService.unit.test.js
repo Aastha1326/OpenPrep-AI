@@ -51,7 +51,87 @@ describe('Calendar Service', () => {
   afterEach(() => {
     vi.clearAllMocks();
   });
+  describe('generateStudyPlanIcs', () => {
+    it('should generate a valid calendar with study events', () => {
+      const plan = {
+        id: 'plan-123',
+        examRef: {
+          name: 'GATE',
+        },
+        dailyGoals: [
+          {
+            date: '2026-08-15',
+            tasks: [
+              {
+                _id: 'task-123',
+                title: 'Operating Systems',
+                duration: 60,
+              },
+            ],
+          },
+        ],
+      };
 
+      const ics = generateStudyPlanIcs(
+        plan,
+        'Asia/Kolkata'
+      );
+
+      expect(ics).toContain(
+        'BEGIN:VCALENDAR'
+      );
+
+      expect(ics).toContain(
+        'END:VCALENDAR'
+      );
+
+      expect(ics).toContain(
+        'BEGIN:VEVENT'
+      );
+
+      expect(ics).toContain(
+        'SUMMARY:Study: Operating Systems'
+      );
+
+      expect(ics).toContain(
+        'DTSTART'
+      );
+
+      expect(ics).toContain(
+        'DTEND'
+      );
+    });
+
+    it('should create the event at 9 AM in the supplied timezone', () => {
+      const plan = {
+        id: 'plan-456',
+        examRef: {
+          name: 'UPSC',
+        },
+        dailyGoals: [
+          {
+            date: '2026-08-15',
+            tasks: [
+              {
+                _id: 'task-456',
+                title: 'Polity Revision',
+                duration: 60,
+              },
+            ],
+          },
+        ],
+      };
+
+      const ics = generateStudyPlanIcs(
+        plan,
+        'Asia/Kolkata'
+      );
+
+      expect(ics).toContain(
+        'DTSTART:20260815T033000Z'
+      );
+    });
+  });
   describe('linkGoogleCalendar', () => {
     it('should exchange code for token and save encrypted token', async () => {
       await linkGoogleCalendar('mock_code', 'user-123');
