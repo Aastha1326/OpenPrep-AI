@@ -17,7 +17,7 @@
     "@google/genai": "^2.16.0",
     "@google/generative-ai": "^0.11.4",
     "anki-apkg-export": "^4.0.3",
-    "archiver": "^7.0.1",
+    "archiver": "^8.0.0",
     "bcryptjs": "^2.4.3",
     "compression": "^1.8.1",
     "cookie-parser": "^1.4.6",
