@@ -1,188 +1,119 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Bell } from 'lucide-react';
-import NotificationList from './NotificationList';
-import { getNotifications, markNotificationRead, markAllNotificationsRead, subscribePushNotifications } from '../../services/api';
+import { io } from 'socket.io-client';
+import { useNavigate } from 'react-router-dom';
+import NotificationDropdown from './NotificationDropdown';
+import API from '../../services/api'; // Standard axios instance for this app
 
-/**
- * NotificationBell Navigation Component
- * Listens to Socket.io real-time notifications, displays unread count badge,
- * announces new alerts to screen readers via ARIA live region, and handles Web Push subscription.
- */
-export default function NotificationBell({ socket, userId }) {
+const SOCKET_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
+const NotificationBell = () => {
+  const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [isOpen, setIsOpen] = useState(false);
-  const [ariaAnnouncement, setAriaAnnouncement] = useState('');
-  const [pushEnabled, setPushEnabled] = useState(false);
-  const dropdownRef = useRef(null);
+  const socketRef = useRef(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    fetchNotifications();
-    checkPushSubscription();
-  }, []);
-
-  // Socket.io Listener for Real-Time NOTIF_NEW events
-  useEffect(() => {
-    if (!socket || !userId) return;
-
-    // Join user socket room
-    socket.emit('join_user_room', userId);
-
-    const handleNewNotif = (notif) => {
-      setNotifications((prev) => [notif, ...prev]);
-      setUnreadCount((prev) => prev + 1);
-      // Screen reader announcement via ARIA live region
-      setAriaAnnouncement(`New notification: ${notif.title}. ${notif.message}`);
+    // 1. Fetch initial notifications
+    const fetchNotifications = async () => {
+      try {
+        const { data } = await API.get('/notifications');
+        if (data.success) {
+          setNotifications(data.data);
+          setUnreadCount(data.unreadCount);
+        }
+      } catch (err) {
+        console.error('Failed to fetch notifications:', err);
+      }
     };
+    fetchNotifications();
 
-    socket.on('NOTIF_NEW', handleNewNotif);
+    // 2. Setup Socket.io
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const socket = io(SOCKET_URL, {
+      auth: { token },
+      withCredentials: true,
+      transports: ['websocket', 'polling'], // Fallback to polling if websocket fails
+    });
+
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      console.log('Notification socket connected');
+    });
+
+    socket.on('notification:new', (newNotif) => {
+      setNotifications((prev) => [newNotif, ...prev].slice(0, 20)); // Keep max 20
+      setUnreadCount((prev) => prev + 1);
+    });
+
+    socket.on('connect_error', (err) => {
+      console.error('Socket connection error:', err.message);
+    });
 
     return () => {
-      socket.off('NOTIF_NEW', handleNewNotif);
+      socket.disconnect();
     };
-  }, [socket, userId]);
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const fetchNotifications = async () => {
-    try {
-      const res = await getNotifications();
-      setNotifications(res.data?.data || res.data || []);
-      setUnreadCount(res.data?.unreadCount || 0);
-    } catch (err) {
-      console.warn('Failed to fetch notifications:', err);
-    }
-  };
-
-  const checkPushSubscription = async () => {
-    if ('serviceWorker' in navigator && 'PushManager' in window) {
-      const reg = await navigator.serviceWorker.getRegistration();
-      if (reg) {
-        const sub = await reg.pushManager.getSubscription();
-        if (sub) setPushEnabled(true);
+  const handleMarkAsRead = async (notif) => {
+    if (!notif.isRead) {
+      try {
+        await API.patch(`/notifications/${notif.id}/read`);
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === notif.id ? { ...n, isRead: true } : n))
+        );
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+      } catch (err) {
+        console.error('Failed to mark notification as read:', err);
       }
     }
-  };
-
-  const handleMarkRead = async (id) => {
-    try {
-      await markNotificationRead(id);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-      );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
-    } catch (err) {
-      console.warn('Error marking notification read:', err);
+    
+    // Navigate if link exists
+    if (notif.link) {
+      setIsOpen(false);
+      navigate(notif.link);
     }
   };
 
-  const handleMarkAllRead = async () => {
+  const handleMarkAllAsRead = async () => {
     try {
-      await markAllNotificationsRead();
+      await API.patch('/notifications/read-all');
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       setUnreadCount(0);
     } catch (err) {
-      console.warn('Error marking all read:', err);
-    }
-  };
-
-  const handleSubscribePush = async () => {
-    try {
-      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-        alert('Web Push is not supported in this browser environment.');
-        return;
-      }
-
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') {
-        alert('Browser push notification permission denied.');
-        return;
-      }
-
-      const reg = await navigator.serviceWorker.register('/sw.js');
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(
-          import.meta.env.VITE_VAPID_PUBLIC_KEY ||
-            'BEl62iUYgUivxIkv69yViEuiBIa45ffc77g0N7i431r9g0p89a5_mock_public_key'
-        ),
-      });
-
-      const subData = JSON.parse(JSON.stringify(sub));
-      await subscribePushNotifications({
-        endpoint: subData.endpoint,
-        keys: subData.keys,
-      });
-
-      setPushEnabled(true);
-      alert('Desktop Push Notifications successfully enabled!');
-    } catch (err) {
-      console.error('Failed to subscribe push notifications:', err);
+      console.error('Failed to mark all as read:', err);
     }
   };
 
   return (
-    <div className="relative inline-block" ref={dropdownRef}>
-      {/* Screen Reader ARIA Live Announcement Region */}
-      <div
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        className="sr-only"
-      >
-        {ariaAnnouncement}
-      </div>
-
-      {/* Bell Button */}
+    <div className="relative">
       <button
-        type="button"
         onClick={() => setIsOpen(!isOpen)}
-        aria-label={`Notifications - ${unreadCount} unread`}
-        className="relative p-2 text-slate-300 hover:text-slate-100 hover:bg-slate-800/80 rounded-xl transition-all border border-slate-700/50"
+        className="relative p-2 rounded-full hover:bg-black/5 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+        aria-label="Notifications"
       >
-        <Bell className="w-5 h-5" />
+        <Bell className="w-6 h-6 text-slate-700" />
+        
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 px-1.5 py-0.5 text-[10px] font-extrabold rounded-full bg-indigo-600 text-white shadow-lg ring-2 ring-slate-950 animate-pulse">
+          <span className="absolute top-1.5 right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white ring-2 ring-white">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
       </button>
 
-      {/* Dropdown Menu */}
-      {isOpen && (
-        <div className="absolute right-0 mt-2 z-50">
-          <NotificationList
-            notifications={notifications}
-            unreadCount={unreadCount}
-            onMarkRead={handleMarkRead}
-            onMarkAllRead={handleMarkAllRead}
-            onSubscribePush={handleSubscribePush}
-            pushEnabled={pushEnabled}
-            onClose={() => setIsOpen(false)}
-          />
-        </div>
-      )}
+      <NotificationDropdown
+        isOpen={isOpen}
+        notifications={notifications}
+        onClose={() => setIsOpen(false)}
+        onMarkAsRead={handleMarkAsRead}
+        onMarkAllAsRead={handleMarkAllAsRead}
+      />
     </div>
   );
-}
+};
 
-// Utility to convert VAPID key string to Uint8Array
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
-}
+export default NotificationBell;

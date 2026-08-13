@@ -31,13 +31,17 @@ function initStudyReminderCron(io) {
             // Check if task is scheduled for today and not completed
             if (!task.completed && task.scheduledTime) {
               const taskTime = new Date(task.scheduledTime);
-              if (taskTime >= now && taskTime <= next15Mins) {
+              // Notify 1 hour in advance
+              const timeDiffMs = taskTime - now;
+              const timeDiffMins = Math.floor(timeDiffMs / 60000);
+
+              if (timeDiffMins > 0 && timeDiffMins <= 60) {
                 await createNotification(
                   plan.user,
-                  '⏰ Study Session Starting Soon!',
-                  `Your scheduled task "${task.title || 'Study Session'}" begins in 15 minutes.`,
-                  'remind',
-                  '/planner',
+                  '⏰ Task Due Soon!',
+                  `Your scheduled task "${task.title || 'Study Session'}" is due in 1 hour.`,
+                  'task_due',
+                  '/study-planner',
                   io
                 );
               }

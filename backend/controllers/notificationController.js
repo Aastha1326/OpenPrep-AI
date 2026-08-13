@@ -9,7 +9,7 @@ exports.getUserNotifications = async (req, res, next) => {
     const notifications = await Notification.findAll({
       where: { user: req.user.id },
       order: [['createdAt', 'DESC']],
-      limit: 50,
+      limit: 20,
     });
 
     const unreadCount = await Notification.count({

@@ -18,6 +18,7 @@ const { runCalibration } = require('../services/difficultyCalibrator');
 const { calculateTopicProficiency, getDifficultyLevel } = require('../services/proficiencyService');
 const Flashcard = require('../models/Flashcard');
 const remediationService = require('../services/remediationService');
+const { createNotification } = require('../services/notificationService');
 
 // Window (ms) during which duplicate quiz submissions for the same quiz are ignored.
 // Prevents double-click on "Submit Quiz" from creating duplicate attempt records.
@@ -116,6 +117,15 @@ exports.generateAIQuiz = async (req, res, next) => {
       language: normalizedLanguage,
       createdBy: req.user.id,
     });
+
+    await createNotification(
+      req.user.id,
+      '🧠 AI Quiz Ready',
+      `Your practice quiz "${quiz.title}" has been generated.`,
+      'ai_quiz',
+      `/quiz/${quiz.id}`,
+      global.io
+    );
 
     res.status(201).json({ success: true, data: quiz });
   } catch (error) {

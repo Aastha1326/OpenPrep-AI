@@ -14,6 +14,7 @@ const errorHandler = require('./middleware/error');
 const logger = require('./utils/logger');
 const requestLogger = require('./middleware/requestLogger');
 const { protect } = require('./middleware/auth');
+const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const PYQ = require('./models/PYQ');
 const Note = require('./models/Note');
@@ -316,18 +317,35 @@ const io = new Server(server, {
   pingTimeout: 60000,
   pingInterval: 25000,
 });
+global.io = io;
 // Initialize socket handlers
 require('./sockets/battleHandler')(io);
 require('./sockets/chatHandler')(io);
 require('./sockets/crdtHandler')(io);
 
+// Authenticate Socket.io connections
+io.use((socket, next) => {
+  const token = socket.handshake.auth.token;
+  if (!token) {
+    return next(new Error('Authentication error: Token missing'));
+  }
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.type !== 'access') {
+      return next(new Error('Authentication error: Invalid token type'));
+    }
+    socket.user = decoded;
+    next();
+  } catch (err) {
+    next(new Error('Authentication error: Invalid token'));
+  }
+});
+
 // User notification room listener
 io.on('connection', (socket) => {
-  socket.on('join_user_room', (userId) => {
-    if (userId) {
-      socket.join(`user:${userId}`);
-    }
-  });
+  if (socket.user && socket.user.id) {
+    socket.join(`user:${socket.user.id}`);
+  }
 });
 
 // Start background schedulers
@@ -335,7 +353,9 @@ const { startScheduler } = require('./services/weeklyDigestService');
 startScheduler();
 
 const { initStudyReminderCron } = require('./jobs/studyReminderCron');
+const { initStreakReminderCron } = require('./jobs/streakReminderCron');
 initStudyReminderCron(io);
+initStreakReminderCron(io);
 
 if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   server.listen(PORT, () => {

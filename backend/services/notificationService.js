@@ -32,7 +32,7 @@ async function createNotification(userId, title, message, type = 'general', link
 
     // Emit Socket.io real-time event if io instance is supplied
     if (io) {
-      io.to(`user:${userId}`).emit('NOTIF_NEW', {
+      io.to(`user:${userId}`).emit('notification:new', {
         id: notification.id,
         title: notification.title,
         message: notification.message,

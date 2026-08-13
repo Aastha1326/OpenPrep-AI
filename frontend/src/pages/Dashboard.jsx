@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import LanguageSelector from '../components/LanguageSelector';
 import { motion, AnimatePresence } from 'framer-motion';
 import SecuritySettings from '../components/SecuritySettings';
+import NotificationBell from '../components/notifications/NotificationBell';
 import {
   Flame,
   Play,
@@ -676,6 +677,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
                 {t('logout')}
               </span>
             </button>
+            <NotificationBell />
             <LanguageSelector />
             <ThemeToggle />
           </motion.div>
