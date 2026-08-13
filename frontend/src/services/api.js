@@ -290,4 +290,11 @@ export const markNotificationRead = (id) => API.patch(`/notifications/${id}/read
 export const markAllNotificationsRead = () => API.patch('/notifications/read-all');
 export const subscribePushNotifications = (payload) => API.post('/notifications/subscribe-push', payload);
 
+/**
+ * Evaluate a student's written response for a subjective question.
+ * POST /api/quizzes/evaluate-subjective
+ */
+export const evaluateSubjectiveAnswer = ({ questionId, quizId, userAnswerText }) =>
+  API.post('/quizzes/evaluate-subjective', { questionId, quizId, userAnswerText });
+
 export default API;
