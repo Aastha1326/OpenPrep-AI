@@ -9,7 +9,6 @@ import { loginUser, loadUser, clearError } from '../store/slices/authSlice';
 import ThemeToggle from '../components/ThemeToggle';
 import SoundToggle from '../components/SoundToggle';
 import ForgotPasswordModal from '../components/auth/ForgotPasswordModal';
-import { useGoogleLogin } from '@react-oauth/google';
 
 const Login = () => {
   const dispatch = useDispatch();
@@ -18,6 +17,7 @@ const Login = () => {
 
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
   
   // New state for handling 2FA step
   const [requires2FA, setRequires2FA] = useState(false);
@@ -57,14 +57,6 @@ const Login = () => {
   useEffect(() => {
     return () => { dispatch(clearError()); };
   }, [dispatch]);
-
-  const loginWithGoogle = useGoogleLogin({
-    onSuccess: handleGoogleSuccess,
-    onError: (err) => {
-      console.warn('Google OAuth popup blocked or failed, redirecting:', err);
-      window.location.href = googleAuthUrl;
-    },
-  });
 
   const handleChange = (e) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -196,9 +188,13 @@ const Login = () => {
                     <label htmlFor="login-password" className="block text-xs font-bold text-[#1F150C] dark:text-[#E1DCC9]">
                       Password
                     </label>
-                    <Link to="/forgot-password" className="text-xs font-semibold text-[#AD8B73] hover:underline dark:text-[#E1DCC9]">
+                    <button
+                      type="button"
+                      onClick={() => setIsForgotPasswordOpen(true)}
+                      className="text-xs font-semibold text-[#AD8B73] hover:underline dark:text-[#E1DCC9]"
+                    >
                       Forgot password?
-                    </Link>
+                    </button>
                   </div>
                   <div className="relative">
                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8C6A53] dark:text-[#C4BA9D]" />
