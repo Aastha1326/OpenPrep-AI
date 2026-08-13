@@ -24,6 +24,8 @@ const BattleSession = require('./BattleSession');
 const BattleParticipant = require('./BattleParticipant');
 const PYQAnalysis = require('./PYQAnalysis');
 const PYQQuestion = require('./PYQQuestion');
+const Folder = require('./Folder');
+
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -39,6 +41,7 @@ User.hasMany(Feedback, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(ActivityLog, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Achievement, { foreignKey: 'userId', as: 'achievements', onDelete: 'CASCADE' });
 User.hasMany(UserBadge, { foreignKey: 'userId', as: 'badgesRef', onDelete: 'CASCADE' });
+User.hasMany(Folder, { foreignKey: 'userId', onDelete: 'CASCADE' });
 
 // Exam associations
 Exam.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
@@ -147,6 +150,21 @@ PYQAnalysis.belongsTo(Subject, { foreignKey: 'subjectId', as: 'subjectRef' });
 PYQAnalysis.hasMany(PYQQuestion, { foreignKey: 'pyqAnalysisId', onDelete: 'CASCADE' });
 PYQQuestion.belongsTo(PYQAnalysis, { foreignKey: 'pyqAnalysisId', as: 'analysisRef' });
 
+// Folder associations
+Folder.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+Folder.belongsTo(Folder, { foreignKey: 'parentId', as: 'parent' });
+Folder.hasMany(Folder, { foreignKey: 'parentId', as: 'children', onDelete: 'CASCADE' });
+
+Folder.hasMany(Note, { foreignKey: 'folderId', onDelete: 'SET NULL' });
+Note.belongsTo(Folder, { foreignKey: 'folderId', as: 'folderRef' });
+
+Folder.hasMany(Flashcard, { foreignKey: 'folderId', onDelete: 'SET NULL' });
+Flashcard.belongsTo(Folder, { foreignKey: 'folderId', as: 'folderRef' });
+
+Folder.hasMany(Quiz, { foreignKey: 'folderId', onDelete: 'SET NULL' });
+Quiz.belongsTo(Folder, { foreignKey: 'folderId', as: 'folderRef' });
+
+
 module.exports = {  sequelize,  User,
   Exam,
   Subject,
@@ -170,4 +188,5 @@ UsageQuota,
   BattleParticipant,
   PYQAnalysis,
   PYQQuestion,
+  Folder,
 };

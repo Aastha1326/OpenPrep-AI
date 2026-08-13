@@ -1,6 +1,9 @@
-import speakeasy from 'speakeasy';
-import QRCode from 'qrcode';
-import crypto from 'crypto';
+const speakeasy = require('speakeasy');
+const QRCode = require('qrcode');
+const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/db');
 
 const User = sequelize.define(
   'User',
@@ -250,9 +253,4 @@ User.prototype.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-    const qrCodeUrl = await QRCode.toDataURL(secret.otpauth_url);
-    res.status(200).json({ success: true, secret: secret.base32, qrCodeUrl, backupCodes });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
+module.exports = User;

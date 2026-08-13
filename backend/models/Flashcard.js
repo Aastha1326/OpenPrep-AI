@@ -51,10 +51,14 @@ nextReviewDate: {
       defaultValue: DataTypes.NOW,
     },
     tags: {
-      type: DataTypes.JSONB,
+      type: DataTypes.ARRAY(DataTypes.STRING),
       defaultValue: [],
     },
-difficulty: {
+    folderId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
+    difficulty: {
       type: DataTypes.ENUM('Easy', 'Medium', 'Hard'),
       allowNull: true,
     },

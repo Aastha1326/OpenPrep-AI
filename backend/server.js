@@ -20,22 +20,10 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
 const passport = require('./config/passport');
 const { getCorsMiddleware, getSocketCorsOrigin } = require('./middleware/corsHandler');
-const http = require('http');
-const { Server } = require('socket.io');
 const app = require('./app'); // Your Express app
 const setupQuizBattleSocket = require('./sockets/quizBattleSocket');
 
-const server = http.createServer(app);
-const io = new Server(server, {
-  cors: { origin: '*', methods: ['GET', 'POST'] },
-});
 
-setupQuizBattleSocket(io);
-
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
 // Validate required environment variables at startup
 if (!process.env.JWT_SECRET) {
   console.error('FATAL ERROR: JWT_SECRET is not defined in environment variables.');
@@ -64,6 +52,7 @@ const analyticsRoutes = require('./routes/analyticsRoutes');
 const calendarRoutes = require('./routes/calendarRoutes');
 const gamificationRoutes = require('./routes/gamificationRoutes');
 const battleRoutes = require('./routes/battleRoutes');
+const folderRoutes = require('./routes/folderRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 initNotificationCron();
@@ -76,7 +65,7 @@ connectDB();
 const redisService = require('./services/redisService');
 redisService.connect();
 
-const app = express();
+
 
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
@@ -254,6 +243,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/gamification', gamificationRoutes);
 app.use('/api/battles', battleRoutes);
+app.use('/api/folders', folderRoutes);
 
 // Base Route
 app.get('/', (req, res) => {
@@ -301,9 +291,9 @@ app.use(
 // Error Handler Middleware
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5000;
-const server = http.createServer(app);
 
+
+const PORT = process.env.PORT || 5000;
 const server = http.createServer(app);
 
 const io = new Server(server, {
@@ -319,6 +309,7 @@ const io = new Server(server, {
 // Initialize socket handlers
 require('./sockets/battleHandler')(io);
 require('./sockets/chatHandler')(io);
+setupQuizBattleSocket(io);
 
 // Start weekly digest background scheduler
 const { startScheduler } = require('./services/weeklyDigestService');
