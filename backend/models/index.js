@@ -19,6 +19,7 @@ const Achievement = require('./Achievement');
 const FocusSession = require('./FocusSession');
 const QuizTelemetryEvent = require('./QuizTelemetryEvent');
 const QuizBookmark = require('./QuizBookmark');
+const DeckRating = require('./DeckRating');
 const UserBadge = require('./UserBadge');
 const BattleSession = require('./BattleSession');
 const BattleParticipant = require('./BattleParticipant');
@@ -178,10 +179,11 @@ module.exports = {  sequelize,  User,
   ActivityLog,
   UsageQuota,
   Achievement,
-  UserBadge,
   FocusSession,
   QuizTelemetryEvent,
   QuizBookmark,
+  DeckRating,
+  UserBadge,
   BattleSession,
   BattleParticipant,
   PYQAnalysis,

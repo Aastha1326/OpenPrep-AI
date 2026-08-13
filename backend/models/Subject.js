@@ -47,6 +47,10 @@ const Subject = sequelize.define(
       type: DataTypes.FLOAT,
       defaultValue: 0.0,
     },
+    ratingsCount: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
     ratingCount: {
       type: DataTypes.INTEGER,
       defaultValue: 0,
