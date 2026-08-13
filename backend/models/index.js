@@ -24,6 +24,8 @@ const BattleSession = require('./BattleSession');
 const BattleParticipant = require('./BattleParticipant');
 const PYQAnalysis = require('./PYQAnalysis');
 const PYQQuestion = require('./PYQQuestion');
+const Notification = require('./Notification');
+const PushSubscription = require('./PushSubscription');
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -147,6 +149,13 @@ PYQAnalysis.belongsTo(Subject, { foreignKey: 'subjectId', as: 'subjectRef' });
 PYQAnalysis.hasMany(PYQQuestion, { foreignKey: 'pyqAnalysisId', onDelete: 'CASCADE' });
 PYQQuestion.belongsTo(PYQAnalysis, { foreignKey: 'pyqAnalysisId', as: 'analysisRef' });
 
+// Notification & PushSubscription associations
+User.hasMany(Notification, { foreignKey: 'user', onDelete: 'CASCADE' });
+Notification.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
+User.hasMany(PushSubscription, { foreignKey: 'user', onDelete: 'CASCADE' });
+PushSubscription.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
 module.exports = {  sequelize,  User,
   Exam,
   Subject,
@@ -160,7 +169,7 @@ module.exports = {  sequelize,  User,
   Progress,
   Feedback,
   ActivityLog,
-UsageQuota,
+  UsageQuota,
   Achievement,
   UserBadge,
   FocusSession,
@@ -170,4 +179,6 @@ UsageQuota,
   BattleParticipant,
   PYQAnalysis,
   PYQQuestion,
+  Notification,
+  PushSubscription,
 };
