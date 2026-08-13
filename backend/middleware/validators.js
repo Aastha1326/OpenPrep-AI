@@ -272,6 +272,12 @@ const validateGenerateRemediationPlan = [
   handleValidationErrors,
 ];
 
+const validateEvaluateSubjective = [
+  body('questionId').optional().isUUID().withMessage('questionId must be a valid UUID'),
+  body('userAnswerText').isString().withMessage('userAnswerText must be a string'),
+  handleValidationErrors,
+];
+
 const validateSubmitQuizAttempt = [
   body('answers').isArray({ min: 1 }).withMessage('Answers must be a non-empty array'),
   body('answers.*.questionId')
@@ -530,6 +536,7 @@ validateGenerateAIFlashcards,
   validateExportFlashcards,
   validateImportFlashcards, // Quiz
   validateGenerateAIQuiz,
+  validateEvaluateSubjective,
   validateGenerateRevisionSheet,
   validateGenerateRemediationPlan,
   validateSubmitQuizAttempt,
