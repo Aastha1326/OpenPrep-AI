@@ -57,7 +57,7 @@ importers:
         specifier: ^174.0.1
         version: 174.0.1
       helmet:
-        specifier: ^8.2.0
+        specifier: ^8.3.0
         version: 8.3.0
       ioredis:
         specifier: ^5.11.1
