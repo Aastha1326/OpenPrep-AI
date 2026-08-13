@@ -9,6 +9,7 @@ const NAV_LINKS = [
   { to: '/flashcards/review', label: 'Flashcards', preload: () => import('../pages/FlashcardReview') },
   { to: '/battle', label: 'Battle Arena', preload: () => import('../pages/BattleArena') },
   { to: '/study-group', label: 'Study Group', preload: () => import('../pages/StudyGroupChat') },
+  { to: '/squads', label: 'Study Squads', preload: () => import('../pages/SquadsPage') },
   { to: '/ai-assistant', label: 'AI Mentor Chat', preload: () => import('../pages/AiAssistant') },
   { to: '/community/decks', label: 'Community Library', preload: () => import('../pages/CommunityDecks') },
   { to: '/settings', label: 'Settings', preload: () => import('../pages/Settings') },

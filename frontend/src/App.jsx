@@ -39,6 +39,7 @@ const MindMapViewer = lazy(() => import('./pages/MindMapViewer'));
 const StudyPlanner = lazy(() => import('./pages/StudyPlanner'));
 const VivaSimulator = lazy(() => import('./pages/VivaSimulator'));
 const CollaborativeNoteView = lazy(() => import('./pages/CollaborativeNoteView'));
+const SquadsPage = lazy(() => import('./pages/SquadsPage'));
 
 function App() {
   const dispatch = useDispatch();
@@ -258,6 +259,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <Settings />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/squads"
+            element={
+              <ProtectedRoute>
+                <SquadsPage />
               </ProtectedRoute>
             }
           />

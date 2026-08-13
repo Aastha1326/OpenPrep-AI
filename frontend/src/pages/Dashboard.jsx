@@ -32,6 +32,7 @@ import {
   Video,
   Brain,
   Bot,
+  Users,
 } from 'lucide-react';import API from '../services/api';
 import { toDateOnlyString } from '../utils/dateUtils';
 import SkillTree from '../components/dashboard/SkillTree';
@@ -517,6 +518,12 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           label="Study Room"
           delay={0.45}
           onClick={() => navigate('/study-group')}
+        />
+        <GoldTabButton
+          icon={Users}
+          label="Study Squads"
+          delay={0.46}
+          onClick={() => navigate('/squads')}
         />
         <GoldTabButton
           icon={Globe}

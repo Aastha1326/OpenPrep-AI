@@ -1,4 +1,4 @@
-const { User, UserBadge, QuizAttempt } = require('../models');
+const { User, UserBadge, QuizAttempt, SquadMember, SquadChallenge, SquadChallengeContribution, SquadAchievement } = require('../models');
 
 // Calculate level based on XP: level = Math.floor(Math.sqrt(xp / 100)) + 1
 function calculateLevel(xp) {
@@ -68,6 +68,67 @@ async function awardXP(userId, amount, reason) {
   }
 
   await user.save();
+
+  // Distribute XP to active squad challenges
+  try {
+    const memberships = await SquadMember.findAll({ where: { userId } });
+    if (memberships.length > 0) {
+      const squadIds = memberships.map(m => m.squadId);
+      const activeChallenges = await SquadChallenge.findAll({
+        where: {
+          squadId: squadIds,
+          status: 'active'
+        }
+      });
+
+      for (const challenge of activeChallenges) {
+        challenge.currentXp += allowedAmount;
+        if (challenge.currentXp >= challenge.targetXp) {
+          challenge.currentXp = challenge.targetXp;
+          challenge.status = 'completed';
+          
+          // Award achievement to the squad
+          await SquadAchievement.findOrCreate({
+            where: { squadId: challenge.squadId, badgeCode: 'challenge_completed' },
+            defaults: { unlockedAt: new Date() }
+          });
+
+          // If io is available globally, we can emit an event
+          if (global.io) {
+            global.io.to(`squad:${challenge.squadId}`).emit('squad:challenge_completed', {
+              squadId: challenge.squadId,
+              challengeId: challenge.id
+            });
+          }
+        }
+        await challenge.save();
+
+        // Update individual contribution
+        const [contribution] = await SquadChallengeContribution.findOrCreate({
+          where: { challengeId: challenge.id, userId },
+          defaults: { contributedXp: 0 }
+        });
+        contribution.contributedXp += allowedAmount;
+        await contribution.save();
+
+        // Update real-time progress
+        if (global.io) {
+          global.io.to(`squad:${challenge.squadId}`).emit('squad:progress_updated', {
+            squadId: challenge.squadId,
+            challengeId: challenge.id,
+            currentXp: challenge.currentXp,
+            targetXp: challenge.targetXp,
+            contributions: {
+              userId,
+              amount: contribution.contributedXp
+            }
+          });
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error updating squad challenge XP:', error);
+  }
 
   return {
     xp: user.xp,
