@@ -64,7 +64,7 @@ const battleRoutes = require('./routes/battleRoutes');
 const readinessRoutes = require('./routes/readinessRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
-initNotificationCron();
+
 initDifficultyCalibratorCron();
 
 // Connect to Database
