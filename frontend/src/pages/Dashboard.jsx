@@ -205,8 +205,7 @@ const Dashboard = () => {
   const [gamificationData, setGamificationData] = useState(null);
   const [loadingGamification, setLoadingGamification] = useState(false);
   const [activeBadgeUnlock, setActiveBadgeUnlock] = useState(null);
-  const [isFreezing, setIsFreezing] = useState(false);
-
+// Streak freezes are automatically consumed by the backend.
   const fetchGamification = useCallback(async () => {
     try {
       setLoadingGamification(true);
@@ -351,27 +350,8 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
     }
   }, [user?.level, prevLevel]);
 
-  const handleUseStreakFreeze = async () => {
-    try {
-      setIsFreezing(true);
-      const timezoneOffset = new Date().getTimezoneOffset();
-      const res = await API.post('/gamification/streak-freeze/use', {}, {
-        headers: { 'x-timezone-offset': String(timezoneOffset) }
-      });
-      if (res.data.success) {
-        alert('Streak Freeze Shield activated successfully!');
-        fetchGamification();
-        dispatch(loadUser());
-        dispatch(fetchDashboardStats());
-      }
-    } catch (err) {
-      console.error(err);
-      alert(err.response?.data?.error || 'Failed to activate Streak Freeze shield.');
-    } finally {
-      setIsFreezing(false);
-    }
-  };
-
+// Streak freezes are consumed automatically by the backend
+// when exactly one study day is missed.
   const handleGoToStudyPlanFromImport = (prefill) => {
     if (prefill) setSyllabusPrefill(prefill);
     // Refresh dashboard caches so the new exam appears immediately in select
@@ -657,14 +637,24 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
 
             {/* --- STREAK WIDGET --- */}
             <div className="w-80">
-              <StreakWidget
-                currentStreak={gamificationData?.currentStreak ?? user?.currentStreak ?? 0}
-                longestStreak={gamificationData?.longestStreak ?? user?.longestStreak ?? 0}
-                streakFreezesAvailable={gamificationData?.streakFreezesAvailable ?? user?.streakFreezesAvailable ?? 0}
-                onUseStreakFreeze={handleUseStreakFreeze}
-                isFreezing={isFreezing}
-              />
-            </div>
+<StreakWidget
+  currentStreak={
+    gamificationData?.currentStreak ??
+    user?.currentStreak ??
+    0
+  }
+  longestStreak={
+    gamificationData?.longestStreak ??
+    user?.longestStreak ??
+    0
+  }
+  streakFreezesAvailable={
+    gamificationData?.streakFreezesAvailable ??
+    user?.streakFreezesAvailable ??
+    0
+  }
+  badges={gamificationData?.badges || []}
+/>            </div>
 
             <button
               onClick={() => navigate('/settings')}
