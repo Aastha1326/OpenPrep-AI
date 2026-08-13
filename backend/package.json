@@ -11,7 +11,7 @@
     "test:integration": "vitest run",
     "test:coverage": "vitest run --config vitest.config.unit.js --coverage",
     "seed": "node scripts/seed.js",
-    "db:migrate:test": "node scripts/migrate.js"
+    "db:migrate:test": "node scripts/migrate.js --force"
   },
   "dependencies": {
     "@google/genai": "^2.16.0",

@@ -321,7 +321,10 @@ If you prefer to run the entire stack containerized, use the configured `docker-
    docker-compose up --build
    ```
 
-This downloads the necessary images, boots an isolated PostgreSQL database container, and builds the frontend and backend service instances.
+This downloads the necessary images, boots PostgreSQL and Redis database containers, and builds the frontend and backend service instances.
+
+> [!NOTE]
+> Database migrations and seeding are automated on first boot! The database will be pre-populated with a default student user: **`demo@openprep.ai`** (password: **`password123`**) along with sample exams, subjects, notes, and flashcard decks. Live hot-reloading is fully supported via mounted volumes for both frontend and backend development.
 
 ### Port Mappings
 
