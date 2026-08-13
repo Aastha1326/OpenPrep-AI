@@ -63,6 +63,8 @@ const gamificationRoutes = require('./routes/gamificationRoutes');
 const battleRoutes = require('./routes/battleRoutes');
 const readinessRoutes = require('./routes/readinessRoutes');
 const podcastRoutes = require('./routes/podcastRoutes');
+const syllabusRoutes = require('./routes/syllabusRoutes');
+const vivaRoutes = require('./routes/vivaRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 
@@ -254,7 +256,7 @@ app.use('/api/pyqs', pyqRoutes);
 app.use('/api/pyq', pyqRoutes);
 app.use('/api/community', communityRoutes);
 app.use('/api/study', fatigueRoutes);
-app.use('/api/documents', pdfRoutes);
+app.use('/api/documents', pdfAnnotationRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/study-plans', studyPlanRoutes);
 app.use('/api/quizzes', quizRoutes);
@@ -268,7 +270,10 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/readiness', readinessRoutes);
 app.use('/api/podcast', podcastRoutes);
+app.use('/api/syllabus', syllabusRoutes);
+app.use('/api/viva', vivaRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/dashboard', analyticsRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/gamification', gamificationRoutes);
 app.use('/api/battles', battleRoutes);
@@ -336,6 +341,7 @@ const io = new Server(server, {
 // Initialize socket handlers
 require('./sockets/battleHandler')(io);
 require('./sockets/chatHandler')(io);
+require('./sockets/crdtHandler')(io);
 
 // User notification room listener
 io.on('connection', (socket) => {

@@ -179,3 +179,66 @@ Provides a responsive frontend AudioPlayer overlay:
 * Includes a 15-second skip/rewind toggle.
 * Adjusts playback speeds dynamically (0.8x to 1.5x) using the HTML5 audio element API.
 * Displays screen-reader accessible scrolling transcripts matching the active audio cues.
+
+---
+
+## 📅 AI Syllabus Coverage Gap Detector & PDF Importer
+
+Uploads official curriculum guidelines and compares them to actual student learning telemetry to identify coverage blind spots.
+
+### 1. PDF Hierarchy Extraction & Modules Parsing
+* **Text Extraction**: Uses `pdf-parse` to convert syllabus PDF data. Multi-column structures are handled, and a mock fallback routes image-only scans.
+* **AI Extraction**: Feeds text to Gemini 1.5 API requesting structured JSON:
+  `{ moduleName, title, subtopics: [], weightage }`
+
+### 2. Coverage Status Logic
+Cross-references parsed topics against user's actual `Note` and `QuizAttempt` tables:
+* **Covered (Green)**: Student has written a note matching the topic title AND has taken quizzes with an average accuracy score $\ge 70\%$.
+* **Partially Covered (Yellow)**: Student has written a notes summary, but has either no quiz attempts or an average accuracy score $< 70\%$.
+* **Unstudied Gap (Red)**: Student has no matching notes and no quiz attempts recorded for the syllabus topic.
+
+Clicking a gap topic triggers a backend call to Gemini 1.5 API, which drafts a detailed educational study note covering the topic and its subtopics in rich Markdown. The note is saved to the user's notes catalog, updating the topic's status to Partially Covered.
+
+---
+
+## 🎙️ AI Practice Interview Simulator (Viva Voce)
+
+Simulates technical oral exams where students answer dynamic questions from an AI examiner via text or voice.
+
+### 1. Multi-turn Conversational Session Manager
+* **Session Lifecycle**:
+  * `/api/viva/start`: Resolves subject title, starts the turn array, and generates the initial technical question.
+  * `/api/viva/respond`: Appends student answers, compiles conversation history, and generates appropriate follow-up probing questions.
+  * `/api/viva/evaluate`: Triggers final grading after 5 student response turns or early finish.
+* **Turn Limit Safeguard**: Auto-evaluates sessions at 5 student turns to ensure quota limits are respected.
+
+### 2. Multi-Rubric Scorecard Assessment
+Calculates four key academic assessment indicators:
+* **Conceptual Depth (0-100)**: Evaluates the completeness of explanation and knowledge of core architectures.
+* **Technical Accuracy (0-100)**: Assesses precision in definitions and technical vocabulary.
+* **Communication Clarity (0-100)**: Evaluates structural focus and coherence in expressing concepts.
+* **Overall Score (0-100)**: The overall average performance score.
+
+### 3. Integrated Voice input Fallback
+* Leverages Web Speech API for real-time speech-to-text translation.
+* Automatically reads examiner questions aloud using window.speechSynthesis to simulate a natural academic oral examination setting.
+* Provides full manual text keyboard input fallback for environments without microphone support.
+
+---
+
+## 👥 Multi-User Study Notes Real-Time Collaboration
+
+Enables concurrent rich co-editing of lecture notes and study guides with peer presence and automatic conflict resolution.
+
+### 1. Conflict-Free Replicated Data Types (CRDT)
+* Powered by Yjs, document contents are modeled as replicated character vectors (`Y.Text`).
+* Simultaneous edits from multiple clients are merged deterministically in real-time, preventing text loss, duplicate insertions, or cursor jumps.
+* Base64 encoded update steps are transmitted over WebSockets, minimizing network payload sizing (<1KB per typing event).
+
+### 2. Presence & Cursors Awareness
+* Syncs peer collaborator cursor character offsets over the WebSocket channel.
+* Displays distinct colored cursor carets and collaborator initial icons in the note editor canvas.
+
+### 3. Asynchronous Database Synchronization
+* Syncs document states to PostgreSQL on a 2-second idle debounce delay.
+* Binary Y.Doc state updates are saved to the `docState` BLOB column while matching raw synchronized text is written to the `content` TEXT column for compatibility with other analytics modules.
