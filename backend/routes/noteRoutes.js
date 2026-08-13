@@ -10,6 +10,8 @@ const {
   uploadOcrNote,
   exportNotes,
   importNotes,
+  shareCollaboration,
+  getNote,
 } = require('../controllers/noteController');
 const { protect } = require('../middleware/auth');
 const upload = require('../middleware/upload');
@@ -486,7 +488,11 @@ router.post('/:id/summarize', protect, summarizeNote);
  *       200:
  *         description: Note updated successfully
  */
+router.get('/:id', protect, getNote);
+
 router.put('/:id', protect, clearCache('notes:*'), updateNote);
+
+router.post('/:id/share', protect, clearCache('notes:*'), shareCollaboration);
 
 router.delete('/:id', protect, clearCache('notes:*'), deleteNote);
 

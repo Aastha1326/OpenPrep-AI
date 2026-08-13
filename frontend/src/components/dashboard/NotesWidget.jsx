@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   FileText,
   Volume2,
@@ -11,6 +12,7 @@ import {
   Mic,
   Play,
   Pause,
+  Users,
 } from 'lucide-react';
 import API from '../../services/api';
 import VintagePaper from './VintagePaper';
@@ -103,6 +105,7 @@ const VoiceNotePlayer = ({ fileUrl }) => {
 };
 
 const NotesWidget = ({ limit = 5 }) => {
+  const navigate = useNavigate();
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -110,12 +113,15 @@ const NotesWidget = ({ limit = 5 }) => {
   const [activeSentenceByNote, setActiveSentenceByNote] = useState({});
   const [flashcardNote, setFlashcardNote] = useState(null);
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
+  const [tagFilter, setTagFilter] = useState('');
 
   const loadNotes = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await API.get('/notes', { params: { limit } });
+      const params = { limit };
+      if (tagFilter.trim()) params.tag = tagFilter.trim();
+      const res = await API.get('/notes', { params });
       const items = res?.data?.data;
       setNotes(Array.isArray(items) ? items : []);
     } catch (err) {
@@ -127,7 +133,7 @@ const NotesWidget = ({ limit = 5 }) => {
 
   useEffect(() => {
     loadNotes();
-  }, [loadNotes]);
+  }, [loadNotes, tagFilter]);
 
   const generateSummary = useCallback(async (noteId) => {
     setSummaries((prev) => ({ ...prev, [noteId]: { loading: true, error: null } }));
@@ -174,6 +180,16 @@ const NotesWidget = ({ limit = 5 }) => {
       </h2>      <p className="text-xs text-neutral-500 italic -mt-2 mb-4">
         Generate a revision summary for a note, or record voice notes to summarize automatically.
       </p>
+
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="Filter by tag (e.g. Important)..."
+          value={tagFilter}
+          onChange={(e) => setTagFilter(e.target.value)}
+          className="w-full px-3 py-1.5 text-sm bg-white border border-neutral-300 rounded focus:outline-none focus:ring-1 focus:ring-yellow-600"
+        />
+      </div>
 
       {loading ? (
         <div className="space-y-3">
@@ -226,6 +242,13 @@ const NotesWidget = ({ limit = 5 }) => {
                         {note.subject.name}
                       </p>
                     )}
+                    {note.tags && note.tags.length > 0 && (
+                      <div className="flex gap-1 mt-1 flex-wrap">
+                        {note.tags.map(t => (
+                          <span key={t} className="text-[9px] bg-neutral-200 text-neutral-700 px-1.5 py-0.5 rounded-sm">#{t}</span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
                     {!summary && (
@@ -243,6 +266,13 @@ const NotesWidget = ({ limit = 5 }) => {
                       className="flex items-center gap-1 px-2.5 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-800 text-xs font-bold rounded transition-colors"
                     >
                       <Layers className="w-3.5 h-3.5" /> Generate AI Flashcards
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/notes/collaborative/${note.id}`)}
+                      className="flex items-center gap-1 px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-bold rounded transition-colors"
+                    >
+                      <Users className="w-3.5 h-3.5" /> Collaborate
                     </button>
                   </div>
                 </div>

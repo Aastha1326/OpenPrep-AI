@@ -13,9 +13,22 @@ try {
   console.warn('Warning: Could not fetch GitHub labels via CLI:', e.message);
 }
 
+// Fetch existing issue titles on GitHub to avoid duplicates
+let existingIssueTitles = [];
+try {
+  const issuesJson = execSync('gh issue list --limit 300 --state all --json title', { encoding: 'utf8' });
+  existingIssueTitles = JSON.parse(issuesJson).map(i => i.title.toLowerCase().trim());
+} catch (e) {
+  console.warn('Warning: Could not fetch existing GitHub issues via CLI:', e.message);
+}
+
 const files = fs.readdirSync(issuesDir).filter(f => f.endsWith('.md')).sort();
 
-console.log(`Processing remaining issue files...`);
+console.log(`Found ${files.length} issue specification files in ${issuesDir}`);
+console.log(`Processing issue creation...\n`);
+
+let createdCount = 0;
+let skippedCount = 0;
 
 for (const file of files) {
   const filePath = path.join(issuesDir, file);
@@ -32,9 +45,10 @@ for (const file of files) {
   const titleMatch = frontmatter.match(/title:\s*['"]?(.*?)['"]?\r?$/m);
   const title = titleMatch ? titleMatch[1].trim() : file.replace('.md', '');
 
-  // Skip files 1-5 that were already created (#805 to #809)
-  if (file.startsWith('issue-471') || file.startsWith('issue-472') || file.startsWith('issue-473') || file.startsWith('issue-474') || file.startsWith('issue-475')) {
-    console.log(`Skipping already created issue file: ${file}`);
+  // Check if title already exists on GitHub
+  if (existingIssueTitles.includes(title.toLowerCase().trim())) {
+    console.log(`[SKIP] Already exists on GitHub: ${file} ("${title}")`);
+    skippedCount++;
     continue;
   }
 
@@ -48,6 +62,7 @@ for (const file of files) {
     let normalized = l;
     if (l.toLowerCase() === 'feature') normalized = 'enhancement';
     if (l.toLowerCase() === 'fullstack') normalized = 'frontend';
+    if (l.toLowerCase() === 'architecture') normalized = 'backend';
 
     const matched = validRepoLabels.find(vl => vl.toLowerCase() === normalized.toLowerCase());
     if (matched && !appliedLabels.includes(matched)) {
@@ -55,11 +70,11 @@ for (const file of files) {
     }
   }
 
-  console.log(`\n----------------------------------------`);
+  console.log(`----------------------------------------`);
   console.log(`Creating GitHub Issue for ${file}: "${title}"`);
   console.log(`Labels: ${appliedLabels.join(', ')}`);
 
-  const tempBodyFile = path.join(__dirname, 'temp_issue_body.md');
+  const tempBodyFile = path.join(__dirname, `temp_body_${file.replace('.md', '')}.md`);
   fs.writeFileSync(tempBodyFile, body, 'utf8');
 
   const labelFlags = appliedLabels.map(l => `--label "${l}"`).join(' ');
@@ -69,6 +84,7 @@ for (const file of files) {
   try {
     const output = execSync(cmd, { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
     console.log(`Success: ${output.trim()}`);
+    createdCount++;
   } catch (err) {
     console.error(`Error creating issue for ${file}:`, err.stdout || err.stderr || err.message);
   } finally {
@@ -78,4 +94,10 @@ for (const file of files) {
   }
 }
 
-console.log('\nAll 15 GitHub issues published successfully!');
+console.log(`\n========================================`);
+console.log(`Publishing Complete! Summary:`);
+console.log(`- Total Issue Files: ${files.length}`);
+console.log(`- Newly Created: ${createdCount}`);
+console.log(`- Already Existing (Skipped): ${skippedCount}`);
+console.log(`========================================\n`);
+

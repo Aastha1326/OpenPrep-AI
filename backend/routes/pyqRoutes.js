@@ -13,14 +13,20 @@ const {
   getSubjectAnalyses,
   exportPYQAnalysisPDF,
 } = require('../controllers/pyqController');
-const express = require('express');
+
 const multer = require('multer');
 const { protect } = require('../middleware/auth');
 const { parsePyqPdf } = require('../controllers/pyqParserController');
+const { strictAiLimiter } = require('../middleware/rateLimiter');
+const { checkQuota } = require('../middleware/quotaMiddleware');
+const upload = require('../middleware/upload');
+const { validateUploadPYQ, validateGetPYQClusters } = require('../middleware/validators');
+const cacheMiddleware = require('../middleware/cache');
+const clearCache = require('../middleware/clearCache');
 
 const router = express.Router();
 
-const upload = multer({
+const parsePdfUpload = multer({
   dest: 'uploads/',
   limits: { fileSize: 25 * 1024 * 1024 }, // 25MB max for large multi-page papers
   fileFilter: (req, file, cb) => {
@@ -32,18 +38,7 @@ const upload = multer({
   },
 });
 
-router.post('/parse-pyq-pdf', protect, upload.single('pdf'), parsePyqPdf);
-
-module.exports = router;
-const { protect } = require('../middleware/auth');
-const { strictAiLimiter } = require('../middleware/rateLimiter');
-const { checkQuota } = require('../middleware/quotaMiddleware');
-const upload = require('../middleware/upload');
-const { validateUploadPYQ, validateGetPYQClusters } = require('../middleware/validators');
-const cacheMiddleware = require('../middleware/cache');
-const clearCache = require('../middleware/clearCache');
-
-const router = express.Router();
+router.post('/parse-pyq-pdf', protect, parsePdfUpload.single('pdf'), parsePyqPdf);
 
 /**
  * @swagger
@@ -268,7 +263,8 @@ router.get(
  * @swagger
  * /api/pyqs/{id}:
  *   get:
- *     summary: Get PYQ details *     tags: [PYQs]
+ *     summary: Get PYQ details
+ *     tags: [PYQs]
  *     security:
  *       - bearerAuth: []
  *     parameters:

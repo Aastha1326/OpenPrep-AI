@@ -48,7 +48,37 @@ describe('FlashcardReview', () => {
       return Promise.resolve({ data: { data: [] } });
     });
   });
+test('shows hands-free voice controls when browser speech APIs are supported', async () => {
+  API.get.mockResolvedValue({ data: { data: sampleCards } });
 
+  renderReview();
+
+  expect(
+    await screen.findByRole('button', {
+      name: /enable hands-free mode/i,
+    })
+  ).toBeInTheDocument();
+});
+
+test('allows speech speed and language controls when hands-free mode is enabled', async () => {
+  API.get.mockResolvedValue({ data: { data: sampleCards } });
+
+  renderReview();
+
+  const toggle = await screen.findByRole('button', {
+    name: /enable hands-free mode/i,
+  });
+
+  fireEvent.click(toggle);
+
+  expect(
+    await screen.findByLabelText(/speech speed/i)
+  ).toBeInTheDocument();
+
+  expect(
+    screen.getByLabelText(/speech language/i)
+  ).toBeInTheDocument();
+});
   test('shows loading state while fetching due cards', () => {
     API.get.mockReturnValue(new Promise(() => {}));
     renderReview();

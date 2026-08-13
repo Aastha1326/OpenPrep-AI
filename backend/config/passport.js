@@ -1,6 +1,7 @@
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const GitHubStrategy = require('passport-github2').Strategy;
+const crypto = require('crypto');
 const User = require('../models/User');
 
 // Google Strategy
@@ -38,7 +39,7 @@ passport.use(
               googleId: profile.id,
               authProvider: 'google',
               avatarUrl: profile.photos && profile.photos[0] ? profile.photos[0].value : null,
-              password: null,
+              password: crypto.randomBytes(16).toString('hex'),
             });
           }
         }
@@ -84,7 +85,7 @@ passport.use(
                 githubId: profile.id,
                 authProvider: 'github',
                 avatarUrl,
-                password: null,
+                password: crypto.randomBytes(16).toString('hex'),
               });
             }
           } else {
