@@ -278,6 +278,20 @@ const validateEvaluateSubjective = [
   handleValidationErrors,
 ];
 
+const validateGenerateRemediationQuiz = [
+  body('deckId').isUUID(4).withMessage('Valid deck (subject) ID is required'),
+  body('failedCardIds')
+    .isArray({ min: 2 })
+    .withMessage('failedCardIds must be an array with at least 2 card IDs'),
+  body('failedCardIds.*').isUUID(4).withMessage('Each failedCardId must be a valid UUID'),
+  body('count')
+    .optional()
+    .isInt({ min: 5, max: 10 })
+    .withMessage('count must be between 5 and 10'),
+  handleValidationErrors,
+];
+
+
 const validateSubmitQuizAttempt = [
   body('answers').isArray({ min: 1 }).withMessage('Answers must be a non-empty array'),
   body('answers.*.questionId')
@@ -539,6 +553,7 @@ validateGenerateAIFlashcards,
   validateEvaluateSubjective,
   validateGenerateRevisionSheet,
   validateGenerateRemediationPlan,
+  validateGenerateRemediationQuiz,
   validateSubmitQuizAttempt,
   validateToggleQuizBookmark,
 // Note

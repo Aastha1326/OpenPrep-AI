@@ -288,4 +288,12 @@ API.interceptors.response.use(
 
 export const getReadinessProjection = (params) => API.get('/dashboard/readiness-projection', { params });
 
+/**
+ * Generate a targeted AI diagnostic quiz from forgotten flashcard concepts.
+ * POST /api/quizzes/generate-remediation
+ * @param {{ deckId: string, failedCardIds: string[], count?: number }} payload
+ */
+export const generateRemediationQuiz = (payload) =>
+  API.post('/quizzes/generate-remediation', payload);
+
 export default API;
