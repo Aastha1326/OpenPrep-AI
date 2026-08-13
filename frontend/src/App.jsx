@@ -12,6 +12,8 @@ import SessionTimeoutModal from './components/SessionTimeoutModal';
 import QuotaExceededModal from './components/dashboard/QuotaExceededModal';
 import CommandPalette from './components/CommandPalette';
 import OfflineBanner from './components/common/OfflineBanner';
+import PwaInstallPrompt from './components/common/PwaInstallPrompt';
+import OfflineIndicator from './components/common/OfflineIndicator';
 import './App.css';
 
 const Landing = lazy(() => import('./pages/Landing'));
@@ -110,6 +112,8 @@ function App() {
         </div>
       )}
       <OfflineBanner />
+      <PwaInstallPrompt />
+      <OfflineIndicator />
       <CustomCursor />
       <ScrollToTop />
       <MobileNavDrawer />
