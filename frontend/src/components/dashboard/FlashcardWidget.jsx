@@ -203,7 +203,7 @@ const FlashcardWidget = ({ flashcard = null, loading = false, error = null, tota
           </button>
           
           <div className="absolute bottom-4 right-4 z-10" onClick={(e) => e.stopPropagation()}>
-            <ExportDeckDropdown />
+            <ExportDeckDropdown subjectId={flashcard?.subject?.id || flashcard?.subject} />
           </div>
 
           {/* Audio Reader Controls */}

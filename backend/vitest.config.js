@@ -8,6 +8,9 @@ export default defineConfig({
     include: ['tests/**/*.test.js'],
     exclude: ['tests/**/*.unit.test.js', 'node_modules'],
     fileParallelism: false,
+    sequence: {
+      concurrent: false,
+    },
     testTimeout: 30000,
     hookTimeout: 30000,
 coverage: {
@@ -28,5 +31,6 @@ coverage: {
       thresholds: {
         statements: 75,
       },
-    },  },
+    },
+  },
 });

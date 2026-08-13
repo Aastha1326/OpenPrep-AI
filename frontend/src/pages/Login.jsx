@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, Eye, EyeOff, AlertCircle, BookOpen } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, AlertCircle, BookOpen, ShieldCheck } from 'lucide-react';
 import GoogleLoginButton from '../components/auth/GoogleLoginButton';
 import GitHubLoginButton from '../components/auth/GitHubLoginButton';
 import { loginUser, loadUser, clearError } from '../store/slices/authSlice';
@@ -17,6 +17,7 @@ const Login = () => {
 
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
   
   // New state for handling 2FA step
   const [requires2FA, setRequires2FA] = useState(false);
@@ -24,6 +25,16 @@ const Login = () => {
   const [verifying2FA, setVerifying2FA] = useState(false);
   const [twoFaError, setTwoFaError] = useState('');
 
+  const getApiBaseUrl = () => {
+    if (import.meta.env.VITE_API_URL) {
+      return import.meta.env.VITE_API_URL;
+    }
+    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      return `${window.location.origin}/api`;
+    }
+    return 'http://localhost:5000/api';
+  };
+  const googleAuthUrl = `${getApiBaseUrl().replace(/\/$/, '')}/auth/google`;
   const [oauthError, setOauthError] = useState(null);
 
   useEffect(() => {
@@ -46,14 +57,6 @@ const Login = () => {
   useEffect(() => {
     return () => { dispatch(clearError()); };
   }, [dispatch]);
-
-  const loginWithGoogle = useGoogleLogin({
-    onSuccess: handleGoogleSuccess,
-    onError: (err) => {
-      console.warn('Google OAuth popup blocked or failed, redirecting:', err);
-      window.location.href = googleAuthUrl;
-    },
-  });
 
   const handleChange = (e) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -185,9 +188,13 @@ const Login = () => {
                     <label htmlFor="login-password" className="block text-xs font-bold text-[#1F150C] dark:text-[#E1DCC9]">
                       Password
                     </label>
-                    <Link to="/forgot-password" className="text-xs font-semibold text-[#AD8B73] hover:underline dark:text-[#E1DCC9]">
+                    <button
+                      type="button"
+                      onClick={() => setIsForgotPasswordOpen(true)}
+                      className="text-xs font-semibold text-[#AD8B73] hover:underline dark:text-[#E1DCC9]"
+                    >
                       Forgot password?
-                    </Link>
+                    </button>
                   </div>
                   <div className="relative">
                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8C6A53] dark:text-[#C4BA9D]" />
@@ -228,6 +235,12 @@ const Login = () => {
               </form>
             ) : (
               <form onSubmit={handleVerify2FA} className="space-y-4">
+                {twoFaError && (
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 flex items-center gap-2 text-xs text-red-700 dark:text-red-300 font-medium">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{twoFaError}</span>
+                  </div>
+                )}
                 <div>
                   <label htmlFor="totp-token" className="block text-xs font-bold text-[#1F150C] dark:text-[#E1DCC9] mb-1">
                     Authentication Code
@@ -270,6 +283,13 @@ const Login = () => {
                 </button>
               </form>
             )}
+
+            {/* Divider */}
+            <div className="my-3 flex items-center justify-center space-x-2">
+              <span className="h-px w-full bg-[#CEAB93]/50 dark:bg-[#412D15]"></span>
+              <span className="text-[10px] text-[#8C6A53] dark:text-[#C4BA9D] font-bold tracking-wider uppercase">OR</span>
+              <span className="h-px w-full bg-[#CEAB93]/50 dark:bg-[#412D15]"></span>
+            </div>
 
             {/* Social OAuth Buttons */}
             <div className="space-y-3">

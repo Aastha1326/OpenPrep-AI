@@ -4,6 +4,7 @@ import API from '../services/api';
 import ChapterWeightageChart from '../components/pyq/ChapterWeightageChart';
 import TopicHeatmap from '../components/pyq/TopicHeatmap';
 import PYQUploadModal from '../components/pyq/PYQUploadModal';
+import CustomQuizModal from '../components/pyq/CustomQuizModal';
 import {
   FaCloudUploadAlt,
   FaFilePdf,
@@ -13,8 +14,8 @@ import {
   FaDownload,
   FaCompass,
   FaTrophy,
-  FaSparkles,
 } from 'react-icons/fa';
+import { Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const PYQAnalytics = () => {
@@ -28,6 +29,7 @@ const PYQAnalytics = () => {
   
   // Modals / Status
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isCustomQuizOpen, setIsCustomQuizOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [actionPending, setActionPending] = useState(false);
   const [actionSuccess, setActionSuccess] = useState('');
@@ -182,6 +184,13 @@ const PYQAnalytics = () => {
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-5 rounded-xl transition-all shadow-md text-xs flex items-center gap-2"
             >
               <FaCloudUploadAlt className="text-sm" /> Analyze Batch
+            </button>
+
+            <button
+              onClick={() => setIsCustomQuizOpen(true)}
+              className="bg-neutral-800 hover:bg-neutral-750 text-stone-250 border border-neutral-700 font-bold py-3 px-5 rounded-xl transition-all shadow-md text-xs flex items-center gap-2"
+            >
+              <FaSparkles className="text-indigo-400" /> Custom Test
             </button>
           </div>
         </div>
@@ -390,6 +399,13 @@ const PYQAnalytics = () => {
         isOpen={isUploadOpen}
         onClose={() => setIsUploadOpen(false)}
         onUploadSuccess={handleUploadSuccess}
+      />
+      {/* Custom Test Generator Modal */}
+      <CustomQuizModal
+        isOpen={isCustomQuizOpen}
+        onClose={() => setIsCustomQuizOpen(false)}
+        subjectId={selectedSubjectId}
+        analyses={analyses}
       />
     </div>
   );

@@ -1,6 +1,6 @@
 const { GoogleGenAI } = require('@google/genai');
 const Subject = require('../models/Subject');
-const Chapter = require('../models/Chapter');
+const Topic = require('../models/Topic');
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
