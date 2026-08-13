@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import SecuritySettings from '../components/SecuritySettings';
 import {
   Flame,
   Play,
@@ -25,6 +26,7 @@ import {
   MessageSquare,
   Shield,
   Globe,
+  PlaySquare as Youtube,
   Video,
   Brain,
   Bot,
@@ -71,6 +73,11 @@ import NotesWidget from '../components/dashboard/NotesWidget';
 import ThemeToggle from '../components/ThemeToggle';
 import BadgesList from '../components/BadgesList';
 import SM2SettingsModal from '../components/dashboard/SM2SettingsModal';
+import LevelProgressBar from '../components/gamification/LevelProgressBar';
+import StreakWidget from '../components/gamification/StreakWidget';
+import BadgeCard from '../components/gamification/BadgeCard';
+import BadgeUnlockModal from '../components/gamification/BadgeUnlockModal';
+import LevelUpModal from '../components/gamification/LevelUpModal';
 import CommunityDecksModal from '../components/dashboard/CommunityDecksModal';
 import QuizSetupModal from '../components/dashboard/QuizSetupModal';
 import GenerateFlashcardsFromYouTubeModal from '../components/dashboard/GenerateFlashcardsFromYouTubeModal';
@@ -190,6 +197,30 @@ const Dashboard = () => {
   const navigate = useNavigate();
 
   const { user } = useSelector((state) => state.auth);
+
+  const [gamificationData, setGamificationData] = useState(null);
+  const [loadingGamification, setLoadingGamification] = useState(false);
+  const [activeBadgeUnlock, setActiveBadgeUnlock] = useState(null);
+  const [isFreezing, setIsFreezing] = useState(false);
+
+  const fetchGamification = useCallback(async () => {
+    try {
+      setLoadingGamification(true);
+      const res = await API.get('/gamification/summary');
+      if (res.data?.success) {
+        setGamificationData(res.data.data);
+      }
+    } catch (e) {
+      console.error('Failed to load gamification summary:', e);
+    } finally {
+      setLoadingGamification(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchGamification();
+  }, [fetchGamification]);
+
   const {
     stats,
     weeklyChartData,
@@ -213,6 +244,7 @@ const Dashboard = () => {
       dispatch(fetchSubjectBreakdown());
       dispatch(fetchActivePlan());
       dispatch(fetchDueFlashcards());
+      fetchGamification();
     };
 
     fetchAll();
@@ -237,10 +269,20 @@ const Dashboard = () => {
     const backendTaskId = task.meta?.taskId || task.id;
     setToggleError(null);
     try {
-      await API.put(`/study-plans/${planId}/tasks/${backendTaskId}`, {
+      const timezoneOffset = new Date().getTimezoneOffset();
+      const res = await API.put(`/study-plans/${planId}/tasks/${backendTaskId}`, {
         completed: !task.completed,
         studyTimeMinutes: 25,
+      }, {
+        headers: { 'x-timezone-offset': String(timezoneOffset) }
       });
+      
+      fetchGamification();
+      if (res.data?.progression?.newBadges?.length > 0) {
+        setActiveBadgeUnlock(res.data.progression.newBadges[0]);
+      }
+      
+      dispatch(loadUser());
       dispatch(fetchActivePlan());
       dispatch(fetchDashboardStats());
       dispatch(fetchSubjectBreakdown());
@@ -279,6 +321,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isCommunityDecksOpen, setIsCommunityDecksOpen] = useState(false);
   const [syllabusPrefill, setSyllabusPrefill] = useState(null);
   const [comingSoon, setComingSoon] = useState(null);
+  const [sessionStartTime] = useState(Date.now());
   const [isExporting, setIsExporting] = useState(false);
   const [isSkillTreeOpen, setIsSkillTreeOpen] = useState(false);
   const [showLevelUpModal, setShowLevelUpModal] = useState(false);
@@ -290,22 +333,38 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
       if (prevLevel && user.level > prevLevel) {
         setLevelUpLevel(user.level);
         setShowLevelUpModal(true);
+        import('canvas-confetti').then((module) => {
+          const confetti = module.default;
+          confetti({
+            particleCount: 200,
+            spread: 100,
+            origin: { y: 0.6 },
+            colors: ['#3b82f6', '#10b981', '#f5a623', '#ffffff'],
+          });
+        });
       }
       setPrevLevel(user.level);
     }
   }, [user?.level, prevLevel]);
 
-  const handleEquipStreakFreeze = async () => {
+  const handleUseStreakFreeze = async () => {
     try {
-      const res = await API.post('/progress/streak-freeze/equip');
+      setIsFreezing(true);
+      const timezoneOffset = new Date().getTimezoneOffset();
+      const res = await API.post('/gamification/streak-freeze/use', {}, {
+        headers: { 'x-timezone-offset': String(timezoneOffset) }
+      });
       if (res.data.success) {
-        alert('Streak Freeze Shield equipped successfully!');
+        alert('Streak Freeze Shield activated successfully!');
+        fetchGamification();
         dispatch(loadUser());
         dispatch(fetchDashboardStats());
       }
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.error || 'Failed to equip Streak Freeze shield.');
+      alert(err.response?.data?.error || 'Failed to activate Streak Freeze shield.');
+    } finally {
+      setIsFreezing(false);
     }
   };
 
@@ -402,7 +461,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
 
   const tasksProgress =
     targetTasksCount > 0
-      ? Math.round((completedTasksCount / targetTasksCount) * 100)
+      ? Math.min(100, Math.round((completedTasksCount / targetTasksCount) * 100))
       : 0;
 
   const completedBonusCount = todayTasks.filter(
@@ -507,32 +566,26 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
-            className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10"
-        >
-          <div>
-            <h1 className="text-3xl font-playfair font-bold text-stone-800 dark:text-stone-100 mb-2">
-              Welcome back, <span className="text-amber-600 dark:text-amber-500">{user?.name?.split(' ')[0] || 'Scholar'}</span>
-            </h1>
-            <p className="text-amber-100/70 text-lg italic font-playfair">
-              &ldquo;The roots of education are bitter, but the fruit is sweet.&rdquo; – Aristotle
-            </p>
+            className="flex flex-col gap-4 relative z-10"
+          >
+            <div>
+              <h1 className="text-3xl font-playfair font-bold text-stone-800 dark:text-stone-100 mb-2">
+                Welcome back, <span className="text-amber-600 dark:text-amber-500">{user?.name?.split(' ')[0] || 'Scholar'}</span>
+              </h1>
+              <p className="text-amber-100/70 text-lg italic font-playfair">
+                &ldquo;The roots of education are bitter, but the fruit is sweet.&rdquo; – Aristotle
+              </p>
 
-            {/* --- XP PROGRESS BAR --- */}
-            <div className="mt-4 flex flex-col max-w-md bg-stone-900/40 backdrop-blur-sm border border-amber-500/10 p-3 rounded-lg">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-amber-400 font-bold text-xs uppercase tracking-wider">Level {user?.level || 1}</span>
-                <span className="text-amber-200/50 text-xs font-mono">{(user?.xp || 0) % 1000} / 1000 XP</span>
-              </div>
-              <div className="w-full bg-stone-950 h-2 rounded-full overflow-hidden border border-stone-800">
-                <div 
-                  className="bg-gradient-to-r from-amber-500 to-amber-300 h-full rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min(100, ((user?.xp || 0) % 1000) / 10)}%` }}
+              {/* --- XP PROGRESS BAR --- */}
+              <div className="mt-4 max-w-md">
+                <LevelProgressBar
+                  xp={gamificationData?.xp || user?.xp || 0}
+                  level={gamificationData?.level || user?.level || 1}
+                  nextLevelXP={gamificationData?.nextLevelXP || 100}
                 />
               </div>
-            </div>
 
-            {/* --- EXAM COUNTDOWN WIDGET --- */}
-            {activePlan?.exam?.date && (
+              {/* --- EXAM COUNTDOWN WIDGET --- */}
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -540,14 +593,12 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
                 className="mt-5"
               >
                 <ExamCountdownWidget
-                  examDate={activePlan.exam.date}
-                  examName={activePlan.exam.name}
+                  examDate={activePlan?.exam?.date}
+                  examName={activePlan?.exam?.name}
                 />
               </motion.div>
-            )}
-          </div>
-        </motion.div>
-
+            </div>
+          </motion.div>
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -600,39 +651,15 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
               </div>
             </button>
 
-            <div className="flex flex-col items-center">
-              <div className="relative">
-                <Flame
-                  className="w-12 h-12 text-orange-500 animate-pulse-glow"
-                  fill="currentColor"
-                />
-                <div className="absolute inset-0 blur-md bg-orange-500/30 rounded-full" />
-              </div>
-              <span className="text-gold-foil font-bold text-2xl">{streakDays} Day</span>
-              <span className="text-amber-200/50 text-xs uppercase tracking-widest">Streak</span>
-            </div>
-
-            <div className="flex flex-col items-center ml-2">
-              <div 
-                className="relative group cursor-pointer flex flex-col items-center" 
-                onClick={handleEquipStreakFreeze}
-                title="Click to equip Streak Freeze (Limit 2/month)"
-              >
-                <div className="relative">
-                  <Shield className="w-10 h-10 text-cyan-400 hover:text-cyan-300 transition-colors" fill="currentColor" />
-                  <div className="absolute inset-0 blur-md bg-cyan-400/20 rounded-full" />
-                </div>
-                <span className="text-cyan-300 font-bold text-xl">{streakFreezes || 0}</span>
-                <span className="text-cyan-200/50 text-[10px] uppercase tracking-widest">
-                  Freezes
-                </span>
-              </div>
-              <button
-                onClick={handleEquipStreakFreeze}
-                className="text-[9px] text-cyan-400 hover:text-cyan-300 underline font-mono mt-0.5"
-              >
-                Equip Shield
-              </button>
+            {/* --- STREAK WIDGET --- */}
+            <div className="w-80">
+              <StreakWidget
+                currentStreak={gamificationData?.currentStreak ?? user?.currentStreak ?? 0}
+                longestStreak={gamificationData?.longestStreak ?? user?.longestStreak ?? 0}
+                streakFreezesAvailable={gamificationData?.streakFreezesAvailable ?? user?.streakFreezesAvailable ?? 0}
+                onUseStreakFreeze={handleUseStreakFreeze}
+                isFreezing={isFreezing}
+              />
             </div>
 
             <button
@@ -647,12 +674,12 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             </button>
 
             <button
-              onClick={() => setIsSkillTreeOpen(true)}
+              onClick={handleLogout}
               className="bg-stone-800 text-amber-500 px-4 py-2 rounded-lg font-bold hover:bg-stone-700 transition shadow-lg border border-amber-900/30 flex items-center gap-2"
             >
               <LogOut className="w-5 h-5 group-hover:text-white" />
               <span className="font-playfair font-bold text-sm tracking-wide group-hover:text-white hidden sm:inline">
-                Logout
+                Log out
               </span>
             </button>
             <ThemeToggle />
@@ -903,7 +930,41 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           </div>
           {/* BADGES / GAMIFICATION */}
           <div className="md:col-span-2 mt-6">
-            <BadgeGrid />
+            {/* --- DYNAMIC GAMIFICATION ACHIEVEMENT BADGES --- */}
+            <div className="bg-neutral-900/40 border border-neutral-800 rounded-2xl p-6 shadow-inner">
+              <div className="flex items-center gap-2 mb-6">
+                <Award className="h-6 w-6 text-amber-500 animate-pulse" />
+                <h3 className="text-xl font-bold font-playfair text-stone-100">
+                  Achievement Badges
+                </h3>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <BadgeCard
+                  badgeCode="seven_day_streak"
+                  title="7-Day Streak 🔥"
+                  description="Studied consistently for 7 consecutive days."
+                  isUnlocked={!!gamificationData?.badges?.some(b => b.badgeCode === 'seven_day_streak')}
+                  unlockedAt={gamificationData?.badges?.find(b => b.badgeCode === 'seven_day_streak')?.unlockedAt}
+                />
+
+                <BadgeCard
+                  badgeCode="night_owl"
+                  title="Night Owl 🦉"
+                  description="Completed a study task between 11 PM and 4 AM."
+                  isUnlocked={!!gamificationData?.badges?.some(b => b.badgeCode === 'night_owl')}
+                  unlockedAt={gamificationData?.badges?.find(b => b.badgeCode === 'night_owl')?.unlockedAt}
+                />
+
+                <BadgeCard
+                  badgeCode="quiz_master"
+                  title="Quiz Master 🎓"
+                  description="Successfully finished 10 quiz attempts."
+                  isUnlocked={!!gamificationData?.badges?.some(b => b.badgeCode === 'quiz_master')}
+                  unlockedAt={gamificationData?.badges?.find(b => b.badgeCode === 'quiz_master')?.unlockedAt}
+                />
+              </div>
+            </div>
           </div>
 
           <div className="flex justify-center">
@@ -942,9 +1003,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
         <div className="my-6">
           <ActivityHeatmap />
         </div>
-        <div className="my-6">
-          <BadgesList achievements={user?.achievements || []} />
-        </div>
+
 
         {/* --- AI REVISION SUMMARIES + AUDIO READER --- */}
         <div className="my-6">
@@ -1141,7 +1200,6 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             </p>
           </VintagePaper>
         </div>
-      </div>
 {/* --- CREATE NOTE MODAL --- */}
       <CreateNoteModal
         isOpen={isNoteModalOpen}
@@ -1313,7 +1371,21 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           </motion.div>
         )}
       </AnimatePresence>
-    </LeatherBoard>
+
+      {/* --- BADGE UNLOCK MODAL --- */}
+      <BadgeUnlockModal
+        isOpen={!!activeBadgeUnlock}
+        title={activeBadgeUnlock?.title}
+        description={activeBadgeUnlock?.description}
+        onClose={() => setActiveBadgeUnlock(null)}
+      />
+
+      {/* --- SECURITY SETTINGS (2FA) --- */}
+      <div className="my-6">
+        <SecuritySettings />
+      </div>
+    </div>
+  </LeatherBoard>
   );
 };
 

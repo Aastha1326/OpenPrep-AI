@@ -1,9 +1,9 @@
-const express = require('express');
 const { explainQuestion, chatWithAssistant } = require('../controllers/aiController');
+const { generateMindMap, getMindMapById, getUserMindMaps } = require('../controllers/mindMapController');
 const { protect } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
-const { checkQuota } = require('../middleware/quotaMiddleware');
-const { validateExplainQuestion } = require('../middleware/validators');
+const { checkAiQuota } = require('../middleware/aiQuotaMiddleware');
+
 
 const router = express.Router();
 
@@ -128,8 +128,7 @@ router.post(
   '/explain-question',
   protect,
   aiLimiter,
-  checkQuota,
-  validateExplainQuestion,
+  checkAiQuota,
   explainQuestion
 );
 
@@ -137,8 +136,56 @@ router.post(
   '/chat',
   protect,
   aiLimiter,
-  checkQuota,
+  checkAiQuota,
   chatWithAssistant
 );
+
+/**
+ * @swagger
+ * /api/ai/mind-map/generate:
+ *   post:
+ *     summary: Generate an interactive 2D concept node mind map using Gemini 1.5 API
+ *     tags: [AI]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               noteId:
+ *                 type: string
+ *                 format: uuid
+ *               subjectId:
+ *                 type: string
+ *                 format: uuid
+ *               topicId:
+ *                 type: string
+ *                 format: uuid
+ *               textContext:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Mind map generated and saved successfully
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Not authenticated
+ *       429:
+ *         description: Rate limit exceeded
+ */
+router.post(
+  '/mind-map/generate',
+  protect,
+  aiLimiter,
+  checkAiQuota,
+  validateGenerateMindMap,
+  generateMindMap
+);
+
+router.get('/mind-map', protect, getUserMindMaps);
+router.get('/mind-map/:id', protect, getMindMapById);
 
 module.exports = router;

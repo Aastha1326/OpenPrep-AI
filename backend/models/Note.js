@@ -54,6 +54,10 @@ const Note = sequelize.define(
       type: DataTypes.JSONB,
       allowNull: true,
     },
+    tags: {
+      type: DataTypes.ARRAY(DataTypes.STRING),
+      defaultValue: [],
+    },
   },
   {
     timestamps: true,

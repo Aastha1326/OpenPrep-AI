@@ -20,13 +20,19 @@ const FocusSession = require('./FocusSession');
 const QuizTelemetryEvent = require('./QuizTelemetryEvent');
 const QuizBookmark = require('./QuizBookmark');
 const DeckRating = require('./DeckRating');
+const UserBadge = require('./UserBadge');
+const BattleSession = require('./BattleSession');
+const BattleParticipant = require('./BattleParticipant');
+const PYQAnalysis = require('./PYQAnalysis');
+const PYQQuestion = require('./PYQQuestion');
+const Notification = require('./Notification');
+const PushSubscription = require('./PushSubscription');
 
 // DeckRating associations
 DeckRating.belongsTo(Subject, { foreignKey: 'deckId', as: 'deckRef', onDelete: 'CASCADE' });
 DeckRating.belongsTo(User, { foreignKey: 'userId', as: 'userRef', onDelete: 'CASCADE' });
 Subject.hasMany(DeckRating, { foreignKey: 'deckId', as: 'ratings', onDelete: 'CASCADE' });
 User.hasMany(DeckRating, { foreignKey: 'userId', as: 'ratings', onDelete: 'CASCADE' });
-
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -41,6 +47,7 @@ User.hasMany(Progress, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Feedback, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(ActivityLog, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Achievement, { foreignKey: 'userId', as: 'achievements', onDelete: 'CASCADE' });
+User.hasMany(UserBadge, { foreignKey: 'userId', as: 'badgesRef', onDelete: 'CASCADE' });
 
 // Exam associations
 Exam.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
@@ -110,6 +117,9 @@ ActivityLog.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 // Achievement associations
 Achievement.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 
+// UserBadge associations
+UserBadge.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
 // FocusSession associations
 FocusSession.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 
@@ -123,6 +133,35 @@ QuizBookmark.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 QuizBookmark.belongsTo(Quiz, { foreignKey: 'quiz', as: 'quizRef', onDelete: 'CASCADE' });
 User.hasMany(QuizBookmark, { foreignKey: 'user', onDelete: 'CASCADE' });
 Quiz.hasMany(QuizBookmark, { foreignKey: 'quiz', onDelete: 'CASCADE' });
+
+// BattleSession and BattleParticipant associations
+User.hasMany(BattleSession, { foreignKey: 'hostUserId', onDelete: 'CASCADE' });
+BattleSession.belongsTo(User, { foreignKey: 'hostUserId', as: 'hostRef' });
+
+BattleSession.hasMany(BattleParticipant, { foreignKey: 'battleId', onDelete: 'CASCADE' });
+BattleParticipant.belongsTo(BattleSession, { foreignKey: 'battleId', as: 'battleRef' });
+
+User.hasMany(BattleParticipant, { foreignKey: 'userId', onDelete: 'CASCADE' });
+BattleParticipant.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+BattleSession.belongsTo(Quiz, { foreignKey: 'quizId', as: 'quizRef', onDelete: 'SET NULL' });
+
+// PYQAnalysis and PYQQuestion associations
+User.hasMany(PYQAnalysis, { foreignKey: 'userId', onDelete: 'CASCADE' });
+PYQAnalysis.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+Subject.hasMany(PYQAnalysis, { foreignKey: 'subjectId', onDelete: 'CASCADE' });
+PYQAnalysis.belongsTo(Subject, { foreignKey: 'subjectId', as: 'subjectRef' });
+
+PYQAnalysis.hasMany(PYQQuestion, { foreignKey: 'pyqAnalysisId', onDelete: 'CASCADE' });
+PYQQuestion.belongsTo(PYQAnalysis, { foreignKey: 'pyqAnalysisId', as: 'analysisRef' });
+
+// Notification & PushSubscription associations
+User.hasMany(Notification, { foreignKey: 'user', onDelete: 'CASCADE' });
+Notification.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
+User.hasMany(PushSubscription, { foreignKey: 'user', onDelete: 'CASCADE' });
+PushSubscription.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 
 module.exports = {
   sequelize,
@@ -145,4 +184,11 @@ module.exports = {
   QuizTelemetryEvent,
   QuizBookmark,
   DeckRating,
+  UserBadge,
+  BattleSession,
+  BattleParticipant,
+  PYQAnalysis,
+  PYQQuestion,
+  Notification,
+  PushSubscription,
 };

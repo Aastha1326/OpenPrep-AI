@@ -223,6 +223,12 @@ html.high-contrast textarea {
   border: 2px solid #FFFFFF !important;
 }
 
+.high-contrast *:focus,
+html.high-contrast *:focus {
+  outline: 3px solid #FFFF00 !important;
+  outline-offset: 2px !important;
+}
+
 .glass-card {
   background: rgba(227, 202, 165, 0.7);
   backdrop-filter: blur(10px);
@@ -459,6 +465,12 @@ html.dark .custom-cursor-ring {
 .math-renderer {
   word-wrap: break-word;
   overflow-wrap: break-word;
+}
+
+.katex-display, .katex {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
 }
 
 /* ───────── COLOR HUNT DARK THEME (#000000, #1F150C, #412D15, #E1DCC9) ───────── */

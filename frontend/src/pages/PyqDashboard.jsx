@@ -13,6 +13,8 @@ import VintagePaper from '../components/dashboard/VintagePaper';
 import AudioReader from '../components/AudioReader';
 import HighlightedText from '../components/HighlightedText';
 import ThemeToggle from '../components/ThemeToggle';
+import OCRUploadZone from '../components/OCRUploadZone';
+import TextCorrectionModal from '../components/TextCorrectionModal';
 
 const COLORS = ['#8B4513', '#D4AF37', '#2563EB', '#059669', '#7C3AED', '#DB2777', '#D97706', '#4B5563'];
 
@@ -62,6 +64,7 @@ const PyqDashboard = () => {
   // State
   const [subjects, setSubjects] = useState([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState(searchParams.get('subjectId') || '');
+  console.log('DEBUG rendering:', { selectedSubjectId });
   const [selectedDifficulties, setSelectedDifficulties] = useState(
     searchParams.get('difficulty') ? searchParams.get('difficulty').split(',') : []
   );
@@ -79,6 +82,9 @@ const [uploadSubjectId, setUploadSubjectId] = useState('');
   const [uploadError, setUploadError] = useState(null);
   const [isTimeout, setIsTimeout] = useState(false);
   const [trendActiveIndex, setTrendActiveIndex] = useState(-1);
+  const [activeUploadTab, setActiveUploadTab] = useState('pdf');
+  const [ocrData, setOcrData] = useState(null);
+  const [isCorrectionOpen, setIsCorrectionOpen] = useState(false);
 
 const [activeInsightTab, setActiveInsightTab] = useState('paper');
   const [forecastData, setForecastData] = useState(null);
@@ -265,13 +271,19 @@ const [activeInsightTab, setActiveInsightTab] = useState('paper');
 
     try {
       const formData = new FormData();
-      formData.append('file', file);
-      formData.append('title', title || file.name);
-formData.append('year', year);
+      formData.append('title', title || (file ? file.name : 'OCR Document'));
+      formData.append('year', year);
       formData.append('subjectId', uploadSubjectId);
       formData.append('difficulty', uploadDifficulty);
+      if (file) {
+        formData.append('file', file);
+      } else if (ocrData) {
+        formData.append('extractedText', ocrData.extractedText);
+        formData.append('fileUrl', ocrData.fileUrl);
+      }
+
       const res = await API.post('/pyqs/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: { 'Content-Type': file ? 'multipart/form-data' : 'application/json' },
         timeout: 60000,
       });
 
@@ -347,8 +359,30 @@ formData.append('year', year);
           {/* Uploader Card */}
           <VintagePaper className="lg:col-span-2 shadow-[0_10px_25px_rgba(0,0,0,0.5)]">
             <h2 className="text-2xl font-bold font-playfair text-neutral-900 mb-4 border-b border-neutral-400 pb-2 flex items-center gap-2">
-              <Upload className="w-6 h-6 text-yellow-700" /> Upload Question Paper (PDF)
+              <Upload className="w-6 h-6 text-yellow-700" /> Upload Question Paper
             </h2>
+
+            {/* Upload Tabs */}
+            <div className="flex border-b border-neutral-300 mb-4">
+              <button
+                type="button"
+                onClick={() => setActiveUploadTab('pdf')}
+                className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
+                  activeUploadTab === 'pdf' ? 'border-amber-700 text-amber-800' : 'border-transparent text-neutral-500 hover:text-neutral-700'
+                }`}
+              >
+                PDF Document
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveUploadTab('ocr')}
+                className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
+                  activeUploadTab === 'ocr' ? 'border-amber-700 text-amber-800' : 'border-transparent text-neutral-500 hover:text-neutral-700'
+                }`}
+              >
+                Image OCR
+              </button>
+            </div>
 
             {uploadError && (
               <div className={`p-3 mb-4 rounded border flex items-center justify-between text-sm ${
@@ -467,38 +501,47 @@ formData.append('year', year);
                 </div>
 
               </div>
-              {/* Drag and Drop Zone */}
-              <div
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                className="border-2 border-dashed border-neutral-400 rounded-lg p-6 text-center bg-amber-50/50 hover:bg-amber-100/50 transition-colors cursor-pointer relative"
-              >
-                <input
-                  type="file"
-                  accept="application/pdf"
-                  onChange={handleFileChange}
-                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                  disabled={isUploading}
-                />
-                <FileText className="w-10 h-10 mx-auto text-yellow-800 mb-2" />
-                {file ? (
-                  <p className="text-sm font-semibold text-amber-900">
-                    Selected: {file.name} ({(file.size / (1024 * 1024)).toFixed(2)} MB)
-                  </p>
-                ) : (
-                  <div>
-                    <p className="text-sm font-medium text-neutral-800">
-                      Drag & Drop your question paper PDF here, or <span className="text-amber-800 font-bold underline">Browse</span>
+              {/* Drag and Drop Zone OR OCR Upload Zone */}
+              {activeUploadTab === 'pdf' ? (
+                <div
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
+                  className="border-2 border-dashed border-neutral-400 rounded-lg p-6 text-center bg-amber-50/50 hover:bg-amber-100/50 transition-colors cursor-pointer relative"
+                >
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    onChange={handleFileChange}
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                    disabled={isUploading}
+                  />
+                  <FileText className="w-10 h-10 mx-auto text-yellow-800 mb-2" />
+                  {file ? (
+                    <p className="text-sm font-semibold text-amber-900">
+                      Selected: {file.name} ({(file.size / (1024 * 1024)).toFixed(2)} MB)
                     </p>
-                    <p className="text-xs text-neutral-500 mt-1">Supports PDF files up to 10MB</p>
-                  </div>
-                )}
-              </div>
+                  ) : (
+                    <div>
+                      <p className="text-sm font-medium text-neutral-800">
+                        Drag & Drop your question paper PDF here, or <span className="text-amber-800 font-bold underline">Browse</span>
+                      </p>
+                      <p className="text-xs text-neutral-500 mt-1">Supports PDF files up to 10MB</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <OCRUploadZone 
+                  onTextExtracted={(data) => {
+                    setOcrData(data);
+                    setIsCorrectionOpen(true);
+                  }} 
+                />
+              )}
 
               <div className="flex justify-end">
                 <button
                   type="submit"
-                  disabled={isUploading || !file}
+                  disabled={isUploading || (activeUploadTab === 'pdf' ? !file : !ocrData?.extractedText)}
                   className="px-6 py-2.5 bg-gradient-to-r from-amber-700 to-amber-900 text-amber-50 font-bold text-sm rounded shadow hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
                 >
                   {isUploading ? (
@@ -920,6 +963,16 @@ formData.append('year', year);
         </div>
       )}
       </div>
+      
+      <TextCorrectionModal
+        isOpen={isCorrectionOpen}
+        onClose={() => setIsCorrectionOpen(false)}
+        ocrData={ocrData}
+        onSave={(correctedText) => {
+          setOcrData((prev) => ({ ...prev, extractedText: correctedText }));
+          setIsCorrectionOpen(false);
+        }}
+      />
     </LeatherBoard>
   );
 };

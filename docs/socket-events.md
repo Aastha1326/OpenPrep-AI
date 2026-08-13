@@ -20,107 +20,101 @@ require('./sockets/chatHandler')(io);
 
 There is no dedicated socket namespace or path configured — clients connect to the default `/` namespace exposed by the same HTTP server as the REST API.
 
----
-
 ## 🗡️ Battle Arena Events (`battleHandler.js`)
 
-Room state is kept in-memory (`rooms[roomId]`) and has this shape:
+Room state is kept in-memory using `roomManager` and has this shape:
 
 ```js
 {
-  id: 'ROOMID',
-  name: 'Battle Room',
+  roomCode: 'PREP99',
+  roomName: 'Biology Match',
   password: '',           // empty string = public room
+  hostUserId: 'host-uuid',
+  hostSocketId: 'host-socket-id',
+  questionCount: 5,
+  timePerQuestion: 15,
+  status: 'waiting',       // 'waiting' | 'playing' | 'finished'
   players: {
     '<socket.id>': {
-      username: 'Anonymous',
+      userId: 'user-uuid',
+      username: 'Alice',
       score: 0,
+      correctCount: 0,
+      timeSpentSumMs: 0,
       isReady: false,
       online: true,
+      answeredThisQuestion: false,
     },
   },
-  status: 'waiting',       // 'waiting' | 'playing'
-  questions: [],
+  quiz: { ... },
+  currentQuestionIndex: 0,
+  questionActive: false,
+  timeRemaining: 15,
 }
 ```
+
+### Authentication Handshake
+
+Before any events are accepted, the Socket.io server checks the handshake auth headers:
+- **Token Location**: `socket.handshake.auth.token`
+- **Verification**: Verified using `jwt.verify` against `JWT_SECRET`. Invalid tokens reject connection.
 
 ### Client → Server
 
 | Event | Payload | Description |
 | --- | --- | --- |
-| `create-room` | `{ roomId, username, roomName?, password? }` | Creates a room (if it doesn't exist) and joins it. Accepts an ack `callback`. |
-| `join-room` | `{ roomId, username, password? }` | Joins an existing (or new) room. Accepts an ack `callback`. |
-| `join_room` | `{ roomId, username }` or a plain `roomId` string | Legacy/alternate alias for `join-room`, kept for backward compatibility. Accepts an ack `callback`. |
-| `request_sync` | `{ roomId }` | Asks the server to re-emit the current room state (e.g. after the browser tab regains focus). |
-| `toggle_ready` | `{ roomId }` | Flips the calling player's ready flag. |
-| `user:ready` | `{ roomId, isReady }` | Explicitly sets the calling player's ready flag. |
-| `user:typing` | `{ roomId, isTyping }` | Broadcasts a typing indicator to everyone else in the room. |
-| `submit_answer` | `{ roomId, isCorrect, points? }` | Submits an answer; `points` (default `10`) is added to the score only if `isCorrect` is true and the room is `playing`. |
-| `disconnect` | *(none — built-in Socket.IO event)* | Cleans up the player from whichever room they were in. |
-
-**`create-room` / `join-room` ack response:**
-```js
-// success
-{ success: true, roomId, room: { id, name, password }, isPrivate }
-// failure
-{ success: false, message: 'A room code is required.' }
-// wrong password
-{ success: false, requiresPassword: true, message: 'Incorrect password' }
-```
+| `join-room` | `{ roomId, password? }` | Joins a battle lobby by its 6-character room code. Accepts an ack `callback`. |
+| `toggle_ready` | `{ roomId }` | Toggles the calling player's ready flag. Auto-starts if all are ready. |
+| `start-game` | `{ roomId }` | Triggers immediate game start. Only permitted by the host player. |
+| `submit_answer` | `{ roomId, optionIndex, timeSpentMs }` | Submits option selection for the current question index. Score calculated with speed bonuses. |
+| `leave-room` | `{ roomId }` | Leaves the room, initiating a 30s re-connection grace period. |
 
 ### Server → Client
 
 | Event | Payload | Emitted when |
 | --- | --- | --- |
-| `room_update` | `{ players, status }` | Any time the room's player list or status changes (join, ready toggle, disconnect, sync request). |
-| `presence_update` | `{ socketId, username, online }` | A player joins or disconnects. |
-| `user:ready` | `{ socketId, username, isReady }` | A player's ready state changes. |
-| `user:typing` | `{ socketId, username, isTyping }` | A player starts/stops typing (sent to everyone **except** the sender). |
-| `score_update` | `{ players }` | A correct/incorrect answer is submitted while the room is `playing`. |
-| `battle_start` | `{ message }` | All players in the room are ready (room moves from `waiting` to `playing`). |
-| `player_left` | `{ username }` | A player disconnects and other players remain in the room. |
+| `room_update` | `{ players, status, hostUserId? }` | Any player joins, gets ready, disconnects, or submits an option. |
+| `host_changed` | `{ hostUserId, username }` | The host disconnects and another online participant is assigned. |
+| `battle_start` | *(none)* | Game transitions from waiting room to active quiz. |
+| `new_question` | `{ questionIndex, questionText, options, totalQuestions, timeLimit }` | Next quiz question is broadcast to all participants. |
+| `timer_tick` | `{ timeRemaining }` | Ticked every second by the server-authoritative countdown. |
+| `question_result` | `{ correctAnswerIndex, correctAnswerText, explanation, players }` | Timer runs out or all participants have submitted answers. |
+| `battle_finished` | `{ players }` | All questions completed. Standings compiled and XP distributed. |
 
 ### Match Lifecycle Sequence
 
 ```mermaid
 sequenceDiagram
-    participant P1 as Player 1 (Host)
-    participant P2 as Player 2
+    participant Host as Host Player
+    participant Guest as Guest Player
     participant S as Server (battleHandler)
 
-    P1->>S: create-room { roomId, username }
-    S-->>P1: ack { success: true, room }
-    S-->>P1: room_update { players, status: 'waiting' }
-    S-->>P1: presence_update { online: true }
+    Host->>S: join-room { roomId: 'PREP99' }
+    S-->>Host: ack { success: true }
+    S-->>Host: room_update { status: 'waiting' }
 
-    P2->>S: join-room { roomId, username }
-    S-->>P2: ack { success: true, room }
-    S-->>P1: room_update { players, status: 'waiting' }
-    S-->>P2: room_update { players, status: 'waiting' }
-    S-->>P1: presence_update { online: true }
-    S-->>P2: presence_update { online: true }
+    Guest->>S: join-room { roomId: 'PREP99' }
+    S-->>Guest: ack { success: true }
+    S-->>Host: room_update
+    S-->>Guest: room_update
 
-    P1->>S: toggle_ready { roomId }
-    S-->>P1: user:ready
-    S-->>P2: user:ready
-    P2->>S: user:ready { roomId, isReady: true }
-    S-->>P1: user:ready
-    S-->>P2: user:ready
+    Host->>S: toggle_ready
+    Guest->>S: toggle_ready
 
-    Note over S: isAllReady() === true
-    S-->>P1: battle_start
-    S-->>P2: battle_start
-    S-->>P1: room_update { status: 'playing' }
-    S-->>P2: room_update { status: 'playing' }
+    Note over S: All players ready, start match
+    S-->>Host: battle_start
+    S-->>Guest: battle_start
 
-    P1->>S: submit_answer { roomId, isCorrect: true, points: 10 }
-    S-->>P1: score_update { players }
-    S-->>P2: score_update { players }
+    Note over S: Server loads & emits Question 1
+    S-->>Host: new_question { questionText }
+    S-->>Guest: new_question { questionText }
 
-    P2->>S: disconnect
-    S-->>P1: presence_update { online: false }
-    S-->>P1: player_left { username }
-    S-->>P1: room_update { players, status: 'playing' }
+    Host->>S: submit_answer { optionIndex: 2 }
+    Guest->>S: submit_answer { optionIndex: 0 }
+
+    Note over S: Reveal results & correct answer
+    S-->>Host: question_result { correctAnswerIndex: 2 }
+    S-->>Guest: question_result { correctAnswerIndex: 2 }
 ```
 
 ---

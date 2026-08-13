@@ -51,6 +51,14 @@ const Subject = sequelize.define(
       type: DataTypes.INTEGER,
       defaultValue: 0,
     },
+    ratingCount: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+    starCount: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
     tags: {
       type: DataTypes.TEXT,
       allowNull: true,

@@ -7,6 +7,8 @@ const QuizAttempt = require('../models/QuizAttempt');
 const Subject = require('../models/Subject');
 const Topic = require('../models/Topic');
 const Note = require('../models/Note');
+const PYQAnalysis = require('../models/PYQAnalysis');
+const PYQQuestion = require('../models/PYQQuestion');
 const ActivityLog = require('../models/ActivityLog');
 const Progress = require('../models/Progress');
 const QuizTelemetryEvent = require('../models/QuizTelemetryEvent');
@@ -50,7 +52,7 @@ function extractMistookQuestions(attempt) {
 // @access  Private
 exports.generateAIQuiz = async (req, res, next) => {
   try {
-    const { subjectId, topicId, count, language } = req.body;
+    const { subjectId, topicId, count, language, questionType = 'MCQ' } = req.body;
     const normalizedLanguage = normalizeQuizLanguage(language);
 
     const subject = await Subject.findByPk(subjectId);
@@ -86,15 +88,20 @@ exports.generateAIQuiz = async (req, res, next) => {
       count || 5,
       req.query.refresh === 'true',
       normalizedLanguage,
-      difficultyLevel
+      difficultyLevel,
+      questionType
     );
 
     // Assign unique question IDs (similar to Mongoose subdocument ids)
     const questionsWithIds = aiQuiz.questions.map((q) => ({
       _id: uuidv4(),
+      questionType: q.questionType || (q.options ? 'MCQ' : 'SUBJECTIVE'),
       questionText: q.questionText,
-      options: q.options,
-      correctAnswer: q.correctAnswer,
+      options: q.options || [],
+      correctAnswer: q.correctAnswer !== undefined ? q.correctAnswer : null,
+      idealAnswer: q.idealAnswer || '',
+      rubricCriteria: q.rubricCriteria || [],
+      maxScore: q.maxScore || 10,
       explanation: q.explanation || '',
     }));
 
@@ -119,6 +126,89 @@ exports.generateAIQuiz = async (req, res, next) => {
       });
     }
     // Handle Gemini API server errors
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({
+        success: false,
+        error: error.message,
+      });
+    }
+    next(error);
+  }
+};
+
+// @desc    Generate a custom revision quiz from PYQ bank
+// @route   POST /api/quizzes/generate-custom
+// @access  Private
+exports.generateCustomQuiz = async (req, res, next) => {
+  try {
+    const { subjectId, topics = [], difficulty = 'medium', years = [], count = 5, timeLimit = 20, language = 'english' } = req.body;
+
+    const subject = await Subject.findByPk(subjectId);
+    if (!subject) {
+      return res.status(404).json({ success: false, error: 'Subject not found' });
+    }
+
+    // Retrieve PYQ analyses for this subject
+    const analyses = await PYQAnalysis.findAll({ where: { subjectId } });
+    const analysisIds = analyses.map((a) => a.id);
+
+    // Retrieve matching PYQ questions
+    const whereClause = {
+      pyqAnalysisId: analysisIds,
+    };
+    if (topics.length > 0) {
+      whereClause.topicName = topics;
+    }
+    if (years.length > 0) {
+      whereClause.year = years;
+    }
+
+    const pyqQuestions = await PYQQuestion.findAll({ where: whereClause });
+    const pyqQuestionsText = pyqQuestions
+      .map((q) => `[Year: ${q.year}, Topic: ${q.topicName}, Marks: ${q.marks}] ${q.questionText}`)
+      .join('\n\n');
+
+    const difficultyLevel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+
+    // Call Gemini Service
+    const aiQuiz = await geminiService.generateCustomQuiz(
+      subject.name,
+      topics,
+      difficultyLevel,
+      count,
+      pyqQuestionsText,
+      language
+    );
+
+    // Assign unique IDs to the questions
+    const questionsWithIds = aiQuiz.questions.map((q) => ({
+      _id: uuidv4(),
+      questionText: q.questionText,
+      options: q.options,
+      correctAnswer: q.correctAnswer,
+      explanation: q.explanation || '',
+    }));
+
+    const quiz = await Quiz.create({
+      title: aiQuiz.title || `${subject.name} Custom Revision Quiz`,
+      subject: subjectId,
+      topic: null, // Covers multiple topics
+      questions: questionsWithIds,
+      type: 'AI_Generated',
+      language: language || 'english',
+      createdBy: req.user.id,
+      timeLimit: timeLimit || 20,
+    });
+
+    res.status(201).json({ success: true, data: quiz });
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
     if (error instanceof GeminiServerError) {
       return res.status(503).json({
         success: false,
@@ -265,21 +355,49 @@ exports.submitQuizAttempt = async (req, res, next) => {
 
       // Evaluate answers
       let correctCount = 0;
+      let totalEarnedPoints = 0;
+      let totalMaxPoints = 0;
+
       const evaluatedAnswers = questionsList.map((q) => {
         const userAns = answers.find((ans) => String(ans.questionId) === String(q._id || q.id));
-        const selected = userAns && userAns.selectedAnswer !== undefined ? userAns.selectedAnswer : -1;
-        const isCorrect = selected === q.correctAnswer;
-        if (isCorrect) correctCount++;
+        const isSubjective = q.questionType === 'SUBJECTIVE' || (!q.options && q.idealAnswer);
 
-        return {
-          questionId: q._id || q.id,
-          selectedAnswer: selected,
-          isCorrect,
-        };
+        if (isSubjective) {
+          const evalObj = userAns && userAns.evaluation ? userAns.evaluation : null;
+          const earned = evalObj ? (evalObj.score || 0) : 0;
+          const maxSc = (evalObj && evalObj.maxScore) ? evalObj.maxScore : (q.maxScore || 10);
+          totalEarnedPoints += earned;
+          totalMaxPoints += maxSc;
+          const isCorrect = maxSc > 0 ? (earned / maxSc) >= 0.5 : false;
+          if (isCorrect) correctCount++;
+
+          return {
+            questionId: q._id || q.id,
+            questionType: 'SUBJECTIVE',
+            userAnswerText: userAns ? (userAns.userAnswerText || userAns.selectedAnswer || '') : '',
+            isCorrect,
+            evaluation: evalObj,
+          };
+        } else {
+          totalMaxPoints += 1;
+          const selected = userAns && userAns.selectedAnswer !== undefined ? userAns.selectedAnswer : -1;
+          const isCorrect = selected === q.correctAnswer;
+          if (isCorrect) {
+            correctCount++;
+            totalEarnedPoints += 1;
+          }
+
+          return {
+            questionId: q._id || q.id,
+            questionType: 'MCQ',
+            selectedAnswer: selected,
+            isCorrect,
+          };
+        }
       });
 
       const totalQuestions = questionsList.length;
-      const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
+      const score = totalMaxPoints > 0 ? Math.round((totalEarnedPoints / totalMaxPoints) * 100) : 0;
 
       // Determine weak vs strong areas based on score (<50% Weak, 50-80% Medium, >80% Strong)
       const weakTopics = [];
@@ -374,10 +492,18 @@ exports.submitQuizAttempt = async (req, res, next) => {
       description: `Completed practice quiz: "${quiz.title}" with score ${score}%`,
     });
 
-    // Award XP for completing quiz attempt
-    const xpService = require('../services/xpService');
-    const xpEarned = Math.round(score * 1.5 + 50);
-    const progression = await xpService.addXP(req.user, xpEarned);
+    // Award XP and check gamification badges/streaks
+    const gamificationService = require('../services/gamificationService');
+    const progression = await gamificationService.awardXP(req.user.id, 100, 'quiz_complete');
+
+    const timezoneOffset = Number(req.headers['x-timezone-offset']) || 0;
+    await gamificationService.updateStreak(req.user.id, timezoneOffset);
+
+    const user = await User.findByPk(req.user.id);
+    const newBadges = await gamificationService.checkAndUnlockBadges(user, 'quiz_complete', {
+      timezoneOffsetMinutes: timezoneOffset
+    });
+    progression.newBadges = newBadges;
 
     res.status(201).json({
       success: true,
@@ -952,6 +1078,57 @@ exports.getQuizAttemptReportPDF = async (req, res, next) => {
 
     doc.end();
   } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Evaluate student's written response for a subjective question against rubric using Gemini
+// @route   POST /api/quizzes/evaluate-subjective
+// @access  Private
+exports.evaluateSubjectiveAnswer = async (req, res, next) => {
+  try {
+    const { questionId, quizId, userAnswerText } = req.body;
+    let targetQuestion = null;
+
+    if (quizId) {
+      const quiz = await Quiz.findByPk(quizId);
+      if (quiz && Array.isArray(quiz.questions)) {
+        targetQuestion = quiz.questions.find((q) => String(q._id || q.id) === String(questionId));
+      }
+    }
+
+    const questionText = targetQuestion ? targetQuestion.questionText : (req.body.questionText || '');
+    const idealAnswer = targetQuestion ? targetQuestion.idealAnswer : (req.body.idealAnswer || '');
+    const rubricCriteria = targetQuestion ? targetQuestion.rubricCriteria : (req.body.rubricCriteria || []);
+    const maxScore = targetQuestion ? (targetQuestion.maxScore || 10) : (req.body.maxScore || 10);
+
+    const evaluation = await geminiService.evaluateSubjectiveAnswer(
+      questionText,
+      idealAnswer,
+      rubricCriteria,
+      userAnswerText || '',
+      maxScore,
+      req.query.refresh === 'true'
+    );
+
+    res.status(200).json({
+      success: true,
+      data: evaluation,
+    });
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({
+        success: false,
+        error: error.message,
+      });
+    }
     next(error);
   }
 };

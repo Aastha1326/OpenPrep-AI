@@ -18,9 +18,13 @@ import { exportAsCSV, exportAsJSON } from '../utils/exportUtils';
 import useVoiceControl from '../hooks/useVoiceControl';
 import VoiceModeToggle from '../components/VoiceModeToggle';
 import AudioWaveform from '../components/AudioWaveform';
+import BadgeUnlockModal from '../components/gamification/BadgeUnlockModal';
+import LevelUpModal from '../components/gamification/LevelUpModal';
 import RevisionSheetModal from '../components/dashboard/RevisionSheetModal';
 import RemediationPlanModal from '../components/dashboard/RemediationPlanModal';
 import QuestionExplanation from '../components/dashboard/QuestionExplanation';
+import SubjectiveQuestionView from '../components/quiz/SubjectiveQuestionView';
+import { evaluateSubjectiveAnswer } from '../services/api';
 
 const REVIEW_FILTERS = [
   { key: 'all', label: 'All Questions' },
@@ -60,6 +64,10 @@ const QuizSession = () => {
   const [quiz, setQuiz] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const [activeBadgeUnlock, setActiveBadgeUnlock] = useState(null);
+  const [levelUpLevel, setLevelUpLevel] = useState(null);
+  const [showLevelUpModal, setShowLevelUpModal] = useState(false);
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState({}); // { questionId: selectedOption }
@@ -161,7 +169,9 @@ const fetchQuiz = useCallback(async () => {
       const res = await API.get(`/quizzes/${id}`);
       const loadedQuiz = res.data.data;
       setQuiz(loadedQuiz);
-      const totalSeconds = (loadedQuiz?.questions?.length || 0) * SECONDS_PER_QUESTION;
+      const totalSeconds = loadedQuiz?.timeLimit
+        ? loadedQuiz.timeLimit * 60
+        : (loadedQuiz?.questions?.length || 0) * SECONDS_PER_QUESTION;
       setTimeLeft(totalSeconds);
       endTimeRef.current = Date.now() + totalSeconds * 1000;
       setLoading(false);
@@ -275,10 +285,22 @@ const submitQuiz = useCallback(async () => {
       telemetryRef.current?.stopAutoFlush();
       telemetryRef.current?.flush();
 
+      const timezoneOffset = new Date().getTimezoneOffset();
       const res = await API.post(`/quizzes/${id}/submit`, {
         answers: formattedAnswers,
         submissionId: getSubmissionId(),
+      }, {
+        headers: { 'x-timezone-offset': String(timezoneOffset) }
       });
+      
+      if (res.data?.progression?.newBadges?.length > 0) {
+        setActiveBadgeUnlock(res.data.progression.newBadges[0]);
+      }
+      if (res.data?.progression?.leveledUp) {
+        setLevelUpLevel(res.data.progression.level);
+        setShowLevelUpModal(true);
+      }
+
       setResult(res.data.data);
       setSubmitted(true);
     } catch (err) {
@@ -517,16 +539,42 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
             </div>
           )}
         </div>
-
         {/* Quiz Content */}
         {!submitted ? (
+          currentQuestion.questionType === 'SUBJECTIVE' || (!currentQuestion.options && currentQuestion.idealAnswer) ? (
+            <SubjectiveQuestionView
+              question={currentQuestion}
+              questionIndex={currentQuestionIndex}
+              totalQuestions={quiz.questions.length}
+              existingAnswer={typeof answers[currentQuestion._id || currentQuestion.id] === 'object' ? answers[currentQuestion._id || currentQuestion.id]?.userAnswerText || '' : (answers[currentQuestion._id || currentQuestion.id] || '')}
+              existingEvaluation={typeof answers[currentQuestion._id || currentQuestion.id] === 'object' ? answers[currentQuestion._id || currentQuestion.id]?.evaluation || null : null}
+              onEvaluateAnswer={async (qId, userAnswerText) => {
+                const response = await evaluateSubjectiveAnswer({
+                  questionId: qId,
+                  quizId: quiz.id,
+                  userAnswerText,
+                });
+                const evalData = response.data.data;
+                setAnswers((prev) => ({
+                  ...prev,
+                  [qId]: {
+                    questionId: qId,
+                    questionType: 'SUBJECTIVE',
+                    userAnswerText,
+                    evaluation: evalData,
+                  },
+                }));
+                return evalData;
+              }}
+            />
+          ) : (
           <div className="bg-slate-800 rounded-xl p-6 md:p-8 shadow-xl border border-slate-700">
             <h2 className="text-xl font-semibold mb-6 leading-relaxed break-words whitespace-pre-wrap">
               <MathRenderer text={currentQuestion.questionText} />
             </h2>
 
             <div className="space-y-3 mb-8">
-              {currentQuestion.options.map((option, index) => {
+              {(currentQuestion.options || []).map((option, index) => {
                 const isSelected = answers[currentQuestion._id] === option;
                 return (
                   <button
@@ -551,46 +599,46 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
                 );
               })}
             </div>
-
-            {/* Navigation */}
-            <div className="flex justify-between items-center mt-8">
-              <button
-                onClick={handlePrevious}
-                disabled={currentQuestionIndex === 0 || timeElapsed}
-                className="flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
-              >
-                <FaArrowLeft className="mr-2" /> Previous
-              </button>
-
-              {isLastQuestion ? (
-                <button
-                  onClick={() => submitQuiz()}
-                  disabled={
-                    submitting || timeElapsed || Object.keys(answers).length < quiz.questions.length
-                  }
-                  className="flex items-center px-6 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold shadow-lg shadow-emerald-500/20 transition-all"
-                >
-                  {submitting ? (
-                    <>
-                      <FaSpinner className="ml-2 animate-spin" /> Submitting...
-                    </>
-                  ) : (
-                    <>
-                      Submit Quiz <FaCheckCircle className="ml-2" />
-                    </>
-                  )}
-                </button>
-              ) : (
-                <button
-                  onClick={handleNext}
-                  disabled={timeElapsed}
-                  className="flex items-center px-6 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-medium transition-colors"
-                >
-                  Next <FaArrowRight className="ml-2" />
-                </button>
-              )}
-            </div>
           </div>
+          )
+        }
+
+        {/* Global Quiz Question Navigation Bar */}
+        <div className="flex justify-between items-center mt-6">
+          <button
+            onClick={handlePrevious}
+            disabled={currentQuestionIndex === 0 || timeElapsed}
+            className="flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors text-slate-200"
+          >
+            <FaArrowLeft className="mr-2" /> Previous
+          </button>
+
+          {isLastQuestion ? (
+            <button
+              onClick={() => submitQuiz()}
+              disabled={submitting || timeElapsed}
+              className="flex items-center px-6 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold shadow-lg shadow-emerald-500/20 transition-all text-white"
+            >
+              {submitting ? (
+                <>
+                  <FaSpinner className="ml-2 animate-spin" /> Submitting...
+                </>
+              ) : (
+                <>
+                  Submit Quiz <FaCheckCircle className="ml-2" />
+                </>
+              )}
+            </button>
+          ) : (
+            <button
+              onClick={handleNext}
+              disabled={timeElapsed}
+              className="flex items-center px-6 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-medium transition-colors text-white"
+            >
+              Next <FaArrowRight className="ml-2" />
+            </button>
+          )}
+        </div>
         ) : (
           /* Results View */
           <div
@@ -778,6 +826,20 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
           </div>
         )}
       </div>
+
+      {/* --- GAMIFICATION CELEBRATION MODALS --- */}
+      <BadgeUnlockModal
+        isOpen={!!activeBadgeUnlock}
+        title={activeBadgeUnlock?.title}
+        description={activeBadgeUnlock?.description}
+        onClose={() => setActiveBadgeUnlock(null)}
+      />
+
+      <LevelUpModal
+        level={levelUpLevel}
+        isOpen={showLevelUpModal}
+        onClose={() => setShowLevelUpModal(false)}
+      />
     </div>
   );
 };

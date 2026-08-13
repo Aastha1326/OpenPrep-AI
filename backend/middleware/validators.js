@@ -98,6 +98,31 @@ const validateUpdateSettings = [
   handleValidationErrors,
 ];
 
+const validateVerifyOtp = [
+  body('email').trim().isEmail().withMessage('Please provide a valid email').normalizeEmail(),
+  body('otp').trim().isLength({ min: 6, max: 6 }).withMessage('OTP must be exactly 6 digits').isNumeric().withMessage('OTP must be numeric'),
+  handleValidationErrors,
+];
+
+const validateResetPasswordOtp = [
+  body('email').trim().isEmail().withMessage('Please provide a valid email').normalizeEmail(),
+  body('otp').trim().isLength({ min: 6, max: 6 }).withMessage('OTP must be exactly 6 digits').isNumeric().withMessage('OTP must be numeric'),
+  body('password')
+    .notEmpty()
+    .withMessage('Password is required')
+    .isLength({ min: 8 })
+    .withMessage('Password must be at least 8 characters')
+    .matches(/[A-Z]/)
+    .withMessage('Password must contain at least one uppercase letter')
+    .matches(/[a-z]/)
+    .withMessage('Password must contain at least one lowercase letter')
+    .matches(/[0-9]/)
+    .withMessage('Password must contain at least one number')
+    .matches(/[^A-Za-z0-9]/)
+    .withMessage('Password must contain at least one special character'),
+  handleValidationErrors,
+];
+
 // ---------------------------------------------------------------------------
 // Academic routes
 // ---------------------------------------------------------------------------
@@ -176,6 +201,10 @@ const validateReviewFlashcard = [
   body('quality')
     .isFloat({ min: 0, max: 5 })
     .withMessage('Quality must be a number between 0 and 5'),
+  body('confidence')
+    .optional()
+    .isIn(['very_unsure', 'unsure', 'confident', 'very_confident'])
+    .withMessage('Confidence must be one of: very_unsure, unsure, confident, very_confident'),
   handleValidationErrors,
 ];
 
@@ -243,6 +272,12 @@ const validateGenerateRemediationPlan = [
   handleValidationErrors,
 ];
 
+const validateEvaluateSubjective = [
+  body('questionId').optional().isUUID().withMessage('questionId must be a valid UUID'),
+  body('userAnswerText').isString().withMessage('userAnswerText must be a string'),
+  handleValidationErrors,
+];
+
 const validateSubmitQuizAttempt = [
   body('answers').isArray({ min: 1 }).withMessage('Answers must be a non-empty array'),
   body('answers.*.questionId')
@@ -263,6 +298,14 @@ const validateSubmitQuizAttempt = [
 // ---------------------------------------------------------------------------
 // AI routes
 // ---------------------------------------------------------------------------
+const validateGenerateMindMap = [
+  body('noteId').optional().isUUID().withMessage('noteId must be a valid UUID'),
+  body('subjectId').optional().isUUID().withMessage('subjectId must be a valid UUID'),
+  body('topicId').optional().isUUID().withMessage('topicId must be a valid UUID'),
+  body('textContext').optional().isString().withMessage('textContext must be a string'),
+  handleValidationErrors,
+];
+
 const validateExplainQuestion = [
   body('question')
     .trim()
@@ -493,6 +536,7 @@ validateGenerateAIFlashcards,
   validateExportFlashcards,
   validateImportFlashcards, // Quiz
   validateGenerateAIQuiz,
+  validateEvaluateSubjective,
   validateGenerateRevisionSheet,
   validateGenerateRemediationPlan,
   validateSubmitQuizAttempt,
@@ -510,5 +554,8 @@ validateGenerateAIFlashcards,
   validateUpdateTopicProgress,
   validateFocusSession, // Community
   validateSubmitFeedback,
+  validateGenerateMindMap,
   validateResendVerification,
+  validateVerifyOtp,
+  validateResetPasswordOtp,
 };

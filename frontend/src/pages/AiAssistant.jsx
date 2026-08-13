@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, Square, Send, Volume2, VolumeX, AlertCircle, ArrowLeft, Bot, User } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -8,6 +9,8 @@ import LeatherBoard from '../components/dashboard/LeatherBoard';
 
 const AiAssistant = () => {
   const navigate = useNavigate();
+  const { aiQuotaExceededUntil } = useSelector((state) => state.auth);
+  const isAiDisabled = !!(aiQuotaExceededUntil && Date.now() < aiQuotaExceededUntil);
 
   // Chat states
   const [messages, setMessages] = useState([
@@ -363,11 +366,12 @@ const AiAssistant = () => {
             {/* Microphone Toggle Button */}
             <button
               onClick={recording ? stopVoiceRecording : startVoiceRecording}
+              disabled={isAiDisabled}
               className={`p-4 rounded-full shadow-lg border transition-all shrink-0 ${
                 recording
                   ? 'bg-red-600 border-red-500 text-white animate-pulse shadow-[0_0_20px_rgba(220,38,38,0.5)]'
                   : 'bg-amber-500 border-amber-600 text-stone-950 hover:bg-amber-400'
-              }`}
+              } disabled:opacity-40 disabled:cursor-not-allowed`}
               title={recording ? 'Stop voice recording' : 'Ask query with your voice'}
             >
               {recording ? <Square className="w-5 h-5 fill-current" /> : <Mic className="w-5 h-5" />}
@@ -385,13 +389,13 @@ const AiAssistant = () => {
                 type="text"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                placeholder="Speak or type your concept question here..."
-                disabled={loading || recording}
-                className="flex-1 bg-stone-900/60 border border-stone-800 rounded-xl px-4 py-3.5 text-stone-200 placeholder-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm"
+                placeholder={isAiDisabled ? "AI queries are temporarily locked..." : "Speak or type your concept question here..."}
+                disabled={loading || recording || isAiDisabled}
+                className="flex-1 bg-stone-900/60 border border-stone-800 rounded-xl px-4 py-3.5 text-stone-200 placeholder-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm disabled:opacity-50"
               />
               <button
                 type="submit"
-                disabled={loading || !inputText.trim() || recording}
+                disabled={loading || !inputText.trim() || recording || isAiDisabled}
                 className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold p-3.5 rounded-xl transition-all disabled:opacity-40 disabled:hover:bg-amber-500 shrink-0"
               >
                 <Send className="w-4 h-4" />

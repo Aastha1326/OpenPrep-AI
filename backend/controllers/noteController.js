@@ -10,6 +10,7 @@ const User = require('../models/User');
 const { escapeLikePattern } = require('../utils/likePattern');
 const { summarizeNoteText, transcribeAndSummarizeAudio } = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
+const { extractTextFromImage } = require('../services/ocrService');
 
 // Helper to escape regex special characters if regex search is used anywhere
 const escapeRegex = (string) => {
@@ -125,9 +126,11 @@ exports.importNotes = async (req, res, next) => {
 
 // @desc    Summarize a note using AI (Gemini) and cache the result
 // @route   POST /api/notes/:id/summarize
-// @access  Privateexports.uploadNote = async (req, res, next) => {
+// @access  Private
+
+exports.uploadNote = async (req, res, next) => {
   try {
-    const { title, content, subjectId, topicId, isPublic, category } = req.body;
+    const { title, content, subjectId, topicId, isPublic, category, tags } = req.body;
 
     const subject = await Subject.findByPk(subjectId);
     if (!subject) {
@@ -152,6 +155,7 @@ exports.importNotes = async (req, res, next) => {
       fileType,
       isPublic: isPublic === 'true' || isPublic === true,
       category: category || 'Lecture Notes',
+      tags: typeof tags === 'string' ? tags.split(',').map(t => t.trim()).filter(Boolean) : (Array.isArray(tags) ? tags : []),
       user: req.user.id,
     });
 
@@ -167,6 +171,61 @@ exports.importNotes = async (req, res, next) => {
     if (req.file) {
       const filePath = path.join(__dirname, '..', 'uploads', req.file.filename);
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    }
+    next(error);
+  }
+};
+
+// @desc    Extract text from an uploaded image via OCR
+// @route   POST /api/notes/ocr-upload
+// @access  Private
+exports.uploadOcrNote = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'Please upload an image file' });
+    }
+
+    const ext = path.extname(req.file.originalname).toLowerCase();
+    const validExts = ['.png', '.jpg', '.jpeg', '.webp'];
+    const invalidExts = ['.gif', '.bmp'];
+
+    if (invalidExts.includes(ext)) {
+      if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+      return res.status(400).json({ success: false, error: 'Unsupported format: GIF and BMP are not allowed for OCR.' });
+    }
+
+    if (!validExts.includes(ext)) {
+      if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+      return res.status(400).json({ success: false, error: 'Please upload a valid image file (.png, .jpg, .jpeg, .webp).' });
+    }
+
+    const fileBuffer = fs.readFileSync(req.file.path);
+    
+    // Process OCR
+    const { extractedText, confidence, wordCount } = await extractTextFromImage(fileBuffer);
+    
+    // Sanitize extracted text
+    const sanitizedText = sanitizeHtml(extractedText, {
+      allowedTags: [], // Strip all HTML from OCR
+      allowedAttributes: {}
+    });
+
+    // Optionally cleanup the uploaded file if we don't want to store raw image beyond this endpoint,
+    // but the issue allows storing as Note later. The prompt says "Do not store unnecessary OCR worker data or raw image data beyond the project's existing upload/storage flow."
+    // We will keep the file in /uploads and let the frontend use its URL to create a Note.
+
+    res.status(200).json({
+      success: true,
+      data: {
+        extractedText: sanitizedText,
+        confidence,
+        wordCount,
+        fileUrl: `/uploads/${req.file.filename}`,
+      },
+    });
+  } catch (error) {
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
     }
     next(error);
   }
@@ -194,6 +253,9 @@ exports.getNotes = async (req, res, next) => {
 
     if (subjectId) where.subject = subjectId;
     if (category) where.category = category;
+    if (req.query.tag) {
+      where.tags = { [Op.contains]: [req.query.tag] };
+    }
 
     if (search) {
       // Sanitize search string to prevent regex or LIKE injection/errors
@@ -446,7 +508,7 @@ exports.uploadVoiceNote = async (req, res, next) => {
 // @access  Private
 exports.updateNote = async (req, res, next) => {
   try {
-    const { title, content, isPublic, category } = req.body;
+    const { title, content, isPublic, category, tags } = req.body;
     const note = await Note.findOne({ where: { id: req.params.id, user: req.user.id } });
     if (!note) {
       return res.status(404).json({ success: false, error: 'Note not found or access denied' });
@@ -456,6 +518,7 @@ exports.updateNote = async (req, res, next) => {
     if (content !== undefined) note.content = content;
     if (isPublic !== undefined) note.isPublic = isPublic === 'true' || isPublic === true;
     if (category !== undefined) note.category = category;
+    if (tags !== undefined) note.tags = typeof tags === 'string' ? tags.split(',').map(t => t.trim()).filter(Boolean) : (Array.isArray(tags) ? tags : []);
 
     await note.save();
     res.status(200).json({ success: true, data: note });

@@ -172,4 +172,63 @@ describe('useVoiceControl', () => {
     expect(mockRecognitionInstance.abort).toHaveBeenCalled();
     expect(mockSynth.cancel).toHaveBeenCalled();
   });
+  test('passes recognized transcript to the answer handler', async () => {
+  const onTranscript = vi.fn();
+
+  const { result } = renderHook(() =>
+    useVoiceControl({
+      onCommand: vi.fn(),
+      onTranscript,
+    })
+  );
+
+  act(() => {
+    result.current.toggleVoiceMode();
+  });
+
+  const recognition = MockSpeechRecognition.instances[0];
+
+  act(() => {
+    recognition.onstart();
+    recognition.onresult({
+      results: [
+        [
+          {
+            transcript: 'A component is a reusable UI building block',
+            confidence: 0.9,
+          },
+        ],
+      ],
+    });
+  });
+
+  expect(onTranscript).toHaveBeenCalledWith(
+    'A component is a reusable UI building block',
+    0.9
+  );
+});
+
+test('reports microphone permission errors without trapping the user in voice mode', async () => {
+  const { result } = renderHook(() =>
+    useVoiceControl({
+      onCommand: vi.fn(),
+      onTranscript: vi.fn(),
+    })
+  );
+
+  act(() => {
+    result.current.toggleVoiceMode();
+  });
+
+  const recognition = MockSpeechRecognition.instances[0];
+
+  act(() => {
+    recognition.onerror({
+      error: 'not-allowed',
+    });
+  });
+
+  expect(result.current.isEnabled).toBe(false);
+  expect(result.current.errorMsg).toMatch(/microphone permission/i);
+});
 });
