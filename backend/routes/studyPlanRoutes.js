@@ -9,6 +9,7 @@ const {
   rescheduleAdaptivePlan,
   rescheduleOverdueTasks,
   exportStudyPlanIcs,
+  exportStudyPlanPdf,
   rebalanceStudyPlan,
 } = require('../controllers/studyPlanController');
 const { protect } = require('../middleware/auth');
@@ -99,6 +100,7 @@ const router = express.Router();
 
 router.post('/generate-ai', protect, aiLimiter, checkAiQuota, validateGenerateAIPlan, generateAIPlan);
 router.get('/:id/export-ics', protect, exportStudyPlanIcs);
+router.get('/:id/export-pdf', protect, exportStudyPlanPdf);
 
 /**
  * @swagger
