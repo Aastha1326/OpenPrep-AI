@@ -46,7 +46,7 @@ describe('Notification Service - Unit Tests', () => {
     expect(notif).toBeDefined();
     expect(notif.title).toBe('Daily Streak Milestone!');
     expect(emittedRoom).toBe(`user:${fakeUserId}`);
-    expect(emittedEvent).toBe('NOTIF_NEW');
+    expect(emittedEvent).toBe('notification:new');
     expect(emittedPayload.title).toBe('Daily Streak Milestone!');
 
     Notification.create.mockRestore();

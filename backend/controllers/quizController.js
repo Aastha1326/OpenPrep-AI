@@ -119,6 +119,15 @@ exports.generateAIQuiz = async (req, res, next) => {
       createdBy: req.user.id,
     });
 
+    await createNotification(
+      req.user.id,
+      '🧠 AI Quiz Ready',
+      `Your practice quiz "${quiz.title}" has been generated.`,
+      'ai_quiz',
+      `/quiz/${quiz.id}`,
+      global.io
+    );
+
     res.status(201).json({ success: true, data: quiz });
   } catch (error) {
     // Handle Gemini API rate limit errors
@@ -1243,4 +1252,4 @@ exports.generateRemediationQuiz = async (req, res, next) => {
     }
     next(error);
   }
-};
+};
