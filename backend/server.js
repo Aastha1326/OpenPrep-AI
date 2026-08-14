@@ -1,4 +1,5 @@
 require('dotenv').config();
+const { Sentry } = require('./config/sentry');
 const express = require('express');
 const compression = require('compression');
 const cors = require('cors');
@@ -308,6 +309,9 @@ app.get('/api/docs.json', (req, res) => {
 });
 
 // Error Handler Middleware
+if (process.env.NODE_ENV !== 'test' && process.env.SENTRY_DSN) {
+  Sentry.setupExpressErrorHandler(app);
+}
 app.use(csrfErrorHandler);
 app.use(errorHandler);
 
