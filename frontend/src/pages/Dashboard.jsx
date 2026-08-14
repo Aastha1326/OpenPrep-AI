@@ -68,6 +68,7 @@ import FocusEfficiencyWidget from '../components/dashboard/FocusEfficiencyWidget
 import ActivityHeatmap from '../components/dashboard/ActivityHeatmap';
 import LeaderboardWidget from '../components/dashboard/LeaderboardWidget';
 import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
+import ExamCountdownCard from '../components/dashboard/ExamCountdownCard';
 import TargetExamOverviewWidget from '../components/dashboard/TargetExamOverviewWidget';
 import CompositeBundleModal from '../components/dashboard/CompositeBundleModal';
 import SyllabusImportModal from '../components/dashboard/SyllabusImportModal';
@@ -241,20 +242,20 @@ const Dashboard = () => {
     errorFlashcards,
   } = useSelector((state) => state.dashboard);
 
-  useEffect(() => {
-    const fetchAll = () => {
-      dispatch(fetchDashboardStats());
-      dispatch(fetchSubjectBreakdown());
-      dispatch(fetchActivePlan());
-      dispatch(fetchDueFlashcards());
-      fetchGamification();
-    };
+  const fetchAll = useCallback(() => {
+    dispatch(fetchDashboardStats());
+    dispatch(fetchSubjectBreakdown());
+    dispatch(fetchActivePlan());
+    dispatch(fetchDueFlashcards());
+    fetchGamification();
+  }, [dispatch, fetchGamification]);
 
+  useEffect(() => {
     fetchAll();
 
     window.addEventListener('focus', fetchAll);
     return () => window.removeEventListener('focus', fetchAll);
-  }, [dispatch]);
+  }, [fetchAll]);
 
   const handleRetry = (thunk) => () => dispatch(thunk());
 
@@ -569,16 +570,16 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
                 />
               </div>
 
-              {/* --- EXAM COUNTDOWN WIDGET --- */}
+              {/* --- EXAM COUNTDOWN CARD --- */}
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.4 }}
-                className="mt-5"
+                className="mt-5 max-w-3xl"
               >
-                <ExamCountdownWidget
-                  examDate={activePlan?.exam?.date}
-                  examName={activePlan?.exam?.name}
+                <ExamCountdownCard
+                  stats={stats?.examCountdown}
+                  onRefresh={fetchAll}
                 />
               </motion.div>
             </div>

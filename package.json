@@ -14,7 +14,9 @@
     "format": "prettier --write \"**/*.{js,jsx,json,css,md}\"",
     "format:check": "prettier --check .",
     "create-labels": "node scripts/create-labels.js",
-    "seed": "npm run seed --prefix backend"
+    "seed": "npm run seed --prefix backend",
+    "db:backup": "npm run db:backup --prefix backend",
+    "db:restore": "npm run db:restore --prefix backend"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.1",

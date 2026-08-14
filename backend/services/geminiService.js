@@ -2174,3 +2174,57 @@ exports.generateMindMapStructure = async (
   }
 };
 
+/**
+ * Generate Q&A Flashcards with timestamp seconds mapping from YouTube transcripts
+ * @param {Array<{start: number, text: string}>} segments
+ * @returns {Promise<Array<{front: string, back: string, timestampSeconds: number}>>}
+ */
+exports.generateFlashcardsFromTranscript = async (segments) => {
+  if (!genAI) {
+    throw new Error('Gemini API is not configured.');
+  }
+
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-1.5-flash',
+    generationConfig: { responseMimeType: 'application/json' },
+  });
+
+  const prompt = `
+    Analyze the following YouTube lecture transcript segments (each segment starts with a starting timestamp [seconds]).
+    Extract key concept definitions, formulas, rules, QA pairs, and high-yield content.
+    Return a JSON array of objects representing study flashcards.
+    
+    Each object MUST have:
+    - "front": A concise, clear question or prompt (String).
+    - "back": A clear, accurate answer (String).
+    - "timestampSeconds": The starting timestamp (integer) of the segment from which this flashcard was derived.
+    
+    Translate the questions and answers to English if the transcript is not in English.
+    
+    Format:
+    [
+      {
+        "front": "What is X?",
+        "back": "X is Y...",
+        "timestampSeconds": 120
+      }
+    ]
+
+    Transcript Segments:
+    ${segments.map((s) => `[${s.start}] ${s.text}`).join('\n\n')}
+  `;
+
+  const result = await exports.generateWithRetry(model, prompt);
+  const responseText = result.response.text();
+  try {
+    return JSON.parse(responseText);
+  } catch (err) {
+    console.error('Failed to parse Gemini response as JSON:', responseText, err);
+    throw new Error('Failed to generate formatted flashcards from transcript.');
+  }
+};
+
+// Expose internal retry logic to exports
+exports.generateWithRetry = generateWithRetry;
+
+

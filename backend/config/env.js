@@ -170,6 +170,8 @@ const schema = z.object({
 
   // ── Test-only switches ───────────────────────────────────────────────────
   ENABLE_RATE_LIMIT_TESTS: booleanFromString(false),
+  SENTRY_DSN: z.string().optional(),
+  SENTRY_ENVIRONMENT: z.string().optional(),
 });
 
 /**
