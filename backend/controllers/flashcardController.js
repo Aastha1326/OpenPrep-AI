@@ -8,6 +8,9 @@ const ActivityLog = require('../models/ActivityLog');
 const Progress = require('../models/Progress');
 const User = require('../models/User');
 const Exam = require('../models/Exam');
+const { calculateTopicProficiency, getDifficultyLevel } = require('../services/proficiencyService');
+const remediationService = require('../services/remediationService');
+const { checkAndAwardBadges } = require('../services/achievementService');
 const geminiService = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
 const youtubeService = require('../services/youtubeService');
@@ -444,6 +447,14 @@ exports.createFlashcard = async (req, res, next) => {
       tags: tags || [],
       difficulty: difficulty || null,
     });
+    
+    // Issue #1053: Check for Card Collector badge
+    const totalCreated = await Flashcard.count({ where: { user: req.user.id } });
+    await checkAndAwardBadges(req.user.id, {
+      type: 'FLASHCARD_CREATED',
+      payload: { totalCreated }
+    });
+
     res.status(201).json({ success: true, data: card });
   } catch (error) {
     next(error);
@@ -617,6 +628,26 @@ exports.reviewFlashcard = async (req, res, next) => {
       timezoneOffsetMinutes: timezoneOffset
     });
     progression.newBadges = newBadges;
+
+    // Issue #1053: Check for Century Club badge
+    // Determine how many flashcards have been reviewed today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const sessionReviewedCount = await Flashcard.count({
+      where: {
+        user: req.user.id,
+        lastReviewed: { [Op.gte]: today }
+      }
+    });
+
+    const earnedAchievements = await checkAndAwardBadges(req.user.id, {
+      type: 'FLASHCARD_REVIEW_SESSION',
+      payload: { sessionReviewedCount }
+    });
+    
+    if (earnedAchievements.length > 0) {
+      progression.earnedAchievements = earnedAchievements;
+    }
 
     res.status(200).json({ success: true, data: card, progression });
   } catch (error) {
