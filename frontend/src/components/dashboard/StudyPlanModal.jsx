@@ -271,6 +271,8 @@ const StudyPlanModal = ({
 
   const contentRef = useRef(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingServerPdf, setIsExportingServerPdf] = useState(false);
+  const [exportPdfError, setExportPdfError] = useState(null);
   const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
 const [isRescheduling, setIsRescheduling] = useState(false);
   const [isRebalancing, setIsRebalancing] = useState(false);  const [rescheduleMessage, setRescheduleMessage] = useState(null);
@@ -390,6 +392,35 @@ const totalWeakCount = useMemo(() => {
       setIsExporting(false);
     }
   };
+
+  // Issue #1056: Server-side study plan PDF export
+  const handleExportServerPdf = async () => {
+    if (!activePlan?.id) return;
+    setIsExportingServerPdf(true);
+    setExportPdfError(null);
+    try {
+      const response = await API.get(`/study-plans/${activePlan.id}/export-pdf`, {
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const dateStr = new Date().toISOString().split('T')[0];
+      link.setAttribute('download', `openprep-studyplan-${dateStr}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Server PDF export failed:', err);
+      setExportPdfError('Failed to export PDF. Please try again.');
+      setTimeout(() => setExportPdfError(null), 5000);
+    } finally {
+      setIsExportingServerPdf(false);
+    }
+  };
+
 
 const handleExportIcs = async () => {
   if (!activePlan?.id) {
@@ -627,6 +658,24 @@ const handleExportIcs = async () => {
                       setIsSyncingCalendar={setIsSyncingCalendar}
                       onExportIcs={handleExportIcs}
                     />
+                    {/* Issue #1056: Export study plan as server-rendered PDF */}
+                    <button
+                      onClick={handleExportServerPdf}
+                      disabled={isExportingServerPdf}
+                      aria-label="Export study plan as PDF"
+                      className="flex items-center space-x-2 bg-gradient-to-r from-emerald-700 to-emerald-900 text-white px-4 py-2 rounded-sm hover:from-emerald-600 hover:to-emerald-800 transition-colors disabled:opacity-50 cursor-pointer"
+                      title="Download a printable PDF of your study plan"
+                    >
+                      {isExportingServerPdf
+                        ? <Loader className="w-4 h-4 animate-spin" />
+                        : <Download className="w-4 h-4" />}
+                      <span className="font-semibold">
+                        {isExportingServerPdf ? 'Exporting...' : 'Export PDF'}
+                      </span>
+                    </button>
+                    {exportPdfError && (
+                      <span className="text-xs text-red-600 font-semibold">{exportPdfError}</span>
+                    )}
                     <button
                       onClick={handleReschedule}
                       disabled={isRescheduling}

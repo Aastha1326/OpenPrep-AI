@@ -3,7 +3,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import { fetchFlashcards, deleteFlashcard } from '../store/slices/flashcardSlice';
 import API from '../services/api';
 import CreateDeckModal from '../components/dashboard/CreateDeckModal';
-import { Search, Trash2, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import YouTubeFlashcardImporter from '../components/flashcards/YouTubeFlashcardImporter';
+import { Search, Trash2, Plus, ChevronLeft, ChevronRight, Youtube } from 'lucide-react';
 
 const Flashcards = () => {
   const dispatch = useDispatch();
@@ -21,6 +22,7 @@ const Flashcards = () => {
   const [subjects, setSubjects] = useState([]);
   const [topics, setTopics] = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showYoutubeModal, setShowYoutubeModal] = useState(false);
 
   useEffect(() => {
     const fetchMetadata = async () => {
@@ -75,13 +77,22 @@ const Flashcards = () => {
             Manage, search, sort, and organize your cards.
           </p>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold shadow-md transition"
-        >
-          <Plus className="w-5 h-5" />
-          Create Flashcard
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowYoutubeModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-semibold shadow-md transition cursor-pointer"
+          >
+            <Youtube className="w-5 h-5" />
+            Generate from YouTube
+          </button>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold shadow-md transition cursor-pointer"
+          >
+            <Plus className="w-5 h-5" />
+            Create Flashcard
+          </button>
+        </div>
       </div>
 
       {/* Filter Controls Bar */}
@@ -242,6 +253,17 @@ const Flashcards = () => {
           subjectId={subjects[0]?.id || ''}
           onClose={() => setShowCreateModal(false)}
           onCreated={() => {
+            setPage(1);
+            dispatch(fetchFlashcards({ page: 1, limit: 12, sortBy, order }));
+          }}
+        />
+      )}
+
+      {showYoutubeModal && (
+        <YouTubeFlashcardImporter
+          isOpen={showYoutubeModal}
+          onClose={() => setShowYoutubeModal(false)}
+          onImported={() => {
             setPage(1);
             dispatch(fetchFlashcards({ page: 1, limit: 12, sortBy, order }));
           }}
