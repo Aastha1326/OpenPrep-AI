@@ -15,6 +15,7 @@ import {
   AlertCircle,
   CheckCircle,
   Bell,
+  Award,
 } from 'lucide-react';
 import LeatherBoard from '../components/dashboard/LeatherBoard';
 import VintagePaper from '../components/dashboard/VintagePaper';
@@ -22,6 +23,7 @@ import API from '../services/api';
 import { getVapidPublicKey, subscribeToPush, unsubscribeFromPush, updateNotificationPreferences } from '../services/notificationApi';
 import { loadUser } from '../store/slices/authSlice';
 import { validateAvatarFile } from '../utils/fileValidation';
+import { BADGE_LIST, BADGE_ICONS } from '../config/badges';
 
 const urlBase64ToUint8Array = (base64String) => {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -336,6 +338,56 @@ const Settings = () => {
                 </p>
               )}
             </div>
+          </div>
+        </VintagePaper>
+
+        {/* --- BADGE GALLERY --- */}
+        <VintagePaper className="border-t-4 border-t-amber-700">
+          <div className="flex items-center gap-3 mb-3">
+            <Award className="w-7 h-7 text-amber-700" />
+            <h2 className="text-2xl font-bold font-playfair text-neutral-800 dark:text-neutral-100">
+              Badge Gallery
+            </h2>
+          </div>
+
+          <p className="text-neutral-600 dark:text-neutral-300 mb-6 leading-relaxed">
+            Track your milestones and study achievements. Keep up the great work!
+          </p>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {BADGE_LIST.map((badgeConfig) => {
+              const Icon = BADGE_ICONS[badgeConfig.icon] || Award;
+              const earnedRecord = user?.achievements?.find((a) => a.badgeId === badgeConfig.id);
+              const isEarned = !!earnedRecord;
+              
+              return (
+                <div 
+                  key={badgeConfig.id}
+                  className={`p-4 border rounded-sm flex flex-col items-center text-center transition-all ${
+                    isEarned 
+                      ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700/50 shadow-sm'
+                      : 'bg-neutral-50 dark:bg-neutral-800/40 border-neutral-200 dark:border-neutral-700 opacity-60 grayscale'
+                  }`}
+                >
+                  <div className={`p-3 rounded-full mb-3 ${
+                    isEarned ? 'bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200' : 'bg-neutral-200 dark:bg-neutral-700 text-neutral-500'
+                  }`}>
+                    <Icon className="w-8 h-8" />
+                  </div>
+                  <h3 className="font-playfair font-bold text-sm text-neutral-800 dark:text-neutral-200 mb-1">
+                    {badgeConfig.name}
+                  </h3>
+                  <p className="text-xs text-neutral-600 dark:text-neutral-400 mb-2 leading-tight">
+                    {badgeConfig.description}
+                  </p>
+                  {isEarned && (
+                    <span className="text-[10px] font-semibold tracking-wider uppercase text-amber-700 dark:text-amber-400">
+                      Earned {new Date(earnedRecord.earnedAt || earnedRecord.createdAt).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </VintagePaper>
 

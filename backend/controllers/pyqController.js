@@ -7,8 +7,10 @@ const PYQ = require('../models/PYQ');
 const Subject = require('../models/Subject');
 const Topic = require('../models/Topic');
 const ActivityLog = require('../models/ActivityLog');
+const { uploadFileToFirebase } = require('../services/firebaseStorageService');
 const geminiService = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
+const { checkAndAwardBadges } = require('../services/achievementService');
 const { clusterByCosineSimilarity } = require('../utils/vectorUtils');
 
 // Cosine similarity cutoff above which two questions are treated as duplicates
@@ -140,6 +142,13 @@ exports.uploadAndAnalyzePYQ = async (req, res, next) => {
       user: req.user.id,
       activityType: 'pyq_upload',
       description: `Uploaded and analyzed Previous Year Question Paper: ${pyq.title}`,
+    });
+
+    // Issue #1053: Check for PYQ Analyst badge
+    const totalAnalyzed = await PYQ.count({ where: { user: req.user.id } });
+    await checkAndAwardBadges(req.user.id, {
+      type: 'PYQ_ANALYZED',
+      payload: { totalAnalyzed }
     });
 
     res.status(201).json({

@@ -1,4 +1,5 @@
 const logger = require('../utils/logger');
+const { Sentry, isSentryReady } = require('../config/sentry');
 
 /**
  * Attach the correlation ID to an error payload so a user can quote it in a
@@ -106,10 +107,22 @@ if (err.name === 'MulterError') {
     error.message = err.message || 'Request processing timed out. Please try again with a smaller file.';
   }
 
-  res.status(error.statusCode || 500).json(
+  const statusCode = error.statusCode || 500;
+
+  if (isSentryReady && statusCode >= 500) {
+    if (req.user) {
+      Sentry.setUser({ id: req.user.id, email: req.user.email });
+    }
+    Sentry.captureException(err);
+  }
+
+  const responseMessage = statusCode === 500 ? 'Internal Server Error' : (error.message || 'Server Error');
+
+  res.status(statusCode).json(
     withRequestId(req, {
       success: false,
-      error: error.message || 'Server Error',
+      error: responseMessage,
+      message: responseMessage,
     })
   );
 };

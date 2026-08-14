@@ -35,4 +35,19 @@ describe('FlashcardGrid and FlashcardCard', () => {
     fireEvent.click(card);
     expect(screen.getByText('Back 1')).toBeInTheDocument();
   });
+
+  test('renders video playback badge and opens modal player on click', () => {
+    const cardsWithVideo = [
+      { id: '4', front: 'Front Video', back: 'Back Video', sourceUrl: 'https://youtube.com/watch?v=dQw4w9WgXcQ', timestampSeconds: 120 },
+    ];
+    render(<FlashcardGrid flashcards={cardsWithVideo} />);
+
+    // 120 seconds -> 2:00
+    const badge = screen.getByRole('button', { name: /2:00/i });
+    expect(badge).toBeInTheDocument();
+
+    // Click badge to launch reference video modal
+    fireEvent.click(badge);
+    expect(screen.getByTitle('YouTube Reference Clip')).toBeInTheDocument();
+  });
 });

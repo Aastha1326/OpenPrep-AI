@@ -1,4 +1,5 @@
 require('dotenv').config();
+const { Sentry } = require('./config/sentry');
 const express = require('express');
 const compression = require('compression');
 const cors = require('cors');
@@ -63,6 +64,7 @@ const calendarRoutes = require('./routes/calendarRoutes');
 const gamificationRoutes = require('./routes/gamificationRoutes');
 const battleRoutes = require('./routes/battleRoutes');
 const readinessRoutes = require('./routes/readinessRoutes');
+const squadRoutes = require('./routes/squadRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 
@@ -74,8 +76,7 @@ connectDB();
 // Connect to Redis
 const redisService = require('./services/redisService');
 redisService.connect();
-
-
+const app = express();
 
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
@@ -138,7 +139,7 @@ const docsSecurityHeaders = helmet({
 });
 
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api-docs')) {
+  if (req.path.startsWith('/api/docs')) {
     return docsSecurityHeaders(req, res, next);
   }
   return securityHeaders(req, res, next);
@@ -255,6 +256,7 @@ app.use('/api/calendar', calendarRoutes);
 app.use('/api/gamification', gamificationRoutes);
 app.use('/api/battles', battleRoutes);
 app.use('/api/folders', folderRoutes);
+app.use('/api/squads', squadRoutes);
 
 // Base Route
 app.get('/', (req, res) => {
@@ -285,21 +287,34 @@ app.get('/healthz', (req, res) => {
   res.status(200).send('OK');
 });
 
-// Swagger UI Documentation
-app.use(
-  '/api-docs',
-  swaggerUi.serve,
-  swaggerUi.setup(swaggerSpec, {
-    customCss: '.swagger-ui .topbar { display: none }',
-    customSiteTitle: 'OpenPrep AI API Documentation',
-    swaggerOptions: {
-      persistAuthorization: true,
-      displayRequestDuration: true,
-    },
-  })
-);
+// Swagger UI Documentation & Spec endpoints
+const swaggerEnabled = process.env.SWAGGER_ENABLED === 'true' || process.env.NODE_ENV !== 'production';
+
+app.use('/api/docs', (req, res, next) => {
+  if (!swaggerEnabled) {
+    return res.status(403).json({ success: false, error: 'Swagger API documentation is disabled in this environment.' });
+  }
+  next();
+}, swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'OpenPrep AI API Documentation',
+  swaggerOptions: {
+    persistAuthorization: true,
+    displayRequestDuration: true,
+  },
+}));
+
+app.get('/api/docs.json', (req, res) => {
+  if (!swaggerEnabled) {
+    return res.status(403).json({ success: false, error: 'Swagger API documentation is disabled in this environment.' });
+  }
+  res.json(swaggerSpec);
+});
 
 // Error Handler Middleware
+if (process.env.NODE_ENV !== 'test' && process.env.SENTRY_DSN) {
+  Sentry.setupExpressErrorHandler(app);
+}
 app.use(csrfErrorHandler);
 app.use(errorHandler);
 

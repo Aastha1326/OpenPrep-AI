@@ -644,4 +644,51 @@ describe('POST /api/flashcards/from-audio', () => {
       expect(otherSubject.cloneCount).toBe(1);
     });
   });
+
+  describe('POST /api/flashcards/from-youtube', () => {
+    it('should reject invalid YouTube URLs with 400', async () => {
+      const res = await request(app)
+        .post('/api/flashcards/from-youtube')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ youtubeUrl: 'https://malicious-ssrf-url.com' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+    });
+
+    it('should generate and save flashcards with sourceUrl and timestampSeconds', async () => {
+      const youtubeService = require('../../services/youtubeService');
+      const originalFetch = youtubeService.fetchTranscript;
+      const originalExtract = youtubeService.extractVideoId;
+      const originalGenerate = geminiService.generateFlashcardsFromTranscript;
+
+      youtubeService.extractVideoId = () => 'dQw4w9WgXcQ';
+      youtubeService.fetchTranscript = async () => [
+        { text: 'captions text', start: 10 }
+      ];
+      geminiService.generateFlashcardsFromTranscript = async () => [
+        { front: 'Question?', back: 'Answer.', timestampSeconds: 10 }
+      ];
+
+      const res = await request(app)
+        .post('/api/flashcards/from-youtube')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+          subjectId: testSubject.id
+        });
+
+      // Restore
+      youtubeService.fetchTranscript = originalFetch;
+      youtubeService.extractVideoId = originalExtract;
+      geminiService.generateFlashcardsFromTranscript = originalGenerate;
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.count).toBe(1);
+      expect(res.body.data[0].front).toBe('Question?');
+      expect(res.body.data[0].sourceUrl).toBe('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+      expect(res.body.data[0].timestampSeconds).toBe(10);
+    });
+  });
 });

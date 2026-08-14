@@ -2,6 +2,7 @@ const { sequelize } = require('../config/db');
 
 // Import all models
 const User = require('./User');
+const Folder = require('./Folder');
 const Exam = require('./Exam');
 const Subject = require('./Subject');
 const Topic = require('./Topic');
@@ -28,6 +29,11 @@ const PYQQuestion = require('./PYQQuestion');
 const Notification = require('./Notification');
 const PushSubscription = require('./PushSubscription');
 const ReadinessSnapshot = require('./ReadinessSnapshot');
+const StudySquad = require('./StudySquad');
+const SquadMember = require('./SquadMember');
+const SquadChallenge = require('./SquadChallenge');
+const SquadChallengeContribution = require('./SquadChallengeContribution');
+const SquadAchievement = require('./SquadAchievement');
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -165,6 +171,28 @@ ReadinessSnapshot.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 Subject.hasMany(ReadinessSnapshot, { foreignKey: 'subjectId', onDelete: 'CASCADE' });
 ReadinessSnapshot.belongsTo(Subject, { foreignKey: 'subjectId', as: 'subjectRef' });
 
+// StudySquad associations
+User.hasMany(StudySquad, { foreignKey: 'adminUserId', as: 'ownedSquads', onDelete: 'CASCADE' });
+StudySquad.belongsTo(User, { foreignKey: 'adminUserId', as: 'adminRef' });
+
+StudySquad.hasMany(SquadMember, { foreignKey: 'squadId', onDelete: 'CASCADE' });
+SquadMember.belongsTo(StudySquad, { foreignKey: 'squadId', as: 'squadRef' });
+
+User.hasMany(SquadMember, { foreignKey: 'userId', onDelete: 'CASCADE' });
+SquadMember.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+StudySquad.hasMany(SquadChallenge, { foreignKey: 'squadId', onDelete: 'CASCADE' });
+SquadChallenge.belongsTo(StudySquad, { foreignKey: 'squadId', as: 'squadRef' });
+
+SquadChallenge.hasMany(SquadChallengeContribution, { foreignKey: 'challengeId', onDelete: 'CASCADE' });
+SquadChallengeContribution.belongsTo(SquadChallenge, { foreignKey: 'challengeId', as: 'challengeRef' });
+
+User.hasMany(SquadChallengeContribution, { foreignKey: 'userId', onDelete: 'CASCADE' });
+SquadChallengeContribution.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+StudySquad.hasMany(SquadAchievement, { foreignKey: 'squadId', onDelete: 'CASCADE' });
+SquadAchievement.belongsTo(StudySquad, { foreignKey: 'squadId', as: 'squadRef' });
+
 module.exports = {  sequelize,  User,
   Exam,
   Subject,
@@ -192,4 +220,9 @@ module.exports = {  sequelize,  User,
   Notification,
   PushSubscription,
   ReadinessSnapshot,
+  StudySquad,
+  SquadMember,
+  SquadChallenge,
+  SquadChallengeContribution,
+  SquadAchievement,
 };

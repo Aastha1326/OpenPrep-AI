@@ -18,7 +18,8 @@ const { runCalibration } = require('../services/difficultyCalibrator');
 const { calculateTopicProficiency, getDifficultyLevel } = require('../services/proficiencyService');
 const Flashcard = require('../models/Flashcard');
 const remediationService = require('../services/remediationService');
-const { createNotification } = require('../services/notificationService');
+const { uploadFileToFirebase } = require('../services/firebaseStorageService');
+const { checkAndAwardBadges } = require('../services/achievementService');
 
 // Window (ms) during which duplicate quiz submissions for the same quiz are ignored.
 // Prevents double-click on "Submit Quiz" from creating duplicate attempt records.
@@ -516,6 +517,28 @@ exports.submitQuizAttempt = async (req, res, next) => {
       timezoneOffsetMinutes: timezoneOffset
     });
     progression.newBadges = newBadges;
+
+    // Issue #1053: Check for Quiz Master and Sharpshooter
+    let consecutiveHighScores = 0;
+    if (score > 85) {
+      const pastAttempts = await QuizAttempt.findAll({
+        where: { user: req.user.id },
+        order: [['createdAt', 'DESC']],
+        limit: 3
+      });
+      if (pastAttempts.length === 3 && pastAttempts.every(a => a.score > 85)) {
+        consecutiveHighScores = 3;
+      }
+    }
+    
+    const earnedAchievements = await checkAndAwardBadges(req.user.id, {
+      type: 'QUIZ_SUBMIT',
+      payload: { score, consecutiveHighScores }
+    });
+    
+    if (earnedAchievements.length > 0) {
+      progression.earnedAchievements = earnedAchievements;
+    }
 
     res.status(201).json({
       success: true,
@@ -1229,4 +1252,4 @@ exports.generateRemediationQuiz = async (req, res, next) => {
     }
     next(error);
   }
-};
+};
