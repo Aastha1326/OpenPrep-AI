@@ -288,35 +288,12 @@ exports.login = async (req, res, next) => {
       user.lockoutUntil = null;
     }
 
-    // Update daily streak
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const lastActive = new Date(user.streakLastActive);
-    lastActive.setHours(0, 0, 0, 0);
-
-    const diffTime = Math.abs(today - lastActive);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 0 && user.streakCount === 0) {
-      user.streakCount = 1;
-    } else if (diffDays === 1) {
-      user.streakCount += 1;
-      if (user.streakCount > 0 && user.streakCount % 7 === 0) {
-        user.streakFreezes = (user.streakFreezes || 0) + 1;
-      }
-    } else if (diffDays > 1) {
-      const missedDays = diffDays - 1;
-      if (user.streakFreezes && user.streakFreezes >= missedDays) {
-        user.streakFreezes -= missedDays;
-        user.streakCount += 1;
-        if (user.streakCount > 0 && user.streakCount % 7 === 0) {
-          user.streakFreezes = (user.streakFreezes || 0) + 1;
-        }
-      } else {
-        user.streakCount = 1;
-      }
-    }
-    user.streakLastActive = new Date();
+    const gamificationService = require('../services/gamificationService');
+    const timezoneOffset = Number(req.headers['x-timezone-offset']) || 0;
+    await gamificationService.updateStreak(user.id, timezoneOffset);
+    
+    // Reload user to get the updated fields
+    await user.reload();
 
     // Generate new token family for this login session
     const tokenFamily = generateTokenFamily();
