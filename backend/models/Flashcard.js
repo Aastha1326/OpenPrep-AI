@@ -62,6 +62,14 @@ const Flashcard = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: true,
     },
+    sourceUrl: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    timestampSeconds: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
   },
   {
     timestamps: true,

@@ -8,9 +8,12 @@ const ActivityLog = require('../models/ActivityLog');
 const Progress = require('../models/Progress');
 const User = require('../models/User');
 const Exam = require('../models/Exam');
+const { calculateTopicProficiency, getDifficultyLevel } = require('../services/proficiencyService');
+const remediationService = require('../services/remediationService');
+const { checkAndAwardBadges } = require('../services/achievementService');
 const geminiService = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
-const { YoutubeTranscript } = require('youtube-transcript');
+const youtubeService = require('../services/youtubeService');
 const { fromBuffer } = require('file-type');
 const { adjustIntervalByConfidence } = require('../utils/confidenceScheduler');
 
@@ -325,7 +328,7 @@ exports.generateFlashcardsFromYouTube = async (req, res, next) => {
   try {
     const { youtubeUrl, subjectId, topicId, count } = req.body;
 
-    const videoId = extractYouTubeVideoId(youtubeUrl);
+    const videoId = youtubeService.extractVideoId(youtubeUrl);
     if (!videoId) {
       return res
         .status(400)
@@ -334,50 +337,86 @@ exports.generateFlashcardsFromYouTube = async (req, res, next) => {
 
     let transcriptItems;
     try {
-      transcriptItems = await YoutubeTranscript.fetchTranscript(videoId);
+      transcriptItems = await youtubeService.fetchTranscript(youtubeUrl);
     } catch (err) {
       return res.status(422).json({
         success: false,
-        error: 'Could not retrieve a transcript for this video. It may not have captions enabled.',
+        error: err.message || 'Could not retrieve a transcript for this video.',
       });
     }
 
-    const transcriptText = (transcriptItems || [])
-      .map((item) => item.text)
-      .join(' ')
-      .trim();
-    if (!transcriptText) {
+    // Chunk the transcript into segments (60-second segments)
+    const segments = [];
+    let currentText = '';
+    let currentStart = 0;
+
+    transcriptItems.forEach((item, index) => {
+      const text = item.text || '';
+      const start = typeof item.start === 'number' ? item.start : (item.offset ? item.offset / 1000 : 0);
+
+      if (!currentText) {
+        currentStart = Math.floor(start);
+      }
+
+      currentText += ' ' + text;
+
+      const duration = start - currentStart;
+      const isLast = index === transcriptItems.length - 1;
+      if (duration >= 60 || isLast) {
+        segments.push({
+          text: currentText.trim(),
+          start: currentStart,
+        });
+        currentText = '';
+      }
+    });
+
+    if (segments.length === 0) {
       return res.status(422).json({
         success: false,
-        error: 'This video does not appear to contain any educational transcript content',
+        error: 'This video does not contain any usable transcript content.',
       });
     }
 
-    let subjectName = 'General';
-    if (subjectId) {
-      const subject = await Subject.findByPk(subjectId);
-      if (subject) subjectName = subject.name;
+    let finalSubjectId = subjectId;
+    if (!finalSubjectId) {
+      const firstSubject = await Subject.findOne({ where: { user: req.user.id } });
+      if (firstSubject) {
+        finalSubjectId = firstSubject.id;
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: 'Subject ID is required. Please create a subject category first.',
+        });
+      }
     }
 
-    let topicName = 'YouTube Lecture';
-    if (topicId) {
-      const topicObj = await Topic.findByPk(topicId);
-      if (topicObj) topicName = topicObj.name;
-    }
+    const cardsList = await geminiService.generateFlashcardsFromTranscript(segments);
 
-    const cardsList = await geminiService.generateFlashcards(
-      subjectName,
-      topicName,
-      transcriptText,
-      count || 6
-    );
+    const cardsToInsert = cardsList.map((card) => ({
+      user: req.user.id,
+      subject: finalSubjectId,
+      topic: topicId || null,
+      front: card.front,
+      back: card.back,
+      sourceUrl: youtubeUrl,
+      timestampSeconds: card.timestampSeconds || 0,
+    }));
 
-    res.status(200).json({
+    const createdCards = await Flashcard.bulkCreate(cardsToInsert);
+
+    // Log activity
+    await ActivityLog.create({
+      user: req.user.id,
+      activityType: 'flashcard_review',
+      description: `Generated ${createdCards.length} AI flashcards from YouTube lecture video`,
+    });
+
+    res.status(201).json({
       success: true,
-      count: cardsList.length,
-      videoId,
-      subjectId: subjectId || null,
-      data: cardsList,
+      count: createdCards.length,
+      subjectId: finalSubjectId,
+      data: createdCards,
     });
   } catch (error) {
     if (error instanceof GeminiRateLimitError) {
@@ -408,6 +447,14 @@ exports.createFlashcard = async (req, res, next) => {
       tags: tags || [],
       difficulty: difficulty || null,
     });
+    
+    // Issue #1053: Check for Card Collector badge
+    const totalCreated = await Flashcard.count({ where: { user: req.user.id } });
+    await checkAndAwardBadges(req.user.id, {
+      type: 'FLASHCARD_CREATED',
+      payload: { totalCreated }
+    });
+
     res.status(201).json({ success: true, data: card });
   } catch (error) {
     next(error);
@@ -581,6 +628,26 @@ exports.reviewFlashcard = async (req, res, next) => {
       timezoneOffsetMinutes: timezoneOffset
     });
     progression.newBadges = newBadges;
+
+    // Issue #1053: Check for Century Club badge
+    // Determine how many flashcards have been reviewed today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const sessionReviewedCount = await Flashcard.count({
+      where: {
+        user: req.user.id,
+        lastReviewed: { [Op.gte]: today }
+      }
+    });
+
+    const earnedAchievements = await checkAndAwardBadges(req.user.id, {
+      type: 'FLASHCARD_REVIEW_SESSION',
+      payload: { sessionReviewedCount }
+    });
+    
+    if (earnedAchievements.length > 0) {
+      progression.earnedAchievements = earnedAchievements;
+    }
 
     res.status(200).json({ success: true, data: card, progression });
   } catch (error) {

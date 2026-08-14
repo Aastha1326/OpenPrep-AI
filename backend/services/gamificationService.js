@@ -1,4 +1,5 @@
 const { User, UserBadge, QuizAttempt, SquadMember, SquadChallenge, SquadChallengeContribution, SquadAchievement } = require('../models');
+const { checkAndAwardBadges } = require('./achievementService');
 
 // Calculate level based on XP: level = Math.floor(Math.sqrt(xp / 100)) + 1
 function calculateLevel(xp) {
@@ -203,6 +204,12 @@ async function updateStreak(userId, timezoneOffsetMinutes = 0) {
 
   const unlockedBadges = await checkAndUnlockBadges(user, 'streak_check', {
     timezoneOffsetMinutes,
+  });
+
+  // Issue #1053: Check for Week Warrior badge
+  await checkAndAwardBadges(userId, {
+    type: 'STREAK_UPDATED',
+    payload: { streakDays: user.currentStreak }
   });
 
   return {

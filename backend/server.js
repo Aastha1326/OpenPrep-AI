@@ -1,4 +1,5 @@
 require('dotenv').config();
+const { Sentry } = require('./config/sentry');
 const express = require('express');
 const compression = require('compression');
 const cors = require('cors');
@@ -74,8 +75,7 @@ connectDB();
 // Connect to Redis
 const redisService = require('./services/redisService');
 redisService.connect();
-
-
+const app = express();
 
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
@@ -138,7 +138,7 @@ const docsSecurityHeaders = helmet({
 });
 
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api-docs')) {
+  if (req.path.startsWith('/api/docs')) {
     return docsSecurityHeaders(req, res, next);
   }
   return securityHeaders(req, res, next);
@@ -286,21 +286,34 @@ app.get('/healthz', (req, res) => {
   res.status(200).send('OK');
 });
 
-// Swagger UI Documentation
-app.use(
-  '/api-docs',
-  swaggerUi.serve,
-  swaggerUi.setup(swaggerSpec, {
-    customCss: '.swagger-ui .topbar { display: none }',
-    customSiteTitle: 'OpenPrep AI API Documentation',
-    swaggerOptions: {
-      persistAuthorization: true,
-      displayRequestDuration: true,
-    },
-  })
-);
+// Swagger UI Documentation & Spec endpoints
+const swaggerEnabled = process.env.SWAGGER_ENABLED === 'true' || process.env.NODE_ENV !== 'production';
+
+app.use('/api/docs', (req, res, next) => {
+  if (!swaggerEnabled) {
+    return res.status(403).json({ success: false, error: 'Swagger API documentation is disabled in this environment.' });
+  }
+  next();
+}, swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'OpenPrep AI API Documentation',
+  swaggerOptions: {
+    persistAuthorization: true,
+    displayRequestDuration: true,
+  },
+}));
+
+app.get('/api/docs.json', (req, res) => {
+  if (!swaggerEnabled) {
+    return res.status(403).json({ success: false, error: 'Swagger API documentation is disabled in this environment.' });
+  }
+  res.json(swaggerSpec);
+});
 
 // Error Handler Middleware
+if (process.env.NODE_ENV !== 'test' && process.env.SENTRY_DSN) {
+  Sentry.setupExpressErrorHandler(app);
+}
 app.use(csrfErrorHandler);
 app.use(errorHandler);
 
