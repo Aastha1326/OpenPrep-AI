@@ -8,6 +8,7 @@ const Subject = require('../models/Subject');
 const Exam = require('../models/Exam');
 const FocusSession = require('../models/FocusSession');
 const Flashcard = require('../models/Flashcard');
+const StudyPlan = require('../models/StudyPlan');
 
 // ── Mastery tier thresholds (shared with the dashboard UI) ──
 // Beginner: < 50% | Intermediate: 50-79% | Master: 80%+
@@ -122,6 +123,60 @@ exports.getDashboardStats = async (req, res, next) => {
       });
     }
 
+    // Calculate countdown and required daily velocity
+    let daysUntilExam = null;
+    let requiredDailyMinutes = 0;
+    const targetDateStr = req.user.examCountdownPreferences?.targetExamDate;
+    if (targetDateStr) {
+      const targetDate = new Date(targetDateStr);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      targetDate.setHours(0, 0, 0, 0);
+      const diffTime = targetDate.getTime() - today.getTime();
+      daysUntilExam = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
+
+    const activePlan = await StudyPlan.findOne({
+      where: { user: userId, status: 'active' },
+    });
+
+    let totalUncompletedDuration = 0;
+    if (activePlan && Array.isArray(activePlan.dailyGoals)) {
+      activePlan.dailyGoals.forEach((goal) => {
+        if (goal && Array.isArray(goal.tasks)) {
+          goal.tasks.forEach((task) => {
+            if (!task.completed) {
+              totalUncompletedDuration += task.duration || 60;
+            }
+          });
+        }
+      });
+    }
+
+    if (daysUntilExam !== null) {
+      if (daysUntilExam > 0) {
+        requiredDailyMinutes = Math.ceil(totalUncompletedDuration / daysUntilExam);
+      } else if (daysUntilExam === 0) {
+        requiredDailyMinutes = totalUncompletedDuration;
+      }
+    }
+
+    const loggedHoursToday = weeklyChartData[weeklyChartData.length - 1]?.hours || 0;
+    const loggedMinutesToday = Math.round(loggedHoursToday * 60);
+
+    let paceStatus = 'On Track';
+    if (targetDateStr) {
+      if (loggedMinutesToday < requiredDailyMinutes) {
+        if (loggedMinutesToday >= requiredDailyMinutes * 0.5) {
+          paceStatus = 'Slightly Behind';
+        } else {
+          paceStatus = 'Action Required';
+        }
+      }
+    } else {
+      paceStatus = null;
+    }
+
     // 5. Recent activity logs
     const activities = await ActivityLog.findAll({
       where: { user: userId },
@@ -145,6 +200,13 @@ exports.getDashboardStats = async (req, res, next) => {
         attemptsCount,
         weeklyChartData,
         recentActivity: activities,
+        examCountdown: {
+          targetExamDate: targetDateStr || null,
+          daysUntilExam,
+          requiredDailyMinutes,
+          loggedMinutesToday,
+          paceStatus,
+        },
       },
     });
   } catch (error) {
