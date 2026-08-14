@@ -11,6 +11,8 @@ import {
   AlertCircle,
   Settings,
   FileAudio,
+  Play,
+  X,
 } from 'lucide-react';import API from '../services/api';
 import useVoiceControl from '../hooks/useVoiceControl';
 import VoiceModeToggle from '../components/VoiceModeToggle';
@@ -62,6 +64,35 @@ const clearSession = () => {
 
 const FlashcardReview = () => {
   const navigate = useNavigate();
+
+  const [showVideoModal, setShowVideoModal] = useState(false);
+  const [videoUrl, setVideoUrl] = useState('');
+  const [videoStart, setVideoStart] = useState(0);
+
+  const handleOpenVideo = (url, start) => {
+    setVideoUrl(url);
+    setVideoStart(start);
+    setShowVideoModal(true);
+  };
+
+  const getYouTubeId = (url) => {
+    if (!url) return '';
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : '';
+  };
+
+  const formatSeconds = (totalSeconds) => {
+    if (!totalSeconds) return '0:00';
+    const hrs = Math.floor(totalSeconds / 3600);
+    const mins = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+    
+    if (hrs > 0) {
+      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const [userSettings, setUserSettings] = useState({
     sm2EasyFactorModifier: 1.0,
@@ -734,6 +765,20 @@ useEffect(() => {
                 <RotateCw className="w-4 h-4 mr-2" />
                 Click or press Space to reveal answer
               </div>
+
+              {currentCard.sourceUrl && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenVideo(currentCard.sourceUrl, currentCard.timestampSeconds);
+                  }}
+                  className="absolute bottom-4 left-6 flex items-center gap-1 px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shadow-md transition z-30 cursor-pointer"
+                >
+                  <Play className="w-3 h-3 fill-white" />
+                  Video Reference ({formatSeconds(currentCard.timestampSeconds)})
+                </button>
+              )}
             </div>
 
             {/* Back */}
@@ -782,6 +827,20 @@ useEffect(() => {
                   {currentCard.back}
                 </p>
               </div>
+
+              {currentCard.sourceUrl && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenVideo(currentCard.sourceUrl, currentCard.timestampSeconds);
+                  }}
+                  className="absolute bottom-4 left-6 flex items-center gap-1 px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shadow-md transition z-30 cursor-pointer"
+                >
+                  <Play className="w-3 h-3 fill-white" />
+                  Video Reference ({formatSeconds(currentCard.timestampSeconds)})
+                </button>
+              )}
             </div>
           </motion.div>
         </AnimatePresence>
@@ -979,6 +1038,30 @@ useEffect(() => {
                 </div>
               </div>
             </motion.div>
+          </div>
+        {showVideoModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+            <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 max-w-2xl w-full flex flex-col gap-4 relative">
+              <button
+                type="button"
+                onClick={() => setShowVideoModal(false)}
+                className="absolute -top-3 -right-3 p-1.5 rounded-full bg-neutral-850 border border-neutral-700 text-stone-400 hover:text-white cursor-pointer z-50"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-black shadow-lg">
+                <iframe
+                  title="Flashcard Video Reference"
+                  src={`https://www.youtube.com/embed/${getYouTubeId(videoUrl)}?start=${videoStart}&autoplay=1`}
+                  className="absolute inset-0 w-full h-full"
+                  allowFullScreen
+                  allow="autoplay"
+                />
+              </div>
+              <div className="text-center text-xs font-semibold text-stone-400">
+                Playing reference from timestamp {formatSeconds(videoStart)}
+              </div>
+            </div>
           </div>
         )}
       </AnimatePresence>
