@@ -4,8 +4,10 @@ import { Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle, X, ArrowLeft } from 
 import API from '../../services/api';
 import OtpInput from './OtpInput';
 import { loadUser } from '../../store/slices/authSlice';
+import useFocusTrap from '../../hooks/useFocusTrap';
 
 const ForgotPasswordModal = ({ isOpen, onClose }) => {
+  const containerRef = useFocusTrap(isOpen, onClose);
   const dispatch = useDispatch();
   const [step, setStep] = useState(1); // 1: Email, 2: OTP, 3: New Password
   const [email, setEmail] = useState('');
@@ -99,7 +101,13 @@ const ForgotPasswordModal = ({ isOpen, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
-      <div className="w-full max-w-md bg-[#FFFBE9] dark:bg-[#16120E] border border-[#CEAB93] dark:border-[#412D15] rounded-3xl shadow-2xl overflow-hidden relative p-6 sm:p-8 animate-scale-up">
+      <div
+        ref={containerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="forgot-password-modal-title"
+        className="w-full max-w-md bg-[#FFFBE9] dark:bg-[#16120E] border border-[#CEAB93] dark:border-[#412D15] rounded-3xl shadow-2xl overflow-hidden relative p-6 sm:p-8 animate-scale-up"
+      >
         {/* Close Button */}
         <button
           onClick={onClose}
@@ -111,7 +119,7 @@ const ForgotPasswordModal = ({ isOpen, onClose }) => {
 
         {/* Header */}
         <div className="text-center mb-6">
-          <h2 className="text-2xl font-extrabold font-playfair text-[#1F150C] dark:text-[#E1DCC9]">
+          <h2 id="forgot-password-modal-title" className="text-2xl font-extrabold font-playfair text-[#1F150C] dark:text-[#E1DCC9]">
             {step === 1 && 'Forgot Password'}
             {step === 2 && 'Verify Code'}
             {step === 3 && 'New Password'}
