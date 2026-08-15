@@ -23,7 +23,94 @@ const createVerifiedUser = async (overrides = {}) => {
     ...overrides,
   });
 };
+// =========================================================================
+// POST /api/auth/logout-all
+// =========================================================================
+describe('POST /api/auth/logout-all', () => {
+  it('should revoke refresh tokens from all devices', async () => {
+    const user = await createVerifiedUser({
+      email: 'logout-all@example.com',
+      refreshTokens: [
+        {
+          token: crypto.createHash('sha256').update('device-token-1').digest('hex'),
+          family: 'device-family-1',
+          createdAt: new Date().toISOString(),
+        },
+        {
+          token: crypto.createHash('sha256').update('device-token-2').digest('hex'),
+          family: 'device-family-2',
+          createdAt: new Date().toISOString(),
+        },
+      ],
+      refreshTokenExpire: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
 
+    const accessToken = jwt.sign(
+      { id: user.id, type: 'access' },
+      process.env.JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+
+    const res = await request(app)
+      .post('/api/auth/logout-all')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+
+    const updatedUser = await User.findByPk(user.id);
+
+    expect(updatedUser.refreshTokens).toEqual([]);
+    expect(updatedUser.refreshTokenExpire).toBeNull();
+  });
+
+  it('should reject refresh tokens after logout-all', async () => {
+    const deviceToken1 = 'device-refresh-token-1';
+    const deviceToken2 = 'device-refresh-token-2';
+
+    const user = await createVerifiedUser({
+      email: 'logout-all-refresh@example.com',
+      refreshTokens: [
+        {
+          token: crypto.createHash('sha256').update(deviceToken1).digest('hex'),
+          family: 'device-family-1',
+          createdAt: new Date().toISOString(),
+        },
+        {
+          token: crypto.createHash('sha256').update(deviceToken2).digest('hex'),
+          family: 'device-family-2',
+          createdAt: new Date().toISOString(),
+        },
+      ],
+      refreshTokenExpire: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
+
+    const accessToken = jwt.sign(
+      { id: user.id, type: 'access' },
+      process.env.JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+
+    const logoutResponse = await request(app)
+      .post('/api/auth/logout-all')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(logoutResponse.status).toBe(200);
+
+    const device1Refresh = await request(app)
+      .post('/api/auth/refresh-token')
+      .send({ refreshToken: deviceToken1 });
+
+    const device2Refresh = await request(app)
+      .post('/api/auth/refresh-token')
+      .send({ refreshToken: deviceToken2 });
+
+    expect(device1Refresh.status).toBe(401);
+    expect(device2Refresh.status).toBe(401);
+    expect(device1Refresh.body.error).toBe('Invalid or expired refresh token');
+    expect(device2Refresh.body.error).toBe('Invalid or expired refresh token');
+  });
+});
 describe('Auth Controller - Integration Tests', () => {
   // =========================================================================
   // POST /api/auth/register

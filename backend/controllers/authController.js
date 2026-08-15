@@ -1171,7 +1171,28 @@ exports.logout = async (req, res, next) => {
     next(error);
   }
 };
+// @route   POST /api/auth/logout-all
+// @access  Private
+// ---------------------------------------------------------------------------
+exports.logoutAll = async (req, res, next) => {
+  try {
+    // Remove every refresh token belonging to the authenticated user.
+    // This invalidates sessions on all devices immediately because the
+    // refresh-token endpoint only accepts tokens stored in this array.
+    req.user.refreshTokens = [];
+    req.user.refreshTokenExpire = null;
+    await req.user.save();
 
+    clearRefreshTokenCookie(res);
+
+    res.status(200).json({
+      success: true,
+      message: 'Logged out from all devices successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 // ---------------------------------------------------------------------------
 // @desc    Resend verification email
 // @route   POST /api/auth/resend-verification

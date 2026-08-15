@@ -16,8 +16,8 @@ const {
   resetPasswordOtp,
   refreshToken,
   logout,
-  updateSettings,
-  updateSM2Settings,
+  logoutAll,
+  updateSettings,  updateSM2Settings,
   resetSM2Settings,
   oauthSuccessCallback,
   registerOAuthEmail,
@@ -186,8 +186,8 @@ router.post(
 );
 
 // Log out the current user
-router.post('/logout', logout);
-
+// Log out the authenticated user from all devices
+router.post('/logout-all', protect, logoutAll);
 // Retrieve the authenticated user's profile
 router.get('/me', protect, getMe);
 
