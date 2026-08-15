@@ -1,5 +1,155 @@
-const speakeasy = require('speakeasy');
-const QRCode = require('qrcode');
+const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
+let speakeasy = null;
+let QRCode = null;
+try {
+  speakeasy = require('speakeasy');
+  QRCode = require('qrcode');
+} catch (e) {
+  // Graceful fallback for test environments without optional dependencies
+}
+const { Op } = require('sequelize');
+const User = require('../models/User');
+const Achievement = require('../models/Achievement');
+
+const getAuthCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+  maxAge: 30 * 24 * 60 * 60 * 1000,
+  path: '/',
+});
+
+const generateAccessToken = (id) => {
+  return jwt.sign({ id, type: 'access' }, process.env.JWT_SECRET || 'supersecret_openprep_key', {
+    expiresIn: process.env.JWT_EXPIRE || '30d',
+  });
+};
+
+const generateTokenFamily = () => crypto.randomBytes(16).toString('hex');
+
+const generateRefreshToken = async (user, family = null) => {
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+  const tokenFamily = family || generateTokenFamily();
+
+  const userTokens = Array.isArray(user.refreshTokens) ? user.refreshTokens : [];
+  userTokens.push({
+    token: hashedToken,
+    family: tokenFamily,
+    createdAt: new Date(),
+  });
+
+  user.refreshTokens = userTokens;
+  user.refreshTokenExpire = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  await user.save();
+
+  return { rawToken, tokenFamily };
+};
+
+const setRefreshTokenCookie = (res, refreshToken) => {
+  res.cookie('refreshToken', refreshToken, getAuthCookieOptions());
+};
+
+const clearRefreshTokenCookie = (res) => {
+  res.clearCookie('refreshToken', getAuthCookieOptions());
+};
+
+// ---------------------------------------------------------------------------
+// @desc    Register user
+// @route   POST /api/auth/register
+// @access  Public
+// ---------------------------------------------------------------------------
+exports.register = async (req, res, next) => {
+  try {
+    const { name, email, password, role } = req.body;
+
+    let user = await User.findOne({ where: { email } });
+    if (user) {
+      return res.status(400).json({ success: false, error: 'User already exists' });
+    }
+
+    user = await User.create({
+      name,
+      email,
+      password,
+      role: role || 'student',
+    });
+
+    const accessToken = generateAccessToken(user.id);
+    res.cookie('token', accessToken, getAuthCookieOptions());
+
+    res.status(201).json({
+      success: true,
+      token: accessToken,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// @desc    Login user
+// @route   POST /api/auth/login
+// @access  Public
+// ---------------------------------------------------------------------------
+exports.login = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ success: false, error: 'Please provide email and password' });
+    }
+
+    const user = await User.findOne({ where: { email } });
+    if (!user) {
+      return res.status(401).json({ success: false, error: 'Invalid credentials' });
+    }
+
+    const isMatch = await user.matchPassword(password);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, error: 'Invalid credentials' });
+    }
+
+    const accessToken = generateAccessToken(user.id);
+    res.cookie('token', accessToken, getAuthCookieOptions());
+
+    res.status(200).json({
+      success: true,
+      token: accessToken,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// @desc    Logout user & clear HttpOnly cookies
+// @route   POST /api/auth/logout
+// @access  Private / Public
+// ---------------------------------------------------------------------------
+exports.logout = async (req, res, next) => {
+  try {
+    const cookieOptions = getAuthCookieOptions();
+    res.clearCookie('token', cookieOptions);
+    res.clearCookie('refreshToken', cookieOptions);
+    res.status(200).json({ success: true, message: 'Logged out successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
 
 // ---------------------------------------------------------------------------
 // @desc    Setup 2FA (Generate secret and backup codes)
@@ -116,8 +266,18 @@ exports.verifyLogin2FA = async (req, res, next) => {
     const refreshToken = refreshResult.rawToken;
 
     setRefreshTokenCookie(res, refreshToken);
+    res.cookie('token', accessToken, getAuthCookieOptions());
 
-        unlockedNodes: user.unlockedNodes || ['root'],
+    res.status(200).json({
+      success: true,
+      token: accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isEmailVerified: user.isEmailVerified,
       },
     });
   } catch (error) {
@@ -448,12 +608,11 @@ exports.googleLogin = async (req, res, next) => {
     const refreshToken = refreshResult.rawToken;
 
     setRefreshTokenCookie(res, refreshToken);
+    res.cookie('token', accessToken, getAuthCookieOptions());
 
     return res.status(200).json({
       success: true,
       token: accessToken,
-=======
->>>>>>> 18bdb2e24fbfe9356291e11a5ec0dad6b95ff817
       refreshToken,
       user: {
         id: user.id,
@@ -625,6 +784,7 @@ exports.registerOAuthEmail = async (req, res, next) => {
     const refreshResult = await generateRefreshToken(user);
     const refreshToken = refreshResult.rawToken;
     setRefreshTokenCookie(res, refreshToken);
+    res.cookie('token', accessToken, getAuthCookieOptions());
 
     res.status(200).json({
       success: true,
