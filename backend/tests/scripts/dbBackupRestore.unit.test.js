@@ -1,7 +1,7 @@
+const { vi, describe, test, expect, afterEach } = require('vitest');
 const fs = require('fs');
 const path = require('path');
 
-// Mock fs module for file pruning tests
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal();
   return {
