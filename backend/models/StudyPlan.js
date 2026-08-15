@@ -67,6 +67,8 @@ StudyPlan.afterSave(async (studyPlan, options) => {
   try {
     const pattern = `user_${studyPlan.user}:*`;
     await cacheManager.invalidate(pattern);
+    const cacheService = require('../services/cacheService');
+    await cacheService.del(`study_plan:active:${studyPlan.user}`);
   } catch (err) {
     console.error('Error invalidating cache after StudyPlan save:', err);
   }
@@ -76,6 +78,8 @@ StudyPlan.afterDestroy(async (studyPlan, options) => {
   try {
     const pattern = `user_${studyPlan.user}:*`;
     await cacheManager.invalidate(pattern);
+    const cacheService = require('../services/cacheService');
+    await cacheService.del(`study_plan:active:${studyPlan.user}`);
   } catch (err) {
     console.error('Error invalidating cache after StudyPlan destroy:', err);
   }
