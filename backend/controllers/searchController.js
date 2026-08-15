@@ -1,86 +1,93 @@
+const { Topic, FlashcardDeck, Quiz, StudyPlan } = require('../models');
 const { Op } = require('sequelize');
-const Note = require('../models/Note');
-const PYQ = require('../models/PYQ');
-const Flashcard = require('../models/Flashcard');
-const Subject = require('../models/Subject');
 
-exports.universalSearch = async (req, res, next) => {
-  const startTime = Date.now();
+// @desc    Global search across topics, decks, quizzes, and study plan tasks
+// @route   GET /api/search
+// @access  Private
+exports.globalSearch = async (req, res, next) => {
   try {
-    const { q, category = 'all', page = 1, limit = 20 } = req.query;
-
-    if (!q || q.trim() === '') {
-      return res.status(400).json({ success: false, error: 'Search query parameter "q" is required' });
+    const q = req.query.q || '';
+    if (!q.trim()) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          topics: [],
+          decks: [],
+          quizzes: [],
+          tasks: [],
+        },
+      });
     }
 
-    const searchTerm = `%${q.trim()}%`;
-    const offset = (parseInt(page) - 1) * parseInt(limit);
-    const searchLimit = parseInt(limit);
+    const userId = req.user.id;
+    const queryLike = `%${q}%`;
 
-    let notes = [], pyqs = [], flashcards = [], syllabi = [];
+    // 1. Search Topics
+    const topics = await Topic.findAll({
+      where: {
+        user: userId,
+        name: { [Op.iLike]: queryLike },
+      },
+      attributes: ['id', 'name', 'subject'],
+      limit: 10,
+    });
 
-    // Run parallel queries based on category filter
-    const promises = [];
+    // 2. Search FlashcardDecks
+    const decks = await FlashcardDeck.findAll({
+      where: {
+        user: userId,
+        name: { [Op.iLike]: queryLike },
+      },
+      attributes: ['id', 'name', 'subject'],
+      limit: 10,
+    });
 
-    if (category === 'all' || category === 'notes') {
-      promises.push(
-        Note.findAll({
-          where: { [Op.or]: [{ title: { [Op.iLike]: searchTerm } }, { content: { [Op.iLike]: searchTerm } }] },
-          limit: searchLimit,
-          offset,
-        }).then((res) => { notes = res.map(item => ({ id: item.id, title: item.title, snippet: item.content, type: 'notes' })); })
-      );
-    }
+    // 3. Search Quizzes
+    const quizzes = await Quiz.findAll({
+      where: {
+        createdBy: userId,
+        title: { [Op.iLike]: queryLike },
+      },
+      attributes: ['id', 'title', 'subject'],
+      limit: 10,
+    });
 
-    if (category === 'all' || category === 'pyqs') {
-      promises.push(
-        PYQ.findAll({
-          where: { [Op.or]: [{ question: { [Op.iLike]: searchTerm } }, { solution: { [Op.iLike]: searchTerm } }] },
-          limit: searchLimit,
-          offset,
-        }).then((res) => { pyqs = res.map(item => ({ id: item.id, title: item.question, snippet: item.solution, type: 'pyqs' })); })
-      );
-    }
+    // 4. Search StudyPlan Tasks (inside dailyGoals JSONB)
+    const studyPlans = await StudyPlan.findAll({
+      where: { user: userId },
+      attributes: ['id', 'dailyGoals'],
+    });
 
-    if (category === 'all' || category === 'flashcards') {
-      promises.push(
-        Flashcard.findAll({
-          where: { [Op.or]: [{ front: { [Op.iLike]: searchTerm } }, { back: { [Op.iLike]: searchTerm } }] },
-          limit: searchLimit,
-          offset,
-        }).then((res) => { flashcards = res.map(item => ({ id: item.id, title: item.front, snippet: item.back, type: 'flashcards' })); })
-      );
-    }
+    const tasks = [];
+    studyPlans.forEach((plan) => {
+      const dailyGoals = plan.dailyGoals || [];
+      dailyGoals.forEach((goal, gIdx) => {
+        const title = goal.title || goal.task || goal.text || '';
+        if (title.toLowerCase().includes(q.toLowerCase())) {
+          tasks.push({
+            id: `${plan.id}-task-${gIdx}`,
+            title,
+            planId: plan.id,
+            completed: goal.completed || false,
+          });
+        }
+      });
+    });
 
-    if (category === 'all' || category === 'syllabi') {
-      promises.push(
-        Syllabus.findAll({
-          where: { [Op.or]: [{ topic: { [Op.iLike]: searchTerm } }, { description: { [Op.iLike]: searchTerm } }] },
-          limit: searchLimit,
-          offset,
-        }).then((res) => { syllabi = res.map(item => ({ id: item.id, title: item.topic, snippet: item.description, type: 'syllabi' })); })
-      );
-    }
-
-    await Promise.all(promises);
-
-    const combinedResults = [...notes, ...pyqs, ...flashcards, ...syllabi];
-    const executionTime = Date.now() - startTime;
+    // Limit tasks output
+    const limitedTasks = tasks.slice(0, 10);
 
     res.status(200).json({
       success: true,
-      query: q,
-      executionTimeMs: executionTime,
-      count: combinedResults.length,
       data: {
-        notes,
-        pyqs,
-        flashcards,
-        syllabi,
-        all: combinedResults,
+        topics,
+        decks,
+        quizzes,
+        tasks: limitedTasks,
       },
     });
   } catch (error) {
+    console.error('[searchController.globalSearch] Error:', error);
     next(error);
   }
 };

@@ -1,4 +1,4 @@
-import { useEffect, lazy, Suspense } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { loadUser, checkTokenFreshness, setAiQuotaExceededUntil, setAiQuotaErrorMsg } from './store/slices/authSlice';
@@ -10,7 +10,7 @@ import MobileNavDrawer from './components/MobileNavDrawer';
 import PageSkeleton from './components/PageSkeleton';
 import SessionTimeoutModal from './components/SessionTimeoutModal';
 import QuotaExceededModal from './components/dashboard/QuotaExceededModal';
-import CommandPalette from './components/CommandPalette';
+import CommandPalette from './components/search/CommandPalette';
 import OfflineBanner from './components/common/OfflineBanner';
 import PwaInstallPrompt from './components/common/PwaInstallPrompt';
 import OfflineIndicator from './components/common/OfflineIndicator';
@@ -45,6 +45,18 @@ const SquadsPage = lazy(() => import('./pages/SquadsPage'));
 function App() {
   const dispatch = useDispatch();
   const { sessionExpired, aiQuotaExceededUntil } = useSelector((state) => state.auth);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     if (localStorage.getItem('token')) {
@@ -124,7 +136,7 @@ function App() {
       <ScrollToTop />
       <MobileNavDrawer />
       <QuotaExceededModal />
-      <CommandPalette />
+      <CommandPalette isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
       <Suspense fallback={<PageSkeleton />}>
         <Routes>
           <Route path="/" element={<Landing />} />
