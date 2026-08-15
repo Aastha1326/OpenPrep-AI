@@ -1,0 +1,14 @@
+{
+  "welcome": "Welcome back",
+  "dashboard": "Dashboard",
+  "settings": "Settings",
+  "logout": "Log out",
+  "export_analytics": "Export Analytics",
+  "sm2_settings": "SM-2 Settings",
+  "skill_tree": "Skill Tree",
+  "study_group": "Study Group",
+  "ai_assistant": "AI Assistant",
+  "pyqs": "PYQs",
+  "flashcards": "Flashcards",
+  "select_language": "Select Language"
+}

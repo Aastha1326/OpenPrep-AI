@@ -16,6 +16,10 @@ const QuizBookmark = require('../models/QuizBookmark');const geminiService = req
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
 const { runCalibration } = require('../services/difficultyCalibrator');
 const { calculateTopicProficiency, getDifficultyLevel } = require('../services/proficiencyService');
+const Flashcard = require('../models/Flashcard');
+const remediationService = require('../services/remediationService');
+const { uploadFileToFirebase } = require('../services/firebaseStorageService');
+const { checkAndAwardBadges } = require('../services/achievementService');
 
 // Window (ms) during which duplicate quiz submissions for the same quiz are ignored.
 // Prevents double-click on "Submit Quiz" from creating duplicate attempt records.
@@ -52,7 +56,7 @@ function extractMistookQuestions(attempt) {
 // @access  Private
 exports.generateAIQuiz = async (req, res, next) => {
   try {
-    const { subjectId, topicId, count, language } = req.body;
+    const { subjectId, topicId, count, language, questionType = 'MCQ' } = req.body;
     const normalizedLanguage = normalizeQuizLanguage(language);
 
     const subject = await Subject.findByPk(subjectId);
@@ -88,15 +92,20 @@ exports.generateAIQuiz = async (req, res, next) => {
       count || 5,
       req.query.refresh === 'true',
       normalizedLanguage,
-      difficultyLevel
+      difficultyLevel,
+      questionType
     );
 
     // Assign unique question IDs (similar to Mongoose subdocument ids)
     const questionsWithIds = aiQuiz.questions.map((q) => ({
       _id: uuidv4(),
+      questionType: q.questionType || (q.options ? 'MCQ' : 'SUBJECTIVE'),
       questionText: q.questionText,
-      options: q.options,
-      correctAnswer: q.correctAnswer,
+      options: q.options || [],
+      correctAnswer: q.correctAnswer !== undefined ? q.correctAnswer : null,
+      idealAnswer: q.idealAnswer || '',
+      rubricCriteria: q.rubricCriteria || [],
+      maxScore: q.maxScore || 10,
       explanation: q.explanation || '',
     }));
 
@@ -109,6 +118,15 @@ exports.generateAIQuiz = async (req, res, next) => {
       language: normalizedLanguage,
       createdBy: req.user.id,
     });
+
+    await createNotification(
+      req.user.id,
+      '🧠 AI Quiz Ready',
+      `Your practice quiz "${quiz.title}" has been generated.`,
+      'ai_quiz',
+      `/quiz/${quiz.id}`,
+      global.io
+    );
 
     res.status(201).json({ success: true, data: quiz });
   } catch (error) {
@@ -350,21 +368,49 @@ exports.submitQuizAttempt = async (req, res, next) => {
 
       // Evaluate answers
       let correctCount = 0;
+      let totalEarnedPoints = 0;
+      let totalMaxPoints = 0;
+
       const evaluatedAnswers = questionsList.map((q) => {
         const userAns = answers.find((ans) => String(ans.questionId) === String(q._id || q.id));
-        const selected = userAns && userAns.selectedAnswer !== undefined ? userAns.selectedAnswer : -1;
-        const isCorrect = selected === q.correctAnswer;
-        if (isCorrect) correctCount++;
+        const isSubjective = q.questionType === 'SUBJECTIVE' || (!q.options && q.idealAnswer);
 
-        return {
-          questionId: q._id || q.id,
-          selectedAnswer: selected,
-          isCorrect,
-        };
+        if (isSubjective) {
+          const evalObj = userAns && userAns.evaluation ? userAns.evaluation : null;
+          const earned = evalObj ? (evalObj.score || 0) : 0;
+          const maxSc = (evalObj && evalObj.maxScore) ? evalObj.maxScore : (q.maxScore || 10);
+          totalEarnedPoints += earned;
+          totalMaxPoints += maxSc;
+          const isCorrect = maxSc > 0 ? (earned / maxSc) >= 0.5 : false;
+          if (isCorrect) correctCount++;
+
+          return {
+            questionId: q._id || q.id,
+            questionType: 'SUBJECTIVE',
+            userAnswerText: userAns ? (userAns.userAnswerText || userAns.selectedAnswer || '') : '',
+            isCorrect,
+            evaluation: evalObj,
+          };
+        } else {
+          totalMaxPoints += 1;
+          const selected = userAns && userAns.selectedAnswer !== undefined ? userAns.selectedAnswer : -1;
+          const isCorrect = selected === q.correctAnswer;
+          if (isCorrect) {
+            correctCount++;
+            totalEarnedPoints += 1;
+          }
+
+          return {
+            questionId: q._id || q.id,
+            questionType: 'MCQ',
+            selectedAnswer: selected,
+            isCorrect,
+          };
+        }
       });
 
       const totalQuestions = questionsList.length;
-      const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
+      const score = totalMaxPoints > 0 ? Math.round((totalEarnedPoints / totalMaxPoints) * 100) : 0;
 
       // Determine weak vs strong areas based on score (<50% Weak, 50-80% Medium, >80% Strong)
       const weakTopics = [];
@@ -471,6 +517,28 @@ exports.submitQuizAttempt = async (req, res, next) => {
       timezoneOffsetMinutes: timezoneOffset
     });
     progression.newBadges = newBadges;
+
+    // Issue #1053: Check for Quiz Master and Sharpshooter
+    let consecutiveHighScores = 0;
+    if (score > 85) {
+      const pastAttempts = await QuizAttempt.findAll({
+        where: { user: req.user.id },
+        order: [['createdAt', 'DESC']],
+        limit: 3
+      });
+      if (pastAttempts.length === 3 && pastAttempts.every(a => a.score > 85)) {
+        consecutiveHighScores = 3;
+      }
+    }
+    
+    const earnedAchievements = await checkAndAwardBadges(req.user.id, {
+      type: 'QUIZ_SUBMIT',
+      payload: { score, consecutiveHighScores }
+    });
+    
+    if (earnedAchievements.length > 0) {
+      progression.earnedAchievements = earnedAchievements;
+    }
 
     res.status(201).json({
       success: true,
@@ -1045,6 +1113,143 @@ exports.getQuizAttemptReportPDF = async (req, res, next) => {
 
     doc.end();
   } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Evaluate student's written response for a subjective question against rubric using Gemini
+// @route   POST /api/quizzes/evaluate-subjective
+// @access  Private
+exports.evaluateSubjectiveAnswer = async (req, res, next) => {
+  try {
+    const { questionId, quizId, userAnswerText } = req.body;
+    let targetQuestion = null;
+
+    if (quizId) {
+      const quiz = await Quiz.findByPk(quizId);
+      if (quiz && Array.isArray(quiz.questions)) {
+        targetQuestion = quiz.questions.find((q) => String(q._id || q.id) === String(questionId));
+      }
+    }
+
+    const questionText = targetQuestion ? targetQuestion.questionText : (req.body.questionText || '');
+    const idealAnswer = targetQuestion ? targetQuestion.idealAnswer : (req.body.idealAnswer || '');
+    const rubricCriteria = targetQuestion ? targetQuestion.rubricCriteria : (req.body.rubricCriteria || []);
+    const maxScore = targetQuestion ? (targetQuestion.maxScore || 10) : (req.body.maxScore || 10);
+
+    const evaluation = await geminiService.evaluateSubjectiveAnswer(
+      questionText,
+      idealAnswer,
+      rubricCriteria,
+      userAnswerText || '',
+      maxScore,
+      req.query.refresh === 'true'
+    );
+
+    res.status(200).json({
+      success: true,
+      data: evaluation,
+    });
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({
+        success: false,
+        error: error.message,
+      });
+    }
+    next(error);
+  }
+};
+
+// @desc    Generate a targeted MCQ diagnostic quiz from forgotten flashcards
+// @route   POST /api/quizzes/generate-remediation
+// @access  Private
+exports.generateRemediationQuiz = async (req, res, next) => {
+  try {
+    const { deckId, failedCardIds, count = 5 } = req.body;
+
+    // Validate deck ownership
+    const subject = await Subject.findOne({ where: { id: deckId, user: req.user.id } });
+    if (!subject) {
+      return res.status(404).json({ success: false, error: 'Flashcard deck not found or access denied' });
+    }
+
+    // Edge case: fewer than 2 failed cards → fallback message
+    if (!Array.isArray(failedCardIds) || failedCardIds.length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: 'At least 2 failed card IDs are required to generate a remediation quiz.',
+        fallback: 'standard_revision',
+      });
+    }
+
+    // Retrieve and validate that the caller owns all provided card IDs
+    const weakCards = await Flashcard.findAll({
+      where: { id: failedCardIds, user: req.user.id, subject: deckId },
+      attributes: ['id', 'front', 'back'],
+    });
+
+    if (weakCards.length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: 'Fewer than 2 valid failed cards found for this deck. Standard revision recommended.',
+        fallback: 'standard_revision',
+      });
+    }
+
+    const forceRefresh = req.query.refresh === 'true';
+    const aiQuiz = await remediationService.generateRemediationQuiz({
+      userId: req.user.id,
+      deckId,
+      subjectName: subject.name,
+      weakCards: weakCards.map((c) => ({ id: c.id, front: c.front, back: c.back })),
+      count,
+      forceRefresh,
+    });
+
+    const questionsWithIds = (aiQuiz.questions || []).map((q) => ({
+      _id: uuidv4(),
+      questionType: 'MCQ',
+      questionText: q.questionText,
+      options: q.options || [],
+      correctAnswer: q.correctAnswer !== undefined ? q.correctAnswer : null,
+      explanation: q.explanation || '',
+    }));
+
+    const quiz = await Quiz.create({
+      title: aiQuiz.title || `Remediation Quiz: ${subject.name}`,
+      subject: deckId,
+      topic: null,
+      questions: questionsWithIds,
+      type: 'AI_Generated',
+      sourceType: 'REMEDIATION',
+      linkedDeckId: deckId,
+      language: 'english',
+      createdBy: req.user.id,
+      timeLimit: 10,
+    });
+
+    await ActivityLog.create({
+      user: req.user.id,
+      activityType: 'quiz_attempt',
+      description: `Generated remediation diagnostic quiz for deck: "${subject.name}" targeting ${weakCards.length} weak cards`,
+    });
+
+    res.status(201).json({ success: true, data: quiz });
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({ success: false, error: error.message, retryAfter: error.retryAfter });
+    }
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({ success: false, error: error.message });
+    }
     next(error);
   }
 };

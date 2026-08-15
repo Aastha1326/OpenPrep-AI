@@ -48,3 +48,9 @@ backend/uploads/
 *.sw?
 .vercel
 .env*.local
+
+# Database Backups
+backups/
+backend/backups/
+*.sql.gz
+

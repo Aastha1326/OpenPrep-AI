@@ -1,5 +1,6 @@
 const express = require('express');
 const { getActivityHeatmap } = require('../controllers/progressController');
+const { getReadinessProjection } = require('../controllers/readinessController');
 const { protect } = require('../middleware/auth');
 const router = express.Router();
 
@@ -55,6 +56,36 @@ const router = express.Router();
  *               $ref: '#/components/schemas/Error'
  */
 
+/**
+ * @swagger
+ * /api/analytics/readiness-projection:
+ *   get:
+ *     summary: Retrieve predictive exam readiness trajectory and daily hours simulation data
+ *     tags: [Analytics]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: targetExamDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: dailyHours
+ *         schema:
+ *           type: integer
+ *           default: 2
+ *       - in: query
+ *         name: targetScore
+ *         schema:
+ *           type: integer
+ *           default: 85
+ *     responses:
+ *       200:
+ *         description: Predictive readiness trajectory and recommendations
+ */
+
+router.get('/readiness-projection', protect, getReadinessProjection);
 router.get('/activity-heatmap', protect, getActivityHeatmap);
 
 module.exports = router;
