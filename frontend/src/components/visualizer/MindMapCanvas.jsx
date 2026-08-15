@@ -23,8 +23,27 @@ const CustomConceptNode = ({ data, selected }) => {
     subtopic: 'bg-emerald-950/90 border-emerald-500/80 text-emerald-100 shadow-emerald-500/30',
     formula: 'bg-amber-950/90 border-amber-500/80 text-amber-100 shadow-amber-500/30',
     definition: 'bg-cyan-950/90 border-cyan-500/80 text-cyan-100 shadow-cyan-500/30',
-  }[category] || 'bg-slate-900/90 border-slate-700 text-slate-100 shadow-slate-500/20';
+const CustomConceptNode = ({ data, selected }) => {
+  const category = data.category || 'topic';
 
+  // Mastery-based color coding (Issue #758):
+  // Green = Mastered (>80%), Yellow = In Progress (50-80%), Red = Weak (<50%), Grey = Unstudied
+  const masteryStyles = {
+    Mastered: 'bg-emerald-950/90 border-emerald-500/80 text-emerald-100 shadow-emerald-500/30',
+    'In Progress': 'bg-yellow-950/90 border-yellow-500/80 text-yellow-100 shadow-yellow-500/30',
+    Weak: 'bg-red-950/90 border-red-500/80 text-red-100 shadow-red-500/30',
+    Unstudied: 'bg-slate-800/90 border-slate-600/80 text-slate-300 shadow-slate-500/20',
+  };
+
+  const categoryStyles = data.masteryTier
+    ? masteryStyles[data.masteryTier] || masteryStyles.Unstudied
+    : {
+        root: 'bg-purple-950/90 border-purple-500/80 text-purple-100 shadow-purple-500/30',
+        topic: 'bg-indigo-950/90 border-indigo-500/80 text-indigo-100 shadow-indigo-500/30',
+        subtopic: 'bg-emerald-950/90 border-emerald-500/80 text-emerald-100 shadow-emerald-500/30',
+        formula: 'bg-amber-950/90 border-amber-500/80 text-amber-100 shadow-amber-500/30',
+        definition: 'bg-cyan-950/90 border-cyan-500/80 text-cyan-100 shadow-cyan-500/30',
+      }[category] || 'bg-slate-900/90 border-slate-700 text-slate-100 shadow-slate-500/20';
   const categoryBadges = {
     root: 'ROOT',
     topic: 'TOPIC',
@@ -41,14 +60,18 @@ const CustomConceptNode = ({ data, selected }) => {
     >
       <Handle type="target" position={Position.Top} className="!bg-slate-400 !w-2.5 !h-2.5" />
       <div className="flex items-center justify-between gap-2 mb-1">
-        <span className="text-[9px] font-extrabold tracking-widest uppercase opacity-75">{categoryBadges}</span>
+<span className="text-[9px] font-extrabold tracking-widest uppercase opacity-75">{categoryBadges}</span>
         {data.difficulty && (
           <span className="text-[9px] font-mono opacity-80 uppercase px-1.5 py-0.5 rounded bg-slate-950/50">
             {data.difficulty}
           </span>
         )}
-      </div>
-      <div className="text-xs font-bold leading-tight break-words">{data.label}</div>
+        {typeof data.masteryPercentage === 'number' && (
+          <span className="text-[9px] font-mono opacity-90 px-1.5 py-0.5 rounded bg-slate-950/50">
+            {data.masteryPercentage}%
+          </span>
+        )}
+      </div>      <div className="text-xs font-bold leading-tight break-words">{data.label}</div>
       <Handle type="source" position={Position.Bottom} className="!bg-slate-400 !w-2.5 !h-2.5" />
     </div>
   );
@@ -278,12 +301,20 @@ export default function MindMapCanvas({ graphData, onNodeSelect }) {
           >
             <Background color="#334155" gap={24} size={1} />
             <Controls className="!bg-slate-900 !border-slate-800 !text-slate-200 !rounded-xl overflow-hidden" />
-            <MiniMap
-              nodeColor={(n) => (n.data?.category === 'root' ? '#8b5cf6' : '#6366f1')}
+<MiniMap
+              nodeColor={(n) => {
+                const tierColors = {
+                  Mastered: '#10b981',
+                  'In Progress': '#eab308',
+                  Weak: '#ef4444',
+                  Unstudied: '#64748b',
+                };
+                if (n.data?.masteryTier) return tierColors[n.data.masteryTier] || tierColors.Unstudied;
+                return n.data?.category === 'root' ? '#8b5cf6' : '#6366f1';
+              }}
               maskColor="rgba(15, 23, 42, 0.8)"
               className="!bg-slate-900 !border-slate-800 !rounded-xl"
-            />
-          </ReactFlow>
+            />          </ReactFlow>
         </div>
       )}
     </div>
