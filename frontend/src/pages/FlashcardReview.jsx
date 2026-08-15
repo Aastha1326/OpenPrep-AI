@@ -11,14 +11,14 @@ import {
   AlertCircle,
   Settings,
   FileAudio,
-  Play,
-  X,
-} from 'lucide-react';import API from '../services/api';
+  Keyboard,
+} from 'lucide-react';
+import API from '../services/api';
 import useVoiceControl from '../hooks/useVoiceControl';
 import VoiceModeToggle from '../components/VoiceModeToggle';
 import AudioWaveform from '../components/AudioWaveform';
 import GenerateFlashcardsFromAudioModal from '../components/dashboard/GenerateFlashcardsFromAudioModal';
-import RemediationQuizModal from '../components/flashcards/RemediationQuizModal';
+import KeyboardShortcutsModal from '../components/flashcards/KeyboardShortcutsModal';
 const STORAGE_KEY = 'flashcardReviewSession';
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -102,6 +102,7 @@ const FlashcardReview = () => {
   });
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isKeyboardHelpOpen, setIsKeyboardHelpOpen] = useState(false);
   const [isAudioGeneratorOpen, setIsAudioGeneratorOpen] = useState(false);
   const [modalSettings, setModalSettings] = useState(userSettings);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
@@ -431,25 +432,85 @@ useEffect(() => {
     }
   };
 
-  // Keyboard support
+  // Comprehensive Keyboard Navigation Support
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Space or Enter to flip
-      if (!isFlipped && (e.key === ' ' || e.key === 'Enter')) {
+      // Input guard: ignore shortcuts if typing inside text inputs or editable areas
+      const activeEl = document.activeElement;
+      const isInputActive =
+        activeEl &&
+        (['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl.tagName) || activeEl.isContentEditable);
+      if (isInputActive) return;
+
+      // Question mark (?) to toggle keyboard shortcuts modal
+      if (e.key === '?' || (e.shiftKey && e.key === '/')) {
         e.preventDefault();
-        setIsFlipped(true);
+        setIsKeyboardHelpOpen((prev) => !prev);
+        return;
       }
-      // If flipped, 0-5 keys for rating
-      if (isFlipped) {
-        if (['0', '1', '2', '3', '4', '5'].includes(e.key)) {
-          e.preventDefault();
-          handleReview(parseInt(e.key, 10));
+
+      // Escape to close open modals or exit review session
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (isKeyboardHelpOpen) {
+          setIsKeyboardHelpOpen(false);
+        } else if (isSettingsOpen) {
+          setIsSettingsOpen(false);
+        } else if (isAudioGeneratorOpen) {
+          setIsAudioGeneratorOpen(false);
+        } else {
+          handleExit();
         }
+        return;
+      }
+
+      // Space or Enter to flip card front/back
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        handleCardFlip();
+        return;
+      }
+
+      // ArrowRight or 'n' / 'N' to skip to Next Card
+      if (e.key === 'ArrowRight' || e.key === 'n' || e.key === 'N') {
+        e.preventDefault();
+        if (currentIndex < cards.length - 1) {
+          setCurrentIndex((prev) => prev + 1);
+          setIsFlipped(false);
+        }
+        return;
+      }
+
+      // ArrowLeft or 'p' / 'P' to go back to Previous Card
+      if (e.key === 'ArrowLeft' || e.key === 'p' || e.key === 'P') {
+        e.preventDefault();
+        if (currentIndex > 0) {
+          setCurrentIndex((prev) => prev - 1);
+          setIsFlipped(false);
+        }
+        return;
+      }
+
+      // 0-5 keys for rating (only when card is flipped)
+      if (isFlipped && ['0', '1', '2', '3', '4', '5'].includes(e.key)) {
+        e.preventDefault();
+        handleReview(parseInt(e.key, 10));
       }
     };
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFlipped, handleReview]);
+  }, [
+    isFlipped,
+    isKeyboardHelpOpen,
+    isSettingsOpen,
+    isAudioGeneratorOpen,
+    currentIndex,
+    cards.length,
+    handleCardFlip,
+    handleReview,
+    handleExit,
+  ]);
 
   // Persist the latest checkpoint when the tab is closed or refreshed.
   useEffect(() => {
@@ -616,6 +677,15 @@ useEffect(() => {
 />          <div className="text-sm font-semibold text-neutral-500 dark:text-neutral-400 border-l border-neutral-300 dark:border-slate-700 pl-3">
             {currentIndex + 1} <span className="text-neutral-300 dark:text-neutral-600">/</span> {cards.length}
           </div>
+          <button
+            onClick={() => setIsKeyboardHelpOpen(true)}
+            aria-keyshortcuts="?"
+            aria-label="Keyboard Shortcuts Guide (?)"
+            className="p-1.5 rounded-full hover:bg-neutral-200 dark:hover:bg-slate-800 text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-100 transition-colors"
+            title="Keyboard Shortcuts Guide (?)"
+          >
+            <Keyboard className="w-5 h-5" />
+          </button>
           <button
             onClick={() => setIsSettingsOpen(true)}
             className="p-1.5 rounded-full hover:bg-neutral-200 dark:hover:bg-slate-800 text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-100 transition-colors"
@@ -876,13 +946,17 @@ useEffect(() => {
             ].map(btn => (
               <button
                 key={btn.val}
-                aria-label={btn.label}
+                aria-label={`${btn.label} (Key ${btn.val})`}
+                aria-keyshortcuts={`${btn.val}`}
                 disabled={submitting}
                 onClick={() => handleReview(btn.val)}
                 className={`py-3 px-2 rounded-xl border flex flex-col items-center justify-center transition-all hover:scale-105 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed ${btn.color}`}
               >
-                <span className="font-bold text-lg mb-1">{btn.val}</span>
+                <span className="font-bold text-lg mb-0.5">{btn.val}</span>
                 <span className="text-[10px] uppercase tracking-wider font-semibold opacity-80">{btn.label}</span>
+                <span className="mt-1 px-1.5 py-0.5 text-[9px] font-mono rounded bg-black/10 dark:bg-white/10 opacity-70">
+                  [{btn.val}]
+                </span>
               </button>
             ))}
           </div>
@@ -1065,6 +1139,12 @@ useEffect(() => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Keyboard Shortcuts Guide Modal */}
+      <KeyboardShortcutsModal
+        isOpen={isKeyboardHelpOpen}
+        onClose={() => setIsKeyboardHelpOpen(false)}
+      />
     </div>
   );
 };
