@@ -16,6 +16,8 @@ import ThemeToggle from '../components/ThemeToggle';
 import OCRUploadZone from '../components/OCRUploadZone';
 import TextCorrectionModal from '../components/TextCorrectionModal';
 
+import WeightageChart from '../components/pyq/WeightageChart';
+
 const COLORS = ['#8B4513', '#D4AF37', '#2563EB', '#059669', '#7C3AED', '#DB2777', '#D97706', '#4B5563'];
 
 const RepeatedQuestionCard = ({ rq }) => {
@@ -700,40 +702,11 @@ const [activeInsightTab, setActiveInsightTab] = useState('paper');
               <div className="space-y-8">
                 {/* Row 1: Pie Chart & AI Trend Card */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* Recharts Chapter Weightage Pie Chart */}
-                  <VintagePaper className="shadow-[0_10px_25px_rgba(0,0,0,0.5)]">
-                    <h3 className="text-xl font-bold font-playfair text-neutral-900 mb-4 border-b border-neutral-400 pb-2 flex items-center gap-2">
-                      <PieChartIcon className="w-5 h-5 text-amber-800" /> Chapter Weightage Breakdown
-                    </h3>
-                    <div className="h-64 w-full" style={{ minHeight: '260px' }}>
-                      {pieChartData.length === 0 ? (
-                        <div className="flex items-center justify-center h-full text-xs text-neutral-500 italic">
-                          No chapter weightage data available for this paper.
-                        </div>
-                      ) : (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={pieChartData}
-                              cx="50%"
-                              cy="50%"
-                              labelLine={false}
-                              outerRadius={80}
-                              fill="#8884d8"
-                              dataKey="value"
-                              label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                            >
-                              {pieChartData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                              ))}
-                            </Pie>
-                            <PieTooltip formatter={(val) => [`${val}% Weightage`, 'Chapter']} />
-                            <Legend wrapperStyle={{ fontSize: '11px', fontFamily: 'Inter' }} />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      )}
-                    </div>
-                  </VintagePaper>
+                  {/* Recharts Chapter / Topic Weightage Horizontal Bar Chart */}
+                  <WeightageChart
+                    data={selectedPyq.chapterWeightage || []}
+                    title="Chapter & Topic Weightage Breakdown"
+                  />
 
                   {/* AI Exam Trend Card */}
                   <VintagePaper className="shadow-[0_10px_25px_rgba(0,0,0,0.5)] flex flex-col">
