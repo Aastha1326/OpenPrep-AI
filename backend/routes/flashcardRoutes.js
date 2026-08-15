@@ -17,8 +17,10 @@ const {
   cloneCommunityDeck,
   rateCommunityDeck,
   starCommunityDeck,
+  batchSyncOfflineReviews,
 } = require('../controllers/flashcardController');
 const { protect } = require('../middleware/auth');
+const cacheMiddleware = require('../middleware/cacheMiddleware');
 const { aiLimiter } = require('../middleware/rateLimiter');
 const { checkQuota } = require('../middleware/quotaMiddleware');
 const flashcardUpload = require('../middleware/flashcardUpload');
@@ -547,7 +549,7 @@ router.post('/', protect, validateCreateFlashcard, createFlashcard);
  *               $ref: '#/components/schemas/Error'
  */
 
-router.get('/', protect, getFlashcards);
+router.get('/', protect, cacheMiddleware(900), getFlashcards);
 
 /**
  * @swagger
@@ -777,6 +779,7 @@ router.put('/decks/:subjectId/share', protect, shareFlashcardDeck);
 router.post('/decks/:subjectId/clone', protect, cloneCommunityDeck);
 router.post('/decks/:subjectId/rate', protect, rateCommunityDeck);
 router.post('/decks/:subjectId/star', protect, starCommunityDeck);
+router.post('/batch-sync', protect, batchSyncOfflineReviews);
 
 router.delete('/:id', protect, deleteFlashcard);
 

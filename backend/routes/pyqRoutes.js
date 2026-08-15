@@ -5,6 +5,7 @@ const {
   searchPYQs,
   getPYQDetails,
   getPYQAnalysis,
+  analyzePYQStream,
   deletePYQ,
   getPYQTrends,
   getUpcomingForecast,
@@ -13,14 +14,20 @@ const {
   getSubjectAnalyses,
   exportPYQAnalysisPDF,
 } = require('../controllers/pyqController');
-const express = require('express');
+
 const multer = require('multer');
 const { protect } = require('../middleware/auth');
 const { parsePyqPdf } = require('../controllers/pyqParserController');
+const { strictAiLimiter } = require('../middleware/rateLimiter');
+const { checkQuota } = require('../middleware/quotaMiddleware');
+const upload = require('../middleware/upload');
+const { validateUploadPYQ, validateGetPYQClusters } = require('../middleware/validators');
+const cacheMiddleware = require('../middleware/cache');
+const clearCache = require('../middleware/clearCache');
 
 const router = express.Router();
 
-const upload = multer({
+const parsePdfUpload = multer({
   dest: 'uploads/',
   limits: { fileSize: 25 * 1024 * 1024 }, // 25MB max for large multi-page papers
   fileFilter: (req, file, cb) => {
@@ -32,18 +39,7 @@ const upload = multer({
   },
 });
 
-router.post('/parse-pyq-pdf', protect, upload.single('pdf'), parsePyqPdf);
-
-module.exports = router;
-const { protect } = require('../middleware/auth');
-const { strictAiLimiter } = require('../middleware/rateLimiter');
-const { checkQuota } = require('../middleware/quotaMiddleware');
-const upload = require('../middleware/upload');
-const { validateUploadPYQ, validateGetPYQClusters } = require('../middleware/validators');
-const cacheMiddleware = require('../middleware/cache');
-const clearCache = require('../middleware/clearCache');
-
-const router = express.Router();
+router.post('/parse-pyq-pdf', protect, parsePdfUpload.single('pdf'), parsePyqPdf);
 
 /**
  * @swagger
@@ -371,6 +367,31 @@ router.post(
   clearCache('pyqs:*'),
   getPYQAnalysis
 );
+
+/**
+ * @swagger
+ * /api/pyqs/{id}/analyze-stream:
+ *   get:
+ *     summary: Stream Gemini PYQ analysis via Server-Sent Events (SSE)
+ *     tags: [PYQ Analysis]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: PYQ ID
+ *     responses:
+ *       200:
+ *         description: SSE stream of analysis tokens
+ *         content:
+ *           text/event-stream:
+ *             schema:
+ *               type: string
+ */
+router.get('/:id/analyze-stream', protect, analyzePYQStream);
 
 /**
  * @swagger

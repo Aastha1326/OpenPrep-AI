@@ -3,8 +3,11 @@ FROM node:20-alpine AS build
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm install
+# Enable pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+COPY package.json pnpm-lock.yaml* ./
+RUN pnpm install
 
 COPY . .
 
@@ -12,7 +15,7 @@ COPY . .
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
 
-RUN npm run build
+RUN pnpm run build
 
 # Production stage
 FROM nginx:alpine

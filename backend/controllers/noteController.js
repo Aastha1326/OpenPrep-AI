@@ -526,3 +526,52 @@ exports.updateNote = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Generate invite link for collaboration
+// @route   POST /api/notes/:id/share
+// @access  Private
+exports.shareCollaboration = async (req, res, next) => {
+  try {
+    const note = await Note.findOne({ where: { id: req.params.id, user: req.user.id } });
+    if (!note) {
+      return res.status(404).json({ success: false, error: 'Note not found' });
+    }
+    note.isCollaborative = true;
+    await note.save();
+
+    const inviteLink = `/notes/collaborative/${note.id}`;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        isCollaborative: true,
+        inviteLink,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get single note details
+// @route   GET /api/notes/:id
+// @access  Private
+exports.getNote = async (req, res, next) => {
+  try {
+    const note = await Note.findByPk(req.params.id, {
+      include: [{ model: Subject, as: 'subjectRef', attributes: ['name'] }],
+    });
+    if (!note) {
+      return res.status(404).json({ success: false, error: 'Note not found' });
+    }
+
+    const isOwner = note.user === req.user.id;
+    if (!isOwner && !note.isCollaborative && !note.isPublic) {
+      return res.status(403).json({ success: false, error: 'Access denied to this note' });
+    }
+
+    res.status(200).json({ success: true, data: note });
+  } catch (error) {
+    next(error);
+  }
+};

@@ -2,8 +2,11 @@ import Skeleton from '../components/dashboard/Skeleton';
 import { useState, useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import LanguageSelector from '../components/LanguageSelector';
 import { motion, AnimatePresence } from 'framer-motion';
 import SecuritySettings from '../components/SecuritySettings';
+import NotificationBell from '../components/notifications/NotificationBell';
 import {
   Flame,
   Play,
@@ -30,6 +33,7 @@ import {
   Video,
   Brain,
   Bot,
+  Users,
 } from 'lucide-react';import API from '../services/api';
 import { toDateOnlyString } from '../utils/dateUtils';
 import SkillTree from '../components/dashboard/SkillTree';
@@ -66,11 +70,13 @@ import FocusEfficiencyWidget from '../components/dashboard/FocusEfficiencyWidget
 import ActivityHeatmap from '../components/dashboard/ActivityHeatmap';
 import LeaderboardWidget from '../components/dashboard/LeaderboardWidget';
 import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
+import ExamCountdownCard from '../components/dashboard/ExamCountdownCard';
 import TargetExamOverviewWidget from '../components/dashboard/TargetExamOverviewWidget';
 import CompositeBundleModal from '../components/dashboard/CompositeBundleModal';
 import SyllabusImportModal from '../components/dashboard/SyllabusImportModal';
 import NotesWidget from '../components/dashboard/NotesWidget';
 import ThemeToggle from '../components/ThemeToggle';
+import ReadinessWidget from '../components/dashboard/ReadinessWidget';
 import BadgesList from '../components/BadgesList';
 import SM2SettingsModal from '../components/dashboard/SM2SettingsModal';
 import LevelProgressBar from '../components/gamification/LevelProgressBar';
@@ -193,6 +199,7 @@ const EmptyState = ({ icon: Icon = Lightbulb, message = 'No data yet' }) => (
 
 // ── Main Component ──
 const Dashboard = () => {
+  const { t } = useTranslation();
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
@@ -201,8 +208,7 @@ const Dashboard = () => {
   const [gamificationData, setGamificationData] = useState(null);
   const [loadingGamification, setLoadingGamification] = useState(false);
   const [activeBadgeUnlock, setActiveBadgeUnlock] = useState(null);
-  const [isFreezing, setIsFreezing] = useState(false);
-
+// Streak freezes are automatically consumed by the backend.
   const fetchGamification = useCallback(async () => {
     try {
       setLoadingGamification(true);
@@ -238,20 +244,20 @@ const Dashboard = () => {
     errorFlashcards,
   } = useSelector((state) => state.dashboard);
 
-  useEffect(() => {
-    const fetchAll = () => {
-      dispatch(fetchDashboardStats());
-      dispatch(fetchSubjectBreakdown());
-      dispatch(fetchActivePlan());
-      dispatch(fetchDueFlashcards());
-      fetchGamification();
-    };
+  const fetchAll = useCallback(() => {
+    dispatch(fetchDashboardStats());
+    dispatch(fetchSubjectBreakdown());
+    dispatch(fetchActivePlan());
+    dispatch(fetchDueFlashcards());
+    fetchGamification();
+  }, [dispatch, fetchGamification]);
 
+  useEffect(() => {
     fetchAll();
 
     window.addEventListener('focus', fetchAll);
     return () => window.removeEventListener('focus', fetchAll);
-  }, [dispatch]);
+  }, [fetchAll]);
 
   const handleRetry = (thunk) => () => dispatch(thunk());
 
@@ -347,27 +353,8 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
     }
   }, [user?.level, prevLevel]);
 
-  const handleUseStreakFreeze = async () => {
-    try {
-      setIsFreezing(true);
-      const timezoneOffset = new Date().getTimezoneOffset();
-      const res = await API.post('/gamification/streak-freeze/use', {}, {
-        headers: { 'x-timezone-offset': String(timezoneOffset) }
-      });
-      if (res.data.success) {
-        alert('Streak Freeze Shield activated successfully!');
-        fetchGamification();
-        dispatch(loadUser());
-        dispatch(fetchDashboardStats());
-      }
-    } catch (err) {
-      console.error(err);
-      alert(err.response?.data?.error || 'Failed to activate Streak Freeze shield.');
-    } finally {
-      setIsFreezing(false);
-    }
-  };
-
+// Streak freezes are consumed automatically by the backend
+// when exactly one study day is missed.
   const handleGoToStudyPlanFromImport = (prefill) => {
     if (prefill) setSyllabusPrefill(prefill);
     // Refresh dashboard caches so the new exam appears immediately in select
@@ -535,6 +522,12 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           onClick={() => navigate('/study-group')}
         />
         <GoldTabButton
+          icon={Users}
+          label="Study Squads"
+          delay={0.46}
+          onClick={() => navigate('/squads')}
+        />
+        <GoldTabButton
           icon={Globe}
           label="Community Decks"
           delay={0.48}
@@ -585,16 +578,16 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
                 />
               </div>
 
-              {/* --- EXAM COUNTDOWN WIDGET --- */}
+              {/* --- EXAM COUNTDOWN CARD --- */}
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.4 }}
-                className="mt-5"
+                className="mt-5 max-w-3xl"
               >
-                <ExamCountdownWidget
-                  examDate={activePlan?.exam?.date}
-                  examName={activePlan?.exam?.name}
+                <ExamCountdownCard
+                  stats={stats?.examCountdown}
+                  onRefresh={fetchAll}
                 />
               </motion.div>
             </div>
@@ -607,7 +600,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           >
             <div className="relative group z-50">
               <button className="bg-neutral-800 text-gold-foil border border-yellow-700/50 hover:bg-neutral-700 px-4 py-2 rounded-sm shadow-[0_4px_15px_rgba(0,0,0,0.5)] flex items-center gap-2 font-playfair font-bold text-sm tracking-wide">
-                <Download className="w-4 h-4" /> Export Analytics
+                <Download className="w-4 h-4" /> {t('export_analytics')}
               </button>
               <div className="absolute right-0 top-full mt-2 w-40 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
                 <button
@@ -636,7 +629,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             >
               <Settings className="w-5 h-5 transition-transform duration-300 group-hover:rotate-45" />
               <div className="absolute top-full mt-2 px-2 py-1 bg-neutral-800 text-yellow-500 text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
-                SM-2 Settings
+                {t('sm2_settings')}
               </div>
             </button>
 
@@ -647,20 +640,30 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             >
               <Brain className="w-5 h-5 transition-transform duration-300 group-hover:scale-110" />
               <div className="absolute top-full mt-2 px-2 py-1 bg-neutral-800 text-yellow-500 text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
-                Skill Tree
+                {t('skill_tree')}
               </div>
             </button>
 
             {/* --- STREAK WIDGET --- */}
             <div className="w-80">
-              <StreakWidget
-                currentStreak={gamificationData?.currentStreak ?? user?.currentStreak ?? 0}
-                longestStreak={gamificationData?.longestStreak ?? user?.longestStreak ?? 0}
-                streakFreezesAvailable={gamificationData?.streakFreezesAvailable ?? user?.streakFreezesAvailable ?? 0}
-                onUseStreakFreeze={handleUseStreakFreeze}
-                isFreezing={isFreezing}
-              />
-            </div>
+<StreakWidget
+  currentStreak={
+    gamificationData?.currentStreak ??
+    user?.currentStreak ??
+    0
+  }
+  longestStreak={
+    gamificationData?.longestStreak ??
+    user?.longestStreak ??
+    0
+  }
+  streakFreezesAvailable={
+    gamificationData?.streakFreezesAvailable ??
+    user?.streakFreezesAvailable ??
+    0
+  }
+  badges={gamificationData?.badges || []}
+/>            </div>
 
             <button
               onClick={() => navigate('/settings')}
@@ -669,7 +672,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             >
               <Settings className="w-5 h-5" />
               <span className="font-playfair font-bold text-sm tracking-wide hidden sm:inline">
-                Settings
+                {t('settings')}
               </span>
             </button>
 
@@ -679,9 +682,11 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             >
               <LogOut className="w-5 h-5 group-hover:text-white" />
               <span className="font-playfair font-bold text-sm tracking-wide group-hover:text-white hidden sm:inline">
-                Log out
+                {t('logout')}
               </span>
             </button>
+            <NotificationBell />
+            <LanguageSelector />
             <ThemeToggle />
           </motion.div>
         </div>
@@ -772,8 +777,13 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           )}
         </div>
 
+        {/* --- AI EXAM READINESS SECTION --- */}
+        <div className="space-y-4 pt-6">
+          <ReadinessWidget />
+        </div>
+
         {/* --- ANALYTICS SECTION (WOODEN DESK) --- */}
-        <div className="space-y-4">
+        <div className="space-y-4 pt-6">
           <div className="flex justify-between items-center px-1">
             <h2 className="text-2xl font-bold font-playfair text-amber-100 flex items-center gap-2">
               <TrendingUp className="w-6 h-6 text-yellow-500" /> Performance Analytics

@@ -2,6 +2,7 @@ const { sequelize } = require('../config/db');
 
 // Import all models
 const User = require('./User');
+const Folder = require('./Folder');
 const Exam = require('./Exam');
 const Subject = require('./Subject');
 const Topic = require('./Topic');
@@ -19,12 +20,22 @@ const Achievement = require('./Achievement');
 const FocusSession = require('./FocusSession');
 const QuizTelemetryEvent = require('./QuizTelemetryEvent');
 const QuizBookmark = require('./QuizBookmark');
+const DeckRating = require('./DeckRating');
 const UserBadge = require('./UserBadge');
 const BattleSession = require('./BattleSession');
 const BattleParticipant = require('./BattleParticipant');
 const PYQAnalysis = require('./PYQAnalysis');
 const PYQQuestion = require('./PYQQuestion');
-// User associations
+const Notification = require('./Notification');
+const PushSubscription = require('./PushSubscription');
+const ReadinessSnapshot = require('./ReadinessSnapshot');
+const StudySquad = require('./StudySquad');
+const SquadMember = require('./SquadMember');
+const SquadChallenge = require('./SquadChallenge');
+const SquadChallengeContribution = require('./SquadChallengeContribution');
+const SquadAchievement = require('./SquadAchievement');
+const SquadActivity = require('./SquadActivity');
+const SquadActivityReaction = require('./SquadActivityReaction');// User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Topic, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -39,6 +50,7 @@ User.hasMany(Feedback, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(ActivityLog, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Achievement, { foreignKey: 'userId', as: 'achievements', onDelete: 'CASCADE' });
 User.hasMany(UserBadge, { foreignKey: 'userId', as: 'badgesRef', onDelete: 'CASCADE' });
+User.hasMany(Folder, { foreignKey: 'userId', onDelete: 'CASCADE' });
 
 // Exam associations
 Exam.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
@@ -147,8 +159,54 @@ PYQAnalysis.belongsTo(Subject, { foreignKey: 'subjectId', as: 'subjectRef' });
 PYQAnalysis.hasMany(PYQQuestion, { foreignKey: 'pyqAnalysisId', onDelete: 'CASCADE' });
 PYQQuestion.belongsTo(PYQAnalysis, { foreignKey: 'pyqAnalysisId', as: 'analysisRef' });
 
-module.exports = {  sequelize,  User,
-  Exam,
+// Notification & PushSubscription associations
+User.hasMany(Notification, { foreignKey: 'user', onDelete: 'CASCADE' });
+Notification.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
+User.hasMany(PushSubscription, { foreignKey: 'user', onDelete: 'CASCADE' });
+PushSubscription.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
+User.hasMany(ReadinessSnapshot, { foreignKey: 'userId', onDelete: 'CASCADE' });
+ReadinessSnapshot.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+Subject.hasMany(ReadinessSnapshot, { foreignKey: 'subjectId', onDelete: 'CASCADE' });
+ReadinessSnapshot.belongsTo(Subject, { foreignKey: 'subjectId', as: 'subjectRef' });
+
+// StudySquad associations
+User.hasMany(StudySquad, { foreignKey: 'adminUserId', as: 'ownedSquads', onDelete: 'CASCADE' });
+StudySquad.belongsTo(User, { foreignKey: 'adminUserId', as: 'adminRef' });
+
+StudySquad.hasMany(SquadMember, { foreignKey: 'squadId', onDelete: 'CASCADE' });
+SquadMember.belongsTo(StudySquad, { foreignKey: 'squadId', as: 'squadRef' });
+
+User.hasMany(SquadMember, { foreignKey: 'userId', onDelete: 'CASCADE' });
+SquadMember.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+StudySquad.hasMany(SquadChallenge, { foreignKey: 'squadId', onDelete: 'CASCADE' });
+SquadChallenge.belongsTo(StudySquad, { foreignKey: 'squadId', as: 'squadRef' });
+
+SquadChallenge.hasMany(SquadChallengeContribution, { foreignKey: 'challengeId', onDelete: 'CASCADE' });
+SquadChallengeContribution.belongsTo(SquadChallenge, { foreignKey: 'challengeId', as: 'challengeRef' });
+
+User.hasMany(SquadChallengeContribution, { foreignKey: 'userId', onDelete: 'CASCADE' });
+SquadChallengeContribution.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+StudySquad.hasMany(SquadAchievement, { foreignKey: 'squadId', onDelete: 'CASCADE' });
+SquadAchievement.belongsTo(StudySquad, { foreignKey: 'squadId', as: 'squadRef' });
+
+StudySquad.hasMany(SquadActivity, { foreignKey: 'squadId', onDelete: 'CASCADE' });
+SquadActivity.belongsTo(StudySquad, { foreignKey: 'squadId', as: 'squadRef' });
+
+User.hasMany(SquadActivity, { foreignKey: 'userId', onDelete: 'CASCADE' });
+SquadActivity.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+SquadActivity.hasMany(SquadActivityReaction, { foreignKey: 'activityId', onDelete: 'CASCADE' });
+SquadActivityReaction.belongsTo(SquadActivity, { foreignKey: 'activityId', as: 'activityRef' });
+
+User.hasMany(SquadActivityReaction, { foreignKey: 'userId', onDelete: 'CASCADE' });
+SquadActivityReaction.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+module.exports = {  sequelize,  User,  Exam,
   Subject,
   Topic,
   PYQ,
@@ -160,14 +218,25 @@ module.exports = {  sequelize,  User,
   Progress,
   Feedback,
   ActivityLog,
-UsageQuota,
+  UsageQuota,
   Achievement,
-  UserBadge,
   FocusSession,
   QuizTelemetryEvent,
   QuizBookmark,
+  DeckRating,
+  UserBadge,
   BattleSession,
   BattleParticipant,
   PYQAnalysis,
   PYQQuestion,
+  Notification,
+  PushSubscription,
+  ReadinessSnapshot,
+  StudySquad,
+  SquadMember,
+  SquadChallenge,
+  SquadChallengeContribution,
+SquadAchievement,
+  SquadActivity,
+  SquadActivityReaction,
 };

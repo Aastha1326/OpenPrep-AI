@@ -11,6 +11,7 @@ const geminiService = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
 const { toDateOnlyString, toLocalDateString } = require('../utils/dateUtils');
 const { generateMilestones } = require('../services/milestoneGeneratorService');
+const calendarService = require('../services/calendarService');
 const schedulePredictorService = require('../services/schedulePredictorService');
 // @desc    Generate AI Study Plan
 // @route   POST /api/study-plans/generate-ai
@@ -281,6 +282,9 @@ exports.toggleTaskCompletion = async (req, res, next) => {
       }
       // If state unchanged (completed === wasCompleted), do nothing
     }
+
+    const { recalculateReadinessInBackground } = require('./readinessController');
+    recalculateReadinessInBackground(req.user.id).catch((err) => console.error('Background readiness recalculation error:', err));
 
     res.status(200).json({ success: true, data: plan, progression });
   } catch (error) {
@@ -617,89 +621,54 @@ exports.rescheduleAdaptivePlan = async (req, res, next) => {
 exports.exportStudyPlanIcs = async (req, res, next) => {
   try {
     const { id } = req.params;
+
     const plan = await StudyPlan.findOne({
       where: { id, user: req.user.id },
       include: [{ model: Exam, as: 'examRef' }],
     });
 
     if (!plan) {
-      return res.status(404).json({ success: false, error: 'Study plan not found' });
+      return res.status(404).json({
+        success: false,
+        error: 'Study plan not found',
+      });
     }
 
-    const examName = plan.examRef ? plan.examRef.name : 'Exam Study Plan';
-    
-    // Helper to format JS date to RFC 5545 UTC timestamp format (YYYYMMDDTHHmmssZ)
-    const formatIcsDate = (date) => {
-      const d = new Date(date);
-      if (isNaN(d.getTime())) return new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-      return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-    };
+    const timeZone = req.headers['x-timezone'] || 'UTC';
 
-    const nowTimestamp = formatIcsDate(new Date());
-
-    let icsLines = [
-      'BEGIN:VCALENDAR',
-      'VERSION:2.0',
-      'PRODID:-//OpenPrep-AI//Study Plan Calendar//EN',
-      'CALSCALE:GREGORIAN',
-      'METHOD:PUBLISH',
-      `X-WR-CALNAME:${examName} - Study Plan`,
-    ];
-
-    if (Array.isArray(plan.dailyGoals)) {
-      for (const goal of plan.dailyGoals) {
-        const goalDateStr = goal.date; // YYYY-MM-DD format
-        if (!goalDateStr || !Array.isArray(goal.tasks)) continue;
-
-        // Base start time for tasks on this day (e.g., 09:00:00 UTC)
-        let baseHour = 9;
-        for (const task of goal.tasks) {
-          const startDateObj = new Date(`${goalDateStr}T${String(baseHour).padStart(2, '0')}:00:00Z`);
-          const durationMinutes = task.duration || 60;
-          const endDateObj = new Date(startDateObj.getTime() + durationMinutes * 60000);
-
-          const dtStart = formatIcsDate(startDateObj);
-          const dtEnd = formatIcsDate(endDateObj);
-          const uid = `${task._id || uuidv4()}@openprep.ai`;
-          const summary = `Study: ${task.title} (${examName})`;
-          const description = `Scheduled study session for exam: ${examName}. Duration: ${durationMinutes} minutes.`;
-
-          icsLines.push(
-            'BEGIN:VEVENT',
-            `UID:${uid}`,
-            `DTSTAMP:${nowTimestamp}`,
-            `DTSTART:${dtStart}`,
-            `DTEND:${dtEnd}`,
-            `SUMMARY:${summary}`,
-            `DESCRIPTION:${description}`,
-            // Add reminder notification metadata (VALARM - 15 minutes prior)
-            'BEGIN:VALARM',
-            'TRIGGER:-PT15M',
-            'ACTION:DISPLAY',
-            `DESCRIPTION:Reminder: ${task.title} starts in 15 minutes`,
-            'END:VALARM',
-            'END:VEVENT'
-          );
-
-          // Increment start hour for subsequent tasks on the same day
-          baseHour += Math.ceil(durationMinutes / 60);
-          if (baseHour > 20) baseHour = 9; // wrap around if too late
-        }
-      }
+    try {
+      new Intl.DateTimeFormat('en-US', {
+        timeZone,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid timezone supplied',
+      });
     }
 
-    icsLines.push('END:VCALENDAR');
+    const calendarService = require('../services/calendarService');
 
-    const icsContent = icsLines.join('\r\n');
+    const icsContent = calendarService.generateStudyPlanIcs(
+      plan,
+      timeZone
+    );
 
-res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="study-plan-${id}.ics"`);
+    res.setHeader(
+      'Content-Type',
+      'text/calendar; charset=utf-8'
+    );
+
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="study-plan-${id}.ics"`
+    );
+
     return res.status(200).send(icsContent);
   } catch (error) {
     next(error);
   }
 };
-
 // @desc    Predict syllabus completion date and evenly rebalance pending tasks
 //          across the remaining study days
 // @route   POST /api/study-plans/rebalance
@@ -767,6 +736,125 @@ exports.rebalanceStudyPlan = async (req, res, next) => {
     }
 
     res.status(200).json({ success: true, data: plan, forecast, rebalanced, reason, message });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Export active study plan as a downloadable PDF
+// @route   GET /api/study-plans/:id/export-pdf
+// @access  Private
+exports.exportStudyPlanPdf = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Load plan and verify ownership in one query — prevents cross-user leaks
+    const plan = await StudyPlan.findOne({
+      where: { id, user: req.user.id },
+      include: [{ model: Exam, as: 'examRef' }],
+    });
+
+    if (!plan) {
+      return res.status(404).json({ success: false, error: 'Study plan not found' });
+    }
+
+    // Resolve topic names for tasks that reference a topic ID
+    const topicIds = new Set();
+    (plan.dailyGoals || []).forEach((goal) => {
+      (goal.tasks || []).forEach((task) => {
+        if (task.topic && typeof task.topic === 'string') topicIds.add(task.topic);
+      });
+    });
+
+    const topicMap = {};
+    if (topicIds.size > 0) {
+      const topics = await Topic.findAll({
+        where: { id: { [Op.in]: Array.from(topicIds) }, user: req.user.id },
+      });
+      topics.forEach((t) => { topicMap[t.id] = t.name; });
+    }
+
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+
+    const dateStr = new Date().toISOString().split('T')[0];
+    const filename = `openprep-studyplan-${dateStr}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    doc.pipe(res);
+
+    // ── Header ──────────────────────────────────────────────────────────────
+    doc.fillColor('#1a365d').fontSize(22).text('OpenPrep AI — Study Plan', { align: 'center' });
+    doc.moveDown(0.4);
+    doc.fillColor('#4a5568').fontSize(11)
+      .text(`Student: ${req.user.name || 'Scholar'}`, { align: 'center' })
+      .text(`Generated: ${new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}`, { align: 'center' });
+    doc.moveDown(0.8);
+
+    // ── Exam Info ────────────────────────────────────────────────────────────
+    doc.fillColor('#2b6cb0').fontSize(14).text('Exam Details', { underline: true });
+    doc.moveDown(0.3);
+    doc.fillColor('#2d3748').fontSize(10);
+    const exam = plan.examRef;
+    doc.text(`• Exam: ${exam ? exam.name : 'N/A'}`);
+    doc.text(`• Plan Start: ${plan.startDate ? new Date(plan.startDate).toLocaleDateString() : 'N/A'}`);
+    doc.text(`• Exam Date: ${exam?.date ? new Date(exam.date).toLocaleDateString() : 'N/A'}`);
+    doc.text(`• Status: ${plan.status}`);
+    doc.moveDown(1);
+
+    // ── Progress Summary ─────────────────────────────────────────────────────
+    const allTasks = (plan.dailyGoals || []).flatMap((g) => g.tasks || []);
+    const totalTasks = allTasks.length;
+    const completedTasks = allTasks.filter((t) => t.completed).length;
+    const progressPct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+    doc.fillColor('#2b6cb0').fontSize(14).text('Progress Summary', { underline: true });
+    doc.moveDown(0.3);
+    doc.fillColor('#2d3748').fontSize(10);
+    doc.text(`• Total Tasks: ${totalTasks}`);
+    doc.text(`• Completed: ${completedTasks}`);
+    doc.text(`• Pending: ${totalTasks - completedTasks}`);
+    doc.text(`• Completion: ${progressPct}%`);
+    doc.moveDown(1);
+
+    // ── Daily Task Sections ──────────────────────────────────────────────────
+    doc.fillColor('#2b6cb0').fontSize(14).text('Daily Study Schedule', { underline: true });
+    doc.moveDown(0.5);
+
+    const sortedGoals = [...(plan.dailyGoals || [])].sort(
+      (a, b) => new Date(a.date) - new Date(b.date)
+    );
+
+    for (const goal of sortedGoals) {
+      const dayTasks = goal.tasks || [];
+      if (dayTasks.length === 0) continue;
+
+      if (doc.y > 700) doc.addPage();
+
+      const dayLabel = goal.date
+        ? new Date(goal.date).toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })
+        : 'Unknown Date';
+
+      doc.fillColor('#1a202c').fontSize(11).font('Helvetica-Bold').text(dayLabel);
+      doc.font('Helvetica').fontSize(9).fillColor('#4a5568');
+
+      for (const task of dayTasks) {
+        if (doc.y > 720) doc.addPage();
+        const status = task.completed ? '✓' : '○';
+        const topicName = task.topic
+          ? (typeof task.topic === 'object' ? task.topic.name : (topicMap[task.topic] || task.topic))
+          : null;
+        const durationLabel = task.duration ? ` (${task.duration} min)` : '';
+        const topicLabel = topicName ? ` — ${topicName}` : '';
+        doc.fillColor(task.completed ? '#276749' : '#4a5568');
+        doc.text(`  ${status} ${task.title}${topicLabel}${durationLabel}`);
+      }
+      doc.moveDown(0.6);
+    }
+
+    doc.moveDown(1.5);
+    doc.fillColor('#718096').fontSize(8).text('Generated by OpenPrep AI Learning Platform', { align: 'center' });
+    doc.end();
   } catch (error) {
     next(error);
   }

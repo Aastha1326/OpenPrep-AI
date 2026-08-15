@@ -1,12 +1,22 @@
+/**
+ * GitHubLoginButton
+ *
+ * Redirects the browser to the backend's Passport GitHub OAuth2 route.
+ * Same pattern as GoogleLoginButton — always uses VITE_API_URL, never
+ * a relative '/api' path that would hit the Vercel SPA instead of the backend.
+ */
+
+const getApiBase = () => {
+  if (import.meta.env.VITE_API_URL) {
+    const url = import.meta.env.VITE_API_URL.replace(/\/$/, '');
+    return url.endsWith('/api') ? url : `${url}/api`;
+  }
+  return 'http://localhost:5000/api';
+};
+
 const GitHubLoginButton = () => {
   const handleLogin = () => {
-    let base = '';
-    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      base = '/api';
-    } else {
-      base = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-    }
-    window.location.href = `${base.replace(/\/$/, '')}/auth/github`;
+    window.location.href = `${getApiBase()}/auth/github`;
   };
 
   return (

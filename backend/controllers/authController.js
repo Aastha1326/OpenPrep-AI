@@ -336,9 +336,12 @@ exports.getMe = async (req, res, next) => {
 // ---------------------------------------------------------------------------
 exports.updateSettings = async (req, res, next) => {
   try {
-    const { leaderboardVisible } = req.body;
+    const { leaderboardVisible, hideActivityFromSquad } = req.body;
 
     req.user.leaderboardVisible = leaderboardVisible;
+    if (typeof hideActivityFromSquad === 'boolean') {
+      req.user.hideActivityFromSquad = hideActivityFromSquad;
+    }
     await req.user.save();
 
     res.status(200).json({
@@ -356,13 +359,13 @@ exports.updateSettings = async (req, res, next) => {
         studyHours: req.user.studyHours,
         isEmailVerified: req.user.isEmailVerified,
         leaderboardVisible: req.user.leaderboardVisible,
+        hideActivityFromSquad: req.user.hideActivityFromSquad,
       },
     });
   } catch (error) {
     next(error);
   }
 };
-
 // ---------------------------------------------------------------------------
 // @desc    Forgot Password
 // @route   POST /api/auth/forgot-password
@@ -804,3 +807,203 @@ exports.registerOAuthEmail = async (req, res, next) => {
   }
 };
 
+
+// ---------------------------------------------------------------------------
+// @desc    Verify OTP
+// @route   POST /api/auth/verify-otp
+// @access  Public
+// ---------------------------------------------------------------------------
+exports.verifyOtp = async (req, res, next) => {
+  try {
+    const { email, otp } = req.body;
+    const user = await User.findOne({ where: { email } });
+
+    if (!user || !user.resetPasswordOtpHash) {
+      return res.status(400).json({ success: false, error: 'Invalid email or code.' });
+    }
+
+    // Check expiration
+    if (new Date() > user.resetPasswordOtpExpires) {
+      return res.status(400).json({ success: false, error: 'Reset code has expired.' });
+    }
+
+    // Check attempts limit (max 5 incorrect attempts)
+    if (user.resetPasswordAttempts >= 5) {
+      return res.status(400).json({
+        success: false,
+        error: 'Too many incorrect attempts. Please request a new code.',
+      });
+    }
+
+    // Match OTP
+    const isMatch = await bcrypt.compare(otp, user.resetPasswordOtpHash);
+    if (!isMatch) {
+      user.resetPasswordAttempts += 1;
+      await user.save();
+      return res.status(400).json({
+        success: false,
+        error: `Incorrect code. Remaining attempts: ${5 - user.resetPasswordAttempts}`,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Code verified successfully.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// @desc    Reset Password (OTP version)
+// @route   POST /api/auth/reset-password
+// @access  Public
+// ---------------------------------------------------------------------------
+exports.resetPasswordOtp = async (req, res, next) => {
+  try {
+    const { email, otp, password } = req.body;
+    const user = await User.findOne({ where: { email } });
+
+    if (!user || !user.resetPasswordOtpHash) {
+      return res.status(400).json({ success: false, error: 'Invalid email or code.' });
+    }
+
+    // Check expiration
+    if (new Date() > user.resetPasswordOtpExpires) {
+      return res.status(400).json({ success: false, error: 'Reset code has expired.' });
+    }
+
+    // Check attempts limit
+    if (user.resetPasswordAttempts >= 5) {
+      return res.status(400).json({
+        success: false,
+        error: 'Too many incorrect attempts. Please request a new code.',
+      });
+    }
+
+    // Match OTP
+    const isMatch = await bcrypt.compare(otp, user.resetPasswordOtpHash);
+    if (!isMatch) {
+      user.resetPasswordAttempts += 1;
+      await user.save();
+      return res.status(400).json({
+        success: false,
+        error: `Incorrect code. Remaining attempts: ${5 - user.resetPasswordAttempts}`,
+      });
+    }
+
+    // Set new password
+    user.password = password;
+    user.resetPasswordOtpHash = null;
+    user.resetPasswordOtpExpires = null;
+    user.resetPasswordAttempts = 0;
+    // Invalidate all existing refresh tokens
+    user.refreshTokens = [];
+
+    // Generate new token family for fresh session
+    const tokenFamily = generateTokenFamily();
+    const accessToken = generateAccessToken(user.id);
+    const refreshResult = await generateRefreshToken(user, tokenFamily);
+    const refreshToken = refreshResult.rawToken;
+
+    setRefreshTokenCookie(res, refreshToken);
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successful. You can now log in with your new password.',
+      token: accessToken,
+      refreshToken,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// @desc    Google OAuth Passport Callback (Redirect flow)
+// @route   GET /api/auth/google/callback
+// @access  Public
+// ---------------------------------------------------------------------------
+exports.googlePassportCallback = async (req, res, next) => {
+  try {
+    const frontendBase = process.env.FRONTEND_URL || 'https://openprep-ai.vercel.app';
+    if (!req.user) {
+      return res.redirect(`${frontendBase.replace(/\/$/, '')}/login?error=Google%20Authentication%20Failed`);
+    }
+
+    const accessToken = generateAccessToken(req.user.id);
+    const refreshResult = await generateRefreshToken(req.user);
+    const refreshToken = refreshResult.rawToken;
+
+    setRefreshTokenCookie(res, refreshToken);
+
+    return res.redirect(
+      `${frontendBase.replace(/\/$/, '')}/login?token=${accessToken}&refreshToken=${refreshToken}`
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @route   POST /api/auth/logout
+// @access  Public
+// ---------------------------------------------------------------------------
+exports.logout = async (req, res, next) => {
+  try {
+    // Support both cookie and body for refresh token
+    const rawToken = req.cookies?.refreshToken || req.body?.refreshToken;
+
+    if (rawToken) {
+      const hashed = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+      // Find user who has this hashed refresh token
+      const user = await User.findOne({
+        where: {
+          refreshTokens: {
+            [Op.contains]: [{ token: hashed }],
+          },
+        },
+      });
+
+      if (user) {
+        // Remove the token from the user's refresh tokens array
+        user.refreshTokens = user.refreshTokens.filter((t) => t.token !== hashed);
+        await user.save();
+      }
+    }
+
+    clearRefreshTokenCookie(res);
+
+    res.status(200).json({
+      success: true,
+      message: 'Logged out successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// @desc    Resend verification email
+// @route   POST /api/auth/resend-verification
+// @access  Public
+// ---------------------------------------------------------------------------
+exports.resendVerification = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ where: { email } });
+
+    // To prevent user enumeration, always return 200 success response
+    if (user && !user.isEmailVerified) {
+      await sendVerificationEmail(user);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'If an unverified account with that email exists, a verification link has been sent.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
