@@ -111,6 +111,30 @@ The React frontend will be available at `http://localhost:5173` and the Express 
    npm run dev
    ```
 
+### 🗄️ Database Migrations with Sequelize CLI
+
+We use Sequelize CLI for managing database schema changes.
+
+- **Run all pending migrations**:
+  ```bash
+  npx sequelize-cli db:migrate
+  ```
+
+- **Revert the last migration**:
+  ```bash
+  npx sequelize-cli db:migrate:undo
+  ```
+
+- **Revert all migrations**:
+  ```bash
+  npx sequelize-cli db:migrate:undo:all
+  ```
+
+- **Seed the database with demo users**:
+  ```bash
+  npx sequelize-cli db:seed:all
+  ```
+
 ---
 
 ## 🗺️ Roadmap
