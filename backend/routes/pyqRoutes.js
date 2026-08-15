@@ -5,6 +5,7 @@ const {
   searchPYQs,
   getPYQDetails,
   getPYQAnalysis,
+  analyzePYQStream,
   deletePYQ,
   getPYQTrends,
   getUpcomingForecast,
@@ -366,6 +367,31 @@ router.post(
   clearCache('pyqs:*'),
   getPYQAnalysis
 );
+
+/**
+ * @swagger
+ * /api/pyqs/{id}/analyze-stream:
+ *   get:
+ *     summary: Stream Gemini PYQ analysis via Server-Sent Events (SSE)
+ *     tags: [PYQ Analysis]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: PYQ ID
+ *     responses:
+ *       200:
+ *         description: SSE stream of analysis tokens
+ *         content:
+ *           text/event-stream:
+ *             schema:
+ *               type: string
+ */
+router.get('/:id/analyze-stream', protect, analyzePYQStream);
 
 /**
  * @swagger

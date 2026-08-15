@@ -538,6 +538,72 @@ exports.analyzePYQText = async (rawText, subjectName = 'the subject', forceRefre
 };
 
 /**
+ * 1b. Stream Previous Year Question Paper (PYQ) Analysis via SSE
+ */
+exports.analyzePYQStream = async (rawText, subjectName = 'the subject', onChunk) => {
+  if (!genAI) {
+    console.warn('Gemini API key not configured. Streaming mock PYQ analysis.');
+    const mock = getMockPYQAnalysis(subjectName);
+    const mockJson = JSON.stringify(mock, null, 2);
+    for (let i = 0; i < mockJson.length; i += 20) {
+      if (onChunk) onChunk(mockJson.substring(i, i + 20));
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    }
+    return mock;
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const prompt = `
+      You are an expert exam analyzer. Analyze the following text extracted from a Previous Year Question Paper for ${subjectName}.
+      Identify:
+      1. Chapter-wise weightage (list of chapters with approximate percentage weightage/percentage points).
+      2. Important/frequently asked topics (categorized by High, Medium, or Low importance, along with estimated frequency/appearance count).
+      3. Repeated questions or very similar questions asked across years (provide question text and estimated years).
+      4. General exam trend analysis (briefly describing the style of questions, emphasis on theoretical vs practical/analytical, and suggestions for preparing).
+
+      Return the result STRICTLY as a JSON object with this exact structure:
+      {
+        "chapterWeightage": [
+          { "chapterName": "string", "weightage": number }
+        ],
+        "importantTopics": [
+          { "topicName": "string", "importance": "High" | "Medium" | "Low", "frequency": number }
+        ],
+        "repeatedQuestions": [
+          { "questionText": "string", "years": [number] }
+        ],
+        "trendAnalysis": "string"
+      }
+
+      Text to analyze:
+      """
+      ${rawText.substring(0, 15000)}
+      """
+    `;
+
+    const resultStream = await model.generateContentStream(prompt);
+    let fullText = '';
+
+    for await (const chunk of resultStream.stream) {
+      const chunkText = chunk.text();
+      if (chunkText) {
+        fullText += chunkText;
+        if (onChunk) onChunk(chunkText);
+      }
+    }
+
+    const parsed = cleanJSON(fullText);
+    return parsed || getMockPYQAnalysis(subjectName);
+  } catch (error) {
+    console.error('Gemini PYQ analysis streaming failed:', error);
+    const mock = getMockPYQAnalysis(subjectName);
+    if (onChunk) onChunk(JSON.stringify(mock, null, 2));
+    return mock;
+  }
+};
+
+/**
  * 2. Generate AI Study Plan
  */
 exports.generateStudyPlan = async (
