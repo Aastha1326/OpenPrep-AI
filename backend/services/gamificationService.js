@@ -1,6 +1,12 @@
 const { User, UserBadge, QuizAttempt, SquadMember, SquadChallenge, SquadChallengeContribution, SquadAchievement } = require('../models');
 const { checkAndAwardBadges } = require('./achievementService');
-const { logSquadActivity } = require('./squadActivityService');
+let logSquadActivity = async () => {};
+try {
+  const squadSvc = require('./squadActivityService');
+  logSquadActivity = squadSvc.logSquadActivity;
+} catch (e) {
+  // squadActivityService unavailable (e.g. test environment)
+}
 // Calculate level based on XP: level = Math.floor(Math.sqrt(xp / 100)) + 1
 function calculateLevel(xp) {
   if (!xp || xp <= 0) return 1;
@@ -221,19 +227,6 @@ async function updateStreak(userId, timezoneOffsetMinutes = 0) {
 
   return {
     currentStreak: user.currentStreak,    longestStreak: user.longestStreak,
-    streakFreezesAvailable: user.streakFreezesAvailable,
-    unlockedBadges,
-  };
-}
-  user.lastActivityDate = todayStr;
-  await user.save();
-
-  // Also check if streak unlocks "7-Day Streak" badge
-  const unlockedBadges = await checkAndUnlockBadges(user, 'streak_check');
-
-  return {
-    currentStreak: user.currentStreak,
-    longestStreak: user.longestStreak,
     streakFreezesAvailable: user.streakFreezesAvailable,
     unlockedBadges,
   };

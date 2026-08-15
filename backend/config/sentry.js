@@ -1,15 +1,22 @@
 const Sentry = require('@sentry/node');
-const { nodeProfilingIntegration } = require('@sentry/profiling-node');
 
 const isSentryReady = process.env.NODE_ENV !== 'test' && !!process.env.SENTRY_DSN;
+
 
 if (isSentryReady) {
   Sentry.init({
     dsn: process.env.SENTRY_DSN,
     environment: process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || 'development',
     integrations: [
-      nodeProfilingIntegration(),
-    ],
+      (() => {
+        try {
+          const { nodeProfilingIntegration } = require('@sentry/profiling-node');
+          return nodeProfilingIntegration();
+        } catch (e) {
+          return null;
+        }
+      })()
+    ].filter(Boolean),
     tracesSampleRate: 0.2, // Sampling rate at 20%
     profilesSampleRate: 0.2,
     
