@@ -6,13 +6,15 @@ const {
   moveTaskDate,
   getPlans,
   getWeaknessAnalysis,
-rescheduleAdaptivePlan,
+  rescheduleAdaptivePlan,
   rescheduleOverdueTasks,
   exportStudyPlanIcs,
+  exportStudyPlanPdf,
   rebalanceStudyPlan,
-} = require('../controllers/studyPlanController');const { protect } = require('../middleware/auth');
+} = require('../controllers/studyPlanController');
+const { protect } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
-const { checkQuota } = require('../middleware/quotaMiddleware');
+const { checkAiQuota } = require('../middleware/aiQuotaMiddleware');
 const {
   validateGenerateAIPlan,
   validateToggleTask,
@@ -96,8 +98,9 @@ const router = express.Router();
  *               $ref: '#/components/schemas/Error'
  */
 
-router.post('/generate-ai', protect, aiLimiter, checkQuota, validateGenerateAIPlan, generateAIPlan);
+router.post('/generate-ai', protect, aiLimiter, checkAiQuota, validateGenerateAIPlan, generateAIPlan);
 router.get('/:id/export-ics', protect, exportStudyPlanIcs);
+router.get('/:id/export-pdf', protect, exportStudyPlanPdf);
 
 /**
  * @swagger
@@ -135,6 +138,7 @@ router.get('/:id/export-ics', protect, exportStudyPlanIcs);
  */
 
 router.get('/active', protect, getActivePlan);
+
 
 /**
  * @swagger
@@ -387,7 +391,7 @@ router.put('/:planId/tasks/:taskId/date', protect, validateMoveTaskDate, moveTas
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/:id/reschedule', protect, aiLimiter, checkQuota, rescheduleOverdueTasks);
+router.post('/:id/reschedule', protect, aiLimiter, checkAiQuota, rescheduleOverdueTasks);
 
 /**
  * @swagger

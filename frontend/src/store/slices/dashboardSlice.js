@@ -66,8 +66,7 @@ export const reviewFlashcard = createAsyncThunk(
 // ── Helper: Initial theme detection ──
 const getInitialTheme = () => {
   const saved = localStorage.getItem('openprep_theme') || localStorage.getItem('theme');
-  if (saved) return saved;
-  return 'system';
+  return saved === 'dark' ? 'dark' : 'light';
 };
 
 // ── Initial State ──
@@ -97,12 +96,12 @@ const dashboardSlice = createSlice({
   initialState,
   reducers: {
     toggleTheme: (state) => {
-      // Rotate through: system -> light -> dark -> oled
+      // Rotate through: system -> light -> dark -> high-contrast
       let nextTheme = 'system';
 
       if (state.theme === 'system') nextTheme = 'light';
       else if (state.theme === 'light') nextTheme = 'dark';
-      else if (state.theme === 'dark') nextTheme = 'oled';
+      else if (state.theme === 'dark') nextTheme = 'high-contrast';
       
       state.theme = nextTheme;
       localStorage.setItem('openprep_theme', nextTheme);

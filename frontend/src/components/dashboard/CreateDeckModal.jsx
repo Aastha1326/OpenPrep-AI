@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { X, Sparkles, Loader, AlertCircle, Check, XCircle } from 'lucide-react';
+import { Sparkles, Loader, AlertCircle, Check, XCircle } from 'lucide-react';
 import API from '../../services/api';
+import Modal from '../common/Modal';
 
 const CreateDeckModal = ({ subjectId, topicId, onClose, onCreated }) => {
   const [front, setFront] = useState('');
@@ -59,20 +59,24 @@ const CreateDeckModal = ({ subjectId, topicId, onClose, onCreated }) => {
   };
 
   return (
-    <motion.div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-lg">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-bold">Create Flashcard</h2>
-          <button onClick={onClose}><X className="w-5 h-5" /></button>
-        </div>
-
+    // Rendered conditionally by the parent, so it is open whenever it exists.
+    <Modal isOpen onClose={onClose} title="Create Flashcard" size="lg">
+      <>
+        <label htmlFor="flashcard-front" className="sr-only">
+          Front (question or term)
+        </label>
         <textarea
+          id="flashcard-front"
           value={front}
           onChange={(e) => setFront(e.target.value)}
           placeholder="Front (question/term)"
           className="w-full border rounded p-2 mb-3"
         />
+        <label htmlFor="flashcard-back" className="sr-only">
+          Back (answer or definition)
+        </label>
         <textarea
+          id="flashcard-back"
           value={back}
           onChange={(e) => setBack(e.target.value)}
           placeholder="Back (answer/definition)"
@@ -80,6 +84,7 @@ const CreateDeckModal = ({ subjectId, topicId, onClose, onCreated }) => {
         />
 
         <button
+          type="button"
           onClick={handleAutoTag}
           disabled={tagging}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-700 text-white text-sm rounded mb-3 disabled:opacity-50"
@@ -103,7 +108,9 @@ const CreateDeckModal = ({ subjectId, topicId, onClose, onCreated }) => {
               {suggestedTags.map((tag, idx) => (
                 <button
                   key={idx}
+                  type="button"
                   onClick={() => toggleTag(idx)}
+                  aria-pressed={tag.accepted}
                   className={`flex items-center gap-1 px-2 py-1 rounded text-xs border ${
                     tag.accepted
                       ? 'bg-green-100 border-green-400 text-green-800'
@@ -119,14 +126,15 @@ const CreateDeckModal = ({ subjectId, topicId, onClose, onCreated }) => {
         )}
 
         <button
+          type="button"
           onClick={handleSave}
           disabled={saving || !front.trim() || !back.trim()}
           className="w-full py-2 bg-neutral-900 text-white rounded disabled:opacity-50"
         >
           {saving ? 'Saving...' : 'Save Flashcard'}
         </button>
-      </div>
-    </motion.div>
+      </>
+    </Modal>
   );
 };
 

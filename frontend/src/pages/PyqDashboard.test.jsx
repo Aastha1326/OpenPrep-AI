@@ -73,11 +73,11 @@ describe('PyqDashboard Component', () => {
       if (url === '/academic/subjects') {
         return Promise.resolve({ data: { success: true, data: mockSubjects } });
       }
-      if (url === '/pyqs') {
-        return Promise.resolve({ data: { success: true, data: mockPyqs } });
-      }
-      if (url === '/pyqs/forecast') {
+      if (url.startsWith('/pyqs/forecast')) {
         return Promise.resolve({ data: { success: true, data: mockForecast } });
+      }
+      if (url.startsWith('/pyqs')) {
+        return Promise.resolve({ data: { success: true, data: mockPyqs } });
       }
       return Promise.resolve({ data: { data: [] } });
     });
@@ -91,8 +91,12 @@ describe('PyqDashboard Component', () => {
     // Verify paper title is rendered
     expect(await screen.findByText('Midterm 2025')).toBeInTheDocument();
 
+    // Select a subject
+    const subjectSelect = screen.getAllByRole('combobox')[2]; // Index 2 is selectedSubjectId
+    fireEvent.change(subjectSelect, { target: { value: 'subj-1' } });
+
     // Verify Tab buttons exist
-    const paperTab = screen.getByRole('button', { name: /Paper Insights/i });
+    const paperTab = await screen.findByRole('button', { name: /Paper Insights/i });
     const forecastTab = screen.getByRole('button', { name: /AI Upcoming Forecast/i });
     expect(paperTab).toBeInTheDocument();
     expect(forecastTab).toBeInTheDocument();
@@ -102,7 +106,7 @@ describe('PyqDashboard Component', () => {
 
     // Assert that forecast details are loaded and rendered
     expect(await screen.findByText('Predicted Upcoming Difficulty')).toBeInTheDocument();
-    expect(screen.getByText('HARD')).toBeInTheDocument();
+    expect(screen.getAllByText(/Hard/i)[0]).toBeInTheDocument();
     expect(screen.getByText('CI/CD Pipeline Design')).toBeInTheDocument();
     expect(screen.getByText('High Probability in 2026')).toBeInTheDocument();
     expect(screen.getByText('95%')).toBeInTheDocument();

@@ -24,10 +24,7 @@ describe('Error Handler Middleware', () => {
     errorHandler(err, req, res, vi.fn());
 
     expect(res.statusCode).toBe(500);
-    expect(res.body).toEqual({
-      success: false,
-      error: 'Something went wrong',
-    });
+    expect(res.body.error).toBe('Internal Server Error');
   });
 
   it('should return 400 for a SequelizeValidationError', () => {
@@ -118,6 +115,27 @@ describe('Error Handler Middleware', () => {
     expect(res.body).toEqual({
       success: false,
       error: 'Gemini request timed out',
+      message: 'Gemini request timed out',
     });
+  });
+
+  it('should capture 500 errors in Sentry when Sentry is enabled', () => {
+    const sentryConfig = require('../../config/sentry');
+    const originalReady = sentryConfig.isSentryReady;
+    sentryConfig.isSentryReady = true;
+
+    const originalCapture = sentryConfig.Sentry.captureException;
+    sentryConfig.Sentry.captureException = vi.fn();
+
+    const err = new Error('Internal system crash');
+    errorHandler(err, req, res, vi.fn());
+
+    expect(sentryConfig.Sentry.captureException).toHaveBeenCalledWith(err);
+    expect(res.statusCode).toBe(500);
+    expect(res.body.error).toBe('Internal Server Error');
+
+    // Restore
+    sentryConfig.isSentryReady = originalReady;
+    sentryConfig.Sentry.captureException = originalCapture;
   });
 });

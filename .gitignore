@@ -17,6 +17,9 @@ coverage/
 .env.production.local
 backend/.env
 frontend/.env
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
 
 # Logs
 logs
@@ -46,3 +49,11 @@ backend/uploads/
 
 tests/load/reports/
 tests/load/reports/
+.vercel
+.env*.local
+
+# Database Backups
+backups/
+backend/backups/
+*.sql.gz
+
