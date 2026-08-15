@@ -81,6 +81,9 @@ const QuizSession = () => {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
 
+  const [savedSessionBanner, setSavedSessionBanner] = useState(null);
+  const startedAtRef = useRef(Date.now());
+
   const submittingRef = useRef(false);
   // Unique idempotency key for this session's submission — reused across retries
   // so the backend can drop duplicate submissions (#762).
@@ -188,6 +191,79 @@ const fetchQuiz = useCallback(async () => {
   useEffect(() => {
     fetchQuiz();
   }, [id, fetchQuiz]);
+
+  // Check localStorage for saved session on quiz load
+  useEffect(() => {
+    if (!id || !quiz) return;
+    const storageKey = `quiz_progress_${id}`;
+    try {
+      const savedStr = localStorage.getItem(storageKey);
+      if (savedStr) {
+        const parsed = JSON.parse(savedStr);
+        const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+        if (parsed && parsed.startedAt && Date.now() - parsed.startedAt < TWO_HOURS_MS) {
+          setSavedSessionBanner(parsed);
+        } else {
+          // Expired (older than 2 hours) -> automatically discard
+          localStorage.removeItem(storageKey);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to parse saved quiz progress:', e);
+    }
+  }, [id, quiz]);
+
+  // Auto-save quiz progress to localStorage (debounced by 500ms)
+  useEffect(() => {
+    if (!id || !quiz || submitted) return;
+    if (Object.keys(answers).length === 0 && currentQuestionIndex === 0) return;
+
+    const timer = setTimeout(() => {
+      try {
+        const storageKey = `quiz_progress_${id}`;
+        const dataToSave = {
+          quizId: id,
+          answers,
+          currentQuestionIndex,
+          startedAt: startedAtRef.current || Date.now(),
+        };
+        localStorage.setItem(storageKey, JSON.stringify(dataToSave));
+      } catch (e) {
+        console.error('Failed to save quiz progress to localStorage:', e);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [id, quiz, answers, currentQuestionIndex, submitted]);
+
+  const handleResumeQuiz = () => {
+    if (savedSessionBanner) {
+      if (savedSessionBanner.answers) {
+        setAnswers(savedSessionBanner.answers);
+      }
+      if (savedSessionBanner.startedAt) {
+        startedAtRef.current = savedSessionBanner.startedAt;
+      }
+      let targetIndex = savedSessionBanner.currentQuestionIndex ?? 0;
+      if (quiz && quiz.questions) {
+        const restoredAnswers = savedSessionBanner.answers || {};
+        const firstUnanswered = quiz.questions.findIndex((q) => !restoredAnswers[q._id || q.id]);
+        if (firstUnanswered !== -1) {
+          targetIndex = firstUnanswered;
+        }
+      }
+      setCurrentQuestionIndex(targetIndex);
+    }
+    setSavedSessionBanner(null);
+  };
+
+  const handleDiscardSavedQuiz = () => {
+    if (id) {
+      localStorage.removeItem(`quiz_progress_${id}`);
+    }
+    setSavedSessionBanner(null);
+  };
+
   const timeElapsed = timeLeft === 0 && !submitted;
 
 const handleOptionSelect = useCallback((questionId, option) => {
@@ -302,6 +378,9 @@ const submitQuiz = useCallback(async () => {
 
       setResult(res.data.data);
       setSubmitted(true);
+      if (id) {
+        localStorage.removeItem(`quiz_progress_${id}`);
+      }
     } catch (err) {
       console.error(err);
       setSubmitError('Failed to submit quiz attempt. Check your connection and retry.');
@@ -508,6 +587,39 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
           )}
         </div>
       )}
+
+      {savedSessionBanner && !submitted && (
+        <div
+          role="alert"
+          aria-label="Resume quiz banner"
+          className="max-w-3xl mx-auto mb-6 bg-amber-500/20 border border-amber-500/40 text-amber-200 p-4 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg backdrop-blur-sm"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-2xl" aria-hidden="true">⏳</span>
+            <div>
+              <h4 className="font-bold text-white text-base">Resume quiz?</h4>
+              <p className="text-xs text-amber-200/80">
+                You have saved progress for this quiz from {new Date(savedSessionBanner.startedAt).toLocaleTimeString()}.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={handleResumeQuiz}
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold text-sm rounded-lg transition-colors shadow"
+            >
+              Resume
+            </button>
+            <button
+              onClick={handleDiscardSavedQuiz}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-sm rounded-lg transition-colors"
+            >
+              Start Fresh
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8 border-b border-slate-700 pb-4">
