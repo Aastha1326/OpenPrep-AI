@@ -16,10 +16,12 @@ CalendarDays,
   GanttChartSquare,
   List,
   Gauge,
-} from 'lucide-react';import html2pdf from 'html2pdf.js';
+} from 'lucide-react';
+import html2pdf from 'html2pdf.js';
 import API from '../../services/api';
 import { toLocalDateString, formatDateOnly } from '../../utils/dateUtils';
 import StudyPlanGanttView from './StudyPlanGanttView';
+import { downloadCertificate } from '../../services/reportService';
 // Create Study Plan Form Component
 const CreateStudyPlanForm = ({
   onClose,
@@ -585,6 +587,28 @@ const totalWeakCount = useMemo(() => {
                         {isExporting ? 'Exporting...' : 'Export to PDF'}
                       </span>
                     </button>
+                    {activePlan?.status === 'completed' || (completionForecast && completionForecast.progress === 100) ? (
+                      <button
+                        onClick={async () => {
+                          setIsExporting(true);
+                          try {
+                            await downloadCertificate(activePlan.id);
+                          } catch (err) {
+                            console.error(err);
+                          } finally {
+                            setIsExporting(false);
+                          }
+                        }}
+                        disabled={isExporting}
+                        className="flex items-center space-x-2 bg-gradient-to-r from-indigo-700 to-indigo-900 text-white px-4 py-2 rounded-sm hover:from-indigo-600 hover:to-indigo-800 transition-colors disabled:opacity-50 cursor-pointer"
+                        title="Download Certificate of Achievement"
+                      >
+                        <Download className="w-5 h-5" />
+                        <span className="font-semibold">
+                          Certificate
+                        </span>
+                      </button>
+                    ) : null}
                   </>
                 )}
                 <button

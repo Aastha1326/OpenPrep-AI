@@ -59,6 +59,7 @@ import PyqAnalysisModal from '../components/dashboard/PyqAnalysisModal';
 import WeaknessDashboardWidget from '../components/dashboard/WeaknessDashboardWidget';
 import SubjectMasteryWidget from '../components/dashboard/SubjectMasteryWidget';
 import FocusEfficiencyWidget from '../components/dashboard/FocusEfficiencyWidget';
+import StudyReportPDF from '../components/reports/StudyReportPDF';
 import ActivityHeatmap from '../components/dashboard/ActivityHeatmap';
 import LeaderboardWidget from '../components/dashboard/LeaderboardWidget';
 import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
@@ -687,14 +688,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
               >
                 <Download className="w-3.5 h-3.5" /> Export CSV
               </button>
-              <button
-                onClick={() => handleExportReport('pdf')}
-                disabled={isExporting}
-                className="px-3 py-1.5 bg-gradient-to-r from-yellow-700 to-yellow-600 hover:from-yellow-600 hover:to-yellow-500 text-yellow-50 rounded text-xs font-semibold flex items-center gap-1.5 shadow transition-all disabled:opacity-50"
-                title="Export report as PDF"
-              >
-                <Download className="w-3.5 h-3.5" /> Export PDF
-              </button>
+              <StudyReportPDF />
             </div>
           </div>
 
