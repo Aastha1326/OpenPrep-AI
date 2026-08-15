@@ -13,6 +13,7 @@ const {
   shareCollaboration,
   getNote,
 } = require('../controllers/noteController');
+const { transcribeAndSummarize } = require('../controllers/audioNoteController');
 const { protect } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const { uploadMarkdown } = require('../middleware/upload');
@@ -234,6 +235,13 @@ router.post(
   validateUploadNote,
   clearCache('notes:*'),
   uploadVoiceNote
+);
+
+router.post(
+  '/transcribe-and-summarize',
+  protect,
+  upload.single('file'),
+  transcribeAndSummarize
 );
 
 /**
