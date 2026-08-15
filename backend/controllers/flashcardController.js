@@ -437,11 +437,12 @@ exports.generateFlashcardsFromYouTube = async (req, res, next) => {
 // @access  Private
 exports.createFlashcard = async (req, res, next) => {
   try {
-    const { subjectId, topicId, front, back, tags, difficulty } = req.body;
+    const { subjectId, topicId, deckId, front, back, tags, difficulty } = req.body;
     const card = await Flashcard.create({
       user: req.user.id,
       subject: subjectId,
       topic: topicId || null,
+      deckId: deckId || null,
       front,
       back,
       tags: tags || [],
@@ -466,7 +467,7 @@ exports.createFlashcard = async (req, res, next) => {
 // @access  Private
 exports.getFlashcards = async (req, res, next) => {
   try {
-    const { subjectId, topicId, dueOnly, search, sortBy, order } = req.query;
+    const { subjectId, topicId, deckId, dueOnly, search, sortBy, order } = req.query;
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const offset = (page - 1) * limit;
@@ -475,6 +476,7 @@ exports.getFlashcards = async (req, res, next) => {
 
     if (subjectId) filter.subject = subjectId;
     if (topicId) filter.topic = topicId;
+    if (deckId) filter.deckId = deckId;
 
     if (dueOnly === 'true') {
       filter.nextReviewDate = { [Op.lte]: new Date() };
