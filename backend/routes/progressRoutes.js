@@ -13,8 +13,9 @@ const {
   logFocusSession,
   getWeeklyFocusEfficiency,
 } = require('../controllers/progressController');
-const { awardXP, unlockSkillNode } = require('../controllers/xpController');
+const { getXPStatus, awardXP, unlockSkillNode, equipStreakFreeze } = require('../controllers/xpController');
 const { protect } = require('../middleware/auth');
+const cacheMiddleware = require('../middleware/cacheMiddleware');
 const {
   validateTrackStudyTime,
   validateUpdateTopicProgress,
@@ -90,7 +91,7 @@ router.get('/composite-overview', protect, getCompositeBundleOverview);
  *               $ref: '#/components/schemas/Error'
  */
 
-router.get('/stats', protect, getDashboardStats);
+router.get('/stats', protect, cacheMiddleware(900), getDashboardStats);
 
 /**
  * @swagger
@@ -150,7 +151,7 @@ router.get('/stats', protect, getDashboardStats);
  *               $ref: '#/components/schemas/Error'
  */
 
-router.get('/dashboard', protect, getDashboardStats);
+router.get('/dashboard', protect, cacheMiddleware(900), getDashboardStats);
 
 /**
  * @swagger
@@ -564,5 +565,10 @@ router.get('/activity', protect, getActivityFeed);
 
 router.post('/focus-session', protect, validateFocusSession, logFocusSession);
 router.get('/focus-session/weekly', protect, getWeeklyFocusEfficiency);
+
+router.get('/xp/status', protect, getXPStatus);
+router.post('/xp/award', protect, awardXP);
+router.post('/xp/unlock', protect, unlockSkillNode);
+router.post('/streak-freeze/equip', protect, equipStreakFreeze);
 
 module.exports = router;

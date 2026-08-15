@@ -1,0 +1,14 @@
+{
+  "welcome": "Bon retour",
+  "dashboard": "Tableau de bord",
+  "settings": "Paramètres",
+  "logout": "Se déconnecter",
+  "export_analytics": "Exporter les analyses",
+  "sm2_settings": "Paramètres SM-2",
+  "skill_tree": "Arbre des compétences",
+  "study_group": "Groupe d'étude",
+  "ai_assistant": "Assistant IA",
+  "pyqs": "Annales",
+  "flashcards": "Cartes mémoires",
+  "select_language": "Choisir la langue"
+}

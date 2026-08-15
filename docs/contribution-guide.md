@@ -62,6 +62,11 @@ If your contribution adds new features or alters database/API schemas:
 3. Highlight any new dependencies added.
 
 ---
+## 🛡️ Dependency Updates & Security
+* **Dependabot**: Automated security updates are handled via Dependabot. Review and merge security patch PRs promptly.
+* **Manual Audits**: Before submitting a PR, ensure your local packages are secure by running:
+  ```bash
+  npm audit --audit-level=high
 
 ## 💬 Community & Support
 

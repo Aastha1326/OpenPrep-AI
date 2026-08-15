@@ -2,8 +2,9 @@ const express = require('express');
 const {
   generateAIFlashcards,
   generateFlashcardsFromNote,
+  generateFlashcardsFromAudio,
   generateFlashcardsFromYouTube,
-  autoTagFlashcard,
+  autoTagFlashcard,  
   createFlashcard,
   getFlashcards,
   reviewFlashcard,
@@ -14,11 +15,16 @@ const {
   shareFlashcardDeck,
   getCommunityDecks,
   cloneCommunityDeck,
+  rateCommunityDeck,
+  starCommunityDeck,
+  batchSyncOfflineReviews,
 } = require('../controllers/flashcardController');
 const { protect } = require('../middleware/auth');
+const cacheMiddleware = require('../middleware/cacheMiddleware');
 const { aiLimiter } = require('../middleware/rateLimiter');
 const { checkQuota } = require('../middleware/quotaMiddleware');
 const flashcardUpload = require('../middleware/flashcardUpload');
+const audioFlashcardUpload = require('../middleware/audioFlashcardUpload');
 const {
 validateGenerateAIFlashcards,
   validateGenerateFlashcardsFromNote,
@@ -253,6 +259,23 @@ router.post(
  *       503:
  *         description: AI service unavailable
  */
+/**
+ * @swagger
+ * /api/flashcards/from-audio:
+ *   post:
+ *     summary: Transcribe an audio lecture and generate preview flashcards
+ *     tags: [Flashcards]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post(
+  '/from-audio',
+  protect,
+  aiLimiter,
+  checkQuota,
+  audioFlashcardUpload.single('audio'),
+  generateFlashcardsFromAudio
+);
 router.post(
   '/from-youtube',
   protect,
@@ -264,7 +287,8 @@ router.post(
 
 /**
  * @swagger
- * /api/flashcards/export: *   get:
+ * /api/flashcards/export:
+ *   get:
  *     summary: Export flashcards as JSON
  *     tags: [Flashcards]
  *     security:
@@ -525,7 +549,7 @@ router.post('/', protect, validateCreateFlashcard, createFlashcard);
  *               $ref: '#/components/schemas/Error'
  */
 
-router.get('/', protect, getFlashcards);
+router.get('/', protect, cacheMiddleware(900), getFlashcards);
 
 /**
  * @swagger
@@ -753,6 +777,9 @@ router.put('/decks/:subjectId/share', protect, shareFlashcardDeck);
  *         description: Deck cloned successfully
  */
 router.post('/decks/:subjectId/clone', protect, cloneCommunityDeck);
+router.post('/decks/:subjectId/rate', protect, rateCommunityDeck);
+router.post('/decks/:subjectId/star', protect, starCommunityDeck);
+router.post('/batch-sync', protect, batchSyncOfflineReviews);
 
 router.delete('/:id', protect, deleteFlashcard);
 

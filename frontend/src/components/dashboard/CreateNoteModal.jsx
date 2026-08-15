@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Save, AlertCircle, Cloud, CloudRain } from 'lucide-react';
+import { X, Save, AlertCircle, Cloud, CloudRain, Edit3, Image as ImageIcon } from 'lucide-react';
 import 'react-quill/dist/quill.snow.css';
 import API from '../../services/api';
+import OCRUploadZone from '../OCRUploadZone';
+import TextCorrectionModal from '../TextCorrectionModal';
 
 const ReactQuill = lazy(() => import('react-quill'));
 
@@ -11,10 +13,14 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
   const [content, setContent] = useState('');
   const [subjects, setSubjects] = useState([]);
   const [subjectId, setSubjectId] = useState('');
+  const [tags, setTags] = useState('');
   const [noteId, setNoteId] = useState(null);
   const [autosaveStatus, setAutosaveStatus] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState('write'); // 'write' or 'ocr'
+  const [ocrData, setOcrData] = useState(null);
+  const [isCorrectionOpen, setIsCorrectionOpen] = useState(false);
 
   const lastSavedTitle = useRef('');
   const lastSavedContent = useRef('');
@@ -43,8 +49,12 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
       setContent('');
       setNoteId(null);
       setAutosaveStatus('');
+      setTags('');
       lastSavedTitle.current = '';
       lastSavedContent.current = '';
+      setActiveTab('write');
+      setOcrData(null);
+      setIsCorrectionOpen(false);
     }
 
     return () => {
@@ -75,6 +85,7 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
           formData.append('title', title);
           formData.append('content', content);
           formData.append('subjectId', subjectId);
+          if (tags.trim()) formData.append('tags', tags);
 
           const response = await API.post('/notes', formData, {
             isBackground: true,
@@ -102,6 +113,7 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
             title,
             content,
             subjectId,
+            tags: tags ? tags.split(',').map(t => t.trim()) : [],
           }, {
             isBackground: true,
           });
@@ -154,12 +166,14 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
           title,
           content,
           subjectId,
+          tags: tags ? tags.split(',').map(t => t.trim()) : [],
         });
       } else {
         const formData = new FormData();
         formData.append('title', title);
         formData.append('content', content);
         formData.append('subjectId', subjectId);
+        if (tags.trim()) formData.append('tags', tags);
 
         response = await API.post('/notes', formData, {
           headers: {
@@ -211,6 +225,28 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
                 disabled={loading}
               >
                 <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            {/* Tabs */}
+            <div className="flex border-b border-neutral-200 bg-neutral-50 px-6 pt-2">
+              <button
+                onClick={() => setActiveTab('write')}
+                className={`px-4 py-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${
+                  activeTab === 'write' ? 'border-yellow-600 text-yellow-700' : 'border-transparent text-neutral-500 hover:text-neutral-700'
+                }`}
+              >
+                <Edit3 className="w-4 h-4" />
+                Write Note
+              </button>
+              <button
+                onClick={() => setActiveTab('ocr')}
+                className={`px-4 py-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${
+                  activeTab === 'ocr' ? 'border-yellow-600 text-yellow-700' : 'border-transparent text-neutral-500 hover:text-neutral-700'
+                }`}
+              >
+                <ImageIcon className="w-4 h-4" />
+                Extract from Image (OCR)
               </button>
             </div>
 
@@ -270,31 +306,64 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
                   />
                 </div>
 
-                {/* Quill Editor */}
+                {/* Tags */}
                 <div>
-                  <label className="block text-sm font-semibold text-neutral-700 mb-1">
-                    Content
+                  <label
+                    htmlFor="tags"
+                    className="block text-sm font-semibold text-neutral-700 mb-1"
+                  >
+                    Tags (comma separated)
                   </label>
-                  <div className="bg-white rounded overflow-hidden">
-                    <Suspense
-                      fallback={
-                        <div className="h-[300px] flex items-center justify-center text-neutral-400 text-sm animate-pulse">
-                          Loading editor...
-                        </div>
-                      }
-                    >
-                      <ReactQuill
-                        theme="snow"
-                        value={content}
-                        onChange={setContent}
-                        modules={modules}
-                        placeholder="Write your study notes here..."
-                        className="h-[300px] mb-12"
-                        readOnly={loading}
-                      />
-                    </Suspense>
-                  </div>
+                  <input
+                    id="tags"
+                    type="text"
+                    value={tags}
+                    onChange={(e) => setTags(e.target.value)}
+                    placeholder="e.g. Important, Formulas, Exam2026"
+                    className="w-full px-4 py-2 bg-white border border-neutral-300 rounded focus:outline-none focus:ring-2 focus:ring-yellow-600 focus:border-transparent transition-all"
+                    disabled={loading}
+                  />
                 </div>
+
+                {/* Main Content Area Based on Tab */}
+                {activeTab === 'write' ? (
+                  <div>
+                    <label className="block text-sm font-semibold text-neutral-700 mb-1">
+                      Content
+                    </label>
+                    <div className="bg-white rounded overflow-hidden">
+                      <Suspense
+                        fallback={
+                          <div className="h-[300px] flex items-center justify-center text-neutral-400 text-sm animate-pulse">
+                            Loading editor...
+                          </div>
+                        }
+                      >
+                        <ReactQuill
+                          theme="snow"
+                          value={content}
+                          onChange={setContent}
+                          modules={modules}
+                          placeholder="Write your study notes here..."
+                          className="h-[300px] mb-12"
+                          readOnly={loading}
+                        />
+                      </Suspense>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-sm font-semibold text-neutral-700 mb-1">
+                      Upload Handwritten Note or Screenshot
+                    </label>
+                    <OCRUploadZone 
+                      onTextExtracted={(data) => {
+                        setOcrData(data);
+                        setIsCorrectionOpen(true);
+                      }} 
+                    />
+                  </div>
+                )}
               </div>
             </div>
 
@@ -342,6 +411,18 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
           </motion.div>
         </div>
       )}
+
+      {/* OCR Correction Modal */}
+      <TextCorrectionModal
+        isOpen={isCorrectionOpen}
+        onClose={() => setIsCorrectionOpen(false)}
+        ocrData={ocrData}
+        onSave={(correctedText) => {
+          setContent((prev) => prev ? `${prev}<br><br>${correctedText.replace(/\\n/g, '<br>')}` : correctedText.replace(/\\n/g, '<br>'));
+          setIsCorrectionOpen(false);
+          setActiveTab('write'); // Switch back to editor
+        }}
+      />
     </AnimatePresence>
   );
 };

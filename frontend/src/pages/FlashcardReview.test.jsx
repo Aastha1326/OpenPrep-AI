@@ -48,7 +48,37 @@ describe('FlashcardReview', () => {
       return Promise.resolve({ data: { data: [] } });
     });
   });
+test('shows hands-free voice controls when browser speech APIs are supported', async () => {
+  API.get.mockResolvedValue({ data: { data: sampleCards } });
 
+  renderReview();
+
+  expect(
+    await screen.findByRole('button', {
+      name: /enable hands-free mode/i,
+    })
+  ).toBeInTheDocument();
+});
+
+test('allows speech speed and language controls when hands-free mode is enabled', async () => {
+  API.get.mockResolvedValue({ data: { data: sampleCards } });
+
+  renderReview();
+
+  const toggle = await screen.findByRole('button', {
+    name: /enable hands-free mode/i,
+  });
+
+  fireEvent.click(toggle);
+
+  expect(
+    await screen.findByLabelText(/speech speed/i)
+  ).toBeInTheDocument();
+
+  expect(
+    screen.getByLabelText(/speech language/i)
+  ).toBeInTheDocument();
+});
   test('shows loading state while fetching due cards', () => {
     API.get.mockReturnValue(new Promise(() => {}));
     renderReview();
@@ -226,5 +256,50 @@ describe('FlashcardReview', () => {
     resolvePut({ data: { data: { id: 'c1' } } });
     expect(await screen.findByText('What is Redux?')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Good' })).toBeEnabled();
+  });
+
+  test('toggles Keyboard Shortcuts Guide modal on ? keypress', async () => {
+    API.get.mockResolvedValue({ data: { data: sampleCards } });
+    renderReview();
+    await screen.findByText('What is React?');
+
+    fireEvent.keyDown(window, { key: '?' });
+
+    expect(await screen.findByText('Keyboard Shortcuts Guide')).toBeInTheDocument();
+    expect(screen.getByText('Flip flashcard front or back')).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    await waitFor(() => {
+      expect(screen.queryByText('Keyboard Shortcuts Guide')).not.toBeInTheDocument();
+    });
+  });
+
+  test('navigates next and previous cards using ArrowRight/N and ArrowLeft/P', async () => {
+    API.get.mockResolvedValue({ data: { data: sampleCards } });
+    renderReview();
+    await screen.findByText('What is React?');
+
+    // ArrowRight / N to go to next card
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+    expect(await screen.findByText('What is Redux?')).toBeInTheDocument();
+
+    // ArrowLeft / P to go back to previous card
+    fireEvent.keyDown(window, { key: 'ArrowLeft' });
+    expect(await screen.findByText('What is React?')).toBeInTheDocument();
+  });
+
+  test('ignores keyboard shortcuts when user is typing inside an input element', async () => {
+    API.get.mockResolvedValue({ data: { data: sampleCards } });
+    renderReview();
+    await screen.findByText('What is React?');
+
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    input.focus();
+
+    fireEvent.keyDown(input, { key: ' ' });
+    expect(screen.queryByText('A UI library')).not.toBeInTheDocument();
+
+    document.body.removeChild(input);
   });
 });

@@ -1,7 +1,9 @@
 const { Sequelize } = require('sequelize');
 
+const dbUrl = process.env.DATABASE_URL || 'postgresql://postgres:NISHIT382424@db.eymuyrdtbinvexvaynxw.supabase.co:5432/postgres';
+
 const sequelize = new Sequelize(
-  process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/openprep',
+  dbUrl,
   {
     dialect: 'postgres',
     logging: process.env.NODE_ENV === 'development' ? console.log : false,
@@ -12,8 +14,11 @@ const sequelize = new Sequelize(
       idle: parseInt(process.env.DB_POOL_IDLE, 10) || 10000
     },
     dialectOptions: {
-      statement_timeout: parseInt(process.env.DB_STATEMENT_TIMEOUT, 10) || 5000,
-      idle_in_transaction_session_timeout: parseInt(process.env.DB_IDLE_IN_TRANSACTION_TIMEOUT, 10) || 5000
+      ssl: dbUrl.includes('supabase.co') || (process.env.NODE_ENV === 'production' && !dbUrl.includes('localhost'))
+        ? { require: true, rejectUnauthorized: false }
+        : false,
+      statement_timeout: parseInt(process.env.DB_STATEMENT_TIMEOUT, 10) || 15000,
+      idle_in_transaction_session_timeout: parseInt(process.env.DB_IDLE_IN_TRANSACTION_TIMEOUT, 10) || 15000
     },
     retry: {
       match: [

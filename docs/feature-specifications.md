@@ -4,33 +4,39 @@ This document defines the functional specifications and algorithmic details for 
 
 ---
 
-## 📊 PYQ Intelligence
+## 📊 PYQ Intelligence & Batch Trend Analyzer
 
-The PYQ Intelligence engine extracts insights from historical exam papers to help students optimize their preparation.
+The PYQ Intelligence and Batch Trend Analyzer extracts consolidated chapter weightages and recurring concept frequencies from multiple historical exam papers.
 
 ### 1. Functional Scope
-* **Document Processing**: Students upload a PDF of a Previous Year Question Paper (PYQ).
-* **Text Extraction**: The backend extracts raw text from the PDF.
-* **AI Analysis**: The Gemini API processes the text to identify:
-  * **Chapter Weightage**: A percentage breakdown of chapters represented in the exam paper.
-  * **Important Topics**: Core concepts rated by importance (`High`, `Medium`, `Low`) and frequency.
-  * **Repeated Questions**: Detection of duplicate or highly similar questions across exam years.
-  * **Exam Trend Analysis**: Descriptive summaries analyzing emphasis on theory vs. practical problem-solving.
+* **Batch PDF Processing**: Students upload up to 10 past exam paper PDFs for a subject.
+* **Text Extraction & OCR**: 
+  * The backend extracts selectable text from PDF files using `pdf-parse`.
+  * If a file has empty text (such as scanned image-only PDFs), the system logs the event and routes to the OCR text-extraction pipeline.
+  * Image uploads (JPEG, PNG) are routed directly to the Tesseract.js OCR engine.
+* **AI Aggregation**: The Gemini API processes the combined text across years and extracts structured questions mapped to chapters, topics, marks, and year.
+* **Interactive Charts**:
+  * **Chapter Weightage Bar Chart**: Displays chapter marks percentage contributions. Clicking a bar allows launching targeted AI quizzes or creating flashcard decks for that specific chapter.
+  * **Concept Heatmap Grid**: Displays a Recharts scatter plot showing years on the X-axis, topic names on the Y-axis, and marks weightage as bubble sizes.
+* **High-Yield Priorities**: Lists chapters ranked by weightage percentage, suggesting study sequences.
+* **PDF Export**: Generates and downloads detailed past paper reports using PDFKit.
 
 ### 2. Prompt Schema & Flow
 The backend uses `gemini-1.5-flash` with a strict JSON system prompt to retrieve structured data. The schema must resolve to:
 ```json
 {
-  "chapterWeightage": [
-    { "chapterName": "string", "weightage": 35 }
-  ],
-  "importantTopics": [
-    { "topicName": "string", "importance": "High", "frequency": 4 }
-  ],
-  "repeatedQuestions": [
-    { "questionText": "string", "years": [2023, 2025] }
-  ],
-  "trendAnalysis": "string"
+  "examName": "CBSE Board Exams",
+  "yearRange": "2020-2025",
+  "totalQuestions": 32,
+  "questions": [
+    {
+      "chapterName": "Database Management",
+      "topicName": "SQL Joins",
+      "questionText": "Compare INNER JOIN versus LEFT OUTER JOIN.",
+      "marks": 5,
+      "year": 2024
+    }
+  ]
 }
 ```
 
@@ -124,10 +130,25 @@ If response quality $q < 3$, repetitions is reset to $0$, and interval $I$ is re
 
 ---
 
-## 📊 Dashboard Analytics
+## 📊 Dashboard Analytics & Exam Readiness Index (ERI)
 
-Provides students with an overview of their learning telemetry:
+Provides students with an overview of their learning telemetry and predicted exam readiness levels:
 * **Streak Tracking**: Logs consecutive active days. If last active date is $> 1$ day, the streak resets to 0.
 * **Hours Studied**: Aggregates time spent on completed study plan tasks.
 * **Completion Rate**: Percentage of overall syllabus topics categorized as "Strong".
 * **Recent Activity Feed**: Chronological list of completed quizzes, uploaded PYQs, and flashcard reviews.
+
+### 1. Exam Readiness Index (ERI) Formula
+Calculates a composite exam preparedness metric (0-100%) for each subject:
+$$\text{ERI} = 0.30 \times \text{Syllabus Coverage} + 0.30 \times \text{Quiz Accuracy} + 0.25 \times \text{Memory Retention} + 0.15 \times \text{Schedule Velocity}$$
+* **Syllabus Coverage**: Average completion percentage across all topics of the subject.
+* **Quiz Accuracy**: Percentage of correct answers across all quiz attempts in the subject.
+* **Memory Retention**: Average memory stability derived from flashcardrepetitions and SM-2 ease factors.
+* **Schedule Velocity**: Percentage of completed study goals inside the active study plan.
+
+### 2. Knowledge Radar Chart
+An interactive Recharts Radar Chart mapping ERI masteries across enrolled subjects. If the student has less than 3 active subjects, the visualization falls back to a horizontal Bar Chart to maintain correct scale rendering.
+
+### 3. Trajectory Score Forecast
+Plots projected readiness progression up to the target exam date based on daily study plan goals, helping students visualize their revision progress.
+

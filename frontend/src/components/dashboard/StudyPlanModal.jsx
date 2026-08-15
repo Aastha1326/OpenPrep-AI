@@ -1,4 +1,5 @@
 import { useRef, useState, useMemo, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
@@ -12,16 +13,82 @@ import {
   Plus,
   RefreshCw,
   AlertCircle,
-CalendarDays,
+  CalendarDays,
   GanttChartSquare,
   List,
   Gauge,
 } from 'lucide-react';
+  Sparkles,
+  Loader,
+} from 'lucide-react';
+import CalendarExportDropdown from '../CalendarExportDropdown';
 import html2pdf from 'html2pdf.js';
 import API from '../../services/api';
 import { toLocalDateString, formatDateOnly } from '../../utils/dateUtils';
 import StudyPlanGanttView from './StudyPlanGanttView';
 import { downloadCertificate } from '../../services/reportService';
+
+const MILESTONE_TYPE_LABELS = {
+  weekly_checkpoint: 'Weekly Checkpoint',
+  mid_course_review: 'Mid-Course Review',
+  final_review: 'Final Review',
+  exam_day: 'Target Exam',
+};
+
+const MilestoneBadge = ({ date, status }) => {
+  if (status === 'completed') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-800 border border-green-200 shadow-sm">
+        <CheckCircle className="w-4 h-4" />
+        Completed
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-[#8B4513]/10 text-[#8B4513] border border-[#8B4513]/20 shadow-sm">
+      <CalendarIcon className="w-4 h-4" />
+      {formatDateOnly(date)}
+    </span>
+  );
+};
+
+const MilestonesSection = ({ milestones }) => (
+  <div className="mt-12 mb-8">
+    <div className="flex items-center gap-2 mb-6 border-b border-[#8B4513]/20 pb-2">
+      <Sparkles className="w-6 h-6 text-yellow-600" />
+      <h3 className="text-2xl font-bold font-playfair text-[#3E2723]">
+        Milestones & Checkpoints
+      </h3>
+    </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {milestones.map((m) => (
+        <div
+          key={m.id}
+          className="bg-white rounded-md border border-[#8B4513]/20 p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group"
+        >
+          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:scale-110 transition-transform">
+            <Sparkles className="w-24 h-24" />
+          </div>
+          <div className="flex justify-between items-start mb-3 relative z-10">
+            <div>
+              <span className="inline-block px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-[#8B4513]/5 text-[#8B4513]/70 mb-2">
+                {MILESTONE_TYPE_LABELS[m.type] || 'Milestone'}
+              </span>
+              <h4 className="text-lg font-bold text-neutral-800 font-playfair">
+                {m.title}
+              </h4>
+            </div>
+            <MilestoneBadge date={m.date} status={m.status} />
+          </div>
+          <p className="text-sm text-neutral-600 relative z-10">
+            {m.description}
+          </p>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
 // Create Study Plan Form Component
 const CreateStudyPlanForm = ({
   onClose,
@@ -34,6 +101,7 @@ const CreateStudyPlanForm = ({
   minEndDate,
   exams,
   prefillExamName,
+  isAiDisabled,
 }) => (
   <div className="max-w-xl mx-auto">
     <div className="flex items-center justify-between mb-6">
@@ -51,6 +119,13 @@ const CreateStudyPlanForm = ({
         <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
+        </div>
+      )}
+
+      {isAiDisabled && (
+        <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-750 dark:text-red-200 text-sm rounded flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>AI creation is temporarily disabled due to rate limits/quota exhaustion.</span>
         </div>
       )}
 
@@ -142,7 +217,7 @@ const CreateStudyPlanForm = ({
         </button>
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || isAiDisabled}
           className="px-6 py-2 bg-gradient-to-r from-yellow-600 to-yellow-700 text-white rounded shadow hover:shadow-lg font-medium transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? (
@@ -193,8 +268,13 @@ const StudyPlanModal = ({
   onPlanUpdate,
   syllabusPrefill,
 }) => {
+  const { aiQuotaExceededUntil } = useSelector((state) => state.auth);
+  const isAiDisabled = !!(aiQuotaExceededUntil && Date.now() < aiQuotaExceededUntil);
+
   const contentRef = useRef(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingServerPdf, setIsExportingServerPdf] = useState(false);
+  const [exportPdfError, setExportPdfError] = useState(null);
   const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
 const [isRescheduling, setIsRescheduling] = useState(false);
   const [isRebalancing, setIsRebalancing] = useState(false);  const [rescheduleMessage, setRescheduleMessage] = useState(null);
@@ -315,36 +395,104 @@ const totalWeakCount = useMemo(() => {
     }
   };
 
-  const handleExportIcs = async () => {
+  // Issue #1056: Server-side study plan PDF export
+  const handleExportServerPdf = async () => {
     if (!activePlan?.id) return;
-    setIsSyncingCalendar(true);
-
+    setIsExportingServerPdf(true);
+    setExportPdfError(null);
     try {
-      const response = await API.get(`/study-plans/${activePlan.id}/export-ics`, {
+      const response = await API.get(`/study-plans/${activePlan.id}/export-pdf`, {
         responseType: 'blob',
       });
-
-      const blob = new Blob([response.data], { type: 'text/calendar;charset=utf-8' });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `study-plan-${activePlan.id}.ics`);
+      const dateStr = new Date().toISOString().split('T')[0];
+      link.setAttribute('download', `openprep-studyplan-${dateStr}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.parentNode.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('iCal export failed:', err);
-      setRescheduleMessage({
-        type: 'error',
-        text: err.response?.data?.error || 'Failed to export calendar .ics file',
-      });
-      setTimeout(() => setRescheduleMessage(null), 4000);
+      console.error('Server PDF export failed:', err);
+      setExportPdfError('Failed to export PDF. Please try again.');
+      setTimeout(() => setExportPdfError(null), 5000);
     } finally {
-      setIsSyncingCalendar(false);
+      setIsExportingServerPdf(false);
     }
   };
 
+
+const handleExportIcs = async () => {
+  if (!activePlan?.id) {
+    return;
+  }
+
+  setIsSyncingCalendar(true);
+
+  try {
+    const timeZone =
+      Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    const response = await API.get(
+      `/study-plans/${activePlan.id}/export-ics`,
+      {
+        responseType: 'blob',
+        headers: {
+          'x-timezone': timeZone,
+        },
+      }
+    );
+
+    const blob = new Blob(
+      [response.data],
+      {
+        type: 'text/calendar;charset=utf-8',
+      }
+    );
+
+    const url =
+      window.URL.createObjectURL(blob);
+
+    const link =
+      document.createElement('a');
+
+    link.href = url;
+
+    link.setAttribute(
+      'download',
+      `study-plan-${activePlan.id}.ics`
+    );
+
+    document.body.appendChild(link);
+
+    link.click();
+
+    link.parentNode.removeChild(link);
+
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error(
+      'iCal export failed:',
+      err
+    );
+
+    setRescheduleMessage({
+      type: 'error',
+      text:
+        err.response?.data?.error ||
+        'Failed to export calendar .ics file',
+    });
+
+    setTimeout(
+      () => setRescheduleMessage(null),
+      4000
+    );
+  } finally {
+    setIsSyncingCalendar(false);
+  }
+};
   const handleReschedule = async () => {
     if (!activePlan?.id) return;
 
@@ -506,19 +654,30 @@ const totalWeakCount = useMemo(() => {
               <div className="flex flex-wrap items-center gap-3">
                 {!showForm && activePlan && (
                   <>
+                    <CalendarExportDropdown 
+                      activePlanId={activePlan.id}
+                      isSyncingCalendar={isSyncingCalendar}
+                      setIsSyncingCalendar={setIsSyncingCalendar}
+                      onExportIcs={handleExportIcs}
+                    />
+                    {/* Issue #1056: Export study plan as server-rendered PDF */}
                     <button
-                      onClick={handleExportIcs}
-                      disabled={isSyncingCalendar}
+                      onClick={handleExportServerPdf}
+                      disabled={isExportingServerPdf}
+                      aria-label="Export study plan as PDF"
                       className="flex items-center space-x-2 bg-gradient-to-r from-emerald-700 to-emerald-900 text-white px-4 py-2 rounded-sm hover:from-emerald-600 hover:to-emerald-800 transition-colors disabled:opacity-50 cursor-pointer"
-                      title="Export calendar file for Google Calendar or Outlook (.ics)"
+                      title="Download a printable PDF of your study plan"
                     >
-                      <CalendarDays
-                        className={`w-5 h-5 ${isSyncingCalendar ? 'animate-spin' : ''}`}
-                      />
+                      {isExportingServerPdf
+                        ? <Loader className="w-4 h-4 animate-spin" />
+                        : <Download className="w-4 h-4" />}
                       <span className="font-semibold">
-                        {isSyncingCalendar ? 'Exporting...' : 'Sync Calendar (.ics)'}
+                        {isExportingServerPdf ? 'Exporting...' : 'Export PDF'}
                       </span>
                     </button>
+                    {exportPdfError && (
+                      <span className="text-xs text-red-600 font-semibold">{exportPdfError}</span>
+                    )}
                     <button
                       onClick={handleReschedule}
                       disabled={isRescheduling}
@@ -676,6 +835,7 @@ const totalWeakCount = useMemo(() => {
                   minEndDate={minEndDate}
                   exams={exams}
                   prefillExamName={syllabusPrefill?.examName}
+                  isAiDisabled={isAiDisabled}
                 />
               ) : showTimeline ? (
                 <div className="bg-white/80 p-6 rounded-sm shadow-sm border border-[#8B4513]/10">
@@ -803,6 +963,9 @@ const totalWeakCount = useMemo(() => {
                       </div>
                     )}
                   </div>
+                  {activePlan?.milestones?.length > 0 && (
+                    <MilestonesSection milestones={activePlan.milestones} />
+                  )}
                   {/* PDF Footer spacer */}
                   <div className="mt-12 pt-4 border-t border-[#8B4513]/20 text-center text-sm text-[#8B4513]/60 italic font-playfair">
                     Stay consistent. The roots of education are bitter, but the fruit is sweet.

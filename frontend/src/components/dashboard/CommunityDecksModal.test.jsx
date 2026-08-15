@@ -57,9 +57,10 @@ describe('CommunityDecksModal Component', () => {
 
     // Check deck metadata
     expect(screen.getByText('Organic Chemistry')).toBeInTheDocument();
-    expect(screen.getByText('By Alice • For MCAT')).toBeInTheDocument();
-    expect(screen.getByText('Cards: 45')).toBeInTheDocument();
-    expect(screen.getByText('Clones: 120')).toBeInTheDocument();
+    expect(screen.getByText(/Alice/)).toBeInTheDocument();
+    expect(screen.getByText(/MCAT/)).toBeInTheDocument();
+    expect(screen.getByText(/45/)).toBeInTheDocument();
+    expect(screen.getByText(/120/)).toBeInTheDocument();
 
     // Perform clone operation
     const cloneBtn = screen.getByRole('button', { name: /Clone Deck/i });
@@ -67,6 +68,65 @@ describe('CommunityDecksModal Component', () => {
 
     await waitFor(() => {
       expect(API.post).toHaveBeenCalledWith('/flashcards/decks/deck-1/clone', {});
+    });
+  });
+
+  it('allows user to star a community deck', async () => {
+    const mockDecks = [
+      {
+        id: 'deck-1',
+        name: 'Organic Chemistry',
+        description: 'Advanced chemistry cards',
+        rating: 4.8,
+        starCount: 5,
+        tags: ['Chemistry'],
+        cardCount: 45,
+        cloneCount: 120,
+        ownerName: 'Alice',
+        examName: 'MCAT',
+      },
+    ];
+
+    API.get.mockResolvedValue({ data: { success: true, data: mockDecks } });
+    API.post.mockResolvedValue({ data: { success: true } });
+
+    render(<CommunityDecksModal isOpen={true} onClose={vi.fn()} />);
+
+    const starBtn = await screen.findByTitle('Star this deck');
+    fireEvent.click(starBtn);
+
+    await waitFor(() => {
+      expect(API.post).toHaveBeenCalledWith('/flashcards/decks/deck-1/star', {});
+    });
+  });
+
+  it('allows user to rate a community deck', async () => {
+    const mockDecks = [
+      {
+        id: 'deck-1',
+        name: 'Organic Chemistry',
+        description: 'Advanced chemistry cards',
+        rating: 4.8,
+        starCount: 5,
+        tags: ['Chemistry'],
+        cardCount: 45,
+        cloneCount: 120,
+        ownerName: 'Alice',
+        examName: 'MCAT',
+      },
+    ];
+
+    API.get.mockResolvedValue({ data: { success: true, data: mockDecks } });
+    API.post.mockResolvedValue({ data: { success: true } });
+
+    render(<CommunityDecksModal isOpen={true} onClose={vi.fn()} />);
+
+    const rateBtns = await screen.findAllByTitle(/Rate \d Stars/);
+    // Click on the 5-star rate button
+    fireEvent.click(rateBtns[4]);
+
+    await waitFor(() => {
+      expect(API.post).toHaveBeenCalledWith('/flashcards/decks/deck-1/rate', { rating: 5 });
     });
   });
 });

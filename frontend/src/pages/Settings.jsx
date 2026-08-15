@@ -14,14 +14,16 @@ import {
   Trash,
   AlertCircle,
   CheckCircle,
-  Bell,
-} from 'lucide-react';
-import LeatherBoard from '../components/dashboard/LeatherBoard';
+Bell,
+  Award,
+  Users,
+} from 'lucide-react';import LeatherBoard from '../components/dashboard/LeatherBoard';
 import VintagePaper from '../components/dashboard/VintagePaper';
 import API from '../services/api';
 import { getVapidPublicKey, subscribeToPush, unsubscribeFromPush, updateNotificationPreferences } from '../services/notificationApi';
 import { loadUser } from '../store/slices/authSlice';
 import { validateAvatarFile } from '../utils/fileValidation';
+import { BADGE_LIST, BADGE_ICONS } from '../config/badges';
 
 const urlBase64ToUint8Array = (base64String) => {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -39,12 +41,15 @@ const Settings = () => {
   const navigate = useNavigate();
   const { user } = useSelector((state) => state.auth);
 
-  const [leaderboardVisible, setLeaderboardVisible] = useState(
+const [leaderboardVisible, setLeaderboardVisible] = useState(
     typeof user?.leaderboardVisible === 'boolean' ? user.leaderboardVisible : true
   );
+  const [hideActivityFromSquad, setHideActivityFromSquad] = useState(
+    typeof user?.hideActivityFromSquad === 'boolean' ? user.hideActivityFromSquad : false
+  );
+  const [savingActivityPrivacy, setSavingActivityPrivacy] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState(null);
+  const [saved, setSaved] = useState(false);  const [error, setError] = useState(null);
 
   // Avatar Upload States
   const [file, setFile] = useState(null);
@@ -135,10 +140,23 @@ const Settings = () => {
     } finally {
       setSaving(false);
     }
-  }, [leaderboardVisible, dispatch]);
+}, [leaderboardVisible, dispatch]);
 
-  const [reminderTime, setReminderTime] = useState(user?.dailyReminderTime || '09:00');
-  const [pushStatus, setPushStatus] = useState(Notification.permission);
+  const handleActivityPrivacyToggle = useCallback(async () => {
+    const next = !hideActivityFromSquad;
+    setSavingActivityPrivacy(true);
+    try {
+      await API.patch('/auth/settings', { hideActivityFromSquad: next });
+      setHideActivityFromSquad(next);
+      await dispatch(loadUser());
+    } catch (err) {
+      console.error('Failed to update squad activity privacy:', err);
+    } finally {
+      setSavingActivityPrivacy(false);
+    }
+  }, [hideActivityFromSquad, dispatch]);
+
+  const [reminderTime, setReminderTime] = useState(user?.dailyReminderTime || '09:00');  const [pushStatus, setPushStatus] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'default');
   const [pushSubscribed, setPushSubscribed] = useState(!!user?.pushSubscription);
   const [pushLoading, setPushLoading] = useState(false);
 
@@ -339,6 +357,56 @@ const Settings = () => {
           </div>
         </VintagePaper>
 
+        {/* --- BADGE GALLERY --- */}
+        <VintagePaper className="border-t-4 border-t-amber-700">
+          <div className="flex items-center gap-3 mb-3">
+            <Award className="w-7 h-7 text-amber-700" />
+            <h2 className="text-2xl font-bold font-playfair text-neutral-800 dark:text-neutral-100">
+              Badge Gallery
+            </h2>
+          </div>
+
+          <p className="text-neutral-600 dark:text-neutral-300 mb-6 leading-relaxed">
+            Track your milestones and study achievements. Keep up the great work!
+          </p>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {BADGE_LIST.map((badgeConfig) => {
+              const Icon = BADGE_ICONS[badgeConfig.icon] || Award;
+              const earnedRecord = user?.achievements?.find((a) => a.badgeId === badgeConfig.id);
+              const isEarned = !!earnedRecord;
+              
+              return (
+                <div 
+                  key={badgeConfig.id}
+                  className={`p-4 border rounded-sm flex flex-col items-center text-center transition-all ${
+                    isEarned 
+                      ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700/50 shadow-sm'
+                      : 'bg-neutral-50 dark:bg-neutral-800/40 border-neutral-200 dark:border-neutral-700 opacity-60 grayscale'
+                  }`}
+                >
+                  <div className={`p-3 rounded-full mb-3 ${
+                    isEarned ? 'bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200' : 'bg-neutral-200 dark:bg-neutral-700 text-neutral-500'
+                  }`}>
+                    <Icon className="w-8 h-8" />
+                  </div>
+                  <h3 className="font-playfair font-bold text-sm text-neutral-800 dark:text-neutral-200 mb-1">
+                    {badgeConfig.name}
+                  </h3>
+                  <p className="text-xs text-neutral-600 dark:text-neutral-400 mb-2 leading-tight">
+                    {badgeConfig.description}
+                  </p>
+                  {isEarned && (
+                    <span className="text-[10px] font-semibold tracking-wider uppercase text-amber-700 dark:text-amber-400">
+                      Earned {new Date(earnedRecord.earnedAt || earnedRecord.createdAt).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </VintagePaper>
+
         {/* --- LEADERBOARD PRIVACY --- */}
         <VintagePaper className="border-t-4 border-t-amber-700">
           <div className="flex items-center gap-3 mb-3">
@@ -405,10 +473,61 @@ const Settings = () => {
               {error}
             </p>
           )}
+</VintagePaper>
+
+        {/* --- STUDY SQUAD ACTIVITY PRIVACY --- */}
+        <VintagePaper className="border-t-4 border-t-amber-700">
+          <div className="flex items-center gap-3 mb-3">
+            <Users className="w-7 h-7 text-amber-700" />
+            <h2 className="text-2xl font-bold font-playfair text-neutral-800 dark:text-neutral-100">
+              Study Squad Activity Privacy
+            </h2>
+          </div>
+
+          <p className="text-neutral-600 dark:text-neutral-300 mb-6 leading-relaxed">
+            Your study squads see a shared activity feed of quiz completions, streak milestones and
+            unlocked badges. You can hide your own activity from every squad feed if you'd rather
+            keep your study progress private.
+          </p>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-neutral-100/60 dark:bg-neutral-800/60 border border-neutral-300 dark:border-neutral-600 rounded-sm">
+            <div className="flex items-start gap-3">
+              {hideActivityFromSquad ? (
+                <EyeOff className="w-5 h-5 mt-0.5 text-red-700 dark:text-red-400 shrink-0" />
+              ) : (
+                <Eye className="w-5 h-5 mt-0.5 text-green-700 dark:text-green-400 shrink-0" />
+              )}
+              <div>
+                <p className="font-playfair font-bold text-lg text-neutral-800 dark:text-neutral-100">
+                  {hideActivityFromSquad ? 'Hidden From Squad Feeds' : 'Visible In Squad Feeds'}
+                </p>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-0.5">
+                  {hideActivityFromSquad
+                    ? 'Your quiz, streak and badge milestones will not appear in any squad activity feed.'
+                    : 'Your quiz, streak and badge milestones will appear in your squads\' activity feeds.'}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              role="switch"
+              aria-checked={!hideActivityFromSquad}
+              aria-label="Show my study milestones in squad activity feeds"
+              onClick={handleActivityPrivacyToggle}
+              disabled={savingActivityPrivacy}
+              className="relative inline-flex items-center h-8 w-14 rounded-full bg-neutral-300 dark:bg-neutral-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 disabled:opacity-50 shrink-0"
+            >
+              <span
+                className={`inline-block w-6 h-6 rounded-full bg-white shadow transform transition-transform ${
+                  !hideActivityFromSquad ? 'translate-x-7' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
         </VintagePaper>
 
-        {/* --- PUSH NOTIFICATIONS --- */}
-        <VintagePaper className="border-t-4 border-t-amber-700">
+        {/* --- PUSH NOTIFICATIONS --- */}        <VintagePaper className="border-t-4 border-t-amber-700">
           <div className="flex items-center gap-3 mb-3">
             <Bell className="w-7 h-7 text-amber-700" />
             <h2 className="text-2xl font-bold font-playfair text-neutral-800 dark:text-neutral-100">

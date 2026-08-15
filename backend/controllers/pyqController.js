@@ -7,8 +7,10 @@ const PYQ = require('../models/PYQ');
 const Subject = require('../models/Subject');
 const Topic = require('../models/Topic');
 const ActivityLog = require('../models/ActivityLog');
+const { uploadFileToFirebase } = require('../services/firebaseStorageService');
 const geminiService = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
+const { checkAndAwardBadges } = require('../services/achievementService');
 const { clusterByCosineSimilarity } = require('../utils/vectorUtils');
 
 // Cosine similarity cutoff above which two questions are treated as duplicates
@@ -43,9 +45,10 @@ const pdfParseSemaphore = new Semaphore(2);
 // @access  Private
 exports.uploadAndAnalyzePYQ = async (req, res, next) => {
   try {
-const { examId, subjectId, year, title, difficulty } = req.body;
-    if (!req.file) {
-      return res.status(400).json({ success: false, error: 'Please upload a question paper PDF' });
+    const { examId, subjectId, year, title, difficulty, extractedText: ocrText, fileUrl: ocrFileUrl } = req.body;
+    
+    if (!req.file && !ocrText) {
+      return res.status(400).json({ success: false, error: 'Please upload a question paper PDF or provide extracted text' });
     }
 
     const subject = await Subject.findByPk(subjectId);
@@ -53,20 +56,25 @@ const { examId, subjectId, year, title, difficulty } = req.body;
       return res.status(404).json({ success: false, error: 'Subject not found' });
     }
 
-    // Read PDF and extract text
-    let extractedText = '';
-    try {
-      await pdfParseSemaphore.acquire();
+    // Read PDF and extract text if no OCR text provided
+    let extractedText = ocrText || '';
+    let fileUrl = ocrFileUrl || '';
+
+    if (!ocrText && req.file) {
+      fileUrl = `/uploads/${req.file.filename}`;
       try {
-        const dataBuffer = await fs.promises.readFile(req.file.path);
-        const pdfData = await pdfParse(dataBuffer);
-        extractedText = pdfData.text;
-      } finally {
-        pdfParseSemaphore.release();
+        await pdfParseSemaphore.acquire();
+        try {
+          const dataBuffer = await fs.promises.readFile(req.file.path);
+          const pdfData = await pdfParse(dataBuffer);
+          extractedText = pdfData.text;
+        } finally {
+          pdfParseSemaphore.release();
+        }
+      } catch (parseError) {
+        console.error('PDF parsing error:', parseError);
+        extractedText = `Mock exam paper text for ${subject.name} - Year ${year}. Dynamic Program, caching, time complexity analysis.`;
       }
-    } catch (parseError) {
-      console.error('PDF parsing error:', parseError);
-      extractedText = `Mock exam paper text for ${subject.name} - Year ${year}. Dynamic Program, caching, time complexity analysis.`;
     }
 
     // Call Gemini API for structure analysis
@@ -84,7 +92,7 @@ const { examId, subjectId, year, title, difficulty } = req.body;
       year: parseInt(year),
       difficulty: ['Easy', 'Medium', 'Hard'].includes(difficulty) ? difficulty : 'Medium',
       chapters,
-      fileUrl: `/uploads/${req.file.filename}`,
+      fileUrl: fileUrl,
       analyzed: true,
       analysisResults: analysis,
       user: req.user.id,
@@ -134,6 +142,13 @@ const { examId, subjectId, year, title, difficulty } = req.body;
       user: req.user.id,
       activityType: 'pyq_upload',
       description: `Uploaded and analyzed Previous Year Question Paper: ${pyq.title}`,
+    });
+
+    // Issue #1053: Check for PYQ Analyst badge
+    const totalAnalyzed = await PYQ.count({ where: { user: req.user.id } });
+    await checkAndAwardBadges(req.user.id, {
+      type: 'PYQ_ANALYZED',
+      payload: { totalAnalyzed }
     });
 
     res.status(201).json({
@@ -513,6 +528,76 @@ exports.getPYQAnalysis = async (req, res, next) => {
   }
 };
 
+// @desc    Stream PYQ Analysis via Server-Sent Events (SSE)
+// @route   GET /api/pyqs/:id/analyze-stream
+// @access  Private
+exports.analyzePYQStream = async (req, res, next) => {
+  try {
+    const pyq = await PYQ.findOne({
+      where: { id: req.params.id, user: req.user.id },
+    });
+    if (!pyq) {
+      return res.status(404).json({ success: false, error: 'Question paper not found' });
+    }
+
+    // Set Server-Sent Events (SSE) headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    if (typeof res.flushHeaders === 'function') {
+      res.flushHeaders();
+    }
+
+    // Initial connection ACK
+    res.write(`data: ${JSON.stringify({ status: 'connected', message: 'SSE stream established' })}\n\n`);
+
+    let extractedText = '';
+    try {
+      if (pyq.fileUrl) {
+        const absolutePath = path.resolve(path.join(__dirname, '..', pyq.fileUrl));
+        if (fs.existsSync(absolutePath)) {
+          const dataBuffer = await fs.promises.readFile(absolutePath);
+          const pdfData = await pdfParse(dataBuffer);
+          extractedText = pdfData.text;
+        }
+      }
+    } catch (parseError) {
+      console.error('PDF parsing error during SSE stream:', parseError);
+    }
+
+    const subject = await Subject.findByPk(pyq.subject);
+    const subjectName = subject ? subject.name : 'the subject';
+
+    const analysis = await geminiService.analyzePYQStream(
+      extractedText || `${subjectName} - Year ${pyq.year}`,
+      subjectName,
+      (chunkText) => {
+        res.write(`data: ${JSON.stringify({ chunk: chunkText })}\n\n`);
+      }
+    );
+
+    if (analysis) {
+      pyq.analysisResults = analysis;
+      pyq.analyzed = true;
+      await pyq.save();
+    }
+
+    res.write(`data: ${JSON.stringify({ status: 'completed', analysis })}\n\n`);
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (error) {
+    console.error('Error during PYQ SSE analysis streaming:', error);
+    if (!res.headersSent) {
+      next(error);
+    } else {
+      res.write(`data: ${JSON.stringify({ error: error.message || 'Stream processing failed' })}\n\n`);
+      res.write('data: [DONE]\n\n');
+      res.end();
+    }
+  }
+};
+
 // @desc    Delete PYQ
 // @route   DELETE /api/pyqs/:id
 // @access  Private
@@ -666,6 +751,183 @@ exports.getUpcomingForecast = async (req, res, next) => {
       success: true,
       data: forecast,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const PYQAnalysis = require('../models/PYQAnalysis');
+const PYQQuestion = require('../models/PYQQuestion');
+const pyqAnalyzerService = require('../services/pyqAnalyzerService');
+const PDFDocument = require('pdfkit');
+
+exports.analyzePYQBatch = async (req, res, next) => {
+  try {
+    const { subjectId, examName } = req.body;
+    const files = req.files;
+
+    if (!subjectId) {
+      return res.status(400).json({ success: false, error: 'subjectId is required.' });
+    }
+
+    if (!files || files.length === 0) {
+      return res.status(400).json({ success: false, error: 'Please upload at least one past exam paper PDF.' });
+    }
+
+    const subject = await Subject.findByPk(subjectId);
+    if (!subject) {
+      return res.status(404).json({ success: false, error: 'Subject not found.' });
+    }
+
+    // 1. Extract combined text from uploaded files (PDF/Image)
+    const combinedText = await pyqAnalyzerService.extractTextFromFiles(files, subject.name);
+
+    // 2. Call batch analysis via Gemini
+    const result = await pyqAnalyzerService.analyzePYQBatch(combinedText, subject.name);
+
+    // 3. Save aggregated analysis to DB
+    const analysis = await PYQAnalysis.create({
+      subjectId,
+      examName: examName || result.examName || 'Board Exams',
+      yearRange: result.yearRange,
+      weightageData: result.weightageData,
+      totalQuestions: result.totalQuestions,
+      userId: req.user.id,
+    });
+
+    // 4. Save individual questions for trend heatmaps
+    if (result.questions && result.questions.length > 0) {
+      const questionsToCreate = result.questions.map((q) => ({
+        pyqAnalysisId: analysis.id,
+        chapterName: q.chapterName || 'General',
+        topicName: q.topicName || 'General Concepts',
+        questionText: q.questionText,
+        marks: q.marks || 5,
+        year: q.year || 2024,
+      }));
+      await PYQQuestion.bulkCreate(questionsToCreate);
+    }
+
+    // Clean up local temp files uploaded by multer
+    for (const file of files) {
+      fs.unlink(file.path, (err) => {
+        if (err) console.error('Failed to delete temp file:', file.path);
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      data: {
+        id: analysis.id,
+        examName: analysis.examName,
+        yearRange: analysis.yearRange,
+        weightageData: analysis.weightageData,
+        totalQuestions: analysis.totalQuestions,
+        questions: result.questions,
+      },
+    });
+  } catch (error) {
+    // Attempt temp files cleanup on error
+    if (req.files) {
+      for (const file of req.files) {
+        fs.unlink(file.path, (err) => {});
+      }
+    }
+    next(error);
+  }
+};
+
+exports.getSubjectAnalyses = async (req, res, next) => {
+  try {
+    const { subjectId } = req.params;
+    const analyses = await PYQAnalysis.findAll({
+      where: { subjectId, userId: req.user.id },
+      order: [['createdAt', 'DESC']],
+      include: [
+        { model: PYQQuestion, as: 'questions' },
+      ],
+    });
+
+    res.status(200).json({
+      success: true,
+      data: analyses,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.exportPYQAnalysisPDF = async (req, res, next) => {
+  try {
+    const { analysisId } = req.params;
+    const analysis = await PYQAnalysis.findOne({
+      where: { id: analysisId, userId: req.user.id },
+      include: [
+        { model: PYQQuestion, as: 'questions' },
+      ],
+    });
+
+    if (!analysis) {
+      return res.status(404).json({ success: false, error: 'Analysis record not found.' });
+    }
+
+    const doc = new PDFDocument({ margin: 50 });
+    
+    // Set headers
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=PYQ_Analysis_${analysis.yearRange}.pdf`);
+    doc.pipe(res);
+
+    // Title
+    doc.fontSize(22).font('Helvetica-Bold').text('PYQ Trend Analysis Report', { align: 'center' });
+    doc.moveDown();
+
+    // Metadata
+    doc.fontSize(12).font('Helvetica').text(`Exam Category: ${analysis.examName}`);
+    doc.text(`Year Range: ${analysis.yearRange}`);
+    doc.text(`Total Questions Analyzed: ${analysis.totalQuestions}`);
+    doc.text(`Generated On: ${new Date().toLocaleDateString()}`);
+    doc.moveDown(1.5);
+
+    // Divider
+    doc.moveTo(50, doc.y).lineTo(550, doc.y).strokeColor('#e2e8f0').stroke();
+    doc.moveDown(1.5);
+
+    // Chapter Weightage
+    doc.fontSize(16).font('Helvetica-Bold').text('Chapter Marks Weightage Breakdown');
+    doc.moveDown(0.5);
+
+    const weightageList = analysis.weightageData?.chapterWeightage || [];
+    weightageList.forEach((ch, idx) => {
+      doc.fontSize(11).font('Helvetica-Bold').text(`${idx + 1}. ${ch.chapterName}`);
+      doc.fontSize(10).font('Helvetica').text(`   Weightage: ${ch.percentage}% (${ch.marks} marks over ${ch.questionCount} questions)`);
+      doc.moveDown(0.3);
+    });
+
+    doc.moveDown(1.5);
+
+    // Recurring Topics List
+    doc.fontSize(16).font('Helvetica-Bold').text('High-Yield Priorities & Topics');
+    doc.moveDown(0.5);
+
+    const topicsSeen = {};
+    (analysis.questions || []).forEach((q) => {
+      if (q.topicName) {
+        topicsSeen[q.topicName] = (topicsSeen[q.topicName] || 0) + 1;
+      }
+    });
+
+    const topTopicsList = Object.entries(topicsSeen)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
+
+    topTopicsList.forEach(([topic, count], idx) => {
+      doc.fontSize(11).font('Helvetica-Bold').text(`- ${topic}`);
+      doc.fontSize(10).font('Helvetica').text(`   Appeared in past papers: ${count} times`);
+      doc.moveDown(0.2);
+    });
+
+    doc.end();
   } catch (error) {
     next(error);
   }

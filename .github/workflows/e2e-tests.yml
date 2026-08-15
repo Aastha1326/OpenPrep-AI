@@ -1,0 +1,71 @@
+name: Playwright E2E Tests
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  e2e-tests:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm install --no-audit
+          npm install --no-audit --prefix backend
+          npm install --no-audit --prefix frontend
+
+      - name: Migrate & Seed Database
+        env:
+          DATABASE_URL: postgres://postgres@localhost:5432/postgres
+          JWT_SECRET: testsecret
+          NODE_ENV: development
+        run: |
+          node backend/scripts/migrate.js
+          npm run seed
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium
+        working-directory: ./frontend
+
+      - name: Run Playwright E2E Tests
+        env:
+          DATABASE_URL: postgres://postgres@localhost:5432/postgres
+          JWT_SECRET: testsecret
+          NODE_ENV: development
+          PORT: 5000
+        run: npm run test:e2e
+        working-directory: ./frontend
+
+      - name: Upload Test Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 30

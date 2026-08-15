@@ -2,7 +2,11 @@ import Skeleton from '../components/dashboard/Skeleton';
 import { useState, useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import LanguageSelector from '../components/LanguageSelector';
 import { motion, AnimatePresence } from 'framer-motion';
+import SecuritySettings from '../components/SecuritySettings';
+import NotificationBell from '../components/notifications/NotificationBell';
 import {
   Flame,
   Play,
@@ -23,11 +27,16 @@ import {
   Upload,
   Settings,
   MessageSquare,
-Shield,
+  Shield,
   Globe,
-  Youtube,
+  PlaySquare as Youtube,
+  Video,
+  Brain,
+  Bot,
+  Users,
 } from 'lucide-react';import API from '../services/api';
 import { toDateOnlyString } from '../utils/dateUtils';
+import SkillTree from '../components/dashboard/SkillTree';
 import {
   LineChart,
   Line,
@@ -52,7 +61,6 @@ import BadgeGrid from '../components/dashboard/BadgeGrid';
 import PinnedTasks from '../components/dashboard/PinnedTasks';
 import FatigueMonitor from '../components/dashboard/FatigueMonitor';
 import UploadMaterial from '../components/dashboard/UploadMaterial';
-import SkillTree from '../components/dashboard/SkillTree';
 import CreateNoteModal from '../components/dashboard/CreateNoteModal';
 import StudyPlanModal from '../components/dashboard/StudyPlanModal';
 import PyqAnalysisModal from '../components/dashboard/PyqAnalysisModal';
@@ -63,13 +71,20 @@ import StudyReportPDF from '../components/reports/StudyReportPDF';
 import ActivityHeatmap from '../components/dashboard/ActivityHeatmap';
 import LeaderboardWidget from '../components/dashboard/LeaderboardWidget';
 import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
+import ExamCountdownCard from '../components/dashboard/ExamCountdownCard';
 import TargetExamOverviewWidget from '../components/dashboard/TargetExamOverviewWidget';
 import CompositeBundleModal from '../components/dashboard/CompositeBundleModal';
 import SyllabusImportModal from '../components/dashboard/SyllabusImportModal';
 import NotesWidget from '../components/dashboard/NotesWidget';
 import ThemeToggle from '../components/ThemeToggle';
+import ReadinessWidget from '../components/dashboard/ReadinessWidget';
 import BadgesList from '../components/BadgesList';
 import SM2SettingsModal from '../components/dashboard/SM2SettingsModal';
+import LevelProgressBar from '../components/gamification/LevelProgressBar';
+import StreakWidget from '../components/gamification/StreakWidget';
+import BadgeCard from '../components/gamification/BadgeCard';
+import BadgeUnlockModal from '../components/gamification/BadgeUnlockModal';
+import LevelUpModal from '../components/gamification/LevelUpModal';
 import CommunityDecksModal from '../components/dashboard/CommunityDecksModal';
 import QuizSetupModal from '../components/dashboard/QuizSetupModal';
 import GenerateFlashcardsFromYouTubeModal from '../components/dashboard/GenerateFlashcardsFromYouTubeModal';
@@ -80,7 +95,7 @@ import {
   fetchDueFlashcards,
   reviewFlashcard,
 } from '../store/slices/dashboardSlice';
-import { logout } from '../store/slices/authSlice';
+import { logout, loadUser } from '../store/slices/authSlice';
 
 // ── Helpers ──
 
@@ -185,10 +200,34 @@ const EmptyState = ({ icon: Icon = Lightbulb, message = 'No data yet' }) => (
 
 // ── Main Component ──
 const Dashboard = () => {
+  const { t } = useTranslation();
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
   const { user } = useSelector((state) => state.auth);
+
+  const [gamificationData, setGamificationData] = useState(null);
+  const [loadingGamification, setLoadingGamification] = useState(false);
+  const [activeBadgeUnlock, setActiveBadgeUnlock] = useState(null);
+// Streak freezes are automatically consumed by the backend.
+  const fetchGamification = useCallback(async () => {
+    try {
+      setLoadingGamification(true);
+      const res = await API.get('/gamification/summary');
+      if (res.data?.success) {
+        setGamificationData(res.data.data);
+      }
+    } catch (e) {
+      console.error('Failed to load gamification summary:', e);
+    } finally {
+      setLoadingGamification(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchGamification();
+  }, [fetchGamification]);
+
   const {
     stats,
     weeklyChartData,
@@ -206,19 +245,20 @@ const Dashboard = () => {
     errorFlashcards,
   } = useSelector((state) => state.dashboard);
 
-  useEffect(() => {
-    const fetchAll = () => {
-      dispatch(fetchDashboardStats());
-      dispatch(fetchSubjectBreakdown());
-      dispatch(fetchActivePlan());
-      dispatch(fetchDueFlashcards());
-    };
+  const fetchAll = useCallback(() => {
+    dispatch(fetchDashboardStats());
+    dispatch(fetchSubjectBreakdown());
+    dispatch(fetchActivePlan());
+    dispatch(fetchDueFlashcards());
+    fetchGamification();
+  }, [dispatch, fetchGamification]);
 
+  useEffect(() => {
     fetchAll();
 
     window.addEventListener('focus', fetchAll);
     return () => window.removeEventListener('focus', fetchAll);
-  }, [dispatch]);
+  }, [fetchAll]);
 
   const handleRetry = (thunk) => () => dispatch(thunk());
 
@@ -236,10 +276,20 @@ const Dashboard = () => {
     const backendTaskId = task.meta?.taskId || task.id;
     setToggleError(null);
     try {
-      await API.put(`/study-plans/${planId}/tasks/${backendTaskId}`, {
+      const timezoneOffset = new Date().getTimezoneOffset();
+      const res = await API.put(`/study-plans/${planId}/tasks/${backendTaskId}`, {
         completed: !task.completed,
         studyTimeMinutes: 25,
+      }, {
+        headers: { 'x-timezone-offset': String(timezoneOffset) }
       });
+      
+      fetchGamification();
+      if (res.data?.progression?.newBadges?.length > 0) {
+        setActiveBadgeUnlock(res.data.progression.newBadges[0]);
+      }
+      
+      dispatch(loadUser());
       dispatch(fetchActivePlan());
       dispatch(fetchDashboardStats());
       dispatch(fetchSubjectBreakdown());
@@ -278,8 +328,34 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isCommunityDecksOpen, setIsCommunityDecksOpen] = useState(false);
   const [syllabusPrefill, setSyllabusPrefill] = useState(null);
   const [comingSoon, setComingSoon] = useState(null);
+  const [sessionStartTime] = useState(Date.now());
   const [isExporting, setIsExporting] = useState(false);
+  const [isSkillTreeOpen, setIsSkillTreeOpen] = useState(false);
+  const [showLevelUpModal, setShowLevelUpModal] = useState(false);
+  const [levelUpLevel, setLevelUpLevel] = useState(null);
+  const [prevLevel, setPrevLevel] = useState(null);
 
+  useEffect(() => {
+    if (user?.level) {
+      if (prevLevel && user.level > prevLevel) {
+        setLevelUpLevel(user.level);
+        setShowLevelUpModal(true);
+        import('canvas-confetti').then((module) => {
+          const confetti = module.default;
+          confetti({
+            particleCount: 200,
+            spread: 100,
+            origin: { y: 0.6 },
+            colors: ['#3b82f6', '#10b981', '#f5a623', '#ffffff'],
+          });
+        });
+      }
+      setPrevLevel(user.level);
+    }
+  }, [user?.level, prevLevel]);
+
+// Streak freezes are consumed automatically by the backend
+// when exactly one study day is missed.
   const handleGoToStudyPlanFromImport = (prefill) => {
     if (prefill) setSyllabusPrefill(prefill);
     // Refresh dashboard caches so the new exam appears immediately in select
@@ -373,7 +449,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
 
   const tasksProgress =
     targetTasksCount > 0
-      ? Math.round((completedTasksCount / targetTasksCount) * 100)
+      ? Math.min(100, Math.round((completedTasksCount / targetTasksCount) * 100))
       : 0;
 
   const completedBonusCount = todayTasks.filter(
@@ -447,10 +523,22 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           onClick={() => navigate('/study-group')}
         />
         <GoldTabButton
+          icon={Users}
+          label="Study Squads"
+          delay={0.46}
+          onClick={() => navigate('/squads')}
+        />
+        <GoldTabButton
           icon={Globe}
           label="Community Decks"
           delay={0.48}
           onClick={() => setIsCommunityDecksOpen(true)}
+        />
+        <GoldTabButton
+          icon={Bot}
+          label="AI Study Assistant"
+          delay={0.5}
+          onClick={() => navigate('/ai-assistant')}
         />
         <button
           onClick={() => {
@@ -472,32 +560,39 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
-            className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10"
-        >
-          <div>
-            <h1 className="text-3xl font-playfair font-bold text-stone-800 dark:text-stone-100 mb-2">
-              Welcome back, <span className="text-amber-600 dark:text-amber-500">{user?.name?.split(' ')[0] || 'Scholar'}</span>
-            </h1>
-            <p className="text-amber-100/70 text-lg italic font-playfair">
-              &ldquo;The roots of education are bitter, but the fruit is sweet.&rdquo; – Aristotle
-            </p>
+            className="flex flex-col gap-4 relative z-10"
+          >
+            <div>
+              <h1 className="text-3xl font-playfair font-bold text-stone-800 dark:text-stone-100 mb-2">
+                Welcome back, <span className="text-amber-600 dark:text-amber-500">{user?.name?.split(' ')[0] || 'Scholar'}</span>
+              </h1>
+              <p className="text-amber-100/70 text-lg italic font-playfair">
+                &ldquo;The roots of education are bitter, but the fruit is sweet.&rdquo; – Aristotle
+              </p>
 
-            {/* --- EXAM COUNTDOWN WIDGET --- */}
-            {activePlan?.exam?.date && (
+              {/* --- XP PROGRESS BAR --- */}
+              <div className="mt-4 max-w-md">
+                <LevelProgressBar
+                  xp={gamificationData?.xp || user?.xp || 0}
+                  level={gamificationData?.level || user?.level || 1}
+                  nextLevelXP={gamificationData?.nextLevelXP || 100}
+                />
+              </div>
+
+              {/* --- EXAM COUNTDOWN CARD --- */}
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.4 }}
-                className="mt-5"
+                className="mt-5 max-w-3xl"
               >
-                <ExamCountdownWidget
-                  examDate={activePlan.exam.date}
-                  examName={activePlan.exam.name}
+                <ExamCountdownCard
+                  stats={stats?.examCountdown}
+                  onRefresh={fetchAll}
                 />
               </motion.div>
-            )}
+            </div>
           </motion.div>
-
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -506,7 +601,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           >
             <div className="relative group z-50">
               <button className="bg-neutral-800 text-gold-foil border border-yellow-700/50 hover:bg-neutral-700 px-4 py-2 rounded-sm shadow-[0_4px_15px_rgba(0,0,0,0.5)] flex items-center gap-2 font-playfair font-bold text-sm tracking-wide">
-                <Download className="w-4 h-4" /> Export Analytics
+                <Download className="w-4 h-4" /> {t('export_analytics')}
               </button>
               <div className="absolute right-0 top-full mt-2 w-40 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
                 <button
@@ -535,33 +630,41 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             >
               <Settings className="w-5 h-5 transition-transform duration-300 group-hover:rotate-45" />
               <div className="absolute top-full mt-2 px-2 py-1 bg-neutral-800 text-yellow-500 text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
-                SM-2 Settings
+                {t('sm2_settings')}
               </div>
             </button>
-            <div className="flex flex-col items-center">
-              <div className="relative">
-                <Flame
-                  className="w-12 h-12 text-orange-500 animate-pulse-glow"
-                  fill="currentColor"
-                />
-                <div className="absolute inset-0 blur-md bg-orange-500/30 rounded-full" />
-              </div>
-              <span className="text-gold-foil font-bold text-2xl">{streakDays} Day</span>
-              <span className="text-amber-200/50 text-xs uppercase tracking-widest">Streak</span>
-            </div>
 
-            {streakFreezes > 0 && (
-              <div className="flex flex-col items-center ml-2">
-                <div className="relative group cursor-pointer" title="Streak Freeze Shield">
-                  <Shield className="w-10 h-10 text-cyan-400 animate-pulse" fill="currentColor" />
-                  <div className="absolute inset-0 blur-md bg-cyan-400/30 rounded-full" />
-                </div>
-                <span className="text-cyan-300 font-bold text-xl">{streakFreezes}</span>
-                <span className="text-cyan-200/50 text-[10px] uppercase tracking-widest">
-                  Freezes
-                </span>
+            <button
+              onClick={() => setIsSkillTreeOpen(true)}
+              className="bg-neutral-800 text-yellow-500 border border-yellow-700/50 hover:bg-neutral-700 p-2.5 rounded-sm shadow-[0_4px_10px_rgba(0,0,0,0.4)] flex items-center justify-center relative group"
+              aria-label="Skill Tree"
+            >
+              <Brain className="w-5 h-5 transition-transform duration-300 group-hover:scale-110" />
+              <div className="absolute top-full mt-2 px-2 py-1 bg-neutral-800 text-yellow-500 text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                {t('skill_tree')}
               </div>
-            )}
+            </button>
+
+            {/* --- STREAK WIDGET --- */}
+            <div className="w-80">
+<StreakWidget
+  currentStreak={
+    gamificationData?.currentStreak ??
+    user?.currentStreak ??
+    0
+  }
+  longestStreak={
+    gamificationData?.longestStreak ??
+    user?.longestStreak ??
+    0
+  }
+  streakFreezesAvailable={
+    gamificationData?.streakFreezesAvailable ??
+    user?.streakFreezesAvailable ??
+    0
+  }
+  badges={gamificationData?.badges || []}
+/>            </div>
 
             <button
               onClick={() => navigate('/settings')}
@@ -570,22 +673,24 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             >
               <Settings className="w-5 h-5" />
               <span className="font-playfair font-bold text-sm tracking-wide hidden sm:inline">
-                Settings
+                {t('settings')}
               </span>
             </button>
 
             <button
-              onClick={() => setIsSkillTreeOpen(true)}
+              onClick={handleLogout}
               className="bg-stone-800 text-amber-500 px-4 py-2 rounded-lg font-bold hover:bg-stone-700 transition shadow-lg border border-amber-900/30 flex items-center gap-2"
             >
               <LogOut className="w-5 h-5 group-hover:text-white" />
               <span className="font-playfair font-bold text-sm tracking-wide group-hover:text-white hidden sm:inline">
-                Logout
+                {t('logout')}
               </span>
             </button>
+            <NotificationBell />
+            <LanguageSelector />
             <ThemeToggle />
-          </div>
-        </motion.div>
+          </motion.div>
+        </div>
 
         {/* --- TARGET EXAM COMPOSITE BUNDLE OVERVIEW --- */}
         <TargetExamOverviewWidget
@@ -673,8 +778,13 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           )}
         </div>
 
+        {/* --- AI EXAM READINESS SECTION --- */}
+        <div className="space-y-4 pt-6">
+          <ReadinessWidget />
+        </div>
+
         {/* --- ANALYTICS SECTION (WOODEN DESK) --- */}
-        <div className="space-y-4">
+        <div className="space-y-4 pt-6">
           <div className="flex justify-between items-center px-1">
             <h2 className="text-2xl font-bold font-playfair text-amber-100 flex items-center gap-2">
               <TrendingUp className="w-6 h-6 text-yellow-500" /> Performance Analytics
@@ -824,7 +934,41 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           </div>
           {/* BADGES / GAMIFICATION */}
           <div className="md:col-span-2 mt-6">
-            <BadgeGrid />
+            {/* --- DYNAMIC GAMIFICATION ACHIEVEMENT BADGES --- */}
+            <div className="bg-neutral-900/40 border border-neutral-800 rounded-2xl p-6 shadow-inner">
+              <div className="flex items-center gap-2 mb-6">
+                <Award className="h-6 w-6 text-amber-500 animate-pulse" />
+                <h3 className="text-xl font-bold font-playfair text-stone-100">
+                  Achievement Badges
+                </h3>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <BadgeCard
+                  badgeCode="seven_day_streak"
+                  title="7-Day Streak 🔥"
+                  description="Studied consistently for 7 consecutive days."
+                  isUnlocked={!!gamificationData?.badges?.some(b => b.badgeCode === 'seven_day_streak')}
+                  unlockedAt={gamificationData?.badges?.find(b => b.badgeCode === 'seven_day_streak')?.unlockedAt}
+                />
+
+                <BadgeCard
+                  badgeCode="night_owl"
+                  title="Night Owl 🦉"
+                  description="Completed a study task between 11 PM and 4 AM."
+                  isUnlocked={!!gamificationData?.badges?.some(b => b.badgeCode === 'night_owl')}
+                  unlockedAt={gamificationData?.badges?.find(b => b.badgeCode === 'night_owl')?.unlockedAt}
+                />
+
+                <BadgeCard
+                  badgeCode="quiz_master"
+                  title="Quiz Master 🎓"
+                  description="Successfully finished 10 quiz attempts."
+                  isUnlocked={!!gamificationData?.badges?.some(b => b.badgeCode === 'quiz_master')}
+                  unlockedAt={gamificationData?.badges?.find(b => b.badgeCode === 'quiz_master')?.unlockedAt}
+                />
+              </div>
+            </div>
           </div>
 
           <div className="flex justify-center">
@@ -863,9 +1007,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
         <div className="my-6">
           <ActivityHeatmap />
         </div>
-        <div className="my-6">
-          <BadgesList achievements={user?.achievements || []} />
-        </div>
+
 
         {/* --- AI REVISION SUMMARIES + AUDIO READER --- */}
         <div className="my-6">
@@ -1062,7 +1204,6 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             </p>
           </VintagePaper>
         </div>
-      </div>
 {/* --- CREATE NOTE MODAL --- */}
       <CreateNoteModal
         isOpen={isNoteModalOpen}
@@ -1178,7 +1319,77 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           </motion.div>
         )}
       </AnimatePresence>
-    </LeatherBoard>
+
+      {/* --- SKILL TREE MODAL --- */}
+      <AnimatePresence>
+        {isSkillTreeOpen && (
+          <SkillTree onClose={() => setIsSkillTreeOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* --- LEVEL UP MODAL --- */}
+      <AnimatePresence>
+        {showLevelUpModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.8, y: 50 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.8, y: 50 }}
+              className="bg-stone-950 border-2 border-amber-500 rounded-3xl p-8 max-w-sm text-center shadow-[0_0_50px_rgba(245,158,11,0.3)] relative overflow-hidden"
+            >
+              {/* Glow element */}
+              <div className="absolute -inset-10 bg-amber-500/10 blur-xl rounded-full" />
+              
+              <div className="relative z-10 space-y-6">
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ repeat: Infinity, duration: 10, ease: 'linear' }}
+                  className="w-24 h-24 mx-auto rounded-full bg-amber-500/20 border-2 border-amber-500 flex items-center justify-center shadow-lg"
+                >
+                  <Award className="w-12 h-12 text-amber-400" />
+                </motion.div>
+                
+                <h2 className="text-3xl font-playfair font-bold text-amber-500">LEVEL UP!</h2>
+                
+                <p className="text-stone-300">
+                  Congratulations! You have reached <strong className="text-white">Level {levelUpLevel}</strong>!
+                </p>
+                
+                <div className="bg-stone-900 border border-stone-800 p-3 rounded-lg text-sm text-amber-200">
+                  +1 Skill Point awarded! Spend it in the Skill Tree.
+                </div>
+
+                <button
+                  onClick={() => setShowLevelUpModal(false)}
+                  className="w-full bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-700 hover:to-amber-600 text-stone-950 font-bold py-2.5 rounded-lg transition-all"
+                >
+                  Awesome!
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* --- BADGE UNLOCK MODAL --- */}
+      <BadgeUnlockModal
+        isOpen={!!activeBadgeUnlock}
+        title={activeBadgeUnlock?.title}
+        description={activeBadgeUnlock?.description}
+        onClose={() => setActiveBadgeUnlock(null)}
+      />
+
+      {/* --- SECURITY SETTINGS (2FA) --- */}
+      <div className="my-6">
+        <SecuritySettings />
+      </div>
+    </div>
+  </LeatherBoard>
   );
 };
 

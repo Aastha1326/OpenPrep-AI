@@ -128,6 +128,13 @@ describe('Auth Middleware - protect', () => {
     expect(req.user).toBeDefined();
     expect(req.user.id.toString()).toBe(user.id.toString());
     expect(req.user.email).toBe('authtest@example.com');
+    expect(req.user.password).toBeUndefined();
+    expect(req.user.refreshTokens).toBeUndefined();
+    expect(req.user.refreshTokenExpire).toBeUndefined();
+    expect(req.user.emailVerificationToken).toBeUndefined();
+    expect(req.user.emailVerificationExpire).toBeUndefined();
+    expect(req.user.resetPasswordToken).toBeUndefined();
+    expect(req.user.resetPasswordExpire).toBeUndefined();
   });
 
   it('should return 401 if token lacks type claim', async () => {

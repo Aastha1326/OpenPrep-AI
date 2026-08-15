@@ -1,16 +1,21 @@
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, User, Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
-import { registerUser, clearError, clearRegistrationSuccess } from '../store/slices/authSlice';
+import { motion } from 'framer-motion';
+import { Mail, User, Lock, Eye, EyeOff, AlertCircle, CheckCircle, BookOpen, ArrowRight, Sparkles } from 'lucide-react';
+import GoogleLoginButton from '../components/auth/GoogleLoginButton';
+import GitHubLoginButton from '../components/auth/GitHubLoginButton';
+import { registerUser, loadUser, clearError, clearRegistrationSuccess } from '../store/slices/authSlice';
+import ThemeToggle from '../components/ThemeToggle';
+import SoundToggle from '../components/SoundToggle';
 
 // Password validation criteria (synced with backend validators.js)
 const PASSWORD_CRITERIA = [
-  { label: 'At least 8 characters', test: (pw) => pw.length >= 8 },
-  { label: 'One uppercase letter (A-Z)', test: (pw) => /[A-Z]/.test(pw) },
-  { label: 'One lowercase letter (a-z)', test: (pw) => /[a-z]/.test(pw) },
-  { label: 'One number (0-9)', test: (pw) => /[0-9]/.test(pw) },
-  { label: 'One special character (!@#$%^&* etc.)', test: (pw) => /[^A-Za-z0-9]/.test(pw) },
+  { label: '8+ chars', test: (pw) => pw.length >= 8 },
+  { label: 'Uppercase', test: (pw) => /[A-Z]/.test(pw) },
+  { label: 'Lowercase', test: (pw) => /[a-z]/.test(pw) },
+  { label: 'Number', test: (pw) => /[0-9]/.test(pw) },
+  { label: 'Special char', test: (pw) => /[^A-Za-z0-9]/.test(pw) },
 ];
 
 const Register = () => {
@@ -21,9 +26,34 @@ const Register = () => {
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
 
+  const getApiBaseUrl = () => {
+    if (import.meta.env.VITE_API_URL) {
+      return import.meta.env.VITE_API_URL;
+    }
+    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      return `${window.location.origin}/api`;
+    }
+    return 'http://localhost:5000/api';
+  };
+  const googleAuthUrl = `${getApiBaseUrl().replace(/\/$/, '')}/auth/google`;
+  const [oauthError, setOauthError] = useState(null);
+
   useEffect(() => {
     if (isAuthenticated) navigate('/dashboard', { replace: true });
   }, [isAuthenticated, navigate]);
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const errorParam = searchParams.get('error');
+
+    if (errorParam) {
+      if (errorParam === 'oauth_cancelled') {
+        setOauthError('Social authentication was cancelled.');
+      } else {
+        setOauthError(decodeURIComponent(errorParam));
+      }
+    }
+  }, [navigate]);
 
   useEffect(() => {
     return () => { dispatch(clearError()); dispatch(clearRegistrationSuccess()); };
@@ -35,188 +65,276 @@ const Register = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    const allPassed = PASSWORD_CRITERIA.every((rule) => rule.test(formData.password));
+    if (!allPassed) {
+      dispatch({
+        type: 'auth/register/rejected',
+        payload: 'Password must be 8+ characters, with uppercase, lowercase, number, and special character.',
+      });
+      return;
+    }
     dispatch(registerUser(formData));
   };
 
   // ── Confirmation screen after successful registration ──
   if (registrationSuccess) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-amber-900 via-stone-900 to-stone-950 p-4">
-        <div className="w-full max-w-md bg-gradient-to-br from-amber-50 to-amber-100 rounded-sm shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-amber-700/50 p-8 text-center">
-          <div className="w-16 h-16 rounded-full bg-amber-600/20 flex items-center justify-center mx-auto mb-6">
-            <Mail className="w-8 h-8 text-amber-700" />
+      <div className="h-screen w-screen max-h-screen overflow-hidden flex items-center justify-center p-4 bg-[#FFFBE9] dark:bg-[#000000] text-[#1F150C] dark:text-[#E1DCC9] font-inter">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-md bg-[#E3CAA5]/70 dark:bg-[#1F150C]/95 backdrop-blur-xl rounded-3xl border border-[#CEAB93] dark:border-[#412D15] shadow-2xl p-8 text-center"
+        >
+          <div className="w-16 h-16 rounded-2xl bg-[#AD8B73]/20 dark:bg-[#412D15] flex items-center justify-center mx-auto mb-6 border border-[#CEAB93] dark:border-[#412D15]">
+            <Mail className="w-8 h-8 text-[#AD8B73] dark:text-[#E1DCC9]" />
           </div>
-          <h1 className="text-2xl font-bold font-playfair text-stone-900 mb-2">Check Your Email</h1>
-          <p className="text-stone-600 mb-6 leading-relaxed">{message}</p>
-          <div className="bg-amber-600/10 border border-amber-600/20 rounded-sm p-4 mb-6 text-left text-sm text-stone-700">
-            <p className="font-semibold flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-600" />
-              Didn't receive the email?
-            </p>
-            <ul className="mt-2 list-disc list-inside space-y-1 text-stone-600">
-              <li>Check your spam / promotions folder</li>
-              <li>Make sure you entered the correct email address</li>
-              <li>The link expires in 24 hours</li>
-            </ul>
-          </div>
+          <h1 className="text-2xl font-extrabold font-playfair text-[#1F150C] dark:text-[#E1DCC9] mb-2">Check Your Email</h1>
+          <p className="text-[#412D15] dark:text-[#C4BA9D] mb-6 text-sm font-medium">{message}</p>
           <Link
             to="/login"
-            className="inline-block bg-amber-700 hover:bg-amber-800 text-amber-50 font-semibold px-6 py-3 rounded-sm transition-colors"
+            className="w-full py-3.5 rounded-xl btn-primary-theme font-bold shadow-lg hover:shadow-xl transition-all inline-block text-sm"
           >
-            Go to Login
+            Go to Sign In
           </Link>
-        </div>
+        </motion.div>
       </div>
     );
   }
 
-  // ── Registration form ──
+  // ── Main Non-Scrollable Split Screen ──
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-amber-900 via-stone-900 to-stone-950 p-4">
-      <div className="w-full max-w-md bg-gradient-to-br from-amber-50 to-amber-100 rounded-sm shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-amber-700/50 p-8">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold font-playfair text-stone-900">Create Account</h1>
-          <p className="text-stone-600 mt-2 text-sm">Join OpenPrep AI and start your preparation</p>
-        </div>
+    <div className="h-screen w-screen max-h-screen overflow-hidden flex items-center justify-center p-3 sm:p-6 bg-[#FFFBE9] dark:bg-[#000000] text-[#1F150C] dark:text-[#E1DCC9] font-inter relative select-none">
+      {/* Background Ambient Glows */}
+      <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(circle_at_70%_20%,rgba(173,139,115,0.12),transparent_50%)] pointer-events-none" />
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-sm p-3 mb-6 flex items-start gap-2 text-sm text-red-700">
-            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Name */}
-          <div>
-            <label htmlFor="register-name" className="block text-sm font-semibold text-stone-700 mb-1">Full Name</label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
-              <input
-                id="register-name"
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                required
-                placeholder="Enter your name"
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-stone-300 rounded-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:border-transparent text-sm"
-              />
+      {/* Main Split Card Container */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="w-full max-w-5xl h-full max-h-[660px] sm:max-h-[700px] bg-[#FFFBE9] dark:bg-[#16120E] rounded-3xl border border-[#CEAB93]/60 dark:border-[#412D15] shadow-2xl overflow-hidden flex flex-col md:flex-row relative z-10"
+      >
+        {/* ── LEFT COLUMN: Sign Up Form Panel (55% Width) ── */}
+        <div className="w-full md:w-[55%] flex flex-col justify-between p-6 sm:p-8 md:p-10 bg-[#FFFBE9] dark:bg-[#16120E] text-[#1F150C] dark:text-[#E1DCC9] overflow-y-auto md:overflow-hidden">
+          {/* Top Logo / Mobile Controls */}
+          <div className="flex items-center justify-between">
+            <Link to="/" className="flex items-center gap-2 group">
+              <div className="bg-[#AD8B73] dark:bg-[#1F150C] p-2 rounded-xl border border-[#CEAB93]/50 dark:border-[#412D15] group-hover:scale-105 transition-transform">
+                <BookOpen className="h-5 w-5 text-[#FFFBE9] dark:text-[#E1DCC9]" />
+              </div>
+              <span className="font-playfair text-lg font-bold text-[#1F150C] dark:text-[#E1DCC9]">
+                OpenPrep AI
+              </span>
+            </Link>
+            <div className="flex md:hidden items-center gap-2">
+              <SoundToggle />
+              <ThemeToggle />
             </div>
           </div>
 
-          {/* Email */}
-          <div>
-            <label htmlFor="register-email" className="block text-sm font-semibold text-stone-700 mb-1">Email</label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
-              <input
-                id="register-email"
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                placeholder="you@example.com"
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-stone-300 rounded-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:border-transparent text-sm"
-              />
-            </div>
-          </div>
-
-          {/* Password */}
-          <div>
-            <label htmlFor="register-password" className="block text-sm font-semibold text-stone-700 mb-1">Password</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
-              <input
-                id="register-password"
-                type={showPassword ? 'text' : 'password'}
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                minLength={8}
-                placeholder="Min. 8 chars, upper, lower, number, special"
-                className="w-full pl-10 pr-10 py-2.5 bg-white border border-stone-300 rounded-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:border-transparent text-sm"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
-            {/* Real-time password criteria checklist */}
-            {formData.password.length > 0 && (
-              <ul className="mt-2 space-y-1">
-                {PASSWORD_CRITERIA.map((rule, idx) => {
-                  const passed = rule.test(formData.password);
-                  return (
-                    <li key={idx} className={`flex items-center gap-1.5 text-xs ${passed ? 'text-green-700' : 'text-stone-400'}`}>
-                      {passed ? (
-                        <CheckCircle className="w-3.5 h-3.5 text-green-600 shrink-0" />
-                      ) : (
-                        <span className="w-3.5 h-3.5 rounded-full border border-stone-300 shrink-0" />
-                      )}
-                      {rule.label}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-            {formData.password.length === 0 && (
-              <p className="text-xs text-stone-500 mt-1">
-                Must contain uppercase, lowercase, number, and special character
+          {/* Form Content */}
+          <div className="my-auto py-2">
+            <div className="mb-5">
+              <h1 className="text-2xl sm:text-3xl font-extrabold font-playfair tracking-tight text-[#1F150C] dark:text-[#E1DCC9]">
+                Sign up
+              </h1>
+              <p className="text-[#412D15] dark:text-[#C4BA9D] mt-1.5 text-xs sm:text-sm font-medium leading-relaxed">
+                Create an account and verify your details to start preparing with OpenPrep AI. Have an account already?{' '}
+                <Link to="/login" className="font-bold text-[#AD8B73] hover:underline dark:text-[#E1DCC9]">
+                  Log in here
+                </Link>
               </p>
+            </div>
+
+            {(error || oauthError) && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 mb-4 flex items-center gap-2 text-xs text-red-700 dark:text-red-300 font-medium">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{error || oauthError}</span>
+              </div>
             )}
+
+            <form onSubmit={handleSubmit} className="space-y-3.5">
+              {/* Full Name */}
+              <div>
+                <label htmlFor="register-name" className="block text-xs font-bold text-[#1F150C] dark:text-[#E1DCC9] mb-1">
+                  Full name
+                </label>
+                <div className="relative">
+                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8C6A53] dark:text-[#C4BA9D]" />
+                  <input
+                    id="register-name"
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    required
+                    placeholder="Provide your full name"
+                    className="w-full pl-10 pr-4 py-2.5 bg-[#FFFBE9] dark:bg-[#251D17] border border-[#CEAB93] dark:border-[#412D15] rounded-xl text-[#1F150C] dark:text-[#E1DCC9] placeholder-[#8C6A53]/60 dark:placeholder-[#C4BA9D]/40 focus:outline-none focus:ring-2 focus:ring-[#AD8B73] dark:focus:ring-[#E1DCC9] text-xs sm:text-sm transition-all shadow-sm font-medium"
+                  />
+                </div>
+              </div>
+
+              {/* Email Address */}
+              <div>
+                <label htmlFor="register-email" className="block text-xs font-bold text-[#1F150C] dark:text-[#E1DCC9] mb-1">
+                  Email address
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8C6A53] dark:text-[#C4BA9D]" />
+                  <input
+                    id="register-email"
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    required
+                    placeholder="Provide your email address"
+                    className="w-full pl-10 pr-4 py-2.5 bg-[#FFFBE9] dark:bg-[#251D17] border border-[#CEAB93] dark:border-[#412D15] rounded-xl text-[#1F150C] dark:text-[#E1DCC9] placeholder-[#8C6A53]/60 dark:placeholder-[#C4BA9D]/40 focus:outline-none focus:ring-2 focus:ring-[#AD8B73] dark:focus:ring-[#E1DCC9] text-xs sm:text-sm transition-all shadow-sm font-medium"
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                <label htmlFor="register-password" className="block text-xs font-bold text-[#1F150C] dark:text-[#E1DCC9] mb-1">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8C6A53] dark:text-[#C4BA9D]" />
+                  <input
+                    id="register-password"
+                    type={showPassword ? 'text' : 'password'}
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    required
+                    minLength={8}
+                    placeholder="Create a strong password"
+                    className="w-full pl-10 pr-10 py-2.5 bg-[#FFFBE9] dark:bg-[#251D17] border border-[#CEAB93] dark:border-[#412D15] rounded-xl text-[#1F150C] dark:text-[#E1DCC9] placeholder-[#8C6A53]/60 dark:placeholder-[#C4BA9D]/40 focus:outline-none focus:ring-2 focus:ring-[#AD8B73] dark:focus:ring-[#E1DCC9] text-xs sm:text-sm transition-all shadow-sm font-medium"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#8C6A53] hover:text-[#1F150C] dark:text-[#C4BA9D] dark:hover:text-[#E1DCC9] transition"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {/* Real-time criteria pills */}
+                {formData.password.length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {PASSWORD_CRITERIA.map((rule, idx) => {
+                      const passed = rule.test(formData.password);
+                      return (
+                        <span
+                          key={idx}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold transition-colors ${
+                            passed
+                              ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
+                              : 'bg-[#AD8B73]/10 text-[#8C6A53] dark:text-[#C4BA9D]/60 border border-[#CEAB93]/30'
+                          }`}
+                        >
+                          {passed && <CheckCircle className="w-2.5 h-2.5" />}
+                          {rule.label}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Submit CTA */}
+              <motion.button
+                whileHover={{ scale: 1.015 }}
+                whileTap={{ scale: 0.985 }}
+                type="submit"
+                disabled={loading}
+                className="w-full py-3 rounded-xl btn-primary-theme font-bold shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 text-sm mt-1"
+              >
+                {loading ? (
+                  <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  'Sign Up'
+                )}
+              </motion.button>
+            </form>
+
+            {/* Divider */}
+            <div className="my-3 flex items-center justify-center space-x-2">
+              <span className="h-px w-full bg-[#CEAB93]/50 dark:bg-[#412D15]"></span>
+              <span className="text-[10px] text-[#8C6A53] dark:text-[#C4BA9D] font-bold tracking-wider uppercase">OR</span>
+              <span className="h-px w-full bg-[#CEAB93]/50 dark:bg-[#412D15]"></span>
+            </div>
+
+            {/* Social OAuth Buttons */}
+            <div className="space-y-3">
+              <GoogleLoginButton />
+              <GitHubLoginButton />
+            </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            aria-busy={loading}
-            aria-label="Create account"
-            className="w-full bg-amber-700 hover:bg-amber-800 disabled:bg-amber-400 text-amber-50 font-semibold py-2.5 rounded-sm transition-colors flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <span className="w-4 h-4 border-2 border-amber-200 border-t-transparent rounded-full animate-spin" aria-hidden="true" />
-            ) : (
-              'Create Account'
-            )}
-          </button>
-        </form>
-
-        <div className="mt-6 flex items-center justify-center space-x-2">
-          <span className="h-px w-full bg-stone-300"></span>
-          <span className="text-sm text-stone-500 font-medium">OR</span>
-          <span className="h-px w-full bg-stone-300"></span>
+          {/* Legal Terms Footer */}
+          <p className="text-center text-[11px] text-[#8C6A53] dark:text-[#C4BA9D]/80 font-medium">
+            By signing up you agree to OpenPrep's{' '}
+            <a href="#" className="underline font-semibold hover:text-[#1F150C] dark:hover:text-[#E1DCC9]">Privacy Policy</a> and{' '}
+            <a href="#" className="underline font-semibold hover:text-[#1F150C] dark:hover:text-[#E1DCC9]">Terms of Service</a>
+          </p>
         </div>
 
-        <div className="mt-6">
-          <a
-            href="http://localhost:5000/api/auth/google"
-            className="w-full flex items-center justify-center gap-2 bg-white border border-stone-300 hover:bg-stone-50 text-stone-700 font-semibold py-2.5 rounded-sm transition-colors"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-              <path fill="none" d="M1 1h22v22H1z" />
-            </svg>
-            Continue with Google
-          </a>
-        </div>
+        {/* ── RIGHT COLUMN: Hero Visual & Brand Panel (45% Width) ── */}
+        <div className="hidden md:flex md:w-[45%] flex-col justify-between p-8 md:p-10 relative overflow-hidden bg-[#0D0A08] text-[#E1DCC9] border-l border-[#CEAB93]/30 dark:border-[#412D15]">
+          {/* Abstract Hero Image Background */}
+          <img
+            src="/assets/abstract_hero.png"
+            alt="OpenPrep Abstract Sculpture"
+            className="absolute inset-0 w-full h-full object-cover opacity-80 mix-blend-screen scale-105 -z-0"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0D0A08] via-[#0D0A08]/40 to-[#0D0A08]/70 -z-0" />
 
-        <p className="text-center text-sm text-stone-600 mt-6">
-          Already have an account?{' '}
-          <Link to="/login" className="text-amber-700 hover:text-amber-800 font-semibold">
-            Sign In
-          </Link>
-        </p>
-      </div>
+          {/* Top Brand Header & Controls */}
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-[#AD8B73] dark:bg-[#1F150C] border border-[#CEAB93]/40 dark:border-[#412D15] flex items-center justify-center shadow-lg">
+                <BookOpen className="w-4 h-4 text-[#FFFBE9] dark:text-[#E1DCC9]" />
+              </div>
+              <span className="font-playfair text-xl font-extrabold tracking-wide text-white">
+                OpenPrep
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <SoundToggle />
+              <ThemeToggle />
+            </div>
+          </div>
+
+          {/* Center Tagline */}
+          <div className="relative z-10 my-auto py-6">
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <h2 className="text-2xl sm:text-3xl font-extrabold font-playfair leading-tight text-white drop-shadow-md">
+                Realize the potential of AI-Powered Exam Preparation
+              </h2>
+              <p className="mt-3 text-xs sm:text-sm text-[#C4BA9D] leading-relaxed font-medium">
+                Personalized study schedules, real-time PYQ analytics, interactive flashcards, and instant AI tutoring.
+              </p>
+            </motion.div>
+          </div>
+
+          {/* Bottom Support Footer */}
+          <div className="relative z-10 text-xs text-[#C4BA9D]/90">
+            <p className="font-medium">Experiencing issues?</p>
+            <p className="mt-0.5">
+              Get assistance via{' '}
+              <a href="mailto:support@openprep.ai" className="underline font-bold text-white hover:text-[#CEAB93] transition">
+                support@openprep.ai
+              </a>
+            </p>
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 };

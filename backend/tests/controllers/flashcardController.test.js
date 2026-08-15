@@ -9,7 +9,7 @@ const Exam = require('../../models/Exam');
 const Subject = require('../../models/Subject');
 const Topic = require('../../models/Topic');
 const Flashcard = require('../../models/Flashcard');
-
+const geminiService = require('../../services/geminiService');
 const app = express();
 app.use(express.json());
 app.use('/api/flashcards', flashcardRoutes);
@@ -20,7 +20,74 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
   let testSubject;
   let testTopic;
   let authToken;
+describe('POST /api/flashcards/from-audio', () => {
+  it('should reject requests without an audio file', async () => {
+    const res = await request(app)
+      .post('/api/flashcards/from-audio')
+      .set('Authorization', `Bearer ${authToken}`)
+      .field('subjectId', testSubject.id);
 
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('should reject unsupported audio formats', async () => {
+    const res = await request(app)
+      .post('/api/flashcards/from-audio')
+      .set('Authorization', `Bearer ${authToken}`)
+      .attach(
+        'audio',
+        Buffer.from('not an audio file'),
+        {
+          filename: 'lecture.txt',
+          contentType: 'text/plain',
+        }
+      );
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('should expose transcription and generated cards for valid audio', async () => {
+    const originalTranscribe = geminiService.transcribeAndSummarizeAudio;
+    const originalGenerate = geminiService.generateFlashcards;
+
+    geminiService.transcribeAndSummarizeAudio = async () => ({
+      transcription: 'Newton second law states that force equals mass times acceleration.',
+    });
+
+    geminiService.generateFlashcards = async () => [
+      {
+        front: 'What is Newton second law?',
+        back: 'Force equals mass multiplied by acceleration.',
+      },
+    ];
+
+    const res = await request(app)
+      .post('/api/flashcards/from-audio')
+      .set('Authorization', `Bearer ${authToken}`)
+      .field('subjectId', testSubject.id)
+      .attach(
+        'audio',
+        Buffer.from([
+          0x49, 0x44, 0x33, 0x04, 0x00, 0x00, 0x00, 0x00,
+          0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ]),
+        {
+          filename: 'lecture.mp3',
+          contentType: 'audio/mpeg',
+        }
+      );
+
+    geminiService.transcribeAndSummarizeAudio = originalTranscribe;
+    geminiService.generateFlashcards = originalGenerate;
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.transcription).toContain('Newton second law');
+    expect(res.body.data).toHaveLength(1);
+  });
+});
   beforeAll(async () => {
     process.env.JWT_SECRET = 'test_jwt_secret_for_flashcards';
 
@@ -123,6 +190,107 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.count).toBe(1);
+    });
+
+    it('should support pagination (page, limit, totalCount)', async () => {
+      for (let i = 1; i <= 25; i++) {
+        await Flashcard.create({
+          user: testUser.id,
+          subject: testSubject.id,
+          front: `Front ${i}`,
+          back: `Back ${i}`,
+        });
+      }
+
+      const res = await request(app)
+        .get('/api/flashcards')
+        .set('Authorization', `Bearer ${authToken}`)
+        .query({ page: 2, limit: 10 });
+
+      expect(res.status).toBe(200);
+      expect(res.body.count).toBe(10);
+      expect(res.body.total).toBe(25);
+      expect(res.body.page).toBe(2);
+      expect(res.body.limit).toBe(10);
+      expect(res.body.totalPages).toBe(3);
+      expect(res.body.pagination).toBeDefined();
+      expect(res.body.pagination.total).toBe(25);
+      expect(res.body.flashcards).toBeDefined();
+    });
+
+    it('should filter flashcards by search query', async () => {
+      await Flashcard.create({
+        user: testUser.id,
+        subject: testSubject.id,
+        front: 'Photosynthesis question',
+        back: 'Plant bio',
+      });
+      await Flashcard.create({
+        user: testUser.id,
+        subject: testSubject.id,
+        front: 'Mitosis question',
+        back: 'Cell division',
+      });
+
+      const res = await request(app)
+        .get('/api/flashcards')
+        .set('Authorization', `Bearer ${authToken}`)
+        .query({ search: 'photosynthesis' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.count).toBe(1);
+      expect(res.body.data[0].front).toContain('Photosynthesis');
+    });
+
+    it('should filter flashcards by topicId', async () => {
+      await Flashcard.create({
+        user: testUser.id,
+        subject: testSubject.id,
+        topic: testTopic.id,
+        front: 'Q with topic',
+        back: 'A with topic',
+      });
+      await Flashcard.create({
+        user: testUser.id,
+        subject: testSubject.id,
+        front: 'Q without topic',
+        back: 'A without topic',
+      });
+
+      const res = await request(app)
+        .get('/api/flashcards')
+        .set('Authorization', `Bearer ${authToken}`)
+        .query({ topicId: testTopic.id.toString() });
+
+      expect(res.status).toBe(200);
+      expect(res.body.count).toBe(1);
+      expect(res.body.data[0].topic.id).toBe(testTopic.id.toString());
+    });
+
+    it('should support sorting by sortBy and order', async () => {
+      await Flashcard.create({
+        user: testUser.id,
+        subject: testSubject.id,
+        front: 'Apple',
+        back: 'Fruit',
+        nextReviewDate: new Date(Date.now() + 100000),
+      });
+      await Flashcard.create({
+        user: testUser.id,
+        subject: testSubject.id,
+        front: 'Zebra',
+        back: 'Animal',
+        nextReviewDate: new Date(Date.now() - 100000),
+      });
+
+      const res = await request(app)
+        .get('/api/flashcards')
+        .set('Authorization', `Bearer ${authToken}`)
+        .query({ sortBy: 'front', order: 'DESC' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data[0].front).toBe('Zebra');
+      expect(res.body.data[1].front).toBe('Apple');
     });
   });
 
@@ -437,7 +605,7 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
       expect(res.body.data.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('should clone a community deck into user\'s personal library and increment cloneCount', async () => {
+    it("should clone a community deck into user's personal library and increment cloneCount", async () => {
       // Create another user to clone from to represent a peer clone
       const otherUser = await User.create({
         name: 'Peer Student',
@@ -446,6 +614,7 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
       });
       const otherExam = await Exam.create({
         name: 'Peer Exam',
+        date: new Date(),
         user: otherUser.id,
       });
       const otherSubject = await Subject.create({
@@ -473,6 +642,53 @@ describe('Flashcard Controller - SM-2 Algorithm Tests', () => {
       // Verify the source deck clone count incremented
       await otherSubject.reload();
       expect(otherSubject.cloneCount).toBe(1);
+    });
+  });
+
+  describe('POST /api/flashcards/from-youtube', () => {
+    it('should reject invalid YouTube URLs with 400', async () => {
+      const res = await request(app)
+        .post('/api/flashcards/from-youtube')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ youtubeUrl: 'https://malicious-ssrf-url.com' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+    });
+
+    it('should generate and save flashcards with sourceUrl and timestampSeconds', async () => {
+      const youtubeService = require('../../services/youtubeService');
+      const originalFetch = youtubeService.fetchTranscript;
+      const originalExtract = youtubeService.extractVideoId;
+      const originalGenerate = geminiService.generateFlashcardsFromTranscript;
+
+      youtubeService.extractVideoId = () => 'dQw4w9WgXcQ';
+      youtubeService.fetchTranscript = async () => [
+        { text: 'captions text', start: 10 }
+      ];
+      geminiService.generateFlashcardsFromTranscript = async () => [
+        { front: 'Question?', back: 'Answer.', timestampSeconds: 10 }
+      ];
+
+      const res = await request(app)
+        .post('/api/flashcards/from-youtube')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+          subjectId: testSubject.id
+        });
+
+      // Restore
+      youtubeService.fetchTranscript = originalFetch;
+      youtubeService.extractVideoId = originalExtract;
+      geminiService.generateFlashcardsFromTranscript = originalGenerate;
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.count).toBe(1);
+      expect(res.body.data[0].front).toBe('Question?');
+      expect(res.body.data[0].sourceUrl).toBe('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+      expect(res.body.data[0].timestampSeconds).toBe(10);
     });
   });
 });
