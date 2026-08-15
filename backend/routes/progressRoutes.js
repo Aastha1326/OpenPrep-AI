@@ -3,8 +3,8 @@ const {
   getDashboardStats,
   getSubjectBreakdown,
   getMasteryLevels,
-  getCompositeBundleOverview,
-  getStudyHours,
+  updateSubjectGoal,
+  getCompositeBundleOverview,  getStudyHours,
   trackStudyTime,
   updateTopicProgress,
   getActivityFeed,
@@ -270,7 +270,7 @@ router.get('/subjects', protect, getSubjectBreakdown);
  */
 
 router.get('/mastery', protect, getMasteryLevels);
-
+router.put('/subject-goals/:subjectId', protect, updateSubjectGoal);
 /**
  * @swagger
  * /api/progress/study-hours:

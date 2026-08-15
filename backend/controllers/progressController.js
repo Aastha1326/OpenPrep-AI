@@ -12,7 +12,7 @@ const { checkAndAwardBadges } = require('../services/achievementService');
 const FocusSession = require('../models/FocusSession');
 const Flashcard = require('../models/Flashcard');
 const StudyPlan = require('../models/StudyPlan');
-
+const SubjectGoal = require('../models/SubjectGoal');
 // ── Mastery tier thresholds (shared with the dashboard UI) ──
 // Beginner: < 50% | Intermediate: 50-79% | Master: 80%+
 const MASTERY_TIER_BEGINNER = 50;
@@ -262,17 +262,20 @@ exports.getMasteryLevels = async (req, res, next) => {
     const userId = req.user.id;
 
     // Fetch all data needed for the calculation in parallel
-    const [subjects, topics, progressRecords, flashcards] = await Promise.all([
-      Subject.findAll({ where: { user: userId } }),
-      Topic.findAll({ where: { user: userId } }),
-      Progress.findAll({ where: { user: userId } }),
-      Flashcard.findAll({
-        where: { user: userId },
-        attributes: ['id', 'subject', 'topic', 'interval'],
-        raw: true,
-      }),
-    ]);
-
+const [subjects, topics, progressRecords, flashcards, subjectGoals] = await Promise.all([
+  Subject.findAll({ where: { user: userId } }),
+  Topic.findAll({ where: { user: userId } }),
+  Progress.findAll({ where: { user: userId } }),
+  Flashcard.findAll({
+    where: { user: userId },
+    attributes: ['id', 'subject', 'topic', 'interval'],
+    raw: true,
+  }),
+  SubjectGoal.findAll({
+    where: { user: userId },
+    raw: true,
+  }),
+]);
     const topicsBySubject = new Map();
     topics.forEach((t) => {
       if (!topicsBySubject.has(t.subject)) topicsBySubject.set(t.subject, []);
@@ -365,15 +368,20 @@ exports.getMasteryLevels = async (req, res, next) => {
         const flashcardRetention = retentionPct(flashcardsBySubject.get(subject.id));
         masteryPercentage = combineMastery(quizAccuracy, flashcardRetention);
       }
-
-      return {
-        id: subject.id,
-        name: subject.name,
-        masteryPercentage,
-        tier: masteryTier(masteryPercentage),
-        chapters,
-      };
-    });
+const actualScore = Math.round(avg(quizScoresBySubject.get(subject.id) || []) || 0);
+const targetPercentage = goalsBySubject.get(subject.id) ?? null;
+const performanceGap =
+  targetPercentage === null ? null : Math.max(0, targetPercentage - actualScore);
+return {
+  id: subject.id,
+  name: subject.name,
+  masteryPercentage,
+  tier: masteryTier(masteryPercentage),
+  chapters,
+  actualScore,
+  targetPercentage,
+  performanceGap,
+};    });
 
     // Overall mastery = average across subjects
     const overallMastery =
@@ -396,14 +404,66 @@ exports.getMasteryLevels = async (req, res, next) => {
     next(error);
   }
 };
+// @desc    Set or update a subject target score
+// @route   PUT /api/progress/subject-goals/:subjectId
+// @access  Private
+exports.updateSubjectGoal = async (req, res, next) => {
+  try {
+    const { subjectId } = req.params;
+    const targetPercentage = Number(req.body.targetPercentage);
 
+    if (!Number.isFinite(targetPercentage) || targetPercentage < 0 || targetPercentage > 100) {
+      return res.status(400).json({
+        success: false,
+        error: 'Target percentage must be between 0 and 100',
+      });
+    }
+
+    const subject = await Subject.findOne({
+      where: {
+        id: subjectId,
+        user: req.user.id,
+      },
+    });
+
+    if (!subject) {
+      return res.status(404).json({
+        success: false,
+        error: 'Subject not found',
+      });
+    }
+
+    const [goal] = await SubjectGoal.findOrCreate({
+      where: {
+        user: req.user.id,
+        subject: subjectId,
+      },
+      defaults: {
+        targetPercentage,
+      },
+    });
+
+    if (goal.targetPercentage !== targetPercentage) {
+      goal.targetPercentage = targetPercentage;
+      await goal.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      data: goal,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 // @desc    Get Target Exam Composite Bundle Overview with cumulative weighted syllabus progress
 // @route   GET /api/progress/composite-overview
 // @access  Private
 exports.getCompositeBundleOverview = async (req, res, next) => {
   try {
-    const userId = req.user.id;
-    const { examId } = req.query;
+const goalsBySubject = new Map(
+  subjectGoals.map((goal) => [goal.subject, Number(goal.targetPercentage)])
+);    const { examId } = req.query;
 
     let exam;
     if (examId) {
