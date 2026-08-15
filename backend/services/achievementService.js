@@ -1,6 +1,6 @@
 const { Achievement, Notification } = require('../models');
 const { BADGES, BADGE_LIST } = require('../config/badges');
-
+const { logSquadActivity } = require('./squadActivityService');
 /**
  * Event Types:
  * - STREAK_UPDATED: { streakDays }
@@ -90,7 +90,7 @@ async function checkAndAwardBadges(userId, event) {
         message: notificationMsg,
       });
 
-      // Emit real-time event if socket is available
+// Emit real-time event if socket is available
       if (global.io) {
         global.io.to(userId.toString()).emit('achievement:unlocked', {
           badge: badgeConfig
@@ -99,8 +99,10 @@ async function checkAndAwardBadges(userId, event) {
         // Also emit NOTIF_NEW so the bell icon updates in real-time
         global.io.to(userId.toString()).emit('NOTIF_NEW', notif.toJSON());
       }
-    } catch (error) {
-      if (error.name !== 'SequelizeUniqueConstraintError') {
+
+      // Issue #764: Post a "Badge unlocked" milestone to the user's study squad feeds
+      await logSquadActivity(userId, 'badge_unlocked', `unlocked the "${badgeConfig.name}" badge 🏆`);
+    } catch (error) {      if (error.name !== 'SequelizeUniqueConstraintError') {
         console.error('Error awarding badge:', error);
       }
     }

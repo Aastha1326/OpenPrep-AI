@@ -167,11 +167,14 @@ const User = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
-    syncGoogleCalendar: {
+syncGoogleCalendar: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
-    pushSubscription: {
+    hideActivityFromSquad: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },    pushSubscription: {
       type: DataTypes.JSONB,
       allowNull: true,
     },

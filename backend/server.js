@@ -337,7 +337,7 @@ global.io = io;
 require('./sockets/battleHandler')(io);
 require('./sockets/chatHandler')(io);
 require('./sockets/crdtHandler')(io);
-
+require('./sockets/squadHandler')(io);
 // Authenticate Socket.io connections
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;

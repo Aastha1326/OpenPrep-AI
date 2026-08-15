@@ -34,7 +34,8 @@ const SquadMember = require('./SquadMember');
 const SquadChallenge = require('./SquadChallenge');
 const SquadChallengeContribution = require('./SquadChallengeContribution');
 const SquadAchievement = require('./SquadAchievement');
-// User associations
+const SquadActivity = require('./SquadActivity');
+const SquadActivityReaction = require('./SquadActivityReaction');// User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Topic, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -193,8 +194,19 @@ SquadChallengeContribution.belongsTo(User, { foreignKey: 'userId', as: 'userRef'
 StudySquad.hasMany(SquadAchievement, { foreignKey: 'squadId', onDelete: 'CASCADE' });
 SquadAchievement.belongsTo(StudySquad, { foreignKey: 'squadId', as: 'squadRef' });
 
-module.exports = {  sequelize,  User,
-  Exam,
+StudySquad.hasMany(SquadActivity, { foreignKey: 'squadId', onDelete: 'CASCADE' });
+SquadActivity.belongsTo(StudySquad, { foreignKey: 'squadId', as: 'squadRef' });
+
+User.hasMany(SquadActivity, { foreignKey: 'userId', onDelete: 'CASCADE' });
+SquadActivity.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+SquadActivity.hasMany(SquadActivityReaction, { foreignKey: 'activityId', onDelete: 'CASCADE' });
+SquadActivityReaction.belongsTo(SquadActivity, { foreignKey: 'activityId', as: 'activityRef' });
+
+User.hasMany(SquadActivityReaction, { foreignKey: 'userId', onDelete: 'CASCADE' });
+SquadActivityReaction.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+module.exports = {  sequelize,  User,  Exam,
   Subject,
   Topic,
   PYQ,
@@ -224,5 +236,7 @@ module.exports = {  sequelize,  User,
   SquadMember,
   SquadChallenge,
   SquadChallengeContribution,
-  SquadAchievement,
+SquadAchievement,
+  SquadActivity,
+  SquadActivityReaction,
 };
