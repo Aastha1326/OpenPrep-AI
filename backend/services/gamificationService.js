@@ -1,6 +1,6 @@
 const { User, UserBadge, QuizAttempt, SquadMember, SquadChallenge, SquadChallengeContribution, SquadAchievement } = require('../models');
 const { checkAndAwardBadges } = require('./achievementService');
-
+const { logSquadActivity } = require('./squadActivityService');
 // Calculate level based on XP: level = Math.floor(Math.sqrt(xp / 100)) + 1
 function calculateLevel(xp) {
   if (!xp || xp <= 0) return 1;
@@ -208,15 +208,19 @@ async function updateStreak(userId, timezoneOffsetMinutes = 0) {
     timezoneOffsetMinutes,
   });
 
-  // Issue #1053: Check for Week Warrior badge
+// Issue #1053: Check for Week Warrior badge
   await checkAndAwardBadges(userId, {
     type: 'STREAK_UPDATED',
     payload: { streakDays: user.currentStreak }
   });
 
+  // Issue #764: Post a "Streak hit" milestone to the user's study squad feeds
+  if (user.currentStreak >= 7 && user.currentStreak % 7 === 0) {
+    await logSquadActivity(userId, 'streak_hit', `hit a ${user.currentStreak}-day study streak 🔥`);
+  }
+
   return {
-    currentStreak: user.currentStreak,
-    longestStreak: user.longestStreak,
+    currentStreak: user.currentStreak,    longestStreak: user.longestStreak,
     streakFreezesAvailable: user.streakFreezesAvailable,
     unlockedBadges,
   };

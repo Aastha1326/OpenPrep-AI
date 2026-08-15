@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import SquadLeaderboard from './SquadLeaderboard';
-import { Share2, LogOut, Award, Target } from 'lucide-react';
+import SquadActivityFeed from './SquadActivityFeed';import { Share2, LogOut, Award, Target } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { io } from 'socket.io-client';
 
@@ -165,7 +165,11 @@ export default function StudySquadDashboard({ squadData, currentUserRole, onLeav
               <p className="text-slate-400 text-sm">Complete challenges to earn collaborative badges!</p>
             )}
           </div>
-        </div>
+</div>
+      </div>
+
+      <div className="mt-6">
+        <SquadActivityFeed squadId={squad.id} />
       </div>
     </div>
   );

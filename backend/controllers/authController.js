@@ -526,9 +526,12 @@ exports.getMe = async (req, res, next) => {
 // ---------------------------------------------------------------------------
 exports.updateSettings = async (req, res, next) => {
   try {
-    const { leaderboardVisible } = req.body;
+    const { leaderboardVisible, hideActivityFromSquad } = req.body;
 
     req.user.leaderboardVisible = leaderboardVisible;
+    if (typeof hideActivityFromSquad === 'boolean') {
+      req.user.hideActivityFromSquad = hideActivityFromSquad;
+    }
     await req.user.save();
 
     res.status(200).json({
@@ -546,13 +549,13 @@ exports.updateSettings = async (req, res, next) => {
         studyHours: req.user.studyHours,
         isEmailVerified: req.user.isEmailVerified,
         leaderboardVisible: req.user.leaderboardVisible,
+        hideActivityFromSquad: req.user.hideActivityFromSquad,
       },
     });
   } catch (error) {
     next(error);
   }
 };
-
 // ---------------------------------------------------------------------------
 // @desc    Forgot Password
 // @route   POST /api/auth/forgot-password

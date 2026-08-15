@@ -498,16 +498,19 @@ exports.submitQuizAttempt = async (req, res, next) => {
       });
     }
 
-    // Log Activity
+// Log Activity
     await ActivityLog.create({
       user: req.user.id,
       activityType: 'quiz_attempt',
       description: `Completed practice quiz: "${quiz.title}" with score ${score}%`,
     });
 
+    // Issue #764: Post a "Quiz completed" milestone to the user's study squad feeds
+    const { logSquadActivity } = require('../services/squadActivityService');
+    await logSquadActivity(req.user.id, 'quiz_completed', `completed "${quiz.title}" scoring ${score}%`);
+
     // Award XP and check gamification badges/streaks
-    const gamificationService = require('../services/gamificationService');
-    const progression = await gamificationService.awardXP(req.user.id, 100, 'quiz_complete');
+    const gamificationService = require('../services/gamificationService');    const progression = await gamificationService.awardXP(req.user.id, 100, 'quiz_complete');
 
     const timezoneOffset = Number(req.headers['x-timezone-offset']) || 0;
     await gamificationService.updateStreak(req.user.id, timezoneOffset);
