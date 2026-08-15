@@ -2,6 +2,7 @@ const pdfParse = require('pdf-parse');
 const { Syllabus, SyllabusTopic, Note } = require('../models');
 const { analyzeSyllabusGaps } = require('../services/gapDetectorService');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const prompts = require('../config/prompts');
 
 // Initialize Gemini API client
 const apiKey = process.env.GEMINI_API_KEY;
@@ -35,26 +36,7 @@ exports.uploadSyllabus = async (req, res, next) => {
     if (genAI) {
       try {
         const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-        const prompt = `
-          You are an expert syllabus importer assistant. 
-          Extract the hierarchical module structure from the provided syllabus text.
-          Return STRICTLY a JSON object with this shape:
-          {
-            "syllabusName": "Curriculum Title",
-            "topics": [
-              {
-                "moduleName": "Module 1: Name",
-                "title": "Topic Name",
-                "subtopics": ["Sub-topic A", "Sub-topic B"],
-                "weightage": 15
-              }
-            ]
-          }
-          Return raw JSON only, no markdown formatting blocks.
-
-          SYLLABUS TEXT:
-          ${extractedText.substring(0, 20000)}
-        `;
+        const prompt = prompts.syllabus.extractStructure(extractedText);
 
         const result = await model.generateContent(prompt);
         const responseText = result.response.text().trim();
@@ -164,12 +146,7 @@ exports.generateNotesForGap = async (req, res, next) => {
     if (genAI) {
       try {
         const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-        const prompt = `
-          You are an expert tutor writing comprehensive, detailed study notes for a student.
-          Write comprehensive, beautifully formatted study notes in rich Markdown for the topic: "${topic.title}".
-          Make sure to cover all the sub-topics: ${JSON.stringify(topic.subtopics)}.
-          Include standard definitions, formulas if applicable, and clean section titles.
-        `;
+        const prompt = prompts.syllabus.generateNotesForGap(topic.title, topic.subtopics);
         const result = await model.generateContent(prompt);
         generatedContent = result.response.text().trim();
       } catch (err) {
