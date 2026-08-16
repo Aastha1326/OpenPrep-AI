@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FaBook, FaRegCheckCircle, FaExclamationTriangle, FaSparkles } from 'react-icons/fa';
+import { FaBook, FaRegCheckCircle, FaExclamationTriangle, FaMagic } from 'react-icons/fa';
 import { Loader2 } from 'lucide-react';
 import API from '../../services/api';
 
@@ -119,7 +119,7 @@ export default function SyllabusCoverageMatrix({ syllabusName, initialCoverage =
                               {generatingTopicId === topic.id ? (
                                 <Loader2 className="w-3 h-3 animate-spin" />
                               ) : (
-                                <FaSparkles />
+                                <FaMagic />
                               )}
                               Notes
                             </button>

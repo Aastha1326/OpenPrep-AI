@@ -1,6 +1,9 @@
 process.env.TZ = 'America/New_York';
 
 import { render, screen, waitFor } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
+import authReducer from '../../store/slices/authSlice';
 import StudyPlanModal from './StudyPlanModal';
 
 vi.mock('../../services/api', () => ({
@@ -17,9 +20,29 @@ afterEach(() => {
   API.post.mockReset();
 });
 
-const renderModal = (activePlan, syllabusPrefill) =>
+// StudyPlanModal reads aiQuotaExceededUntil off the auth slice, so it needs a
+// store even for the pure rendering assertions below.
+const makeStore = (authState = {}) =>
+  configureStore({
+    reducer: { auth: authReducer },
+    preloadedState: {
+      auth: {
+        token: 'fake-token',
+        isAuthenticated: true,
+        user: { id: 'u1', name: 'Test User', email: 'test@test.com' },
+        loading: false,
+        error: null,
+        aiQuotaExceededUntil: null,
+        ...authState,
+      },
+    },
+  });
+
+const renderModal = (activePlan, syllabusPrefill, authState) =>
   render(
-    <StudyPlanModal isOpen onClose={() => {}} activePlan={activePlan} syllabusPrefill={syllabusPrefill} />
+    <Provider store={makeStore(authState)}>
+      <StudyPlanModal isOpen onClose={() => {}} activePlan={activePlan} syllabusPrefill={syllabusPrefill} />
+    </Provider>
   );
 
 const expectDateHeading = (day) => {
