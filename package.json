@@ -15,14 +15,17 @@
     "format:check": "prettier --check .",
     "create-labels": "node scripts/create-labels.js",
     "seed": "npm run seed --prefix backend",
-    "test:load": "node scripts/run-load-tests.js"
+    "test:load": "node scripts/run-load-tests.js",
     "db:backup": "npm run db:backup --prefix backend",
-    "db:restore": "npm run db:restore --prefix backend"
+    "db:restore": "npm run db:restore --prefix backend",
+    "validate:manifests": "node scripts/validate-manifests.js",
+    "test:scripts": "node --test scripts/*.test.js"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.1",
     "@commitlint/config-conventional": "^21.2.0",
     "concurrently": "^8.2.2",
+    "js-yaml": "^4.1.0",
     "eslint": "^8.56.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
