@@ -220,18 +220,6 @@ async function updateStreak(userId, timezoneOffsetMinutes = 0) {
   }
 
   return {
-    currentStreak: user.currentStreak,    longestStreak: user.longestStreak,
-    streakFreezesAvailable: user.streakFreezesAvailable,
-    unlockedBadges,
-  };
-}
-  user.lastActivityDate = todayStr;
-  await user.save();
-
-  // Also check if streak unlocks "7-Day Streak" badge
-  const unlockedBadges = await checkAndUnlockBadges(user, 'streak_check');
-
-  return {
     currentStreak: user.currentStreak,
     longestStreak: user.longestStreak,
     streakFreezesAvailable: user.streakFreezesAvailable,
