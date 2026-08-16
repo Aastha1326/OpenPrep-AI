@@ -1,6 +1,7 @@
 let createClient;
 let redisClient = null;
 let isRedisConnected = false;
+const redisService = require('../services/redisService');
 
 try {
   createClient = require('redis').createClient;
