@@ -113,6 +113,163 @@ The React frontend will be available at `http://localhost:5173` and the Express 
 
 ---
 
+## 🛠️ Troubleshooting
+
+If you encounter problems while setting up or running OpenPrep AI locally, check the common issues and solutions below.
+
+### 1. Dependencies fail to install
+
+**Possible causes:**
+
+* Unsupported or outdated Node.js version.
+* Network problems while downloading packages.
+* Corrupted npm cache.
+
+**Solutions:**
+
+Check your Node.js and npm versions:
+
+```bash
+node --version
+npm --version
+```
+
+If npm reports cache-related errors, clear the npm cache and retry:
+
+```bash
+npm cache clean --force
+npm install
+```
+
+Run the installation commands separately inside both the `backend` and `frontend` directories.
+
+---
+
+### 2. Missing `.env` configuration
+
+If the backend fails to start because required environment variables are missing, make sure you have created a `.env` file from the provided example.
+
+From the `backend` directory:
+
+```bash
+cp .env.example .env
+```
+
+On Windows CMD:
+
+```cmd
+copy .env.example .env
+```
+
+Open the `.env` file and configure the required values, such as:
+
+```env
+DB_URI=your_postgresql_connection_string
+JWT_SECRET=your_secret_key
+```
+
+Make sure all required environment variables are configured before starting the backend.
+
+**Important:** Never commit your `.env` file or expose secret values publicly.
+
+---
+
+### 3. Backend cannot connect to PostgreSQL
+
+If the backend reports a PostgreSQL connection error:
+
+* Make sure PostgreSQL is installed and running.
+* Verify the database name, username, password, host, and port in `.env`.
+* Check that the `DB_URI` points to the correct PostgreSQL instance.
+* If using Docker, make sure the PostgreSQL container is running.
+
+Check the Docker container status with:
+
+```bash
+docker-compose ps
+```
+
+If the database service is not running, restart the Docker services:
+
+```bash
+docker-compose up --build
+```
+
+---
+
+### 4. Frontend or backend is running on the wrong port
+
+OpenPrep AI normally uses:
+
+* Frontend: `http://localhost:5173`
+* Backend API: `http://localhost:5000`
+
+If either port is already being used by another application, stop the conflicting process or configure the application to use another available port.
+
+After changing the port configuration, restart the affected development server.
+
+---
+
+### 5. Docker containers fail to start
+
+If Docker containers fail to start, first make sure Docker is running.
+
+Check the Docker and Docker Compose versions:
+
+```bash
+docker --version
+docker-compose --version
+```
+
+Check the status of the containers:
+
+```bash
+docker-compose ps
+```
+
+View the container logs to identify the cause of the failure:
+
+```bash
+docker-compose logs
+```
+
+If existing containers are causing conflicts, stop them and start the services again:
+
+```bash
+docker-compose down
+docker-compose up --build
+```
+
+---
+
+### 6. Backend API is not reachable from the frontend
+
+If the frontend loads but API requests fail:
+
+* Make sure the backend server is running.
+* Verify that the backend is available at `http://localhost:5000`.
+* Check that the frontend API configuration points to the correct backend URL.
+* Open the browser Developer Tools and check the **Console** and **Network** tabs for failed API requests.
+
+If the API URL is incorrect, update the frontend API configuration to use the correct backend address and restart the frontend development server.
+
+---
+
+### Still having problems?
+
+If none of the solutions above resolve the issue, open a GitHub issue with:
+
+1. The error message.
+2. The command that produced the error.
+3. Your Node.js version.
+4. Your operating system.
+5. Relevant Docker or backend logs.
+6. Steps to reproduce the problem.
+
+Providing this information will help maintainers and contributors investigate the problem more efficiently.
+
+---
+
 ## 🗺️ Roadmap
 
 - **v1.0**: Core authentication, AI study planners, quiz generators, and analytics dashboards.
