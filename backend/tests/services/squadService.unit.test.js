@@ -1,24 +1,19 @@
 const { createSquad, generateInviteCode, joinSquad, leaveSquad } = require('../../services/squadService');
-const { StudySquad, SquadMember } = require('../../models');
-
-vi.mock('../../models', () => ({
-  StudySquad: {
-    findOne: vi.fn(),
-    create: vi.fn(),
-    findByPk: vi.fn()
-  },
-  SquadMember: {
-    findOne: vi.fn(),
-    create: vi.fn(),
-    findAll: vi.fn(),
-    destroy: vi.fn()
-  },
-  User: {}
-}));
+const models = require('../../models');
 
 describe('Squad Service', () => {
-  afterEach(() => {
+  let squadFindSpy, squadCreateSpy, squadPkSpy;
+  let memberFindSpy, memberCreateSpy, memberAllSpy;
+
+  beforeEach(() => {
     vi.clearAllMocks();
+    squadFindSpy = vi.spyOn(models.StudySquad, 'findOne').mockResolvedValue(null);
+    squadCreateSpy = vi.spyOn(models.StudySquad, 'create').mockResolvedValue({});
+    squadPkSpy = vi.spyOn(models.StudySquad, 'findByPk').mockResolvedValue(null);
+    
+    memberFindSpy = vi.spyOn(models.SquadMember, 'findOne').mockResolvedValue(null);
+    memberCreateSpy = vi.spyOn(models.SquadMember, 'create').mockResolvedValue({});
+    memberAllSpy = vi.spyOn(models.SquadMember, 'findAll').mockResolvedValue([]);
   });
 
   describe('generateInviteCode', () => {
@@ -31,15 +26,15 @@ describe('Squad Service', () => {
 
   describe('createSquad', () => {
     it('should create a squad and add admin member', async () => {
-      StudySquad.findOne.mockResolvedValue(null);
-      StudySquad.create.mockResolvedValue({ id: 'squad-1', name: 'Test Squad' });
-      SquadMember.create.mockResolvedValue({ id: 'member-1' });
+      squadFindSpy.mockResolvedValue(null);
+      squadCreateSpy.mockResolvedValue({ id: 'squad-1', name: 'Test Squad' });
+      memberCreateSpy.mockResolvedValue({ id: 'member-1' });
 
       const squad = await createSquad('user-1', 'Test Squad');
 
       expect(squad.name).toBe('Test Squad');
-      expect(StudySquad.create).toHaveBeenCalled();
-      expect(SquadMember.create).toHaveBeenCalledWith(expect.objectContaining({
+      expect(squadCreateSpy).toHaveBeenCalled();
+      expect(memberCreateSpy).toHaveBeenCalledWith(expect.objectContaining({
         squadId: 'squad-1',
         userId: 'user-1',
         role: 'admin'
@@ -49,14 +44,14 @@ describe('Squad Service', () => {
 
   describe('joinSquad', () => {
     it('should allow joining with valid invite code', async () => {
-      StudySquad.findOne.mockResolvedValue({ id: 'squad-1' });
-      SquadMember.findOne.mockResolvedValue(null);
-      SquadMember.create.mockResolvedValue({ id: 'member-2' });
+      squadFindSpy.mockResolvedValue({ id: 'squad-1' });
+      memberFindSpy.mockResolvedValue(null);
+      memberCreateSpy.mockResolvedValue({ id: 'member-2' });
 
       const squad = await joinSquad('user-2', 'ABCDEF');
       
       expect(squad.id).toBe('squad-1');
-      expect(SquadMember.create).toHaveBeenCalledWith(expect.objectContaining({
+      expect(memberCreateSpy).toHaveBeenCalledWith(expect.objectContaining({
         squadId: 'squad-1',
         userId: 'user-2',
         role: 'member'
@@ -64,13 +59,13 @@ describe('Squad Service', () => {
     });
 
     it('should reject invalid invite code', async () => {
-      StudySquad.findOne.mockResolvedValue(null);
+      squadFindSpy.mockResolvedValue(null);
       await expect(joinSquad('user-2', 'INVALID')).rejects.toThrow('Invalid invite code');
     });
 
     it('should reject duplicate membership', async () => {
-      StudySquad.findOne.mockResolvedValue({ id: 'squad-1' });
-      SquadMember.findOne.mockResolvedValue({ id: 'member-1' });
+      squadFindSpy.mockResolvedValue({ id: 'squad-1' });
+      memberFindSpy.mockResolvedValue({ id: 'member-1' });
 
       await expect(joinSquad('user-1', 'ABCDEF')).rejects.toThrow('User is already a member of this squad');
     });
@@ -79,8 +74,8 @@ describe('Squad Service', () => {
   describe('leaveSquad', () => {
     it('should destroy membership', async () => {
       const mockDestroy = vi.fn();
-      SquadMember.findOne.mockResolvedValue({ destroy: mockDestroy, squadId: 'squad-1', userId: 'user-2' });
-      StudySquad.findByPk.mockResolvedValue({ adminUserId: 'user-1' }); // Not admin
+      memberFindSpy.mockResolvedValue({ destroy: mockDestroy, squadId: 'squad-1', userId: 'user-2' });
+      squadPkSpy.mockResolvedValue({ adminUserId: 'user-1' }); // Not admin
 
       await leaveSquad('user-2', 'squad-1');
       expect(mockDestroy).toHaveBeenCalled();

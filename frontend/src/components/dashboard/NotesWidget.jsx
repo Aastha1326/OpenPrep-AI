@@ -20,7 +20,7 @@ import AudioReader from '../AudioReader';
 import HighlightedText from '../HighlightedText';
 import GenerateFlashcardsFromNoteModal from './GenerateFlashcardsFromNoteModal';
 import ImportExportNotes from './ImportExportNotes';
-const RecordVoiceNoteModal = lazy(() => import('./RecordVoiceNoteModal'));
+const VoiceNoteRecorderModal = lazy(() => import('../notes/VoiceNoteRecorderModal'));
 
 const Shimmer = ({ className = '' }) => (
   <div className={`animate-pulse bg-neutral-300/60 rounded ${className}`} />
@@ -354,7 +354,7 @@ const NotesWidget = ({ limit = 5 }) => {
       )}
 
       <Suspense fallback={null}>
-        <RecordVoiceNoteModal
+        <VoiceNoteRecorderModal
           isOpen={isRecordModalOpen}
           onClose={() => setIsRecordModalOpen(false)}
           onNoteCreated={loadNotes}

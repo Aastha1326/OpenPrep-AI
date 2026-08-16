@@ -226,7 +226,8 @@ async function updateStreak(userId, timezoneOffsetMinutes = 0) {
   }
 
   return {
-    currentStreak: user.currentStreak,    longestStreak: user.longestStreak,
+    currentStreak: user.currentStreak,
+    longestStreak: user.longestStreak,
     streakFreezesAvailable: user.streakFreezesAvailable,
     unlockedBadges,
   };

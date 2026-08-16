@@ -2,6 +2,7 @@ const { GoogleGenAI } = require('@google/genai');
 const StudyPlan = require('../models/StudyPlan');
 const User = require('../models/User');
 const { Op } = require('sequelize');
+const prompts = require('../config/prompts');
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -32,18 +33,7 @@ exports.rescheduleOverdueTasks = async (req, res, next) => {
     const daysRemaining = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
     // 2. Query Gemini AI or compute mathematical redistribution respecting maxDailyHours
-    const prompt = `
-      You are an intelligent study planner assistant. 
-      Reschedule ${overdueTasks.length} overdue tasks across ${daysRemaining} remaining days before the exam.
-      Ensure the total study hours per day do not exceed the user's maximum threshold of ${maxDailyHours} hours/day.
-      
-      Tasks: ${JSON.stringify(overdueTasks.map(t => ({ id: t.id, title: t.title, estimatedHours: t.estimatedHours })))}
-      
-      Return strictly as a JSON array of objects:
-      [
-        { "taskId": "...", "newDueDate": "YYYY-MM-DD", "allocatedHours": 2 }
-      ]
-    `;
+    const prompt = prompts.studyPlanner.rescheduleOverdueTasks(overdueTasks, daysRemaining, maxDailyHours);
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',

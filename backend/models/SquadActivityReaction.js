@@ -15,15 +15,18 @@ const SquadActivityReaction = sequelize.define('SquadActivityReaction', {
     type: DataTypes.UUID,
     allowNull: false
   },
-  reactionType: {
-    type: DataTypes.STRING,
+  emoji: {
+    type: DataTypes.STRING(10),
     allowNull: false
   }
 }, {
   timestamps: true,
   tableName: 'squad_activity_reactions',
   indexes: [
-    { fields: ['activityId', 'userId'], unique: true }
+    {
+      unique: true,
+      fields: ['activityId', 'userId', 'emoji']
+    }
   ]
 });
 

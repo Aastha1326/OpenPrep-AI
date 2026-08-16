@@ -1,6 +1,7 @@
 const { Subject, QuizAttempt, ReadinessSnapshot, StudyPlan } = require('../models');
 const { calculateSubjectReadiness } = require('../services/readinessCalculator');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const prompts = require('../config/prompts');
 
 // Initialize Gemini API client
 const apiKey = process.env.GEMINI_API_KEY;
@@ -72,14 +73,7 @@ const compileReadinessSummary = async (userId) => {
   if (genAI && readinessData.length > 0) {
     try {
       const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-      const prompt = `
-        You are an AI Academic Coach.
-        Analyze the student's exam readiness metrics across these subjects:
-        ${JSON.stringify(readinessData, null, 2)}
-
-        Identify specific gaps or weak areas (e.g. scores < 70%).
-        Provide a single concise paragraph (3-4 sentences max) with actionable advice and specific recommendations on where they should focus their attention next.
-      `;
+      const prompt = prompts.readiness.compileReadinessSummary(readinessData);
       const result = await model.generateContent(prompt);
       aiRecommendation = result.response.text().trim();
     } catch (err) {
