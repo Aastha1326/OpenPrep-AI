@@ -46,6 +46,9 @@ backend/uploads/
 *.njsproj
 *.sln
 *.sw?
+
+tests/load/reports/
+tests/load/reports/
 .vercel
 .env*.local
 

@@ -15,6 +15,7 @@
     "format:check": "prettier --check .",
     "create-labels": "node scripts/create-labels.js",
     "seed": "npm run seed --prefix backend",
+    "test:load": "node scripts/run-load-tests.js"
     "db:backup": "npm run db:backup --prefix backend",
     "db:restore": "npm run db:restore --prefix backend"
   },
