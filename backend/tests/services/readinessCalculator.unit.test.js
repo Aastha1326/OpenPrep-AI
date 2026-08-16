@@ -1,18 +1,18 @@
 const { calculateSubjectReadiness } = require('../../services/readinessCalculator');
 const { Topic, Progress, QuizAttempt, Quiz, Flashcard, StudyPlan } = require('../../models');
 
-jest.mock('../../models', () => ({
-  Topic: { findAll: jest.fn() },
-  Progress: { findAll: jest.fn() },
-  QuizAttempt: { findAll: jest.fn() },
-  Quiz: { findAll: jest.fn() },
-  Flashcard: { findAll: jest.fn() },
-  StudyPlan: { findOne: jest.fn() },
+vi.mock('../../models', () => ({
+  Topic: { findAll: vi.fn() },
+  Progress: { findAll: vi.fn() },
+  QuizAttempt: { findAll: vi.fn() },
+  Quiz: { findAll: vi.fn() },
+  Flashcard: { findAll: vi.fn() },
+  StudyPlan: { findOne: vi.fn() },
 }));
 
 describe('readinessCalculator Unit Tests', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('calculates ERI readiness score correctly based on metrics weightages', async () => {

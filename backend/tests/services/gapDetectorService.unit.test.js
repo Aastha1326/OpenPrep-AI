@@ -1,22 +1,22 @@
 const { analyzeSyllabusGaps } = require('../../services/gapDetectorService');
 const { SyllabusTopic, Note, Topic, Quiz, QuizAttempt } = require('../../models');
 
-jest.mock('../../models', () => ({
-  SyllabusTopic: { findAll: jest.fn() },
-  Note: { findOne: jest.fn() },
-  Topic: { findOne: jest.fn() },
-  Quiz: { findAll: jest.fn() },
-  QuizAttempt: { findAll: jest.fn() },
+vi.mock('../../models', () => ({
+  SyllabusTopic: { findAll: vi.fn() },
+  Note: { findOne: vi.fn() },
+  Topic: { findOne: vi.fn() },
+  Quiz: { findAll: vi.fn() },
+  QuizAttempt: { findAll: vi.fn() },
 }));
 
 describe('gapDetectorService Unit Tests', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('correctly maps topic gaps based on notes and quiz scores', async () => {
     // 1. Syllabus Topics
-    const mockSave = jest.fn();
+    const mockSave = vi.fn();
     SyllabusTopic.findAll.mockResolvedValue([
       { id: 't-1', title: 'Linear Algebra', moduleName: 'Mod 1', subtopics: ['Matrices'], save: mockSave },
       { id: 't-2', title: 'Calculus', moduleName: 'Mod 1', subtopics: ['Limits'], save: mockSave },
