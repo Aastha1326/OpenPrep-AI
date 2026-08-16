@@ -318,6 +318,14 @@ const RESPONSE_SCHEMAS = {
     keyConcepts: 'array',
     examTips: 'array',
   },
+  audioSummaryStructured: {
+    transcription: 'string',
+    title: 'string',
+    keyTakeaways: 'array',
+    formulas: 'array',
+    examWarnings: 'array',
+    actionItems: 'array',
+  },
   questionExplanation: {
     markdown: 'string',
   },
@@ -1909,6 +1917,76 @@ exports.transcribeAndSummarizeAudio = async (fileBuffer, mimeType, subjectName) 
       summary: 'Failed to generate study summary from the audio.',
       keyConcepts: [],
       examTips: [],
+    };
+  }
+};
+
+/**
+ * 6.5. Transcribe & Summarize Audio (Structured for Voice Notes)
+ */
+exports.transcribeAndSummarizeAudioStructured = async (fileBuffer, mimeType, subjectName) => {
+  if (!genAI) {
+    console.warn('Gemini API key not configured. Using Mock Audio transcription and summary.');
+    return {
+      transcription: `Mock transcription: Today we are discussing key topics in ${subjectName || 'this subject'}. In standard lectures, we cover core definitions and formulas.`,
+      title: `${subjectName || 'General'} Lecture Summary`,
+      keyTakeaways: ['Introductory concepts', 'Core principles'],
+      formulas: ['E = mc^2'],
+      examWarnings: ['Review basic formulas', 'Focus on terminology'],
+      actionItems: ['Read chapter 1', 'Solve practice problems']
+    };
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const prompt = `
+      You are an expert academic tutor. You are given an audio recording from a study session or class for the subject "${subjectName || 'General Study'}".
+      Please perform two tasks:
+      1. Transcribe the audio content as accurately and completely as possible.
+      2. Generate a structured study summary based on the transcription.
+
+      Return the result STRICTLY as a JSON object with this exact structure:
+      {
+        "transcription": "string",
+        "title": "string (Core Topic/Title)",
+        "keyTakeaways": ["string"],
+        "formulas": ["string (Formulas or Definitions)"],
+        "examWarnings": ["string (Exam Warning Points)"],
+        "actionItems": ["string (Action Items)"]
+      }
+    `;
+
+    const result = await generateWithRetry(model, [
+      {
+        inlineData: {
+          data: Buffer.from(fileBuffer).toString('base64'),
+          mimeType: mimeType || 'audio/mp3',
+        },
+      },
+      prompt,
+    ]);
+
+    const parsed = cleanJSON(result.response.text());
+    
+    // Validate response structure
+    if (!validateResponse(parsed, RESPONSE_SCHEMAS.audioSummaryStructured)) {
+      console.error('Audio summary structured response validation failed');
+      throw new Error('Invalid JSON structure returned by Gemini');
+    }
+
+    return parsed;
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError || error instanceof GeminiServerError) {
+      throw error;
+    }
+    console.error('Gemini audio transcription and structured summarization failed:', error);
+    return {
+      transcription: `Unable to transcribe audio due to error: ${error.message}`,
+      title: 'Failed to generate title',
+      keyTakeaways: [],
+      formulas: [],
+      examWarnings: [],
+      actionItems: [],
     };
   }
 };
