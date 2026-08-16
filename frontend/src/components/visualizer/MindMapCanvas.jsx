@@ -17,14 +17,6 @@ import { Search, Download, Eye, ListTree, ZoomIn, RefreshCw } from 'lucide-react
  */
 const CustomConceptNode = ({ data, selected }) => {
   const category = data.category || 'topic';
-  const categoryStyles = {
-    root: 'bg-purple-950/90 border-purple-500/80 text-purple-100 shadow-purple-500/30',
-    topic: 'bg-indigo-950/90 border-indigo-500/80 text-indigo-100 shadow-indigo-500/30',
-    subtopic: 'bg-emerald-950/90 border-emerald-500/80 text-emerald-100 shadow-emerald-500/30',
-    formula: 'bg-amber-950/90 border-amber-500/80 text-amber-100 shadow-amber-500/30',
-    definition: 'bg-cyan-950/90 border-cyan-500/80 text-cyan-100 shadow-cyan-500/30',
-const CustomConceptNode = ({ data, selected }) => {
-  const category = data.category || 'topic';
 
   // Mastery-based color coding (Issue #758):
   // Green = Mastered (>80%), Yellow = In Progress (50-80%), Red = Weak (<50%), Grey = Unstudied

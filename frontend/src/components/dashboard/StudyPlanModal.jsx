@@ -17,7 +17,6 @@ import {
   GanttChartSquare,
   List,
   Gauge,
-} from 'lucide-react';
   Sparkles,
   Loader,
 } from 'lucide-react';

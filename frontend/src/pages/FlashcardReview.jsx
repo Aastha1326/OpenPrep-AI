@@ -1113,6 +1113,9 @@ useEffect(() => {
               </div>
             </motion.div>
           </div>
+        )}
+
+        {/* Video Reference Modal */}
         {showVideoModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
             <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 max-w-2xl w-full flex flex-col gap-4 relative">

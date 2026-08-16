@@ -296,4 +296,12 @@ export const getReadinessProjection = (params) => API.get('/dashboard/readiness-
 export const generateRemediationQuiz = (payload) =>
   API.post('/quizzes/generate-remediation', payload);
 
+/**
+ * Grade a written answer for a subjective question against its rubric.
+ * POST /api/quizzes/evaluate-subjective
+ * @param {{ questionId: string, quizId: string, userAnswerText: string }} payload
+ */
+export const evaluateSubjectiveAnswer = (payload) =>
+  API.post('/quizzes/evaluate-subjective', payload);
+
 export default API;

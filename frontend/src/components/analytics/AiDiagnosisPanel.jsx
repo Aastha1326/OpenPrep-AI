@@ -1,17 +1,17 @@
 import React from 'react';
-import { FaSparkles, FaInfoCircle, FaRegLightbulb } from 'react-icons/fa';
+import { FaMagic, FaInfoCircle, FaRegLightbulb } from 'react-icons/fa';
 
 const AiDiagnosisPanel = ({ recommendation }) => {
   return (
     <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 shadow-xl relative overflow-hidden">
       <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-        <FaSparkles className="text-8xl text-indigo-400" />
+        <FaMagic className="text-8xl text-indigo-400" />
       </div>
 
       <div className="space-y-4">
         <div className="flex items-center gap-2 border-b border-neutral-800 pb-4">
           <div className="p-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-indigo-400">
-            <FaSparkles className="text-base" />
+            <FaMagic className="text-base" />
           </div>
           <div>
             <h3 className="text-stone-100 font-extrabold font-playfair text-lg">AI Readiness Diagnosis</h3>
