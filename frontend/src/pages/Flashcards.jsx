@@ -5,7 +5,7 @@ import API from '../services/api';
 import CreateDeckModal from '../components/dashboard/CreateDeckModal';
 import CreateFlashcardDeckModal from '../components/flashcards/CreateFlashcardDeckModal';
 import YouTubeFlashcardImporter from '../components/flashcards/YouTubeFlashcardImporter';
-import { Search, Trash2, Plus, ChevronLeft, ChevronRight, Youtube, Share2, Copy, Check, BookOpen, Layers, Globe, Lock } from 'lucide-react';
+import { Search, Trash2, Plus, ChevronLeft, ChevronRight, PlaySquare as Youtube, Share2, Copy, Check, BookOpen, Layers, Globe, Lock } from 'lucide-react';
 
 const Flashcards = () => {
   const dispatch = useDispatch();

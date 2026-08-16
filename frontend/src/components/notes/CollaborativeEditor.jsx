@@ -17,6 +17,10 @@ export default function CollaborativeEditor({ noteId, currentUser = {} }) {
   const [collaborators, setCollaborators] = useState([]);
   const [copiedLink, setCopiedLink] = useState(false);
   const [inviteUrl, setInviteUrl] = useState('');
+  // The server now refuses rooms the user has no claim to, and tells read-only
+  // participants so their keystrokes are not silently discarded (issue #1107).
+  const [accessError, setAccessError] = useState(null);
+  const [readOnly, setReadOnly] = useState(false);
 
   const textareaRef = useRef(null);
   const ydocRef = useRef(null);
@@ -57,8 +61,18 @@ export default function CollaborativeEditor({ noteId, currentUser = {} }) {
     const userId = currentUser.id || 'anon';
     const userColor = getCollaboratorColor(userId);
 
-    // Join Yjs collaboration room
+    // Join Yjs collaboration room. The server derives identity from the
+    // authenticated socket, so username/userId here are presence hints only.
     socket.emit('yjs-join-room', { noteId, username, userId });
+
+    socket.on('collab-error', ({ message }) => {
+      setAccessError(message || 'You do not have access to this note.');
+      setLoaded(false);
+    });
+
+    socket.on('collab-access', ({ level }) => {
+      setReadOnly(level === 'read');
+    });
 
     // Step 1: Initial load
     socket.on('yjs-sync-step-1', (payload) => {
@@ -166,9 +180,12 @@ export default function CollaborativeEditor({ noteId, currentUser = {} }) {
 
     return () => {
       ytext.unobserve(handleYTextChange);
+      socket.emit('yjs-leave-room', { noteId });
       socket.off('yjs-sync-step-1');
       socket.off('yjs-update');
       socket.off('yjs-awareness');
+      socket.off('collab-error');
+      socket.off('collab-access');
       if (textarea) {
         textarea.removeEventListener('keyup', handleSelection);
         textarea.removeEventListener('click', handleSelection);
@@ -214,7 +231,17 @@ export default function CollaborativeEditor({ noteId, currentUser = {} }) {
       </div>
 
       {/* Editor Canvas */}
-      {!loaded ? (
+      {accessError ? (
+        <div
+          role="alert"
+          className="h-64 flex flex-col items-center justify-center bg-neutral-900 border border-red-900/60 rounded-3xl"
+        >
+          <p className="text-sm text-red-300 font-semibold">{accessError}</p>
+          <p className="text-xs text-stone-500 mt-1">
+            Ask the note&apos;s owner to enable collaboration if you need access.
+          </p>
+        </div>
+      ) : !loaded ? (
         <div className="h-64 flex flex-col items-center justify-center bg-neutral-900 border border-neutral-850 rounded-3xl">
           <span className="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin mb-2" />
           <p className="text-xs text-stone-400 font-semibold">Synchronizing CRDT document states...</p>
@@ -225,9 +252,15 @@ export default function CollaborativeEditor({ noteId, currentUser = {} }) {
             ref={textareaRef}
             value={content}
             onChange={handleTextareaChange}
-            placeholder="Start typing your collaborative notes here..."
-            className="w-full min-h-[400px] p-6 bg-transparent text-stone-200 text-sm font-mono outline-none resize-none leading-relaxed"
+            readOnly={readOnly}
+            placeholder={
+              readOnly
+                ? 'This note is shared with you in read-only mode.'
+                : 'Start typing your collaborative notes here...'
+            }
+            className="w-full min-h-[400px] p-6 bg-transparent text-stone-200 text-sm font-mono outline-none resize-none leading-relaxed read-only:opacity-70"
             aria-label="Collaborative note editor"
+            aria-readonly={readOnly}
           />
         </div>
       )}

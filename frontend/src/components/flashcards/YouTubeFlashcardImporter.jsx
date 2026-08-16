@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Youtube, Loader2, Sparkles, AlertCircle, CheckCircle2, Play } from 'lucide-react';
+import { X, PlaySquare as Youtube, Loader2, Sparkles, AlertCircle, CheckCircle2, Play } from 'lucide-react';
 import API from '../../services/api';
 
 // Helper to extract video ID for embed preview

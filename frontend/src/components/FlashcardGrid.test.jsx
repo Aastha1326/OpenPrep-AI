@@ -42,8 +42,9 @@ describe('FlashcardGrid and FlashcardCard', () => {
     ];
     render(<FlashcardGrid flashcards={cardsWithVideo} />);
 
-    // 120 seconds -> 2:00
-    const badge = screen.getByRole('button', { name: /2:00/i });
+    // 120 seconds -> 2:00. The card renders both faces, so the badge appears
+    // twice; either one opens the same player.
+    const [badge] = screen.getAllByRole('button', { name: /2:00/i });
     expect(badge).toBeInTheDocument();
 
     // Click badge to launch reference video modal

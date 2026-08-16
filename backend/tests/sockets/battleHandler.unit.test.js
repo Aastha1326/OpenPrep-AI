@@ -3,11 +3,11 @@ const User = require('../../models/User');
 const BattleSession = require('../../models/BattleSession');
 const BattleParticipant = require('../../models/BattleParticipant');
 
-jest.mock('../../models/User');
-jest.mock('../../models/BattleSession');
-jest.mock('../../models/BattleParticipant');
-jest.mock('../../services/gamificationService', () => ({
-  awardXP: jest.fn().mockResolvedValue({ xp: 100 }),
+vi.mock('../../models/User');
+vi.mock('../../models/BattleSession');
+vi.mock('../../models/BattleParticipant');
+vi.mock('../../services/gamificationService', () => ({
+  awardXP: vi.fn().mockResolvedValue({ xp: 100 }),
 }));
 
 const createFakeIo = () => {
@@ -86,7 +86,7 @@ const setup = () => {
 
 describe('Real-Time Quiz Battle Sockets', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     // Reset roomManager rooms
     for (const key in roomManager.rooms) {
       delete roomManager.rooms[key];
@@ -184,7 +184,7 @@ describe('Real-Time Quiz Battle Sockets', () => {
 
   describe('Player Disconnection & Host Handoffs', () => {
     it('gracefully handles user disconnect without immediate lobby close', () => {
-      jest.useFakeTimers();
+      vi.useFakeTimers();
 
       const room = roomManager.createRoom('PREP66', 'host-user', {
         roomName: 'Grace Match',
@@ -201,12 +201,12 @@ describe('Real-Time Quiz Battle Sockets', () => {
       expect(roomManager.getRoom('PREP66')).not.toBeNull();
 
       // Fast-forward 30 seconds
-      jest.advanceTimersByTime(30000);
+      vi.advanceTimersByTime(30000);
 
       // Room should be cleaned up now as host was the only player
       expect(roomManager.getRoom('PREP66')).toBeNull();
 
-      jest.useRealTimers();
+      vi.useRealTimers();
     });
   });
 });
