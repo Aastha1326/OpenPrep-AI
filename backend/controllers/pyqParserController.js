@@ -2,6 +2,7 @@ const { GoogleGenAI } = require('@google/genai');
 const pdfParse = require('pdf-parse');
 const fs = require('fs');
 const PYQDraft = require('../models/PYQDraft'); // Draft review queue model
+const prompts = require('../config/prompts');
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -20,37 +21,7 @@ exports.parsePyqPdf = async (req, res, next) => {
 
     const extractedText = pdfData.text;
 
-    const prompt = `
-      You are an expert academic parser. Analyze the following multi-page Previous Year Question (PYQ) paper text and extract all questions into a structured JSON array.
-      
-      For each question, extract:
-      1. questionNumber (integer or string)
-      2. questionText (string)
-      3. options (array of 4 strings: [A, B, C, D])
-      4. correctAnswer (string or index matching option)
-      5. topicCategorization (string subject/topic tag)
-      6. yearMetadata (extracted year if present, e.g. 2024 or 2025)
-
-      Text Content:
-      """
-      ${extractedText}
-      """
-
-      Return strictly as a JSON object matching this schema:
-      {
-        "paperTitle": "Extracted Paper Title or Subject",
-        "questions": [
-          {
-            "questionNumber": 1,
-            "questionText": "...",
-            "options": ["...", "...", "...", "..."],
-            "correctAnswer": "...",
-            "topicCategorization": "...",
-            "yearMetadata": 2025
-          }
-        ]
-      }
-    `;
+    const prompt = prompts.pyqParser.parsePyqPdf(extractedText);
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
