@@ -773,7 +773,7 @@ useEffect(() => {
         <AnimatePresence mode="wait">
           <motion.div
             key={currentCard.id}
-            className="w-full max-w-2xl h-80 relative preserve-3d cursor-pointer group"
+            className="w-full max-w-2xl min-h-[22rem] sm:h-80 relative preserve-3d cursor-pointer group"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0, rotateY: isFlipped ? 180 : 0 }}
             exit={{ opacity: 0, x: -100, transition: { duration: 0.2 } }}
@@ -791,7 +791,7 @@ useEffect(() => {
           >
             {/* Front */}
             <div
-              className={`absolute inset-0 bg-white dark:bg-slate-800 shadow-xl border border-neutral-200 dark:border-slate-700 rounded-2xl p-8 flex flex-col justify-center items-center backface-hidden ${isFlipped ? 'pointer-events-none' : ''}`}
+              className={`absolute inset-0 bg-white dark:bg-slate-800 shadow-xl border border-neutral-200 dark:border-slate-700 rounded-2xl p-4 sm:p-8 flex flex-col justify-center items-center backface-hidden ${isFlipped ? 'pointer-events-none' : ''}`}
               style={{
                 backfaceVisibility: 'hidden',
                 WebkitBackfaceVisibility: 'hidden',
@@ -853,7 +853,7 @@ useEffect(() => {
 
             {/* Back */}
             <div
-              className={`absolute inset-0 bg-primary-50 dark:bg-primary-900/10 shadow-xl border border-primary-200 dark:border-primary-800/50 rounded-2xl p-8 flex flex-col items-center overflow-y-auto backface-hidden ${!isFlipped ? 'pointer-events-none' : ''}`}
+              className={`absolute inset-0 bg-primary-50 dark:bg-primary-900/10 shadow-xl border border-primary-200 dark:border-primary-800/50 rounded-2xl p-4 sm:p-8 flex flex-col items-center overflow-y-auto backface-hidden ${!isFlipped ? 'pointer-events-none' : ''}`}
               style={{
                 backfaceVisibility: 'hidden',
                 WebkitBackfaceVisibility: 'hidden',
@@ -1113,32 +1113,35 @@ useEffect(() => {
               </div>
             </motion.div>
           </div>
-        {showVideoModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
-            <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 max-w-2xl w-full flex flex-col gap-4 relative">
-              <button
-                type="button"
-                onClick={() => setShowVideoModal(false)}
-                className="absolute -top-3 -right-3 p-1.5 rounded-full bg-neutral-850 border border-neutral-700 text-stone-400 hover:text-white cursor-pointer z-50"
-              >
-                <X className="w-4 h-4" />
-              </button>
-              <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-black shadow-lg">
-                <iframe
-                  title="Flashcard Video Reference"
-                  src={`https://www.youtube.com/embed/${getYouTubeId(videoUrl)}?start=${videoStart}&autoplay=1`}
-                  className="absolute inset-0 w-full h-full"
-                  allowFullScreen
-                  allow="autoplay"
-                />
-              </div>
-              <div className="text-center text-xs font-semibold text-stone-400">
-                Playing reference from timestamp {formatSeconds(videoStart)}
-              </div>
-            </div>
-          </div>
         )}
       </AnimatePresence>
+
+      {/* Video Modal */}
+      {showVideoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 max-w-2xl w-full flex flex-col gap-4 relative">
+            <button
+              type="button"
+              onClick={() => setShowVideoModal(false)}
+              className="absolute -top-3 -right-3 p-1.5 rounded-full bg-neutral-850 border border-neutral-700 text-stone-400 hover:text-white cursor-pointer z-50"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-black shadow-lg">
+              <iframe
+                title="Flashcard Video Reference"
+                src={`https://www.youtube.com/embed/${getYouTubeId(videoUrl)}?start=${videoStart}&autoplay=1`}
+                className="absolute inset-0 w-full h-full"
+                allowFullScreen
+                allow="autoplay"
+              />
+            </div>
+            <div className="text-center text-xs font-semibold text-stone-400">
+              Playing reference from timestamp {formatSeconds(videoStart)}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Keyboard Shortcuts Guide Modal */}
       <KeyboardShortcutsModal

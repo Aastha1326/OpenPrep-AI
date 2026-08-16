@@ -558,7 +558,7 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
       return true;
     });
   return (
-    <div className="min-h-screen bg-slate-900 text-white py-10 px-4 md:px-20">
+    <div className="min-h-screen bg-slate-900 text-white py-6 sm:py-10 px-3 sm:px-6 md:px-20">
       {timeElapsed && !submitted && (
         <div
           role="alert"
@@ -622,10 +622,10 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
 
       <div className="max-w-3xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8 border-b border-slate-700 pb-4">
-          <h1 className="text-2xl font-bold text-slate-100">{quiz.title}</h1>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8 border-b border-slate-700 pb-4">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-100">{quiz.title}</h1>
           {!submitted && (
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <AudioWaveform status={status} />
               <VoiceModeToggle
                 isSupported={isSupported}
@@ -638,13 +638,13 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
               <span
                 role="timer"
                 aria-label={`Time remaining: ${formatTime(timeLeft)}`}
-                className={`text-sm font-semibold px-3 py-1 rounded-full font-mono ${
+                className={`text-xs sm:text-sm font-semibold px-3 py-1 rounded-full font-mono ${
                   lowTime ? 'bg-red-500/20 text-red-400' : 'bg-slate-800 text-indigo-300'
                 }`}
               >
                 {formatTime(timeLeft)}
               </span>
-              <span className="text-sm font-medium bg-slate-800 px-3 py-1 rounded-full text-indigo-300">
+              <span className="text-xs sm:text-sm font-medium bg-slate-800 px-3 py-1 rounded-full text-indigo-300">
                 Question {currentQuestionIndex + 1} of {quiz.questions.length}
               </span>
             </div>
@@ -680,8 +680,8 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
               }}
             />
           ) : (
-          <div className="bg-slate-800 rounded-xl p-6 md:p-8 shadow-xl border border-slate-700">
-            <h2 className="text-xl font-semibold mb-6 leading-relaxed break-words whitespace-pre-wrap">
+          <div className="bg-slate-800 rounded-xl p-4 sm:p-6 md:p-8 shadow-xl border border-slate-700">
+            <h2 className="text-lg sm:text-xl font-semibold mb-6 leading-relaxed break-words whitespace-pre-wrap">
               <MathRenderer text={currentQuestion.questionText} />
             </h2>
 
@@ -693,7 +693,7 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
                     key={index}
                     onClick={() => handleOptionSelect(currentQuestion._id, option)}
                     disabled={submitted || timeElapsed || submitting}
-                    className={`w-full text-left p-4 rounded-lg border transition-all duration-200 flex items-center disabled:opacity-60 disabled:cursor-not-allowed ${
+                    className={`w-full min-w-0 text-left p-3.5 sm:p-4 rounded-lg border transition-all duration-200 flex items-center min-h-[44px] break-words disabled:opacity-60 disabled:cursor-not-allowed ${
                       isSelected
                         ? 'bg-indigo-600/20 border-indigo-500 text-indigo-100'
                         : 'bg-slate-700/50 border-slate-600 hover:border-indigo-400 hover:bg-slate-700 text-slate-200'

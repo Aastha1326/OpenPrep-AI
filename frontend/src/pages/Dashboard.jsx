@@ -597,23 +597,23 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, delay: 0.3 }}
-            className="flex items-center space-x-6 mt-2 md:mt-0 shrink-0"
+            className="flex flex-wrap md:flex-nowrap items-center gap-3 sm:gap-4 mt-2 md:mt-0 max-w-full"
           >
             <div className="relative group z-50">
-              <button className="bg-neutral-800 text-gold-foil border border-yellow-700/50 hover:bg-neutral-700 px-4 py-2 rounded-sm shadow-[0_4px_15px_rgba(0,0,0,0.5)] flex items-center gap-2 font-playfair font-bold text-sm tracking-wide">
+              <button className="bg-neutral-800 text-gold-foil border border-yellow-700/50 hover:bg-neutral-700 px-4 py-2.5 rounded-sm shadow-[0_4px_15px_rgba(0,0,0,0.5)] flex items-center gap-2 font-playfair font-bold text-sm tracking-wide min-h-[44px]">
                 <Download className="w-4 h-4" /> {t('export_analytics')}
               </button>
               <div className="absolute right-0 top-full mt-2 w-40 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
                 <button
                   onClick={() => handleExportReport('csv')}
-                  className="w-full text-left block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200"
+                  className="w-full text-left block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 min-h-[44px]"
                 >
                   CSV
                 </button>
 
                 <button
                   onClick={() => handleExportReport('pdf')}
-                  className="w-full text-left block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200"
+                  className="w-full text-left block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 min-h-[44px]"
                 >
                   PDF
                 </button>
@@ -625,7 +625,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             <ThemeToggle className="mr-2" />
             <button
               onClick={() => setIsSettingsModalOpen(true)}
-              className="bg-neutral-800 text-yellow-500 border border-yellow-700/50 hover:bg-neutral-700 p-2.5 rounded-sm shadow-[0_4px_10px_rgba(0,0,0,0.4)] flex items-center justify-center relative group"
+              className="bg-neutral-800 text-yellow-500 border border-yellow-700/50 hover:bg-neutral-700 p-2.5 rounded-sm shadow-[0_4px_10px_rgba(0,0,0,0.4)] flex items-center justify-center relative group min-h-[44px] min-w-[44px]"
               aria-label="Settings"
             >
               <Settings className="w-5 h-5 transition-transform duration-300 group-hover:rotate-45" />
@@ -636,7 +636,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
 
             <button
               onClick={() => setIsSkillTreeOpen(true)}
-              className="bg-neutral-800 text-yellow-500 border border-yellow-700/50 hover:bg-neutral-700 p-2.5 rounded-sm shadow-[0_4px_10px_rgba(0,0,0,0.4)] flex items-center justify-center relative group"
+              className="bg-neutral-800 text-yellow-500 border border-yellow-700/50 hover:bg-neutral-700 p-2.5 rounded-sm shadow-[0_4px_10px_rgba(0,0,0,0.4)] flex items-center justify-center relative group min-h-[44px] min-w-[44px]"
               aria-label="Skill Tree"
             >
               <Brain className="w-5 h-5 transition-transform duration-300 group-hover:scale-110" />
@@ -646,7 +646,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             </button>
 
             {/* --- STREAK WIDGET --- */}
-            <div className="w-80">
+            <div className="w-full max-w-xs sm:w-80">
 <StreakWidget
   currentStreak={
     gamificationData?.currentStreak ??
@@ -668,7 +668,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
 
             <button
               onClick={() => navigate('/settings')}
-              className="bg-neutral-800 text-amber-100/80 px-4 py-3 rounded-sm border border-amber-700/40 shadow-[0_4px_15px_rgba(0,0,0,0.5)] hover:bg-neutral-700 hover:text-yellow-400 transition-all flex items-center gap-2 group"
+              className="bg-neutral-800 text-amber-100/80 px-4 py-3 rounded-sm border border-amber-700/40 shadow-[0_4px_15px_rgba(0,0,0,0.5)] hover:bg-neutral-700 hover:text-yellow-400 transition-all flex items-center gap-2 group min-h-[44px]"
               aria-label="Settings"
             >
               <Settings className="w-5 h-5" />
@@ -679,7 +679,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
 
             <button
               onClick={handleLogout}
-              className="bg-stone-800 text-amber-500 px-4 py-2 rounded-lg font-bold hover:bg-stone-700 transition shadow-lg border border-amber-900/30 flex items-center gap-2"
+              className="bg-stone-800 text-amber-500 px-4 py-2.5 rounded-lg font-bold hover:bg-stone-700 transition shadow-lg border border-amber-900/30 flex items-center gap-2 min-h-[44px]"
             >
               <LogOut className="w-5 h-5 group-hover:text-white" />
               <span className="font-playfair font-bold text-sm tracking-wide group-hover:text-white hidden sm:inline">
@@ -703,7 +703,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           <ErrorBanner message={errorStats} onRetry={handleRetry(fetchDashboardStats)} />
         ) : null}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {loadingStats ? (
             <>
               <StatsCardSkeleton />
