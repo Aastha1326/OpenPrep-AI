@@ -1,6 +1,7 @@
 const { Op } = require('sequelize');
 const { v4: uuidv4 } = require('uuid');
 const StudyPlan = require('../models/StudyPlan');
+const cacheService = require('../services/cacheService');
 const Exam = require('../models/Exam');
 const Subject = require('../models/Subject');
 const Topic = require('../models/Topic');
@@ -119,6 +120,8 @@ exports.generateAIPlan = async (req, res, next) => {
       description: `Generated AI Study Plan for exam: ${exam.name}`,
     });
 
+    await cacheService.del(`study_plan:active:${req.user.id}`);
+
     res.status(201).json({
       success: true,
       data: studyPlan,
@@ -149,6 +152,21 @@ exports.generateAIPlan = async (req, res, next) => {
 exports.getActivePlan = async (req, res, next) => {
   try {
     const { examId } = req.query;
+    const cacheKey = `study_plan:active:${req.user.id}`;
+
+    // Read cache
+    const cached = await cacheService.get(cacheKey);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (!examId || (parsed && parsed.exam && parsed.exam.id === examId)) {
+          return res.status(200).json({ success: true, data: parsed });
+        }
+      } catch (err) {
+        console.warn('Failed to parse cached study plan:', err.message);
+      }
+    }
+
     const filter = { user: req.user.id, status: 'active' };
     if (examId) filter.exam = examId;
 
@@ -190,7 +208,7 @@ exports.getActivePlan = async (req, res, next) => {
       })),
     }));
 
-const planJson = plan.toJSON();
+    const planJson = plan.toJSON();
     planJson.exam = planJson.examRef; // populate parity
     planJson.dailyGoals = resolvedGoals;
     planJson.completionForecast = schedulePredictorService.getCompletionForecast({
@@ -199,7 +217,11 @@ const planJson = plan.toJSON();
       examDateStr: plan.examRef ? plan.examRef.date : null,
     });
 
-    res.status(200).json({ success: true, data: planJson });  } catch (error) {
+    // Store in cache for 5 minutes (300 seconds)
+    await cacheService.set(cacheKey, JSON.stringify(planJson), 300);
+
+    res.status(200).json({ success: true, data: planJson });
+  } catch (error) {
     next(error);
   }
 };
@@ -286,6 +308,8 @@ exports.toggleTaskCompletion = async (req, res, next) => {
     const { recalculateReadinessInBackground } = require('./readinessController');
     recalculateReadinessInBackground(req.user.id).catch((err) => console.error('Background readiness recalculation error:', err));
 
+    await cacheService.del(`study_plan:active:${req.user.id}`);
+
     res.status(200).json({ success: true, data: plan, progression });
   } catch (error) {
     next(error);
@@ -341,6 +365,8 @@ exports.moveTaskDate = async (req, res, next) => {
 
     plan.dailyGoals = dailyGoals;
     await plan.save();
+
+    await cacheService.del(`study_plan:active:${req.user.id}`);
 
     res.status(200).json({ success: true, data: plan });
   } catch (error) {
@@ -479,6 +505,8 @@ exports.rescheduleOverdueTasks = async (req, res, next) => {
         description: `AI Re-balanced study plan for exam: ${exam.name}`,
       });
 
+      await cacheService.del(`study_plan:active:${req.user.id}`);
+
       return res.status(200).json({
         success: true,
         data: plan,
@@ -577,6 +605,8 @@ exports.rescheduleOverdueTasks = async (req, res, next) => {
       description: `Rescheduled ${overdueTasks.length} overdue tasks for exam: ${exam.name}`,
     });
 
+    await cacheService.del(`study_plan:active:${req.user.id}`);
+
     res.status(200).json({
       success: true,
       data: plan,
@@ -610,6 +640,9 @@ exports.rescheduleAdaptivePlan = async (req, res, next) => {
     if (!result) {
       return res.status(404).json({ success: false, error: 'No active study plan found to reschedule' });
     }
+
+    await cacheService.del(`study_plan:active:${req.user.id}`);
+
     res.status(200).json({ success: true, data: result, message: 'Adaptive study plan rescheduled successfully' });
   } catch (error) {
     next(error);
@@ -734,6 +767,8 @@ exports.rebalanceStudyPlan = async (req, res, next) => {
     } else if (reason === 'NO_DAYS_REMAINING') {
       message = 'No study days remain before the exam date';
     }
+
+    await cacheService.del(`study_plan:active:${req.user.id}`);
 
     res.status(200).json({ success: true, data: plan, forecast, rebalanced, reason, message });
   } catch (error) {

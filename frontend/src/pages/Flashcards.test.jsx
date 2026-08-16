@@ -8,8 +8,9 @@ import API from '../services/api';
 
 vi.mock('../services/api', () => ({
   default: {
-    get: vi.fn().mockResolvedValue({ data: { data: [] } }),
+    get: vi.fn(),
     delete: vi.fn(),
+    post: vi.fn(),
   },
 }));
 
@@ -46,6 +47,9 @@ describe('Flashcards page', () => {
       if (url.includes('/academic/topics')) {
         return Promise.resolve({ data: { data: [] } });
       }
+      if (url.includes('/flashcard-decks')) {
+        return Promise.resolve({ data: { data: [{ id: 'deck-1', name: 'Science Chemistry', cardCount: 2 }] } });
+      }
       if (url.includes('/flashcards')) {
         return Promise.resolve({
           data: {
@@ -66,7 +70,7 @@ describe('Flashcards page', () => {
       </Provider>
     );
 
-    expect(screen.getByText('Flashcard Decks')).toBeInTheDocument();
-    expect(await screen.findByText('Q1')).toBeInTheDocument();
+    expect(screen.getByText('Study Flashcards')).toBeInTheDocument();
+    expect(await screen.findByText('Science Chemistry')).toBeInTheDocument();
   });
 });

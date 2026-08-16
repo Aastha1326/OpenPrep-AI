@@ -3,7 +3,7 @@ import { Sparkles, Loader, AlertCircle, Check, XCircle } from 'lucide-react';
 import API from '../../services/api';
 import Modal from '../common/Modal';
 
-const CreateDeckModal = ({ subjectId, topicId, onClose, onCreated }) => {
+const CreateDeckModal = ({ subjectId, topicId, deckId, onClose, onCreated }) => {
   const [front, setFront] = useState('');
   const [back, setBack] = useState('');
   const [suggestedTags, setSuggestedTags] = useState([]);
@@ -44,6 +44,7 @@ const CreateDeckModal = ({ subjectId, topicId, onClose, onCreated }) => {
       await API.post('/flashcards', {
         subjectId,
         topicId,
+        deckId,
         front,
         back,
         tags: acceptedTags,

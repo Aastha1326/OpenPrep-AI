@@ -70,6 +70,10 @@ const Flashcard = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true,
     },
+    deckId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
   },
   {
     timestamps: true,

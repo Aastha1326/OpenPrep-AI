@@ -12,6 +12,7 @@ const Quiz = require('./Quiz');
 const QuizAttempt = require('./QuizAttempt');
 const Note = require('./Note');
 const Flashcard = require('./Flashcard');
+const FlashcardDeck = require('./FlashcardDeck');
 const Progress = require('./Progress');
 const Feedback = require('./Feedback');
 const ActivityLog = require('./ActivityLog');
@@ -45,6 +46,7 @@ User.hasMany(Quiz, { foreignKey: 'createdBy', onDelete: 'CASCADE' });
 User.hasMany(QuizAttempt, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Note, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Flashcard, { foreignKey: 'user', onDelete: 'CASCADE' });
+User.hasMany(FlashcardDeck, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Progress, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Feedback, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(ActivityLog, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -66,7 +68,14 @@ Subject.hasMany(PYQ, { foreignKey: 'subject', onDelete: 'CASCADE' });
 Subject.hasMany(Quiz, { foreignKey: 'subject', onDelete: 'CASCADE' });
 Subject.hasMany(Note, { foreignKey: 'subject', onDelete: 'CASCADE' });
 Subject.hasMany(Flashcard, { foreignKey: 'subject', onDelete: 'CASCADE' });
+Subject.hasMany(FlashcardDeck, { foreignKey: 'subject', onDelete: 'SET NULL' });
 Subject.hasMany(Progress, { foreignKey: 'subject', onDelete: 'CASCADE' });
+
+// FlashcardDeck associations
+FlashcardDeck.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+FlashcardDeck.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'SET NULL' });
+FlashcardDeck.hasMany(Flashcard, { foreignKey: 'deckId', onDelete: 'CASCADE' });
+Flashcard.belongsTo(FlashcardDeck, { foreignKey: 'deckId', as: 'deckRef' });
 
 // Topic associations
 Topic.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'CASCADE' });
@@ -236,7 +245,7 @@ module.exports = {  sequelize,  User,  Exam,
   SquadMember,
   SquadChallenge,
   SquadChallengeContribution,
-SquadAchievement,
   SquadActivity,
   SquadActivityReaction,
+  FlashcardDeck,
 };
