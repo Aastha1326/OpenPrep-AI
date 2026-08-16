@@ -2,13 +2,13 @@ const { checkAndAwardBadges } = require('../../../backend/services/achievementSe
 const { Achievement, Notification } = require('../../../backend/models');
 const { BADGES } = require('../../../backend/config/badges');
 
-jest.mock('../../../backend/models', () => ({
+vi.mock('../../../backend/models', () => ({
   Achievement: {
-    findAll: jest.fn(),
-    create: jest.fn(),
+    findAll: vi.fn(),
+    create: vi.fn(),
   },
   Notification: {
-    create: jest.fn(),
+    create: vi.fn(),
   }
 }));
 
@@ -17,7 +17,7 @@ describe('achievementService', () => {
 
   beforeEach(() => {
     userId = 'test-user-id';
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   test('should not award badges if event is invalid', async () => {

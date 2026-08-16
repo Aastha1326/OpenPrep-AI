@@ -193,6 +193,54 @@ Before opening or requesting review on a Pull Request, verify that all items on 
 - [ ] **Up to date with `main`**
   - Merged or rebased against `upstream/main` without merge conflicts.
 
+## Writing Backend Tests
+
+### Which runner owns your file
+
+Three configs split the backend suite by path. Picking the wrong globals means a
+file fails to load, which reports as a failed _file_ rather than failed
+assertions — easy to scroll past in a long run.
+
+| Path                                | Runner | Config                  | Globals                                   |
+| ----------------------------------- | ------ | ----------------------- | ----------------------------------------- |
+| `tests/**/*.unit.test.js`           | Vitest | `vitest.config.unit.js` | `vi`, `describe`, `it`/`test`, `expect`   |
+| `tests/**/*.test.js` (not `.unit.`) | Vitest | `vitest.config.js`      | same                                      |
+| `tests/integration/**/*.test.js`    | Jest   | `jest.config.js`        | `jest`, `describe`, `it`/`test`, `expect` |
+
+Use `vi.*` everywhere except `tests/integration/`. A `jest.*` call outside that
+directory throws `ReferenceError: jest is not defined` before a single
+assertion runs.
+
+### Module mocking does not intercept `require`
+
+`vi.mock` and `vi.doMock` **do not** replace a module that production code
+reaches through CommonJS `require`. The backend is CJS, so a service's internal
+`require('../models')` resolves to the real Sequelize models no matter what the
+test declared — the suite then hits a live database instead of a double.
+
+This affects `vi.mock` with a factory, bare automocks, and `vi.doMock` with a
+dynamic `import` alike. Only a module the **test file itself** imports with
+ESM `import` is intercepted.
+
+Until the backend moves to ESM, pass collaborators in rather than mocking them:
+
+```js
+// sockets/crdtHandler.js — real dependency by default, overridable in tests
+module.exports = (io, deps = {}) => {
+  const noteModel = deps.noteModel || Note;
+  // ...
+};
+```
+
+```js
+// tests/sockets/crdtHandler.unit.test.js
+const Note = { findByPk: vi.fn(), update: vi.fn().mockResolvedValue([1]) };
+crdtHandler(fakeIo, { noteModel: Note });
+```
+
+If a unit test needs a database to pass, it is an integration test — put it
+under `tests/integration/` so it runs against the Postgres service in CI.
+
 ---
 
 ## 5. Code Review Process

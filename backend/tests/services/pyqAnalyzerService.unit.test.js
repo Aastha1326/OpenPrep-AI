@@ -2,12 +2,12 @@ const pyqAnalyzerService = require('../../services/pyqAnalyzerService');
 const pdfParse = require('pdf-parse');
 const ocrService = require('../../services/ocrService');
 
-jest.mock('pdf-parse');
-jest.mock('../../services/ocrService');
+vi.mock('pdf-parse');
+vi.mock('../../services/ocrService');
 
 describe('pyqAnalyzerService Unit Tests', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('extractTextFromFiles', () => {
@@ -26,7 +26,7 @@ describe('pyqAnalyzerService Unit Tests', () => {
 
       // Mock fs.promises.readFile
       const fs = require('fs');
-      jest.spyOn(fs.promises, 'readFile').mockResolvedValue(Buffer.from('mock pdf data'));
+      vi.spyOn(fs.promises, 'readFile').mockResolvedValue(Buffer.from('mock pdf data'));
 
       const result = await pyqAnalyzerService.extractTextFromFiles(mockFiles, 'Mathematics');
       expect(result).toContain('Algebra and Calculus');
@@ -47,7 +47,7 @@ describe('pyqAnalyzerService Unit Tests', () => {
       ];
 
       const fs = require('fs');
-      jest.spyOn(fs.promises, 'readFile').mockResolvedValue(Buffer.from('scanned pdf'));
+      vi.spyOn(fs.promises, 'readFile').mockResolvedValue(Buffer.from('scanned pdf'));
 
       const result = await pyqAnalyzerService.extractTextFromFiles(mockFiles, 'Computer Science');
       // Should fall back to syllabus trends and contain key topics
@@ -68,7 +68,7 @@ describe('pyqAnalyzerService Unit Tests', () => {
       ];
 
       const fs = require('fs');
-      jest.spyOn(fs.promises, 'readFile').mockResolvedValue(Buffer.from('image buffer'));
+      vi.spyOn(fs.promises, 'readFile').mockResolvedValue(Buffer.from('image buffer'));
 
       const result = await pyqAnalyzerService.extractTextFromFiles(mockFiles, 'Physics');
       expect(result).toContain('Extracted text from PNG');
