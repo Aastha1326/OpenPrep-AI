@@ -1,12 +1,15 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Keyboard, X, Sparkles } from 'lucide-react';
+import useFocusTrap from '../../hooks/useFocusTrap';
 
 /**
  * KeyboardShortcutsModal Component
  * Interactive modal listing all flashcard review keyboard navigation shortcuts.
  */
 export default function KeyboardShortcutsModal({ isOpen, onClose }) {
+  const containerRef = useFocusTrap(isOpen, onClose);
+
   if (!isOpen) return null;
 
   const shortcuts = [
@@ -32,6 +35,10 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }) {
 
         {/* Modal Box */}
         <motion.div
+          ref={containerRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="keyboard-shortcuts-modal-title"
           initial={{ scale: 0.95, opacity: 0, y: 10 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.95, opacity: 0, y: 10 }}
@@ -41,13 +48,14 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }) {
           <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-slate-700">
             <div className="flex items-center gap-2">
               <Keyboard className="w-5 h-5 text-indigo-500" />
-              <h3 className="text-lg font-bold font-inter text-neutral-800 dark:text-neutral-100">
+              <h3 id="keyboard-shortcuts-modal-title" className="text-lg font-bold font-inter text-neutral-800 dark:text-neutral-100">
                 Keyboard Shortcuts Guide
               </h3>
             </div>
             <button
               type="button"
               onClick={onClose}
+              aria-label="Close modal"
               className="p-1 rounded-lg text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-slate-700 transition-colors"
             >
               <X className="w-5 h-5" />
