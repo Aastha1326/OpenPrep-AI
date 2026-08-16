@@ -18,7 +18,13 @@ const { runCalibration } = require('../services/difficultyCalibrator');
 const { calculateTopicProficiency, getDifficultyLevel } = require('../services/proficiencyService');
 const Flashcard = require('../models/Flashcard');
 const remediationService = require('../services/remediationService');
-const { uploadFileToFirebase } = require('../services/firebaseStorageService');
+let uploadFileToFirebase = null;
+try {
+  const firebaseService = require('../services/firebaseStorageService');
+  uploadFileToFirebase = firebaseService.uploadFileToFirebase;
+} catch (e) {
+  // Graceful fallback if firebase storage service is omitted or missing
+}
 const { checkAndAwardBadges } = require('../services/achievementService');
 
 // Window (ms) during which duplicate quiz submissions for the same quiz are ignored.

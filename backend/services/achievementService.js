@@ -1,6 +1,12 @@
 const { Achievement, Notification } = require('../models');
 const { BADGES, BADGE_LIST } = require('../config/badges');
-const { logSquadActivity } = require('./squadActivityService');
+let logSquadActivity = async () => {};
+try {
+  const squadActivityService = require('./squadActivityService');
+  logSquadActivity = squadActivityService.logSquadActivity;
+} catch (e) {
+  // Graceful fallback if squadActivityService is missing
+}
 /**
  * Event Types:
  * - STREAK_UPDATED: { streakDays }

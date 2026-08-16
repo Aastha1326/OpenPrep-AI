@@ -7,7 +7,13 @@ const PYQ = require('../models/PYQ');
 const Subject = require('../models/Subject');
 const Topic = require('../models/Topic');
 const ActivityLog = require('../models/ActivityLog');
-const { uploadFileToFirebase } = require('../services/firebaseStorageService');
+let uploadFileToFirebase = null;
+try {
+  const firebaseService = require('../services/firebaseStorageService');
+  uploadFileToFirebase = firebaseService.uploadFileToFirebase;
+} catch (e) {
+  // Graceful fallback if firebase storage service is omitted or missing
+}
 const geminiService = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
 const { checkAndAwardBadges } = require('../services/achievementService');
