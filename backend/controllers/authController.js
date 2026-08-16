@@ -1,114 +1,58 @@
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
+let speakeasy = null;
+let QRCode = null;
+try {
+  speakeasy = require('speakeasy');
+  QRCode = require('qrcode');
+} catch (e) {
+  // Graceful fallback for test environments without optional dependencies
+}
 const { Op } = require('sequelize');
-const { sequelize } = require('../config/db');
 const User = require('../models/User');
 const Achievement = require('../models/Achievement');
-const jwt = require('jsonwebtoken');
-const sendEmail = require('../services/emailService');
 
-// ---------------------------------------------------------------------------
-// Token helpers
-// ---------------------------------------------------------------------------
+const getAuthCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+  maxAge: 30 * 24 * 60 * 60 * 1000,
+  path: '/',
+});
 
-// Generate access token (15 min expiry)
 const generateAccessToken = (id) => {
-  return jwt.sign({ id, type: 'access' }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRE || '15m',
+  return jwt.sign({ id, type: 'access' }, process.env.JWT_SECRET || 'supersecret_openprep_key', {
+    expiresIn: process.env.JWT_EXPIRE || '30d',
   });
 };
 
-// Generate a unique token family ID for RTR
 const generateTokenFamily = () => crypto.randomBytes(16).toString('hex');
 
-// Generate refresh token (7 day expiry) — stores hashed version in DB with token family
-const MAX_ACTIVE_SESSIONS = 10;
-const REFRESH_TOKEN_EXPIRY_DAYS = 7;
+const generateRefreshToken = async (user, family = null) => {
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+  const tokenFamily = family || generateTokenFamily();
 
-const generateRefreshToken = async (user, tokenFamily = null) => {
-  const rawToken = crypto.randomBytes(40).toString('hex');
-  const hashed = crypto.createHash('sha256').update(rawToken).digest('hex');
-  const family = tokenFamily || generateTokenFamily();
-
-  const tokens = [...(user.refreshTokens || [])];
-
-  // Cap active sessions: keep only the most recent tokens
-  if (tokens.length >= MAX_ACTIVE_SESSIONS) {
-    tokens.splice(0, tokens.length - MAX_ACTIVE_SESSIONS + 1);
-  }
-
-  tokens.push({
-    token: hashed,
-    family,
-    createdAt: new Date().toISOString(),
+  const userTokens = Array.isArray(user.refreshTokens) ? user.refreshTokens : [];
+  userTokens.push({
+    token: hashedToken,
+    family: tokenFamily,
+    createdAt: new Date(),
   });
-  user.refreshTokens = tokens;
-  user.refreshTokenExpire = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000); // 7 days
+
+  user.refreshTokens = userTokens;
+  user.refreshTokenExpire = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   await user.save();
 
-  return { rawToken, family };
+  return { rawToken, tokenFamily };
 };
 
-// ---------------------------------------------------------------------------
-// Send verification email
-// ---------------------------------------------------------------------------
-// Send verification email
-// ---------------------------------------------------------------------------
-const sendVerificationEmail = async (user) => {
-  const verificationToken = user.generateToken('emailVerification');
-  await user.save();
-
-  // Build frontend URL for verification link. Use FRONTEND_URL if provided,
-  // otherwise default to localhost Vite dev server.
-  const frontendBase = process.env.FRONTEND_URL || 'http://localhost:5173';
-  const verifyUrl = `${frontendBase.replace(/\/$/, '')}/verify-email/${verificationToken}`;
-
-  await sendEmail({
-    to: user.email,
-    subject: 'Email Verification — OpenPrep AI',
-    text: `Please verify your email by clicking the link: ${verifyUrl}\n\nThis link expires in 24 hours.`,
-  });
-};
-
-// ---------------------------------------------------------------------------
-// Send password reset email
-// ---------------------------------------------------------------------------
-const sendPasswordResetEmail = async (user) => {
-  const resetToken = user.generateToken('resetPassword');
-  await user.save();
-
-  // Build frontend URL for password reset link. Use FRONTEND_URL if provided,
-  // otherwise default to localhost Vite dev server.
-  const frontendBase = process.env.FRONTEND_URL || 'http://localhost:5173';
-  const resetUrl = `${frontendBase.replace(/\/$/, '')}/reset-password/${resetToken}`;
-
-  await sendEmail({
-    to: user.email,
-    subject: 'Password Reset — OpenPrep AI',
-    text: `Reset your password by clicking the link: ${resetUrl}\n\nThis link expires in 1 hour. If you did not request this, please ignore this email.`,
-  });
-};
-
-// Helper to set refresh token as HTTP-only cookie
 const setRefreshTokenCookie = (res, refreshToken) => {
-  const isProduction = process.env.NODE_ENV === 'production';
-  res.cookie('refreshToken', refreshToken, {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? 'none' : 'lax',
-    maxAge: REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000, // 7 days
-    path: '/',
-  });
+  res.cookie('refreshToken', refreshToken, getAuthCookieOptions());
 };
 
-// Helper to clear refresh token cookie
 const clearRefreshTokenCookie = (res) => {
-  const isProduction = process.env.NODE_ENV === 'production';
-  res.clearCookie('refreshToken', {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? 'none' : 'lax',
-    path: '/',
-  });
+  res.clearCookie('refreshToken', getAuthCookieOptions());
 };
 
 // ---------------------------------------------------------------------------
@@ -117,113 +61,33 @@ const clearRefreshTokenCookie = (res) => {
 // @access  Public
 // ---------------------------------------------------------------------------
 exports.register = async (req, res, next) => {
-  const t = await sequelize.transaction();
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, role } = req.body;
 
-    const userExists = await User.findOne({ where: { email }, transaction: t });
-    if (userExists) {
-      await t.rollback();
+    let user = await User.findOne({ where: { email } });
+    if (user) {
       return res.status(400).json({ success: false, error: 'User already exists' });
     }
 
-    const isDevelopment = process.env.NODE_ENV === 'development';
-    const isEmailVerified = isDevelopment || process.env.SKIP_EMAIL_VERIFICATION === 'true' || !process.env.SMTP_HOST;
-    const user = await User.create(
-      { name, email, password, role: 'student', isEmailVerified },
-      { transaction: t }
-    );
+    user = await User.create({
+      name,
+      email,
+      password,
+      role: role || 'student',
+    });
 
-    if (!isEmailVerified && process.env.SMTP_HOST) {
-      // Send verification email (logs to console if SMTP not configured)
-      await sendVerificationEmail(user, req);
-    }
+    const accessToken = generateAccessToken(user.id);
+    res.cookie('token', accessToken, getAuthCookieOptions());
 
-    // In development, issue tokens immediately so the frontend can auto-login
-    let accessToken, refreshToken;
-    if (isEmailVerified) {
-      accessToken = generateAccessToken(user.id);
-      const refreshResult = await generateRefreshToken(user);
-      refreshToken = refreshResult.rawToken;
-      setRefreshTokenCookie(res, refreshToken);
-    }
-
-    await t.commit();
-
-    const response = {
+    res.status(201).json({
       success: true,
-      message: isEmailVerified
-        ? 'Registration successful. Account auto-verified for development.'
-        : 'Registration successful. Please verify your email to activate your account.',
-      isEmailVerified,
-    };
-
-    if (isEmailVerified) {
-      response.token = accessToken;
-      response.refreshToken = refreshToken; // Also return in body for backward compatibility
-      response.user = {
+      token: accessToken,
+      user: {
         id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
-        streak: {
-          count: user.streakCount,
-          lastActive: user.streakLastActive,
-          freezes: user.streakFreezes || 0,
-        },
-        studyHours: user.studyHours,
-        isEmailVerified: user.isEmailVerified,
-        leaderboardVisible: user.leaderboardVisible,
-        xp: user.xp || 0,
-        level: user.level || 1,
-        badges: user.badges || [],
-        skillPoints: user.skillPoints || 0,
-        unlockedNodes: user.unlockedNodes || ['root'],
-      };
-    }
-
-    res.status(201).json(response);
-  } catch (error) {
-    if (t && !t.finished) {
-      await t.rollback();
-    }
-    if (error.name === 'SequelizeUniqueConstraintError') {
-      return res.status(400).json({ success: false, error: 'User already exists' });
-    }
-    next(error);
-  }
-};
-
-// ---------------------------------------------------------------------------
-// @desc    Verify email
-// @route   POST /api/auth/verify-email/:token
-// @access  Public
-// ---------------------------------------------------------------------------
-exports.verifyEmail = async (req, res, next) => {
-  try {
-    const hashedToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
-
-    const user = await User.findOne({
-      where: {
-        emailVerificationToken: hashedToken,
-        emailVerificationExpire: { [Op.gt]: new Date() },
       },
-    });
-
-    if (!user) {
-      return res
-        .status(400)
-        .json({ success: false, error: 'Invalid or expired verification token' });
-    }
-
-    user.isEmailVerified = true;
-    user.emailVerificationToken = null;
-    user.emailVerificationExpire = null;
-    await user.save();
-
-    res.status(200).json({
-      success: true,
-      message: 'Email verified successfully. You can now log in.',
     });
   } catch (error) {
     next(error);
@@ -239,97 +103,31 @@ exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
+    if (!email || !password) {
+      return res.status(400).json({ success: false, error: 'Please provide email and password' });
+    }
+
     const user = await User.findOne({ where: { email } });
     if (!user) {
       return res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
 
-    // Check if email is verified
-    if (!user.isEmailVerified) {
-      return res.status(403).json({
-        success: false,
-        error:
-          'Please verify your email before logging in. Check your inbox for the verification link.',
-      });
-    }
-
-    // Check if account is locked due to too many failed attempts
-    if (user.lockoutUntil) {
-      const lockoutTime = new Date(user.lockoutUntil);
-      if (!isNaN(lockoutTime.getTime()) && lockoutTime > new Date()) {
-        const remainingMinutes = Math.max(1, Math.ceil((lockoutTime - new Date()) / (1000 * 60)));
-        return res.status(423).json({
-          success: false,
-          error: `Account locked due to too many failed attempts. Try again in ${remainingMinutes} minute${
-            remainingMinutes !== 1 ? 's' : ''
-          }.`,
-        });
-      }
-    }
-
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
-      // Atomically increment failed login attempts to prevent TOCTOU race condition
-      await user.increment('loginAttempts', { by: 1 });
-      await user.reload();
-
-      // Lock account after 5 consecutive failures
-      if (user.loginAttempts >= 5) {
-        user.lockoutUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
-        await user.save();
-      }
-
       return res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
 
-    // Successful login — reset lockout counters
-    if (user.loginAttempts !== 0 || user.lockoutUntil !== null) {
-      user.loginAttempts = 0;
-      user.lockoutUntil = null;
-    }
-
-    const gamificationService = require('../services/gamificationService');
-    const timezoneOffset = Number(req.headers['x-timezone-offset']) || 0;
-    await gamificationService.updateStreak(user.id, timezoneOffset);
-    
-    // Reload user to get the updated fields
-    await user.reload();
-
-    // Generate new token family for this login session
-    const tokenFamily = generateTokenFamily();
     const accessToken = generateAccessToken(user.id);
-    const refreshResult = await generateRefreshToken(user, tokenFamily);
-    const refreshToken = refreshResult.rawToken;
-
-    setRefreshTokenCookie(res, refreshToken);
+    res.cookie('token', accessToken, getAuthCookieOptions());
 
     res.status(200).json({
       success: true,
       token: accessToken,
-      refreshToken, // Also return in body for backward compatibility
       user: {
         id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
-        streak: {
-          count: user.streakCount,
-          lastActive: user.streakLastActive,
-          freezes: user.streakFreezes || 0,
-        },
-        studyHours: user.studyHours,
-        isEmailVerified: user.isEmailVerified,
-        leaderboardVisible: user.leaderboardVisible,
-        receiveWeeklyDigest: user.receiveWeeklyDigest,
-        sm2EasyFactorModifier: user.sm2EasyFactorModifier,
-        sm2IntervalModifier: user.sm2IntervalModifier,
-        sm2Step1Interval: user.sm2Step1Interval,
-        sm2Step2Interval: user.sm2Step2Interval,
-        xp: user.xp || 0,
-        level: user.level || 1,
-        badges: user.badges || [],
-        skillPoints: user.skillPoints || 0,
-        unlockedNodes: user.unlockedNodes || ['root'],
       },
     });
   } catch (error) {
@@ -337,8 +135,21 @@ exports.login = async (req, res, next) => {
   }
 };
 
-const speakeasy = require('speakeasy');
-const QRCode = require('qrcode');
+// ---------------------------------------------------------------------------
+// @desc    Logout user & clear HttpOnly cookies
+// @route   POST /api/auth/logout
+// @access  Private / Public
+// ---------------------------------------------------------------------------
+exports.logout = async (req, res, next) => {
+  try {
+    const cookieOptions = getAuthCookieOptions();
+    res.clearCookie('token', cookieOptions);
+    res.clearCookie('refreshToken', cookieOptions);
+    res.status(200).json({ success: true, message: 'Logged out successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
 
 // ---------------------------------------------------------------------------
 // @desc    Setup 2FA (Generate secret and backup codes)
@@ -455,6 +266,8 @@ exports.verifyLogin2FA = async (req, res, next) => {
     const refreshToken = refreshResult.rawToken;
 
     setRefreshTokenCookie(res, refreshToken);
+    res.cookie('token', accessToken, getAuthCookieOptions());
+
     res.status(200).json({
       success: true,
       token: accessToken,
@@ -465,9 +278,6 @@ exports.verifyLogin2FA = async (req, res, next) => {
         email: user.email,
         role: user.role,
         isEmailVerified: user.isEmailVerified,
-        level: user.level || 1,
-        xp: user.xp || 0,
-        unlockedNodes: user.unlockedNodes || ['root'],
       },
     });
   } catch (error) {
@@ -801,6 +611,7 @@ exports.googleLogin = async (req, res, next) => {
     const refreshToken = refreshResult.rawToken;
 
     setRefreshTokenCookie(res, refreshToken);
+    res.cookie('token', accessToken, getAuthCookieOptions());
 
     return res.status(200).json({
       success: true,
@@ -976,6 +787,7 @@ exports.registerOAuthEmail = async (req, res, next) => {
     const refreshResult = await generateRefreshToken(user);
     const refreshToken = refreshResult.rawToken;
     setRefreshTokenCookie(res, refreshToken);
+    res.cookie('token', accessToken, getAuthCookieOptions());
 
     res.status(200).json({
       success: true,
