@@ -345,6 +345,44 @@ docker-compose down
 
 ## 🧯 Common Troubleshooting
 
+This section covers common problems that may occur while installing, configuring, or running OpenPrep AI locally.
+
+### Issue: Backend dependency installation fails
+
+If `npm install` fails inside the `backend` directory:
+
+1. Check Node.js and npm:
+   ```bash
+   node --version
+   npm --version
+   ```
+
+2. Make sure you are running the command from the `backend` directory:
+   ```bash
+   cd backend
+   ```
+
+### Issue: Frontend dependency installation fails
+
+If `npm install` fails inside the `frontend` directory:
+
+1. Check the required Node.js and npm versions:
+   ```bash
+   node --version
+   npm --version
+   ```
+
+### Issue: Missing environment variables
+
+If the backend exits during startup or reports a missing configuration value:
+
+1. Make sure `backend/.env` exists.
+2. Create it from the provided template:
+   ```powershell
+   cd backend
+   Copy-Item .env.example .env
+   ```
+
 ### Issue: `SequelizeConnectionError: connect ECONNREFUSED`
 
 The backend cannot reach PostgreSQL.
@@ -352,27 +390,28 @@ The backend cannot reach PostgreSQL.
 1. **Ensure PostgreSQL is running**:
    - **Windows (PowerShell, as Administrator):**
      ```powershell
-     Get-Service postgresql*          # find the service name
-     Start-Service postgresql-x64-18 # or the name from above
+     Get-Service postgresql*
+     Start-Service postgresql-x64-18
      ```
    - **Linux/macOS:**
      ```bash
      sudo systemctl status postgresql
      sudo systemctl start postgresql
      ```
+
 2. **Check the connection string** — verify `DATABASE_URL` in `backend/.env` matches your PostgreSQL user, password, host, and port.
+
 3. **Verify the database exists**:
    ```bash
    psql -U postgres -c "SELECT 1 FROM pg_database WHERE datname='openprep'"
    ```
-   If it returns no rows, create it (see [Create the Database](#create-the-database)).
 
 ### Issue: `password authentication failed for user "postgres"`
 
 The password in `DATABASE_URL` does not match your local PostgreSQL password.
 
-- Update `DATABASE_URL` in `backend/.env` to use the correct password, or reset your local password.
-- If you used Docker, the password is `postgres` (matching `POSTGRES_PASSWORD`).
+- Update `DATABASE_URL` in `backend/.env` to use the correct password.
+- If you used Docker, the password is `postgres`.
 
 ### Issue: `database "openprep" does not exist`
 
