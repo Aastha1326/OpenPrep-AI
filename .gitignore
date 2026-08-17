@@ -17,6 +17,9 @@ coverage/
 .env.production.local
 backend/.env
 frontend/.env
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
 
 # Logs
 logs
@@ -30,6 +33,9 @@ lerna-debug.log*
 .tmp/
 tmp/
 
+# Uploaded runtime files
+backend/uploads/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -40,3 +46,14 @@ tmp/
 *.njsproj
 *.sln
 *.sw?
+
+tests/load/reports/
+tests/load/reports/
+.vercel
+.env*.local
+
+# Database Backups
+backups/
+backend/backups/
+*.sql.gz
+

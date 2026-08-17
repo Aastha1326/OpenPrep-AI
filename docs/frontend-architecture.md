@@ -6,11 +6,11 @@ The **OpenPrep AI** frontend is a high-performance, single-page application (SPA
 
 ## ⚡ Core Framework & Tools
 
-* **Core**: [React 18+](https://react.dev/) using JSX and Functional Components.
-* **Build System**: [Vite](https://vite.dev/) for extremely fast Hot Module Replacement (HMR) and optimized assets bundling.
-* **Styling**: [Tailwind CSS](https://tailwindcss.com/) for utility-first styling combined with custom glassmorphic aesthetics.
-* **State Management**: [Redux Toolkit](https://redux-toolkit.js.org/) for managing complex asynchronous state (auth, session details) and React Context for UI theme settings.
-* **Routing**: [React Router DOM v6](https://reactrouter.com/) for declarative client-side route navigation.
+- **Core**: [React 18+](https://react.dev/) using JSX and Functional Components.
+- **Build System**: [Vite](https://vite.dev/) for extremely fast Hot Module Replacement (HMR) and optimized assets bundling.
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/) for utility-first styling combined with custom glassmorphic aesthetics.
+- **State Management**: [Redux Toolkit](https://redux-toolkit.js.org/) for managing complex asynchronous state (auth, session details) and React Context for UI theme settings.
+- **Routing**: [React Router DOM v6](https://reactrouter.com/) for declarative client-side route navigation.
 
 ---
 
@@ -41,15 +41,19 @@ src/
 We divide state into three categories to prevent prop-drilling while maintaining performance:
 
 ### 1. Global Redux State
+
 Used for state variables shared across the entire application workspace (e.g., current authenticated student data, global loading bars, error prompts).
-* Slices are contained in `store/slices/`.
-* Async operations (Thunks) are used for network interactions (e.g., `loginUser`, `registerUser`, `loadUser`).
+
+- Slices are contained in `store/slices/`.
+- Async operations (Thunks) are used for network interactions (e.g., `loginUser`, `registerUser`, `loadUser`).
 
 ### 2. Local Component State (`useState` / `useReducer`)
+
 Used for state isolated to a single component or page (e.g., user input forms, active modal switches, tab indices).
 
 ### 3. Context API State
-Used for low-frequency global settings that do not change frequently (e.g., Dark Mode vs Light Mode via [ThemeContext.jsx](file:///c:/Users/Nishit/OneDrive/Desktop/ALL%20Projects/OPENPREP%20AI/OpenPrep-AI/frontend/src/context/ThemeContext.jsx)).
+
+Used for low-frequency global settings that do not change frequently (e.g., Dark Mode vs Light Mode via [ThemeContext.jsx](../frontend/src/context/ThemeContext.jsx)).
 
 ---
 
@@ -58,23 +62,25 @@ Used for low-frequency global settings that do not change frequently (e.g., Dark
 Client-side routes are managed via `react-router-dom` in `App.jsx`.
 
 ### Protected Routes
+
 Certain pages (e.g., the Study Dashboard, PYQ Analyzer, and AI Quiz Generator) require the user to be logged in. These paths are wrapped using the `ProtectedRoute` component:
 
 ```jsx
 import ProtectedRoute from './components/ProtectedRoute';
 import Dashboard from './pages/Dashboard';
 
-<Route 
-  path="/dashboard" 
+<Route
+  path="/dashboard"
   element={
     <ProtectedRoute>
       <Dashboard />
     </ProtectedRoute>
-  } 
-/>
+  }
+/>;
 ```
 
 When a user tries to access a protected route without a JWT:
+
 1. `ProtectedRoute.jsx` checks the Redux `auth` state (`isAuthenticated`).
 2. If `loading` is true, a spinner is displayed.
 3. If `isAuthenticated` is false, it redirects the browser to `/login`.

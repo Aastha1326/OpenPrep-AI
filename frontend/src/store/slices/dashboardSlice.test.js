@@ -1,7 +1,6 @@
 import { configureStore } from '@reduxjs/toolkit';
 import dashboardReducer, {
   reviewFlashcard,
-  fetchDueFlashcards,
   toggleTheme,
   setTheme,
 } from './dashboardSlice';
@@ -123,7 +122,7 @@ describe('dashboardSlice - theme persistence', () => {
   test('toggles theme and updates localStorage openprep_theme', () => {
     const store = configureStore({ reducer: { dashboard: dashboardReducer } });
 
-    expect(store.getState().dashboard.theme).toBe('dark');
+    expect(store.getState().dashboard.theme).toBe('system');
     store.dispatch(toggleTheme());
 
     expect(store.getState().dashboard.theme).toBe('light');
@@ -132,6 +131,10 @@ describe('dashboardSlice - theme persistence', () => {
     store.dispatch(toggleTheme());
     expect(store.getState().dashboard.theme).toBe('dark');
     expect(localStorage.getItem('openprep_theme')).toBe('dark');
+    
+    store.dispatch(toggleTheme());
+    expect(store.getState().dashboard.theme).toBe('high-contrast');
+    expect(localStorage.getItem('openprep_theme')).toBe('high-contrast');
   });
 
   test('sets theme explicitly and updates localStorage', () => {

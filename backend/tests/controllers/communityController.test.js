@@ -6,6 +6,7 @@ const communityRoutes = require('../../routes/communityRoutes');
 const errorHandler = require('../../middleware/error');
 const User = require('../../models/User');
 const Feedback = require('../../models/Feedback');
+const cacheService = require('../../services/cacheService');
 
 const app = express();
 app.use(express.json());
@@ -34,6 +35,7 @@ describe('Community Controller - Feedback List Pagination', () => {
 
   beforeEach(async () => {
     await Feedback.destroy({ where: {} });
+    await cacheService.del('community:*');
   });
 
   describe('GET /api/community/feedback', () => {
@@ -338,6 +340,19 @@ describe('Community Controller - Feedback List Pagination', () => {
       expect(res.body.count).toBe(1);
       expect(res.body.total).toBe(1);
       expect(res.body.data[0].title).toBe('Open Bug');
+    });
+  });
+
+  describe('Redis Caching Integration', () => {
+    it('should serve GET /api/community/roadmap with 200 status', async () => {
+      const res = await request(app)
+        .get('/api/community/roadmap')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveProperty('milestones');
+      expect(res.body.data).toHaveProperty('communityFeatures');
     });
   });
 });

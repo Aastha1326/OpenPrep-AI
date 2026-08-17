@@ -93,13 +93,13 @@ async function extractPdfText(buffer) {
   try {
     const parsed = await pdfParse(buffer);
     if (parsed && typeof parsed.text === 'string') {
-      const clean = parsed.text.replace(/\u0000/g, '').trim();
+      const clean = parsed.text.replaceAll('\u0000', '').trim();
       if (clean.length > 0) return clean;
     }
   } catch {
     // continue to fallback
   }
-  const rawString = buffer.toString('utf8').replace(/\u0000/g, '').trim();
+  const rawString = buffer.toString('utf8').replaceAll('\u0000', '').trim();
   if (rawString.length < 200) {
     throw new Error('PDF text extraction returned empty or unreadable content. Please try a different PDF.');
   }

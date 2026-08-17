@@ -1,0 +1,60 @@
+name: Backend Integration Tests
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "backend/**"
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - "backend/**"
+
+jobs:
+  test:
+    name: Jest Integration Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: openprep_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run integration tests
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/openprep_test
+          JWT_SECRET: test_jwt_secret_key_for_ci
+          JWT_EXPIRE: 15m
+        run: pnpm test:jest

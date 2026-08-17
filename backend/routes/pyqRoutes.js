@@ -1,16 +1,74 @@
 const express = require('express');
-const { uploadAndAnalyzePYQ, getPYQs, getPYQDetails, getPYQAnalysis, deletePYQ } = require('../controllers/pyqController');
+const {
+  uploadAndAnalyzePYQ,
+  getPYQs,
+  searchPYQs,
+  getPYQDetails,
+  getPYQAnalysis,
+  analyzePYQStream,
+  deletePYQ,
+  getPYQTrends,
+  getUpcomingForecast,
+  getPYQClusters,
+  analyzePYQBatch,
+  getSubjectAnalyses,
+  exportPYQAnalysisPDF,
+} = require('../controllers/pyqController');
+
+const multer = require('multer');
 const { protect } = require('../middleware/auth');
+const { parsePyqPdf } = require('../controllers/pyqParserController');
 const { strictAiLimiter } = require('../middleware/rateLimiter');
 const { checkQuota } = require('../middleware/quotaMiddleware');
 const upload = require('../middleware/upload');
-const { validateUploadPYQ } = require('../middleware/validators');
-
+const { validateUploadPYQ, validateGetPYQClusters } = require('../middleware/validators');
 const cacheMiddleware = require('../middleware/cache');
 const clearCache = require('../middleware/clearCache');
 
 const router = express.Router();
 
+const parsePdfUpload = multer({
+  dest: 'uploads/',
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB max for large multi-page papers
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF files are allowed!'), false);
+    }
+  },
+});
+
+router.post('/parse-pyq-pdf', protect, parsePdfUpload.single('pdf'), parsePyqPdf);
+
+/**
+ * @swagger
+ * /api/pyqs/forecast:
+ *   get:
+ *     summary: Get AI predicted difficulty and topic trends forecast for upcoming exams
+ *     tags: [PYQ Analysis]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: subjectId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Subject ID to generate forecast for
+ *       - in: query
+ *         name: refresh
+ *         schema:
+ *           type: boolean
+ *         description: Force refresh AI prediction cache
+ *     responses:
+ *       200:
+ *         description: Upcoming forecast generated successfully
+ */
+router.get('/forecast', protect, getUpcomingForecast);
+
+router.get('/trends', protect, getPYQTrends);
 /**
  * @swagger
  * tags:
@@ -85,7 +143,16 @@ const router = express.Router();
  *               $ref: '#/components/schemas/Error'
  */
 
-router.post('/upload', protect, strictAiLimiter, checkQuota, upload.single('file'), validateUploadPYQ, clearCache('pyqs:*'), uploadAndAnalyzePYQ);
+router.post(
+  '/upload',
+  protect,
+  strictAiLimiter,
+  checkQuota,
+  upload.single('file'),
+  validateUploadPYQ,
+  clearCache('pyqs:*'),
+  uploadAndAnalyzePYQ
+);
 
 /**
  * @swagger
@@ -118,7 +185,80 @@ router.post('/upload', protect, strictAiLimiter, checkQuota, upload.single('file
  *               $ref: '#/components/schemas/Error'
  */
 
-router.get('/', protect, cacheMiddleware(req => `pyqs:${req.user.id}:${req.originalUrl}`), getPYQs);
+/**
+ * @swagger
+ * /api/pyqs/search:
+ *   get:
+ *     summary: Full-text search for PYQ question papers and topics using tsvector/tsquery
+ *     tags: [PYQs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         schema:
+ *           type: string
+ *         description: Search query terms
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Alternative query param for search terms
+ *     responses:
+ *       200:
+ *         description: Ranked full-text search results
+ *       400:
+ *         description: Missing search query
+ *       401:
+ *         description: Not authenticated
+ */
+router.get(
+  '/search',
+  protect,
+  cacheMiddleware((req) => `pyqs:${req.user.id}:${req.originalUrl}`),
+  searchPYQs
+);
+
+router.get(
+  '/',
+  protect,
+  cacheMiddleware((req) => `pyqs:${req.user.id}:${req.originalUrl}`),
+  getPYQs
+);
+
+/**
+ * @swagger
+ * /api/pyqs/clusters/{subjectId}:
+ *   get:
+ *     summary: Detect near-duplicate PYQ questions across exam years via embedding similarity
+ *     tags: [PYQs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: subjectId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Subject ID to cluster PYQ questions for
+ *     responses:
+ *       200:
+ *         description: Clustered duplicate question sets retrieved successfully
+ *       401:
+ *         description: Not authenticated
+ *       404:
+ *         description: Subject not found
+ *       429:
+ *         description: Rate limit exceeded
+ */
+router.get(
+  '/clusters/:subjectId',
+  protect,
+  strictAiLimiter,
+  validateGetPYQClusters,
+  getPYQClusters
+);
 
 /**
  * @swagger
@@ -163,7 +303,12 @@ router.get('/', protect, cacheMiddleware(req => `pyqs:${req.user.id}:${req.origi
  *               $ref: '#/components/schemas/Error'
  */
 
-router.get('/:id', protect, cacheMiddleware(req => `pyqs:${req.user.id}:${req.originalUrl}`), getPYQDetails);
+router.get(
+  '/:id',
+  protect,
+  cacheMiddleware((req) => `pyqs:${req.user.id}:${req.originalUrl}`),
+  getPYQDetails
+);
 
 /**
  * @swagger
@@ -214,7 +359,39 @@ router.get('/:id', protect, cacheMiddleware(req => `pyqs:${req.user.id}:${req.or
  *               $ref: '#/components/schemas/Error'
  */
 
-router.post('/:id/analyze', protect, strictAiLimiter, checkQuota, clearCache('pyqs:*'), getPYQAnalysis);
+router.post(
+  '/:id/analyze',
+  protect,
+  strictAiLimiter,
+  checkQuota,
+  clearCache('pyqs:*'),
+  getPYQAnalysis
+);
+
+/**
+ * @swagger
+ * /api/pyqs/{id}/analyze-stream:
+ *   get:
+ *     summary: Stream Gemini PYQ analysis via Server-Sent Events (SSE)
+ *     tags: [PYQ Analysis]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: PYQ ID
+ *     responses:
+ *       200:
+ *         description: SSE stream of analysis tokens
+ *         content:
+ *           text/event-stream:
+ *             schema:
+ *               type: string
+ */
+router.get('/:id/analyze-stream', protect, analyzePYQStream);
 
 /**
  * @swagger
@@ -264,5 +441,9 @@ router.post('/:id/analyze', protect, strictAiLimiter, checkQuota, clearCache('py
  */
 
 router.delete('/:id', protect, clearCache('pyqs:*'), deletePYQ);
+
+router.post('/analyze', protect, upload.array('files', 10), analyzePYQBatch);
+router.get('/subject/:subjectId', protect, getSubjectAnalyses);
+router.get('/analysis/:analysisId/export', protect, exportPYQAnalysisPDF);
 
 module.exports = router;

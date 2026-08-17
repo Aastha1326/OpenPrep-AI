@@ -2,20 +2,25 @@ const express = require('express');
 const {
   getDashboardStats,
   getSubjectBreakdown,
-  getCompositeBundleOverview,
-  getStudyHours,
+  getMasteryLevels,
+  updateSubjectGoal,
+  getCompositeBundleOverview,  getStudyHours,
   trackStudyTime,
   updateTopicProgress,
   getActivityFeed,
   exportCSV,
   exportPDF,
+  logFocusSession,
+  getWeeklyFocusEfficiency,
 } = require('../controllers/progressController');
+const { getXPStatus, awardXP, unlockSkillNode, equipStreakFreeze } = require('../controllers/xpController');
 const { protect } = require('../middleware/auth');
+const cacheMiddleware = require('../middleware/cacheMiddleware');
 const {
   validateTrackStudyTime,
   validateUpdateTopicProgress,
+  validateFocusSession,
 } = require('../middleware/validators');
-
 const router = express.Router();
 
 router.get('/composite-overview', protect, getCompositeBundleOverview);
@@ -86,7 +91,7 @@ router.get('/composite-overview', protect, getCompositeBundleOverview);
  *               $ref: '#/components/schemas/Error'
  */
 
-router.get('/stats', protect, getDashboardStats);
+router.get('/stats', protect, cacheMiddleware(900), getDashboardStats);
 
 /**
  * @swagger
@@ -146,7 +151,7 @@ router.get('/stats', protect, getDashboardStats);
  *               $ref: '#/components/schemas/Error'
  */
 
-router.get('/dashboard', protect, getDashboardStats);
+router.get('/dashboard', protect, cacheMiddleware(900), getDashboardStats);
 
 /**
  * @swagger
@@ -197,6 +202,75 @@ router.get('/dashboard', protect, getDashboardStats);
 
 router.get('/subjects', protect, getSubjectBreakdown);
 
+/**
+ * @swagger
+ * /api/progress/mastery:
+ *   get:
+ *     summary: Get subject & chapter mastery levels computed from quiz accuracy and flashcard retention
+ *     tags: [Progress]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Mastery levels with tier badges
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     overallMastery:
+ *                       type: number
+ *                       example: 72
+ *                     overallTier:
+ *                       type: string
+ *                       enum: [Beginner, Intermediate, Master]
+ *                       example: Intermediate
+ *                     subjects:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                             format: uuid
+ *                           name:
+ *                             type: string
+ *                           masteryPercentage:
+ *                             type: number
+ *                           tier:
+ *                             type: string
+ *                             enum: [Beginner, Intermediate, Master]
+ *                           chapters:
+ *                             type: array
+ *                             items:
+ *                               type: object
+ *                               properties:
+ *                                 id:
+ *                                   type: string
+ *                                   format: uuid
+ *                                 name:
+ *                                   type: string
+ *                                 masteryPercentage:
+ *                                   type: number
+ *                                 tier:
+ *                                   type: string
+ *                                   enum: [Beginner, Intermediate, Master]
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+
+router.get('/mastery', protect, getMasteryLevels);
+router.put('/subject-goals/:subjectId', protect, updateSubjectGoal);
 /**
  * @swagger
  * /api/progress/study-hours:
@@ -488,5 +562,13 @@ router.put('/topic/:id', protect, validateUpdateTopicProgress, updateTopicProgre
  */
 
 router.get('/activity', protect, getActivityFeed);
+
+router.post('/focus-session', protect, validateFocusSession, logFocusSession);
+router.get('/focus-session/weekly', protect, getWeeklyFocusEfficiency);
+
+router.get('/xp/status', protect, getXPStatus);
+router.post('/xp/award', protect, awardXP);
+router.post('/xp/unlock', protect, unlockSkillNode);
+router.post('/streak-freeze/equip', protect, equipStreakFreeze);
 
 module.exports = router;

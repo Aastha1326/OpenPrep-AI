@@ -115,6 +115,13 @@ describe('Gemini Service - Mock Fallbacks', () => {
       expect(Array.isArray(result.questions)).toBe(true);
     });
 
+    it('should localize mock quiz content for Hindi requests', async () => {
+      const result = await geminiService.generateQuiz('Math', 'Algebra', '', 2, false, 'hindi');
+
+      expect(result.questions[0].questionText).toContain('हिंदी');
+      expect(result.questions[0].explanation).toContain('हिंदी');
+    });
+
     it('should return the requested number of questions', async () => {
       const result = await geminiService.generateQuiz('Science', 'Physics', '', 3);
 
@@ -358,6 +365,48 @@ describe('Gemini Service - Mock Fallbacks', () => {
         const data = [{ front: 'Question?' }]; // missing back
         expect(validateResponse(data, schema)).toBe(false);
       });
+    });
+
+    describe('pyqForecasting schema', () => {
+      const schema = RESPONSE_SCHEMAS.pyqForecasting;
+
+      it('should accept a fully valid forecasting payload', () => {
+        const data = {
+          predictedDifficulty: 'Medium',
+          expectedEasyPercent: 30,
+          expectedMediumPercent: 50,
+          expectedHardPercent: 20,
+          topicTrends: [
+            { topicName: 'Topic A', expectedProbability: 80, trendStatus: 'Rising Weightage' },
+          ],
+          recommendedFocusAreas: ['Focus A'],
+          revisionStrategy: 'Strategy A',
+        };
+        expect(validateResponse(data, schema)).toBe(true);
+      });
+
+      it('should reject when predictedDifficulty is missing', () => {
+        const data = {
+          expectedEasyPercent: 30,
+          expectedMediumPercent: 50,
+          expectedHardPercent: 20,
+          topicTrends: [
+            { topicName: 'Topic A', expectedProbability: 80, trendStatus: 'Rising Weightage' },
+          ],
+          recommendedFocusAreas: ['Focus A'],
+          revisionStrategy: 'Strategy A',
+        };
+        expect(validateResponse(data, schema)).toBe(false);
+      });
+    });
+  });
+
+  describe('predictUpcomingExamTrends Method', () => {
+    it('should fall back to mock forecasting when genAI is not configured', async () => {
+      const forecast = await geminiService.predictUpcomingExamTrends('Math', []);
+      expect(forecast).toBeDefined();
+      expect(forecast.predictedDifficulty).toBe('Medium');
+      expect(forecast.topicTrends.length).toBeGreaterThan(0);
     });
   });
 });

@@ -6,7 +6,8 @@ const mockPost = vi.fn();
 vi.mock('../../services/api', () => ({
   default: {
     post: (...args) => mockPost(...args),
-    get: vi.fn(() => Promise.resolve({ data: { data: [] } })),
+    put: vi.fn(() => Promise.resolve({ data: { success: true } })),
+    get: vi.fn(() => Promise.resolve({ data: { success: true, data: [{ id: 'sub-123', name: 'Chemistry' }] } })),
   },
 }));
 
@@ -52,12 +53,22 @@ describe('CreateNoteModal', () => {
 
   test('shows error when title is empty', async () => {
     renderModal();
+
+    await waitFor(() => {
+      expect(screen.getByText('Chemistry')).toBeInTheDocument();
+    });
+
     fireEvent.click(screen.getByText('Save Note'));
     expect(await screen.findByText('Title is required')).toBeInTheDocument();
   });
 
   test('shows error when content is empty', async () => {
     renderModal();
+
+    await waitFor(() => {
+      expect(screen.getByText('Chemistry')).toBeInTheDocument();
+    });
+
     fireEvent.change(screen.getByPlaceholderText('Enter note title...'), {
       target: { value: 'My Note' },
     });
@@ -68,6 +79,10 @@ describe('CreateNoteModal', () => {
   test('does not send Content-Type header, letting axios auto-detect boundary', async () => {
     mockPost.mockResolvedValueOnce({ data: { success: true } });
     const { onClose, onNoteCreated } = renderModal();
+
+    await waitFor(() => {
+      expect(screen.getByText('Chemistry')).toBeInTheDocument();
+    });
 
     fireEvent.change(screen.getByPlaceholderText('Enter note title...'), {
       target: { value: 'Test Note' },
@@ -89,6 +104,10 @@ describe('CreateNoteModal', () => {
     mockPost.mockResolvedValueOnce({ data: { success: true, data: { id: '1' } } });
     const { onClose, onNoteCreated } = renderModal();
 
+    await waitFor(() => {
+      expect(screen.getByText('Chemistry')).toBeInTheDocument();
+    });
+
     fireEvent.change(screen.getByPlaceholderText('Enter note title...'), {
       target: { value: 'Test Note' },
     });
@@ -108,6 +127,10 @@ describe('CreateNoteModal', () => {
       response: { data: { error: 'Server error' } },
     });
     renderModal();
+
+    await waitFor(() => {
+      expect(screen.getByText('Chemistry')).toBeInTheDocument();
+    });
 
     fireEvent.change(screen.getByPlaceholderText('Enter note title...'), {
       target: { value: 'Test Note' },

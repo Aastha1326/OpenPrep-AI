@@ -127,33 +127,63 @@ const FlashcardWidget = ({ flashcard = null, loading = false, error = null, tota
     }
   };
 
+  const lastFlipTimeRef = useState(() => ({ current: 0 }))[0];
+
+  const handleCardFlip = (e) => {
+    const now = Date.now();
+    if (now - lastFlipTimeRef.current < 250) {
+      if (e && e.preventDefault) e.preventDefault();
+      return;
+    }
+    lastFlipTimeRef.current = now;
+    setIsFlipped((prev) => !prev);
+  };
+
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      setIsFlipped(!isFlipped);
+      handleCardFlip(e);
     }
   };
 
   return (
     <div
-      className="relative w-full h-56 cursor-pointer perspective-1000"
+      className="relative w-full h-56 cursor-pointer perspective-1000 select-none touch-action-manipulation"
       role="button"
       tabIndex={0}
       aria-label={isFlipped ? 'Flip to front' : 'Flip to back'}
-      onClick={() => setIsFlipped(!isFlipped)}
+      onClick={handleCardFlip}
       onKeyDown={handleKeyDown}
+      style={{
+        WebkitTapHighlightColor: 'transparent',
+        touchAction: 'manipulation',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+      }}
     >
       <motion.div
         className="w-full h-full relative preserve-3d"
         initial={false}
         animate={{ rotateY: isFlipped ? 180 : 0 }}
         transition={{ duration: 0.6, type: 'spring', stiffness: 200, damping: 20 }}
-        style={{ transformStyle: 'preserve-3d' }}
+        style={{
+          transformStyle: 'preserve-3d',
+          WebkitTransformStyle: 'preserve-3d',
+          willChange: 'transform',
+          WebkitTapHighlightColor: 'transparent',
+        }}
       >
         {/* Front of Card */}
         <div
           className="absolute inset-0 bg-white dark:bg-slate-800 shadow-md border border-neutral-300 dark:border-slate-700 rounded-sm p-6 flex flex-col justify-center items-center backface-hidden"
-          style={{ backfaceVisibility: 'hidden' }}
+          style={{
+            backfaceVisibility: 'hidden',
+            WebkitBackfaceVisibility: 'hidden',
+            WebkitTapHighlightColor: 'transparent',
+            transformStyle: 'preserve-3d',
+            WebkitTransformStyle: 'preserve-3d',
+            isolation: 'isolate',
+          }}
         >
           <div className="absolute top-2 left-2 flex items-center text-xs font-bold text-yellow-600 uppercase tracking-widest">
             <Lightbulb className="w-3 h-3 mr-1" />
@@ -173,7 +203,7 @@ const FlashcardWidget = ({ flashcard = null, loading = false, error = null, tota
           </button>
           
           <div className="absolute bottom-4 right-4 z-10" onClick={(e) => e.stopPropagation()}>
-            <ExportDeckDropdown />
+            <ExportDeckDropdown subjectId={flashcard?.subject?.id || flashcard?.subject} />
           </div>
 
           {/* Audio Reader Controls */}
@@ -210,8 +240,17 @@ const FlashcardWidget = ({ flashcard = null, loading = false, error = null, tota
 
         {/* Back of Card */}
         <div
-          className="absolute inset-0 bg-yellow-50 dark:bg-yellow-900/30 shadow-md border border-yellow-200 dark:border-yellow-700/50 rounded-sm p-5 flex flex-col justify-between items-center text-center overflow-y-auto"
-          style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+          className="absolute inset-0 bg-yellow-50 dark:bg-yellow-900/30 shadow-md border border-yellow-200 dark:border-yellow-700/50 rounded-sm p-5 flex flex-col justify-between items-center text-center overflow-y-auto backface-hidden"
+          style={{
+            backfaceVisibility: 'hidden',
+            WebkitBackfaceVisibility: 'hidden',
+            WebkitTapHighlightColor: 'transparent',
+            transformStyle: 'preserve-3d',
+            WebkitTransformStyle: 'preserve-3d',
+            transform: 'rotateY(180deg)',
+            WebkitTransform: 'rotateY(180deg)',
+            isolation: 'isolate',
+          }}
         >
           <div className="w-full flex justify-between items-center text-xs text-yellow-700 dark:text-yellow-400">
             <span className="font-semibold uppercase tracking-wider">Answer</span>

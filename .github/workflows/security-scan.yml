@@ -1,0 +1,125 @@
+name: Dependency & Container Security Scan
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  security-scan:
+    name: Dependency Audit & Trivy Container Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # --- Setup Node.js ---
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20.x
+          cache: 'npm'
+
+      # --- Run npm audit (generate reports) ---
+      - name: Run npm audit (Root)
+        run: |
+          npm audit --audit-level=high > npm-audit-root-report.txt || true
+          cat npm-audit-root-report.txt
+
+      - name: Run npm audit (Backend)
+        run: |
+          npm audit --audit-level=high > npm-audit-backend-report.txt || true
+          cat npm-audit-backend-report.txt
+        working-directory: backend
+
+      - name: Run npm audit (Frontend)
+        run: |
+          npm audit --audit-level=high > npm-audit-frontend-report.txt || true
+          cat npm-audit-frontend-report.txt
+        working-directory: frontend
+
+      # --- Build Container Images ---
+      - name: Build Backend Container Image
+        run: |
+          docker build -t openprep-backend:test .
+        working-directory: backend
+
+      - name: Build Frontend Container Image
+        run: |
+          docker build -t openprep-frontend:test .
+        working-directory: frontend
+
+      # --- Run Trivy Scanner (generate reports) ---
+      - name: Run Trivy Scanner on Backend Image
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: 'openprep-backend:test'
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+          output: 'trivy-backend-report.txt'
+
+      - name: Run Trivy Scanner on Frontend Image
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: 'openprep-frontend:test'
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+          output: 'trivy-frontend-report.txt'
+
+      # --- Display Trivy Reports in Console ---
+      - name: Display Backend Trivy Report
+        run: cat trivy-backend-report.txt || true
+
+      - name: Display Frontend Trivy Report
+        run: cat trivy-frontend-report.txt || true
+
+      # --- Upload Vulnerability Reports as Artifacts ---
+      - name: Upload Security Reports Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-vulnerability-reports
+          path: |
+            npm-audit-root-report.txt
+            backend/npm-audit-backend-report.txt
+            frontend/npm-audit-frontend-report.txt
+            trivy-backend-report.txt
+            trivy-frontend-report.txt
+
+      # --- Fail build if high/critical vulnerabilities found ---
+      - name: Fail build if npm vulnerabilities found (Root)
+        run: npm audit --audit-level=high
+
+      - name: Fail build if npm vulnerabilities found (Backend)
+        run: npm audit --audit-level=high
+        working-directory: backend
+
+      - name: Fail build if npm vulnerabilities found (Frontend)
+        run: npm audit --audit-level=high
+        working-directory: frontend
+
+      - name: Fail build if Trivy vulnerabilities found (Backend Image)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: 'openprep-backend:test'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Fail build if Trivy vulnerabilities found (Frontend Image)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: 'openprep-frontend:test'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'

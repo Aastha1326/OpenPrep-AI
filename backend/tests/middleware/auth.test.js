@@ -62,6 +62,26 @@ describe('Auth Middleware - protect', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  it('should return 401 with Token expired message when token is expired', async () => {
+    const expiredToken = jwt.sign(
+      { id: uuidv4(), type: 'access' },
+      process.env.JWT_SECRET,
+      { expiresIn: '-1s' }
+    );
+    const { req, res, next } = createMockReqRes();
+    req.headers.authorization = `Bearer ${expiredToken}`;
+
+    await protect(req, res, next);
+
+    expect(res.statusCode).toBe(401);
+    expect(res.body).toEqual({
+      success: false,
+      message: 'Token expired',
+      error: 'Token expired',
+    });
+    expect(next).not.toHaveBeenCalled();
+  });
+
   it('should return 401 if token does not start with Bearer', async () => {
     const { req, res, next } = createMockReqRes();
     req.headers.authorization = 'Token sometoken';
@@ -108,6 +128,13 @@ describe('Auth Middleware - protect', () => {
     expect(req.user).toBeDefined();
     expect(req.user.id.toString()).toBe(user.id.toString());
     expect(req.user.email).toBe('authtest@example.com');
+    expect(req.user.password).toBeUndefined();
+    expect(req.user.refreshTokens).toBeUndefined();
+    expect(req.user.refreshTokenExpire).toBeUndefined();
+    expect(req.user.emailVerificationToken).toBeUndefined();
+    expect(req.user.emailVerificationExpire).toBeUndefined();
+    expect(req.user.resetPasswordToken).toBeUndefined();
+    expect(req.user.resetPasswordExpire).toBeUndefined();
   });
 
   it('should return 401 if token lacks type claim', async () => {

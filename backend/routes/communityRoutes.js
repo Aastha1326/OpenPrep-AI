@@ -4,9 +4,13 @@ const {
   getFeedbackList,
   upvoteFeedback,
   getPublicRoadmap,
+  rateCommunityDeck,
 } = require('../controllers/communityController');
+const { getCommunityDecks, cloneCommunityDeck } = require('../controllers/flashcardController');
 const { protect } = require('../middleware/auth');
 const { validateSubmitFeedback } = require('../middleware/validators');
+const cacheMiddleware = require('../middleware/cache');
+const clearCache = require('../middleware/clearCache');
 
 const router = express.Router();
 
@@ -77,7 +81,13 @@ const router = express.Router();
  *               $ref: '#/components/schemas/Error'
  */
 
-router.post('/feedback', protect, validateSubmitFeedback, submitFeedback);
+router.post(
+  '/feedback',
+  protect,
+  validateSubmitFeedback,
+  clearCache('community:*'),
+  submitFeedback
+);
 
 /**
  * @swagger
@@ -110,7 +120,12 @@ router.post('/feedback', protect, validateSubmitFeedback, submitFeedback);
  *               $ref: '#/components/schemas/Error'
  */
 
-router.get('/feedback', protect, getFeedbackList);
+router.get(
+  '/feedback',
+  protect,
+  cacheMiddleware((req) => `community:feedback:${req.originalUrl}`, 900),
+  getFeedbackList
+);
 
 /**
  * @swagger
@@ -155,7 +170,7 @@ router.get('/feedback', protect, getFeedbackList);
  *               $ref: '#/components/schemas/Error'
  */
 
-router.put('/feedback/:id/upvote', protect, upvoteFeedback);
+router.put('/feedback/:id/upvote', protect, clearCache('community:*'), upvoteFeedback);
 
 /**
  * @swagger
@@ -203,6 +218,11 @@ router.put('/feedback/:id/upvote', protect, upvoteFeedback);
  *               $ref: '#/components/schemas/Error'
  */
 
-router.get('/roadmap', protect, getPublicRoadmap);
+router.get('/roadmap', protect, cacheMiddleware('community:roadmap', 900), getPublicRoadmap);
+
+// Community Flashcard Decks routes
+router.get('/decks', protect, getCommunityDecks);
+router.post('/decks/:subjectId/fork', protect, cloneCommunityDeck);
+router.post('/decks/:id/rate', protect, rateCommunityDeck);
 
 module.exports = router;
