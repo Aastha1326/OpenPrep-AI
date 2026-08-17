@@ -13,6 +13,7 @@ const {
   analyzePYQBatch,
   getSubjectAnalyses,
   exportPYQAnalysisPDF,
+  getPYQMetadata,
 } = require('../controllers/pyqController');
 
 const multer = require('multer');
@@ -151,6 +152,7 @@ router.post(
   upload.single('file'),
   validateUploadPYQ,
   clearCache('pyqs:*'),
+  clearCache((req) => `pyqs:${req.user.id}:/api/pyqs/metadata`),
   uploadAndAnalyzePYQ
 );
 
@@ -365,6 +367,7 @@ router.post(
   strictAiLimiter,
   checkQuota,
   clearCache('pyqs:*'),
+  clearCache((req) => `pyqs:${req.user.id}:/api/pyqs/metadata`),
   getPYQAnalysis
 );
 
@@ -440,10 +443,79 @@ router.get('/:id/analyze-stream', protect, analyzePYQStream);
  *               $ref: '#/components/schemas/Error'
  */
 
-router.delete('/:id', protect, clearCache('pyqs:*'), deletePYQ);
+router.delete('/:id', protect, clearCache('pyqs:*'), clearCache((req) => `pyqs:${req.user.id}:/api/pyqs/metadata`), deletePYQ);
 
 router.post('/analyze', protect, upload.array('files', 10), analyzePYQBatch);
 router.get('/subject/:subjectId', protect, getSubjectAnalyses);
 router.get('/analysis/:analysisId/export', protect, exportPYQAnalysisPDF);
+
+/**
+ * @swagger
+ * /api/pyqs/metadata:
+ *   get:
+ *     summary: Get aggregated PYQ metadata (statistics)
+ *     tags: [PYQs]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: PYQ metadata retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     totalPYQs:
+ *                       type: integer
+ *                       example: 25
+ *                     analyzedCount:
+ *                       type: integer
+ *                       example: 20
+ *                     uniqueSubjects:
+ *                       type: integer
+ *                       example: 5
+ *                     yearRange:
+ *                       type: object
+ *                       properties:
+ *                         min:
+ *                           type: integer
+ *                           example: 2020
+ *                         max:
+ *                           type: integer
+ *                           example: 2024
+ *                     difficultyDistribution:
+ *                       type: object
+ *                       properties:
+ *                         Easy:
+ *                           type: integer
+ *                           example: 5
+ *                         Medium:
+ *                           type: integer
+ *                           example: 15
+ *                         Hard:
+ *                           type: integer
+ *                           example: 5
+ *                     lastUpdated:
+ *                       type: string
+ *                       format: date-time
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.get(
+  '/metadata',
+  protect,
+  cacheMiddleware(86400), // 24-hour TTL
+  getPYQMetadata
+);
 
 module.exports = router;
