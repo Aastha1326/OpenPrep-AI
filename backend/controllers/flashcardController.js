@@ -62,6 +62,44 @@ function extractYouTubeVideoId(url) {
 const { calculateSM2 } = require('../utils/sm2');
 const { parseCSV, validateCSVHeaders } = require('../utils/csvParser');
 
+/**
+ * Largest offline batch accepted in one request.
+ *
+ * Kept well below the 10 KB `express.json` body limit set in server.js: at
+ * roughly 100 bytes per review entry, 80 entries is ~8 KB, so a full batch
+ * still fits with headroom instead of bouncing off the parser with a 413.
+ */
+const MAX_OFFLINE_SYNC_BATCH = 80;
+
+/** Bounds a client-supplied card count to a sane range for AI generation. */
+function clampCardCount(value, fallback = 6) {
+  const parsed = parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.min(parsed, 20);
+}
+
+/**
+ * Fold a new score into a deck's running average.
+ *
+ * Kept as a running mean over `ratingCount` rather than a re-aggregation of
+ * every rating row: the deck list sorts and filters on `Subject.rating`, so
+ * the value has to stay on the row itself.
+ *
+ * @returns {{ rating: number, ratingCount: number }} rounded to 2 decimals
+ */
+function foldRating(currentRating, currentCount, newStars) {
+  const count = Number.isFinite(currentCount) && currentCount > 0 ? currentCount : 0;
+  const rating = Number.isFinite(currentRating) ? currentRating : 0;
+
+  const nextCount = count + 1;
+  const nextRating = (rating * count + newStars) / nextCount;
+
+  return {
+    rating: parseFloat(nextRating.toFixed(2)),
+    ratingCount: nextCount,
+  };
+}
+
 // @desc    Generate AI Flashcards
 // @route   POST /api/flashcards/generate-ai
 // @access  Private
@@ -1043,6 +1081,225 @@ exports.cloneCommunityDeck = async (req, res, next) => {
     });
 
     res.status(201).json({ success: true, data: clonedSubject });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Transcribe an uploaded lecture recording and preview flashcards from it
+// @route   POST /api/flashcards/from-audio
+// @access  Private
+exports.generateFlashcardsFromAudio = async (req, res, next) => {
+  try {
+    if (!req.file || !req.file.buffer || req.file.buffer.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'An audio recording is required to generate flashcards',
+      });
+    }
+
+    const { subjectId } = req.body;
+    const count = clampCardCount(req.body.count);
+
+    const subject = await Subject.findOne({ where: { id: subjectId, user: req.user.id } });
+    if (!subject) {
+      return res.status(404).json({ success: false, error: 'Subject not found' });
+    }
+
+    const { transcription, summary } = await geminiService.transcribeAndSummarizeAudio(
+      req.file.buffer,
+      req.file.mimetype,
+      subject.name
+    );
+
+    // Prefer the raw transcript: it carries the wording the student actually
+    // heard. The summary is a lossy fallback for recordings Gemini could only
+    // partially transcribe.
+    const sourceText = (transcription || '').trim() || (summary || '').trim();
+    if (!sourceText) {
+      return res.status(422).json({
+        success: false,
+        error: 'The recording could not be transcribed. Try a clearer or louder recording.',
+      });
+    }
+
+    const cardsList = await geminiService.generateFlashcards(
+      subject.name,
+      'Lecture Recording',
+      sourceText,
+      count
+    );
+
+    // Preview only — nothing is persisted until the user confirms the cards
+    // in the modal and posts them back through the normal create endpoint.
+    res.status(200).json({
+      success: true,
+      count: cardsList.length,
+      subjectId: subject.id,
+      transcription: transcription || '',
+      summary: summary || '',
+      data: cardsList,
+    });
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({ success: false, error: error.message });
+    }
+    next(error);
+  }
+};
+
+// @desc    Rate a public community deck (1-5 stars)
+// @route   POST /api/flashcards/decks/:subjectId/rate
+// @access  Private
+exports.rateCommunityDeck = async (req, res, next) => {
+  try {
+    const { subjectId } = req.params;
+    // The community modal posts `rating`; the deck preview posts `stars`.
+    // Accept either rather than making one of the two existing callers wrong.
+    const raw = req.body.rating !== undefined ? req.body.rating : req.body.stars;
+
+    const stars = Number(raw);
+    if (!Number.isInteger(stars) || stars < 1 || stars > 5) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'Provide a star rating between 1 and 5' });
+    }
+
+    const deck = await Subject.findOne({ where: { id: subjectId } });
+    if (!deck || !deck.isPublic) {
+      return res.status(404).json({ success: false, error: 'Public community deck not found' });
+    }
+
+    if (deck.user && deck.user === req.user.id) {
+      return res.status(400).json({ success: false, error: 'You cannot rate your own deck' });
+    }
+
+    const { rating, ratingCount } = foldRating(deck.rating, deck.ratingCount, stars);
+
+    deck.rating = rating;
+    deck.ratingCount = ratingCount;
+    await deck.save();
+
+    res.status(200).json({
+      success: true,
+      data: { rating, ratingCount },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Star a public community deck
+// @route   POST /api/flashcards/decks/:subjectId/star
+// @access  Private
+exports.starCommunityDeck = async (req, res, next) => {
+  try {
+    const { subjectId } = req.params;
+
+    const deck = await Subject.findOne({ where: { id: subjectId } });
+    if (!deck || !deck.isPublic) {
+      return res.status(404).json({ success: false, error: 'Public community deck not found' });
+    }
+
+    const current = Number.isFinite(deck.starCount) ? deck.starCount : 0;
+    deck.starCount = current + 1;
+    await deck.save();
+
+    res.status(200).json({
+      success: true,
+      data: { starCount: deck.starCount },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Apply a batch of reviews recorded while the client was offline
+// @route   POST /api/flashcards/batch-sync
+// @access  Private
+exports.batchSyncOfflineReviews = async (req, res, next) => {
+  try {
+    const { reviews } = req.body;
+
+    if (!Array.isArray(reviews) || reviews.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Provide a non-empty array of offline reviews to sync',
+      });
+    }
+
+    if (reviews.length > MAX_OFFLINE_SYNC_BATCH) {
+      return res.status(400).json({
+        success: false,
+        error: `A batch may contain at most ${MAX_OFFLINE_SYNC_BATCH} reviews`,
+      });
+    }
+
+    const easyFactorModifier = req.user.sm2EasyFactorModifier ?? 1.0;
+    const intervalModifier = req.user.sm2IntervalModifier ?? 1.0;
+    const step1Interval = req.user.sm2Step1Interval ?? 1;
+    const step2Interval = req.user.sm2Step2Interval ?? 6;
+
+    let synced = 0;
+    let skipped = 0;
+    const errors = [];
+
+    // Sequential rather than Promise.all: two queued reviews of the *same*
+    // card must compose in order, otherwise the second overwrites the first's
+    // SM-2 state instead of building on it.
+    for (const review of reviews) {
+      const { cardId, score, reviewedAt } = review || {};
+
+      const quality = Number(score);
+      if (!Number.isInteger(quality) || quality < 0 || quality > 5) {
+        skipped += 1;
+        errors.push({ cardId: cardId || null, error: 'Score must be an integer between 0 and 5' });
+        continue;
+      }
+
+      const card = await Flashcard.findOne({ where: { id: cardId, user: req.user.id } });
+      if (!card) {
+        skipped += 1;
+        errors.push({ cardId: cardId || null, error: 'Flashcard not found' });
+        continue;
+      }
+
+      const { interval, repetitions, efactor } = calculateSM2({
+        interval: card.interval,
+        repetitions: card.repetitions,
+        efactor: card.efactor,
+        quality,
+        easyFactorModifier,
+        intervalModifier,
+        step1Interval,
+        step2Interval,
+      });
+
+      card.interval = interval;
+      card.repetitions = repetitions;
+      card.efactor = efactor;
+
+      // Schedule from when the review actually happened, not from now — an
+      // hour-old offline review shouldn't push the next due date an hour out.
+      const reviewedTimestamp = Date.parse(reviewedAt);
+      const reviewedDate = Number.isNaN(reviewedTimestamp) ? Date.now() : reviewedTimestamp;
+      card.nextReviewDate = new Date(reviewedDate + interval * 24 * 60 * 60 * 1000);
+
+      await card.save();
+      synced += 1;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: { synced, skipped, errors },
+    });
   } catch (error) {
     next(error);
   }
