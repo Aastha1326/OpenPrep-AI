@@ -1,5 +1,14 @@
-import { splitSentences } from '../utils/textUtils';
+import { Fragment } from 'react';
+import { toSentenceSegments } from '../utils/textUtils';
 
+/**
+ * Renders text one sentence per span so the read-along highlight can target a
+ * single sentence.
+ *
+ * Segments carry the exact whitespace that preceded them. Rejoining with a
+ * hard-coded ' ' — as this used to — collapsed every newline in a note into a
+ * single space, so a multi-paragraph note rendered as one run-on block.
+ */
 const HighlightedText = ({
   text,
   activeIndex = -1,
@@ -9,21 +18,23 @@ const HighlightedText = ({
 }) => {
   if (!text) return null;
 
-  const sentences = splitSentences(text);
-  if (sentences.length <= 1) {
+  const segments = toSentenceSegments(text);
+  if (segments.length <= 1) {
     return <Tag className={className}>{text}</Tag>;
   }
 
   return (
-    <Tag className={className}>
-      {sentences.map((sentence, index) => (
-        <span
-          key={index}
-          className={index === activeIndex ? highlightClassName : undefined}
-        >
-          {sentence.text}
-          {index < sentences.length - 1 ? ' ' : ''}
-        </span>
+    <Tag className={className} style={{ whiteSpace: 'pre-wrap' }}>
+      {segments.map((segment, index) => (
+        // Fragment rather than a wrapping span: one span per sentence keeps
+        // the DOM addressable by index for tests and for the highlight.
+        <Fragment key={index}>
+          {segment.lead}
+          <span className={index === activeIndex ? highlightClassName : undefined}>
+            {segment.text}
+          </span>
+          {segment.trail}
+        </Fragment>
       ))}
     </Tag>
   );
