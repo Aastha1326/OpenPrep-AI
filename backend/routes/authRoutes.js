@@ -76,13 +76,13 @@ const registerLimiter = rateLimit({
   legacyHeaders: true,
 });
 
-// Limit password reset requests to 5 per hour per IP
+// Limit password reset requests to 3 per 15 minutes per IP
 const forgotPasswordLimiter = rateLimit({
-  windowMs: RATE_LIMIT.WINDOWS.ONE_HOUR,
-  max: RATE_LIMIT.MAX_REQUESTS.FORGOT_PASSWORD,
+  windowMs: RATE_LIMIT.WINDOWS.FIFTEEN_MINUTES,
+  max: 3,
   skip: shouldSkip,
   message: createRateLimitResponse(
-    'Too many password reset requests. Please try again after an hour.'
+    'Too many requests. Please try again after 15 minutes.'
   ),
   standardHeaders: true,
   legacyHeaders: true,
@@ -142,7 +142,7 @@ router.post('/login', loginLimiter, validateLogin, login);
 // Request a password reset email
 router.post(
   '/forgot-password',
-  authEmailLimiter,
+  forgotPasswordLimiter,
   validateForgotPassword,
   forgotPassword
 );
