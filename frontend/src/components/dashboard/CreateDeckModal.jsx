@@ -53,7 +53,12 @@ const CreateDeckModal = ({ subjectId, topicId, deckId, onClose, onCreated }) => 
       onCreated?.();
       onClose();
     } catch (err) {
-      setTagError(err?.response?.data?.error || 'Failed to save flashcard.');
+      console.error('Failed to save flashcard:', err);
+      const isNetErr = !err.response && (err.code === 'ERR_NETWORK' || err.message === 'Network Error');
+      const errorMsg = isNetErr 
+        ? 'Failed to save, please check your internet connection' 
+        : (err?.response?.data?.error || 'Failed to save flashcard. Please check your connection and try again.');
+      setTagError(errorMsg);
     } finally {
       setSaving(false);
     }
