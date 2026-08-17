@@ -1,3 +1,5 @@
+import { FaBook, FaRegCheckCircle, FaExclamationTriangle } from 'react-icons/fa';
+import { Loader2, Sparkles as FaSparkles } from 'lucide-react';
 import React, { useState } from 'react';
 import { FaBook, FaRegCheckCircle, FaExclamationTriangle, FaMagic } from 'react-icons/fa';
 import { Loader2 } from 'lucide-react';
@@ -46,7 +48,7 @@ export default function SyllabusCoverageMatrix({ syllabusName, initialCoverage =
   });
 
   return (
-    <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 shadow-xl space-y-6">
+    <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-4 sm:p-6 shadow-xl space-y-6">
       
       {/* Overview Block */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-neutral-800 pb-4 gap-4">
@@ -70,13 +72,13 @@ export default function SyllabusCoverageMatrix({ syllabusName, initialCoverage =
       {/* Modules Listings */}
       <div className="space-y-6">
         {Object.entries(modules).map(([moduleName, moduleTopics]) => (
-          <div key={moduleName} className="space-y-3 bg-stone-950/20 p-4 rounded-2xl border border-neutral-850/80">
+          <div key={moduleName} className="space-y-3 bg-stone-950/20 p-3 sm:p-4 rounded-2xl border border-neutral-850/80">
             <h4 className="text-stone-300 font-extrabold text-xs uppercase tracking-wider border-b border-neutral-850 pb-2">
               📂 {moduleName}
             </h4>
             
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
+            <div className="overflow-x-auto -mx-1 px-1">
+              <table className="w-full text-left text-xs border-collapse min-w-[500px]">
                 <thead>
                   <tr className="text-stone-400 font-bold border-b border-neutral-850/40">
                     <th className="py-2.5">Topic</th>
@@ -114,7 +116,7 @@ export default function SyllabusCoverageMatrix({ syllabusName, initialCoverage =
                             <button
                               onClick={() => handleGenerateNotes(topic.id)}
                               disabled={generatingTopicId !== null}
-                              className="px-3 py-1 bg-indigo-500/10 hover:bg-indigo-500 border border-indigo-500/20 hover:border-indigo-400 hover:text-white rounded-lg text-[10px] font-bold text-indigo-400 transition cursor-pointer flex items-center gap-1 ml-auto"
+                              className="px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500 border border-indigo-500/20 hover:border-indigo-400 hover:text-white rounded-lg text-[10px] font-bold text-indigo-400 transition cursor-pointer inline-flex items-center gap-1.5 ml-auto min-h-[44px]"
                             >
                               {generatingTopicId === topic.id ? (
                                 <Loader2 className="w-3 h-3 animate-spin" />
