@@ -23,6 +23,7 @@ const QuizTelemetryEvent = require('./QuizTelemetryEvent');
 const QuizBookmark = require('./QuizBookmark');
 const DeckRating = require('./DeckRating');
 const UserBadge = require('./UserBadge');
+const Badge = require('./Badge');
 const BattleSession = require('./BattleSession');
 const BattleParticipant = require('./BattleParticipant');
 const PYQAnalysis = require('./PYQAnalysis');
@@ -132,6 +133,10 @@ Achievement.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 // UserBadge associations
 UserBadge.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 
+// Badge associations
+Badge.hasMany(UserBadge, { foreignKey: 'badgeCode', sourceKey: 'id', as: 'userBadges' });
+UserBadge.belongsTo(Badge, { foreignKey: 'badgeCode', targetKey: 'id', as: 'badge' });
+
 // FocusSession associations
 FocusSession.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 
@@ -236,6 +241,7 @@ module.exports = {  sequelize,  User,  Exam,
   QuizBookmark,
   DeckRating,
   UserBadge,
+  Badge,
   BattleSession,
   BattleParticipant,
   PYQAnalysis,
