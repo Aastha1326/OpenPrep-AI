@@ -14,6 +14,7 @@ const Login = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { loading, error, isAuthenticated } = useSelector((state) => state.auth);
+  const { executeCaptcha } = useReCaptcha();
 
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
@@ -61,46 +62,8 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setTwoFaError('');
-    
-    // Dispatch login action
-    const resultAction = await dispatch(loginUser(formData));
-    if (loginUser.fulfilled.match(resultAction)) {
-      // Check if backend indicates 2FA is required
-      if (resultAction.payload?.requires2FA) {
-        setRequires2FA(true);
-      } else {
-        navigate('/dashboard', { replace: true });
-      }
-    }
-  };
-
-  const handleVerify2FA = async (e) => {
-    e.preventDefault();
-    setVerifying2FA(true);
-    setTwoFaError('');
-
-    try {
-      const response = await fetch(`${getApiBaseUrl()}/auth/2fa/verify-login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: formData.email, token: totpToken }),
-      });
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        localStorage.setItem('token', data.token);
-        if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
-        dispatch(loadUser());
-        navigate('/dashboard', { replace: true });
-      } else {
-        setTwoFaError(data.error || 'Invalid 2FA code or backup code.');
-      }
-    } catch (err) {
-      setTwoFaError('An error occurred during 2FA verification.');
-    } finally {
-      setVerifying2FA(false);
-    }
+    const token = await executeCaptcha('login');
+    dispatch(loginUser({ ...formData, captchaToken: token }));
   };
 
   return (

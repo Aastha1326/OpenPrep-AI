@@ -172,6 +172,7 @@ const schema = z.object({
   ENABLE_RATE_LIMIT_TESTS: booleanFromString(false),
   SENTRY_DSN: z.string().optional(),
   SENTRY_ENVIRONMENT: z.string().optional(),
+  RECAPTCHA_SECRET_KEY: z.string().optional(),
 });
 
 /**

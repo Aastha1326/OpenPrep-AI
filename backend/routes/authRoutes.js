@@ -25,6 +25,7 @@ const {
 
 const { protect } = require('../middleware/auth');
 const passport = require('passport');
+const verifyCaptcha = require('../middleware/captchaMiddleware');
 
 const {
   validateRegister,
@@ -134,10 +135,66 @@ const resetPasswordLimiter = rateLimit({
  */
 
 // Register a new user account
-router.post('/register', registerLimiter, validateRequest(registerSchema), register);
+router.post('/register', registerLimiter, verifyCaptcha, validateRegister, register);
+
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Authenticate a user and issue access/refresh tokens
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "john@example.com"
+ *               password:
+ *                 type: string
+ *                 example: "securePassword123"
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/AuthTokens'
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Invalid credentials
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       429:
+ *         description: Too many requests
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 
 // Authenticate a user and issue access/refresh tokens
-router.post('/login', loginLimiter, validateLogin, login);
+router.post('/login', loginLimiter, verifyCaptcha, validateLogin, login);
 
 // Request a password reset email
 router.post(

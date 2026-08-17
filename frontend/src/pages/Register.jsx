@@ -1,13 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Mail, User, Lock, Eye, EyeOff, AlertCircle, CheckCircle, BookOpen, ArrowRight, Sparkles } from 'lucide-react';
-import GoogleLoginButton from '../components/auth/GoogleLoginButton';
-import GitHubLoginButton from '../components/auth/GitHubLoginButton';
-import { registerUser, loadUser, clearError, clearRegistrationSuccess } from '../store/slices/authSlice';
-import ThemeToggle from '../components/ThemeToggle';
-import SoundToggle from '../components/SoundToggle';
+import { Mail, User, Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
+import { registerUser, clearError, clearRegistrationSuccess } from '../store/slices/authSlice';
+import { useReCaptcha } from '../hooks/useReCaptcha';
 
 // Password validation criteria (synced with backend validators.js)
 const PASSWORD_CRITERIA = [
@@ -22,6 +18,7 @@ const Register = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { loading, error, registrationSuccess, message, isAuthenticated } = useSelector((state) => state.auth);
+  const { executeCaptcha } = useReCaptcha();
 
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
@@ -53,7 +50,7 @@ const Register = () => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     dispatch(registerUser(formData));
   };

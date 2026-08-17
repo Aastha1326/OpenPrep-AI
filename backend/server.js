@@ -43,6 +43,10 @@ logger.info('configuration loaded', {
   integrations: summariseIntegrations(env),
 });
 
+if (!process.env.RECAPTCHA_SECRET_KEY) {
+  console.warn('WARNING: RECAPTCHA_SECRET_KEY is not set. reCAPTCHA verification will be bypassed.');
+}
+
 // Import routes
 const authRoutes = require('./routes/authRoutes');
 const academicRoutes = require('./routes/academicRoutes');
