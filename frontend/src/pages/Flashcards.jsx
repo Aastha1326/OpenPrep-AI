@@ -169,6 +169,13 @@ const Flashcards = () => {
             YouTube Import
           </button>
           <button
+            onClick={() => setShowOCRModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold shadow-md transition cursor-pointer text-sm"
+          >
+            <FileImage className="w-4 h-4" />
+            Image/PDF Import
+          </button>
+          <button
             onClick={() => {
               setTargetDeckId('');
               setTargetSubjectId(subjects[0]?.id || '');

@@ -1,5 +1,6 @@
 const { createWorker } = require('tesseract.js');
 const Jimp = require('jimp');
+const pdfParse = require('pdf-parse');
 
 let workerPool = null;
 let currentWorkerIndex = 0;
@@ -75,6 +76,30 @@ async function extractTextFromImage(imageBuffer) {
 }
 
 /**
+ * Extract text from a PDF buffer using pdf-parse
+ * @param {Buffer} pdfBuffer - The PDF data
+ * @returns {Promise<{ extractedText: string, confidence: number, wordCount: number }>}
+ */
+async function extractTextFromPDF(pdfBuffer) {
+  try {
+    const data = await pdfParse(pdfBuffer);
+    
+    const extractedText = data.text || '';
+    const wordCount = extractedText.split(/\s+/).filter(Boolean).length;
+    const confidence = 95; // PDF text extraction is typically high confidence
+    
+    return {
+      extractedText: extractedText.trim(),
+      confidence,
+      wordCount,
+    };
+  } catch (error) {
+    console.error('[OCR Service] PDF extraction failed:', error);
+    throw new Error('Failed to extract text from PDF');
+  }
+}
+
+/**
  * Terminate all Tesseract workers in the pool.
  * Should be called during graceful shutdown.
  */
@@ -87,6 +112,7 @@ async function cleanupWorkers() {
 
 module.exports = {
   extractTextFromImage,
+  extractTextFromPDF,
   cleanupWorkers,
   preprocessImage, // Exported for testing
 };
