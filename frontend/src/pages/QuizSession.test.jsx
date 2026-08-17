@@ -463,6 +463,38 @@ describe('QuizSession', () => {
       });
     });
   });
+
+  describe('Score Tier Motivational Messages & Confetti', () => {
+    test('returns correct motivational message for score >= 90%', () => {
+      const { getScoreMotivationalMessage } = require('./QuizSession');
+      expect(getScoreMotivationalMessage(95)).toBe("Outstanding! 🏆 You've mastered this topic!");
+      expect(getScoreMotivationalMessage(90)).toBe("Outstanding! 🏆 You've mastered this topic!");
+    });
+
+    test('returns correct motivational message for score between 70% and 89%', () => {
+      const { getScoreMotivationalMessage } = require('./QuizSession');
+      expect(getScoreMotivationalMessage(85)).toBe("Great work! 🎯 Keep sharpening those edges.");
+      expect(getScoreMotivationalMessage(70)).toBe("Great work! 🎯 Keep sharpening those edges.");
+    });
+
+    test('returns correct motivational message for score < 70%', () => {
+      const { getScoreMotivationalMessage } = require('./QuizSession');
+      expect(getScoreMotivationalMessage(65)).toBe("Keep pushing! 💪 Review the weak topics below.");
+      expect(getScoreMotivationalMessage(0)).toBe("Keep pushing! 💪 Review the weak topics below.");
+    });
+
+    test('renders score tier motivational message on results screen', async () => {
+      API.get.mockResolvedValue({ data: { data: sampleQuiz } });
+      API.post.mockResolvedValue({ data: { data: { score: 95 } } });
+
+      renderQuiz();
+
+      fireEvent.click(await screen.findByText('What is 2+2?'));
+      fireEvent.click(screen.getByRole('button', { name: /Submit Quiz/i }));
+
+      expect(await screen.findByText(/Outstanding! 🏆 You've mastered this topic!/i)).toBeInTheDocument();
+    });
+  });
 });
 
 

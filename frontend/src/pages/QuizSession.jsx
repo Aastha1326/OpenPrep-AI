@@ -24,6 +24,46 @@ import RevisionSheetModal from '../components/dashboard/RevisionSheetModal';
 import RemediationPlanModal from '../components/dashboard/RemediationPlanModal';
 import QuestionExplanation from '../components/dashboard/QuestionExplanation';
 import SubjectiveQuestionView from '../components/quiz/SubjectiveQuestionView';
+import confetti from 'canvas-confetti';
+
+export const getScoreMotivationalMessage = (score) => {
+  const numScore = Number(score) || 0;
+  if (numScore >= 90) return "Outstanding! 🏆 You've mastered this topic!";
+  if (numScore >= 70) return "Great work! 🎯 Keep sharpening those edges.";
+  return "Keep pushing! 💪 Review the weak topics below.";
+};
+
+export function useCountUp(targetValue, durationMs = 1500, start = false) {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    if (!start || targetValue === undefined || targetValue === null) {
+      setCount(0);
+      return;
+    }
+    const end = Number(targetValue) || 0;
+    let startTimestamp = null;
+    let animationFrameId;
+
+    const step = (timestamp) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / durationMs, 1);
+      const easeOut = 1 - Math.pow(1 - progress, 3);
+      setCount(Math.round(easeOut * end));
+      if (progress < 1) {
+        animationFrameId = requestAnimationFrame(step);
+      }
+    };
+
+    animationFrameId = requestAnimationFrame(step);
+
+    return () => {
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    };
+  }, [targetValue, durationMs, start]);
+
+  return count;
+}
 
 const REVIEW_FILTERS = [
   { key: 'all', label: 'All Questions' },
@@ -235,6 +275,16 @@ const fetchQuiz = useCallback(async () => {
 
     return () => clearTimeout(timer);
   }, [id, quiz, answers, currentQuestionIndex, submitted]);
+
+  useEffect(() => {
+    if (submitted && result?.score !== undefined && result.score >= 70) {
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+      });
+    }
+  }, [submitted, result?.score]);
 
   const handleResumeQuiz = () => {
     if (savedSessionBanner) {
@@ -551,12 +601,17 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
   const filteredQuestions = quiz.questions
     .map((q, idx) => ({ q, idx }))
     .filter(({ q }) => {
-      const isCorrect = answers[q._id] === q.correctAnswer;
+      const isCorrect = Array.isArray(q.correctAnswer)
+        ? q.correctAnswer.includes(answers[q._id])
+        : answers[q._id] === q.correctAnswer;
       if (reviewFilter === 'incorrect') return !isCorrect;
       if (reviewFilter === 'correct') return isCorrect;
       if (reviewFilter === 'bookmarked') return bookmarkedIds.has(q._id);
       return true;
     });
+
+  const animatedScore = useCountUp(result?.score ?? 0, 1500, submitted);
+  const motivationalMessage = getScoreMotivationalMessage(result?.score ?? 0);
   return (
     <div className="min-h-screen bg-slate-900 text-white py-6 sm:py-10 px-3 sm:px-6 md:px-20">
       {timeElapsed && !submitted && (
@@ -764,10 +819,14 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
               <h2 className="text-3xl font-bold text-white mb-2">Quiz Completed!</h2>
               <p className="text-slate-400 text-lg">
                 You scored{' '}
-                <span className="text-emerald-400 font-bold text-2xl">{result?.score}</span> out of{' '}
-                {quiz.questions.length}
+                <span className="text-emerald-400 font-bold text-3xl font-mono" data-testid="animated-score">
+                  {animatedScore}%
+                </span>
               </p>
-              <div className="flex items-center justify-center gap-3 mt-4">
+              <p className="mt-3 text-lg font-semibold text-emerald-300 animate-fade-in" data-testid="motivational-message">
+                {motivationalMessage}
+              </p>
+              <div className="flex items-center justify-center gap-3 mt-6">
                 <button
                   onClick={handleExportResultsCSV}
                   className="px-4 py-2 text-sm bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition-colors"
