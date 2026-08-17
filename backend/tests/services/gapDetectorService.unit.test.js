@@ -1,13 +1,14 @@
-const { analyzeSyllabusGaps } = require('../../services/gapDetectorService');
-const { SyllabusTopic, Note, Topic, Quiz, QuizAttempt } = require('../../models');
-
 vi.mock('../../models', () => ({
   SyllabusTopic: { findAll: vi.fn() },
   Note: { findOne: vi.fn() },
   Topic: { findOne: vi.fn() },
   Quiz: { findAll: vi.fn() },
   QuizAttempt: { findAll: vi.fn() },
+  Syllabus: { findOne: vi.fn() },
 }));
+
+const { analyzeSyllabusGaps } = require('../../services/gapDetectorService');
+const { SyllabusTopic, Note, Topic, Quiz, QuizAttempt } = require('../../models');
 
 describe('gapDetectorService Unit Tests', () => {
   beforeEach(() => {

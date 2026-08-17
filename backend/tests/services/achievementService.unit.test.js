@@ -1,8 +1,4 @@
-const { checkAndAwardBadges } = require('../../../backend/services/achievementService');
-const { Achievement, Notification } = require('../../../backend/models');
-const { BADGES } = require('../../../backend/config/badges');
-
-vi.mock('../../../backend/models', () => ({
+vi.mock('../../models', () => ({
   Achievement: {
     findAll: vi.fn(),
     create: vi.fn(),
@@ -11,6 +7,10 @@ vi.mock('../../../backend/models', () => ({
     create: vi.fn(),
   }
 }));
+
+const { checkAndAwardBadges } = require('../../services/achievementService');
+const { Achievement, Notification } = require('../../models');
+const { BADGES } = require('../../config/badges');
 
 describe('achievementService', () => {
   let userId;

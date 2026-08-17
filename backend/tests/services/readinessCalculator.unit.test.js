@@ -1,6 +1,3 @@
-const { calculateSubjectReadiness } = require('../../services/readinessCalculator');
-const { Topic, Progress, QuizAttempt, Quiz, Flashcard, StudyPlan } = require('../../models');
-
 vi.mock('../../models', () => ({
   Topic: { findAll: vi.fn() },
   Progress: { findAll: vi.fn() },
@@ -8,7 +5,11 @@ vi.mock('../../models', () => ({
   Quiz: { findAll: vi.fn() },
   Flashcard: { findAll: vi.fn() },
   StudyPlan: { findOne: vi.fn() },
+  Subject: { findOne: vi.fn() },
 }));
+
+const { calculateSubjectReadiness } = require('../../services/readinessCalculator');
+const { Topic, Progress, QuizAttempt, Quiz, Flashcard, StudyPlan } = require('../../models');
 
 describe('readinessCalculator Unit Tests', () => {
   beforeEach(() => {

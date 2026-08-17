@@ -1,4 +1,3 @@
-const { describe, it, expect } = require('vitest');
 const swaggerSpec = require('../../config/swagger');
 
 describe('Swagger Documentation Configuration', () => {

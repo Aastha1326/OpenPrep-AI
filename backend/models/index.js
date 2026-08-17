@@ -38,7 +38,11 @@ const SquadChallenge = require('./SquadChallenge');
 const SquadChallengeContribution = require('./SquadChallengeContribution');
 const SquadAchievement = require('./SquadAchievement');
 const SquadActivity = require('./SquadActivity');
-const SquadActivityReaction = require('./SquadActivityReaction');// User associations
+const SquadActivityReaction = require('./SquadActivityReaction');
+const Syllabus = require('./Syllabus');
+const SyllabusTopic = require('./SyllabusTopic');
+
+// User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Topic, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -232,6 +236,15 @@ SquadActivityReaction.belongsTo(SquadActivity, { foreignKey: 'activityId', as: '
 User.hasMany(SquadActivityReaction, { foreignKey: 'userId', onDelete: 'CASCADE' });
 SquadActivityReaction.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 
+// Syllabus associations
+User.hasMany(Syllabus, { foreignKey: 'userId', onDelete: 'CASCADE' });
+Syllabus.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+Syllabus.hasMany(SyllabusTopic, { foreignKey: 'syllabusId', onDelete: 'CASCADE' });
+SyllabusTopic.belongsTo(Syllabus, { foreignKey: 'syllabusId', as: 'syllabusRef' });
+
+SyllabusTopic.belongsTo(Note, { foreignKey: 'linkedNoteId', as: 'linkedNote', onDelete: 'SET NULL' });
+
 module.exports = {  sequelize,  User,  Exam,
   Subject,
   Topic,
@@ -263,6 +276,7 @@ module.exports = {  sequelize,  User,  Exam,
   StudySquad,  SquadMember,
   SquadChallenge,
   SquadChallengeContribution,
+  SquadAchievement,
   SquadActivity,
   SquadActivityReaction,
   FlashcardDeck,

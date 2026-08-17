@@ -1,3 +1,26 @@
+vi.mock('../../models', () => ({
+  User: {
+    findByPk: vi.fn(),
+  },
+  UserBadge: {
+    findOne: vi.fn(),
+    create: vi.fn(),
+  },
+  QuizAttempt: {
+    findAll: vi.fn(),
+  },
+  SquadMember: {},
+  SquadChallenge: {
+    findAll: vi.fn(),
+  },
+  SquadChallengeContribution: {
+    findAll: vi.fn(),
+  },
+  SquadAchievement: {
+    findOrCreate: vi.fn(),
+  },
+}));
+
 const {
   calculateLevel,
   getNextLevelXP,
