@@ -279,6 +279,12 @@ If the API URL is incorrect, update the frontend API configuration to use the co
 
 ---
 
+### 7. Windows & Docker specific issues (Line endings & WSL2)
+
+If you are running Docker on Windows and encounter execution errors (like `\r: command not found` in shell scripts) or hot-reloading volume mounting issues, please refer to the dedicated [Windows Setup & Docker Troubleshooting Guide](./docs/setup-guide.md#windows-setup-via-wsl2-recommended) in our documentation.
+
+---
+
 ### Still having problems?
 
 If none of the solutions above resolve the issue, open a GitHub issue with:
