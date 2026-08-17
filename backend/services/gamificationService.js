@@ -1,5 +1,6 @@
 const { User, UserBadge, QuizAttempt, SquadMember, SquadChallenge, SquadChallengeContribution, SquadAchievement } = require('../models');
 const { checkAndAwardBadges } = require('./achievementService');
+const { createNotification } = require('./notificationService');
 let logSquadActivity = async () => {};
 try {
   const squadSvc = require('./squadActivityService');
