@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, Eye, EyeOff, AlertCircle, BookOpen, ShieldCheck } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, AlertCircle, BookOpen } from 'lucide-react';
 import GoogleLoginButton from '../components/auth/GoogleLoginButton';
 import GitHubLoginButton from '../components/auth/GitHubLoginButton';
 import { loginUser, loadUser, clearError } from '../store/slices/authSlice';
@@ -17,7 +17,6 @@ const Login = () => {
 
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
-  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
   
   // New state for handling 2FA step
   const [requires2FA, setRequires2FA] = useState(false);
@@ -25,16 +24,6 @@ const Login = () => {
   const [verifying2FA, setVerifying2FA] = useState(false);
   const [twoFaError, setTwoFaError] = useState('');
 
-  const getApiBaseUrl = () => {
-    if (import.meta.env.VITE_API_URL) {
-      return import.meta.env.VITE_API_URL;
-    }
-    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      return `${window.location.origin}/api`;
-    }
-    return 'http://localhost:5000/api';
-  };
-  const googleAuthUrl = `${getApiBaseUrl().replace(/\/$/, '')}/auth/google`;
   const [oauthError, setOauthError] = useState(null);
 
   useEffect(() => {
@@ -57,6 +46,14 @@ const Login = () => {
   useEffect(() => {
     return () => { dispatch(clearError()); };
   }, [dispatch]);
+
+  const loginWithGoogle = useGoogleLogin({
+    onSuccess: handleGoogleSuccess,
+    onError: (err) => {
+      console.warn('Google OAuth popup blocked or failed, redirecting:', err);
+      window.location.href = googleAuthUrl;
+    },
+  });
 
   const handleChange = (e) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -107,7 +104,7 @@ const Login = () => {
   };
 
   return (
-    <div className="h-screen w-screen max-h-screen overflow-hidden flex items-center justify-center p-3 sm:p-6 bg-[#FFFBE9] dark:bg-[#000000] text-[#1F150C] dark:text-[#E1DCC9] font-inter relative select-none">
+    <div className="min-h-screen w-screen md:h-screen md:max-h-screen md:overflow-hidden flex items-center justify-center p-3 sm:p-6 bg-[#FFFBE9] dark:bg-[#000000] text-[#1F150C] dark:text-[#E1DCC9] font-inter relative select-none overflow-y-auto">
       {/* Background Ambient Glows */}
       <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(circle_at_70%_20%,rgba(173,139,115,0.12),transparent_50%)] pointer-events-none" />
 
@@ -116,10 +113,10 @@ const Login = () => {
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="w-full max-w-5xl h-full max-h-[640px] sm:max-h-[680px] bg-[#FFFBE9] dark:bg-[#16120E] rounded-3xl border border-[#CEAB93]/60 dark:border-[#412D15] shadow-2xl overflow-hidden flex flex-col md:flex-row relative z-10"
+        className="w-full max-w-5xl h-auto md:h-full md:max-h-[640px] sm:md:max-h-[680px] bg-[#FFFBE9] dark:bg-[#16120E] rounded-3xl border border-[#CEAB93]/60 dark:border-[#412D15] shadow-2xl overflow-hidden flex flex-col md:flex-row relative z-10"
       >
         {/* ── LEFT COLUMN: Sign In Form Panel (55% Width) ── */}
-        <div className="w-full md:w-[55%] flex flex-col justify-between p-6 sm:p-8 md:p-10 bg-[#FFFBE9] dark:bg-[#16120E] text-[#1F150C] dark:text-[#E1DCC9] overflow-y-auto md:overflow-hidden">
+        <div className="w-full md:w-[55%] flex flex-col justify-between gap-6 md:gap-0 p-6 sm:p-8 md:p-10 bg-[#FFFBE9] dark:bg-[#16120E] text-[#1F150C] dark:text-[#E1DCC9] overflow-y-auto md:overflow-hidden">
           {/* Top Logo / Mobile Controls */}
           <div className="flex items-center justify-between">
             <Link to="/" className="flex items-center gap-2 group">
@@ -137,7 +134,7 @@ const Login = () => {
           </div>
 
           {/* Form Content */}
-          <div className="my-auto py-2">
+          <div className="my-auto py-2 flex flex-col gap-4 mt-6 md:mt-0">
             <div className="mb-6">
               <h1 className="text-2xl sm:text-3xl font-extrabold font-playfair tracking-tight text-[#1F150C] dark:text-[#E1DCC9]">
                 {requires2FA ? 'Two-Factor Authentication' : 'Sign in'}
@@ -188,13 +185,9 @@ const Login = () => {
                     <label htmlFor="login-password" className="block text-xs font-bold text-[#1F150C] dark:text-[#E1DCC9]">
                       Password
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => setIsForgotPasswordOpen(true)}
-                      className="text-xs font-semibold text-[#AD8B73] hover:underline dark:text-[#E1DCC9]"
-                    >
+                    <Link to="/forgot-password" className="text-xs font-semibold text-[#AD8B73] hover:underline dark:text-[#E1DCC9]">
                       Forgot password?
-                    </button>
+                    </Link>
                   </div>
                   <div className="relative">
                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8C6A53] dark:text-[#C4BA9D]" />
@@ -235,12 +228,6 @@ const Login = () => {
               </form>
             ) : (
               <form onSubmit={handleVerify2FA} className="space-y-4">
-                {twoFaError && (
-                  <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 flex items-center gap-2 text-xs text-red-700 dark:text-red-300 font-medium">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span>{twoFaError}</span>
-                  </div>
-                )}
                 <div>
                   <label htmlFor="totp-token" className="block text-xs font-bold text-[#1F150C] dark:text-[#E1DCC9] mb-1">
                     Authentication Code
@@ -283,13 +270,6 @@ const Login = () => {
                 </button>
               </form>
             )}
-
-            {/* Divider */}
-            <div className="my-3 flex items-center justify-center space-x-2">
-              <span className="h-px w-full bg-[#CEAB93]/50 dark:bg-[#412D15]"></span>
-              <span className="text-[10px] text-[#8C6A53] dark:text-[#C4BA9D] font-bold tracking-wider uppercase">OR</span>
-              <span className="h-px w-full bg-[#CEAB93]/50 dark:bg-[#412D15]"></span>
-            </div>
 
             {/* Social OAuth Buttons */}
             <div className="space-y-3">
