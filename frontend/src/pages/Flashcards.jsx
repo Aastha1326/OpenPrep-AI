@@ -114,8 +114,8 @@ const Flashcards = () => {
     try {
       const res = await API.post(`/flashcard-decks/${id}/share`);
       if (res.data?.success) {
-        const token = res.data.data.shareToken;
-        const shareLink = `${window.location.origin}/share/${token}`;
+        const deckId = res.data.data.id;
+        const shareLink = `${window.location.origin}/decks/shared/${deckId}`;
         navigator.clipboard.writeText(shareLink);
         setCopiedDeckId(id);
         setTimeout(() => setCopiedDeckId(null), 2000);
@@ -290,15 +290,21 @@ const Flashcards = () => {
                         </span>
                       )}
 
-                      {deck.isPublic ? (
-                        <span className="text-[10px] font-semibold px-2 py-0.5 bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 rounded-full flex items-center gap-1">
-                          <Globe className="w-2.5 h-2.5" /> Shared
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-semibold px-2 py-0.5 bg-neutral-50 dark:bg-neutral-800/40 text-neutral-400 dark:text-neutral-500 rounded-full flex items-center gap-1">
-                          <Lock className="w-2.5 h-2.5" /> Private
-                        </span>
-                      )}
+                      <button
+                        onClick={(e) => handleToggleVisibility(deck.id, deck.isPublic, e)}
+                        className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 transition cursor-pointer hover:opacity-80"
+                        title={deck.isPublic ? 'Make private' : 'Make public'}
+                      >
+                        {deck.isPublic ? (
+                          <span className="bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 flex items-center gap-1">
+                            <Globe className="w-2.5 h-2.5" /> Shared
+                          </span>
+                        ) : (
+                          <span className="bg-neutral-50 dark:bg-neutral-800/40 text-neutral-400 dark:text-neutral-500 flex items-center gap-1">
+                            <Lock className="w-2.5 h-2.5" /> Private
+                          </span>
+                        )}
+                      </button>
                     </div>
                   </div>
 
@@ -324,7 +330,7 @@ const Flashcards = () => {
                             ? 'bg-green-50 dark:bg-green-950/20 border-green-200 text-green-600'
                             : 'bg-white dark:bg-neutral-900 border-neutral-300 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800'
                         }`}
-                        title="Generate and copy shareable link"
+                        title="Copy public deck URL"
                       >
                         {copiedDeckId === deck.id ? <Check className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5" />}
                         {copiedDeckId === deck.id ? 'Copied!' : 'Share'}

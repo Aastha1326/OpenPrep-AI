@@ -278,3 +278,95 @@ exports.cloneSharedDeck = async (req, res) => {
     res.status(500).json({ success: false, error: 'Server error' });
   }
 };
+
+// @desc    Get public deck by deck ID (Public access)
+// @route   GET /api/decks/shared/:deckId
+// @access  Public
+exports.getPublicDeckById = async (req, res) => {
+  try {
+    const deck = await FlashcardDeck.findOne({
+      where: { id: req.params.deckId, isPublic: true },
+      include: [
+        { model: Subject, as: 'subjectRef', attributes: ['id', 'name'] },
+        { model: User, as: 'userRef', attributes: ['id', 'name'] },
+      ],
+    });
+
+    if (!deck) {
+      return res.status(404).json({
+        success: false,
+        error: 'Public deck not found or it is not publicly accessible',
+      });
+    }
+
+    const cards = await Flashcard.findAll({
+      where: { deckId: deck.id },
+      attributes: ['id', 'front', 'back', 'hint', 'tags'],
+      order: [['createdAt', 'ASC']],
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        deck: {
+          id: deck.id,
+          name: deck.name,
+          subject: deck.subjectRef,
+          cloneCount: deck.cloneCount,
+          createdAt: deck.createdAt,
+          owner: {
+            id: deck.userRef.id,
+            name: deck.userRef.name,
+          },
+        },
+        cards,
+      },
+    });
+  } catch (error) {
+    console.error('[flashcardDeckController.getPublicDeckById] Error:', error);
+    res.status(500).json({ success: false, error: 'Server error' });
+  }
+};
+
+// @desc    Update deck visibility (public/private)
+// @route   PATCH /api/flashcard-decks/:id/visibility
+// @access  Private
+exports.updateDeckVisibility = async (req, res) => {
+  try {
+    const { isPublic } = req.body;
+
+    if (typeof isPublic !== 'boolean') {
+      return res.status(400).json({ success: false, error: 'isPublic must be a boolean' });
+    }
+
+    const deck = await FlashcardDeck.findOne({
+      where: { id: req.params.id, user: req.user.id },
+    });
+
+    if (!deck) {
+      return res.status(404).json({ success: false, error: 'Deck not found' });
+    }
+
+    // If making public, ensure deck has cards and generate share token
+    if (isPublic && !deck.isPublic) {
+      const cardCount = await Flashcard.count({ where: { deckId: deck.id } });
+      if (cardCount === 0) {
+        return res.status(400).json({ success: false, error: 'Cannot make an empty deck public' });
+      }
+      if (!deck.shareToken) {
+        deck.shareToken = uuidv4();
+      }
+    }
+
+    deck.isPublic = isPublic;
+    await deck.save();
+
+    res.status(200).json({
+      success: true,
+      data: deck,
+    });
+  } catch (error) {
+    console.error('[flashcardDeckController.updateDeckVisibility] Error:', error);
+    res.status(500).json({ success: false, error: 'Server error' });
+  }
+};

@@ -5,6 +5,8 @@ const {
   getDeckById,
   deleteDeck,
   shareDeck,
+  getPublicDeckById,
+  updateDeckVisibility,
 } = require('../controllers/flashcardDeckController');
 const {
   inviteCollaborator,
@@ -28,6 +30,7 @@ router.route('/:id')
   .delete(protect, deleteDeck);
 
 router.post('/:id/share', protect, shareDeck);
+router.patch('/:id/visibility', protect, updateDeckVisibility);
 
 // Collaborator routes
 router.route('/:deckId/collaborators')
