@@ -5,6 +5,8 @@ const {
   getDeckById,
   deleteDeck,
   shareDeck,
+  getPublicDeckById,
+  updateDeckVisibility,
 } = require('../controllers/flashcardDeckController');
 const { protect } = require('../middleware/auth');
 
@@ -19,5 +21,6 @@ router.route('/:id')
   .delete(protect, deleteDeck);
 
 router.post('/:id/share', protect, shareDeck);
+router.patch('/:id/visibility', protect, updateDeckVisibility);
 
 module.exports = router;

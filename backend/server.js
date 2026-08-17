@@ -249,6 +249,7 @@ app.use('/api/quizzes', quizRoutes);
 app.use('/api/quiz', quizRoutes);
 app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/flashcard-decks', flashcardDeckRoutes);
+app.use('/api/decks', require('./routes/publicDeckRoutes'));
 app.use('/api/share', shareRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/admin', adminRoutes);
