@@ -974,6 +974,7 @@ exports.logout = async (req, res, next) => {
     }
 
     clearRefreshTokenCookie(res);
+    res.clearCookie('token', getAuthCookieOptions());
 
     res.status(200).json({
       success: true,

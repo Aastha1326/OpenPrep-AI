@@ -157,3 +157,16 @@ exports.recalculateReadiness = async (req, res, next) => {
     next(error);
   }
 };
+
+exports.getReadinessProjection = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const payload = await compileReadinessSummary(userId);
+    res.status(200).json({
+      success: true,
+      data: payload,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

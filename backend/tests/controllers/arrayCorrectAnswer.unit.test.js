@@ -1,4 +1,3 @@
-const { describe, it, expect } = require('vitest');
 const geminiService = require('../../services/geminiService');
 
 describe('Quiz Grading and AI Normalization - Array correctAnswer Handling', () => {

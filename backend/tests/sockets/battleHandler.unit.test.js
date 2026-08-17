@@ -198,13 +198,13 @@ describe('Real-Time Quiz Battle Sockets', () => {
       hostSocket.handlers.disconnect();
 
       // Room should still exist during the 30s grace window
-      expect(roomManager.getRoom('PREP66')).not.toBeNull();
+      expect(roomManager.getRoom('PREP66')).toBeTruthy();
 
       // Fast-forward 30 seconds
       vi.advanceTimersByTime(30000);
 
       // Room should be cleaned up now as host was the only player
-      expect(roomManager.getRoom('PREP66')).toBeNull();
+      expect(roomManager.getRoom('PREP66')).toBeUndefined();
 
       vi.useRealTimers();
     });

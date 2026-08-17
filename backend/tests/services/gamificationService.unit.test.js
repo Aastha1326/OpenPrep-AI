@@ -1,3 +1,26 @@
+vi.mock('../../models', () => ({
+  User: {
+    findByPk: vi.fn(),
+  },
+  UserBadge: {
+    findOne: vi.fn(),
+    create: vi.fn(),
+  },
+  QuizAttempt: {
+    findAll: vi.fn(),
+  },
+  SquadMember: {},
+  SquadChallenge: {
+    findAll: vi.fn(),
+  },
+  SquadChallengeContribution: {
+    findAll: vi.fn(),
+  },
+  SquadAchievement: {
+    findOrCreate: vi.fn(),
+  },
+}));
+
 const {
   calculateLevel,
   getNextLevelXP,
@@ -6,13 +29,8 @@ const {
   checkAndUnlockBadges,
 } = require('../../services/gamificationService');
 
-const User = require('../../models/User');
-const UserBadge = require('../../models/UserBadge');
-const QuizAttempt = require('../../models/QuizAttempt');
+const { User, UserBadge, QuizAttempt } = require('../../models');
 
-vi.mock('../../models/User');
-vi.mock('../../models/UserBadge');
-vi.mock('../../models/QuizAttempt');
 vi.mock('../../services/cacheService', () => ({
   get: vi.fn().mockResolvedValue(null),
   set: vi.fn().mockResolvedValue(true),

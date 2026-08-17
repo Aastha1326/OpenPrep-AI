@@ -1,9 +1,9 @@
+vi.mock('pdf-parse');
+vi.mock('../../services/ocrService');
+
 const pyqAnalyzerService = require('../../services/pyqAnalyzerService');
 const pdfParse = require('pdf-parse');
 const ocrService = require('../../services/ocrService');
-
-vi.mock('pdf-parse');
-vi.mock('../../services/ocrService');
 
 describe('pyqAnalyzerService Unit Tests', () => {
   beforeEach(() => {
