@@ -15,6 +15,7 @@ const {
 
 const { protect } = require('../middleware/auth');
 const passport = require('passport');
+const verifyCaptcha = require('../middleware/captchaMiddleware');
 
 const {
   validateRegister,
@@ -174,7 +175,7 @@ const resetPasswordLimiter = rateLimit({
  */
 
 // Register a new user account
-router.post('/register', registerLimiter, validateRegister, register);
+router.post('/register', registerLimiter, verifyCaptcha, validateRegister, register);
 
 /**
  * @swagger
@@ -233,7 +234,7 @@ router.post('/register', registerLimiter, validateRegister, register);
  */
 
 // Authenticate a user and issue access/refresh tokens
-router.post('/login', loginLimiter, validateLogin, login);
+router.post('/login', loginLimiter, verifyCaptcha, validateLogin, login);
 
 /**
  * @swagger

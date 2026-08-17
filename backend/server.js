@@ -31,6 +31,10 @@ if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_gemini_a
   console.warn('WARNING: GEMINI_API_KEY is not set. AI endpoints will return mock data.');
 }
 
+if (!process.env.RECAPTCHA_SECRET_KEY) {
+  console.warn('WARNING: RECAPTCHA_SECRET_KEY is not set. reCAPTCHA verification will be bypassed.');
+}
+
 // Import routes
 const authRoutes = require('./routes/authRoutes');
 const academicRoutes = require('./routes/academicRoutes');

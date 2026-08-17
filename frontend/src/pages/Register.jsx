@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, User, Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
 import { registerUser, clearError, clearRegistrationSuccess } from '../store/slices/authSlice';
+import { useReCaptcha } from '../hooks/useReCaptcha';
 
 // Password validation criteria (synced with backend validators.js)
 const PASSWORD_CRITERIA = [
@@ -17,6 +18,7 @@ const Register = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { loading, error, registrationSuccess, message, isAuthenticated } = useSelector((state) => state.auth);
+  const { executeCaptcha } = useReCaptcha();
 
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
@@ -33,9 +35,10 @@ const Register = () => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    dispatch(registerUser(formData));
+    const token = await executeCaptcha('register');
+    dispatch(registerUser({ ...formData, captchaToken: token }));
   };
 
   // ── Confirmation screen after successful registration ──
