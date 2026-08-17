@@ -271,10 +271,23 @@ app.use('/api/folders', folderRoutes);
 app.use('/api/squads', squadRoutes);
 app.use('/api/badges', badgeRoutes);
 
-// Base Route
-app.get('/', (req, res) => {
-  res.json({ message: 'Welcome to OpenPrep AI Backend REST API API Services' });
-});
+// Serve static assets from frontend build folder in production
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, '../frontend/dist')));
+
+  // Catch-all route to serve index.html for SPA routing
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/')) {
+      return next();
+    }
+    res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+  });
+} else {
+  // Base Route (only in development/test)
+  app.get('/', (req, res) => {
+    res.json({ message: 'Welcome to OpenPrep AI Backend REST API API Services' });
+  });
+}
 
 // Health Check Routes
 app.get(['/api/v1/health', '/api/health'], async (req, res) => {
