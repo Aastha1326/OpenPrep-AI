@@ -16,13 +16,21 @@ const getAuthCookieOptions = () => ({
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
   sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
-  maxAge: 30 * 24 * 60 * 60 * 1000,
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  path: '/',
+});
+
+const getAccessTokenCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+  maxAge: 15 * 60 * 1000, // 15 minutes
   path: '/',
 });
 
 const generateAccessToken = (id) => {
   return jwt.sign({ id, type: 'access' }, process.env.JWT_SECRET || 'supersecret_openprep_key', {
-    expiresIn: process.env.JWT_EXPIRE || '30d',
+    expiresIn: process.env.JWT_EXPIRE || '15m',
   });
 };
 
@@ -41,7 +49,7 @@ const generateRefreshToken = async (user, family = null) => {
   });
 
   user.refreshTokens = userTokens;
-  user.refreshTokenExpire = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  user.refreshTokenExpire = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
   await user.save();
 
   return { rawToken, tokenFamily };
@@ -77,7 +85,7 @@ exports.register = async (req, res, next) => {
     });
 
     const accessToken = generateAccessToken(user.id);
-    res.cookie('token', accessToken, getAuthCookieOptions());
+    res.cookie('token', accessToken, getAccessTokenCookieOptions());
 
     res.status(201).json({
       success: true,
@@ -118,7 +126,7 @@ exports.login = async (req, res, next) => {
     }
 
     const accessToken = generateAccessToken(user.id);
-    res.cookie('token', accessToken, getAuthCookieOptions());
+    res.cookie('token', accessToken, getAccessTokenCookieOptions());
 
     res.status(200).json({
       success: true,
@@ -266,7 +274,7 @@ exports.verifyLogin2FA = async (req, res, next) => {
     const refreshToken = refreshResult.rawToken;
 
     setRefreshTokenCookie(res, refreshToken);
-    res.cookie('token', accessToken, getAuthCookieOptions());
+    res.cookie('token', accessToken, getAccessTokenCookieOptions());
 
     res.status(200).json({
       success: true,
@@ -383,7 +391,7 @@ exports.forgotPassword = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: 'If an account with that email exists, a password reset link has been sent.',
+      message: 'If the email exists, a reset link has been sent',
     });
   } catch (error) {
     // If email sending failed, clear the token from DB
@@ -611,7 +619,7 @@ exports.googleLogin = async (req, res, next) => {
     const refreshToken = refreshResult.rawToken;
 
     setRefreshTokenCookie(res, refreshToken);
-    res.cookie('token', accessToken, getAuthCookieOptions());
+    res.cookie('token', accessToken, getAccessTokenCookieOptions());
 
     return res.status(200).json({
       success: true,
@@ -787,7 +795,7 @@ exports.registerOAuthEmail = async (req, res, next) => {
     const refreshResult = await generateRefreshToken(user);
     const refreshToken = refreshResult.rawToken;
     setRefreshTokenCookie(res, refreshToken);
-    res.cookie('token', accessToken, getAuthCookieOptions());
+    res.cookie('token', accessToken, getAccessTokenCookieOptions());
 
     res.status(200).json({
       success: true,
@@ -974,6 +982,7 @@ exports.logout = async (req, res, next) => {
     }
 
     clearRefreshTokenCookie(res);
+    res.clearCookie('token', getAuthCookieOptions());
 
     res.status(200).json({
       success: true,

@@ -1,4 +1,3 @@
-const { describe, it, expect, vi } = require('vitest');
 const { validateRequest, registerSchema, createStudyPlanSchema, submitQuizSchema } = require('../../middleware/validate');
 
 describe('Zod Validation Middleware & Schemas', () => {

@@ -938,3 +938,80 @@ exports.exportPYQAnalysisPDF = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Get PYQ metadata (aggregated statistics)
+// @route   GET /api/pyqs/metadata
+// @access  Private
+exports.getPYQMetadata = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+
+    // Get aggregated PYQ statistics
+    const totalPYQs = await PYQ.count({ where: { user: userId } });
+    
+    const analyzedCount = await PYQ.count({ 
+      where: { user: userId, analyzed: true } 
+    });
+
+    // Get unique subjects
+    const subjects = await PYQ.findAll({
+      where: { user: userId },
+      attributes: [[sequelize.fn('DISTINCT', sequelize.col('subject')), 'subject']],
+      raw: true,
+    });
+    const uniqueSubjects = subjects.length;
+
+    // Get year range
+    const yearStats = await PYQ.findOne({
+      where: { user: userId },
+      attributes: [
+        [sequelize.fn('MIN', sequelize.col('year')), 'minYear'],
+        [sequelize.fn('MAX', sequelize.col('year')), 'maxYear'],
+      ],
+      raw: true,
+    });
+
+    // Get difficulty distribution
+    const difficultyStats = await PYQ.findAll({
+      where: { user: userId },
+      attributes: [
+        'difficulty',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+      ],
+      group: ['difficulty'],
+      raw: true,
+    });
+
+    const difficultyDistribution = {
+      Easy: 0,
+      Medium: 0,
+      Hard: 0,
+    };
+
+    difficultyStats.forEach((stat) => {
+      if (stat.difficulty && difficultyDistribution.hasOwnProperty(stat.difficulty)) {
+        difficultyDistribution[stat.difficulty] = parseInt(stat.count, 10);
+      }
+    });
+
+    const metadata = {
+      totalPYQs,
+      analyzedCount,
+      uniqueSubjects,
+      yearRange: {
+        min: yearStats?.minYear || null,
+        max: yearStats?.maxYear || null,
+      },
+      difficultyDistribution,
+      lastUpdated: new Date().toISOString(),
+    };
+
+    res.status(200).json({
+      success: true,
+      data: metadata,
+    });
+  } catch (error) {
+    console.error('[pyqController.getPYQMetadata] Error:', error);
+    next(error);
+  }
+};

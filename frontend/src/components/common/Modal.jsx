@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, useRef } from 'react';
 import { X } from 'lucide-react';
 import useFocusTrap from '../../hooks/useFocusTrap';
 
@@ -44,6 +44,7 @@ const Modal = ({
   const generatedId = useId();
   const titleId = `${generatedId}-title`;
   const descriptionId = `${generatedId}-description`;
+  const touchStartTarget = useRef(null);
 
   const containerRef = useFocusTrap(isOpen, onClose, { closeOnEscape, initialFocusRef });
 
@@ -58,10 +59,26 @@ const Modal = ({
     }
   };
 
+  const handleTouchStart = (event) => {
+    touchStartTarget.current = event.target;
+  };
+
+  const handleTouchEnd = (event) => {
+    if (
+      closeOnBackdrop &&
+      event.target === event.currentTarget &&
+      touchStartTarget.current === event.currentTarget
+    ) {
+      onClose?.();
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
       onMouseDown={handleBackdropClick}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
       data-testid="modal-backdrop"
     >
       <div

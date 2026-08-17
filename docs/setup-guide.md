@@ -341,7 +341,31 @@ To shut down all running containers:
 docker-compose down
 ```
 
+### 🪟 Windows Setup via WSL2 (Recommended)
+
+For Windows users, it is highly recommended to run Docker inside **Windows Subsystem for Linux (WSL2)** to avoid file permission issues, line ending conflicts, and performance bottlenecks.
+
+1. **Install WSL2 and Ubuntu**:
+   Ensure WSL2 is enabled and install Ubuntu from the Microsoft Store:
+   ```bash
+   wsl --install
+   ```
+2. **Enable WSL2 Integration in Docker Desktop**:
+   Open Docker Desktop settings, navigate to **General**, check **Use the WSL 2 based engine**, then go to **Resources > WSL Integration** and enable it for your installed distro (e.g., Ubuntu).
+3. **Important: Git Line Endings (`CRLF` vs `LF`)**:
+   Windows uses `CRLF` for line endings, while Linux uses `LF`. When Docker mounts files from Windows, shell scripts (`.sh`) will fail to run inside containers if they contain `CRLF` line endings.
+   
+   To prevent this, configure Git to preserve `LF` line endings **before cloning the repository**:
+   ```bash
+   git config --global core.autocrlf input
+   ```
+   If you have already cloned the repository, you can re-normalize line endings by running:
+   ```bash
+   git add --renormalize .
+   ```
+
 ---
+
 
 ## 🧯 Common Troubleshooting
 
@@ -435,7 +459,39 @@ The backend did not find a valid `GEMINI_API_KEY`.
    ```
 3. Restart the backend to load the new environment variable.
 
+### Issue: Docker shell script execution failures on Windows (`\r: command not found`)
+
+This occurs because Git on Windows converted Unix line endings (`LF`) to Windows line endings (`CRLF`) during checkout, which breaks script execution inside Linux containers.
+
+**Solution:**
+Configure Git to check out line endings as-is:
+```bash
+git config --global core.autocrlf input
+```
+Then, force Git to re-normalize the line endings in your working tree:
+```bash
+git add --renormalize .
+git checkout-index --force --all
+```
+
+### Issue: Common Volume Mounting Issues in Docker Desktop for Windows
+
+If your changes are not hot-reloading inside the container, or if the container fails with permission errors when creating files/directories:
+
+1. **WSL2 File System access**:
+   Always clone your repository inside the WSL2 Linux file system (e.g. `/home/username/OpenPrep-AI/`) instead of the mounted Windows drive (`/mnt/c/Users/...`). Accessing mounted host drives (`/mnt/c`) is much slower and prone to file watcher/reload issues.
+2. **File Sharing Permissions**:
+   If using the Windows file system, make sure the directory is shared with Docker Desktop:
+   - Go to Docker Desktop **Settings > Resources > File sharing**.
+   - Add your workspace path (e.g., `C:\Users\username\OneDrive\Desktop\openSource`) to the list of allowed directories.
+3. **Restart Docker Service**:
+   If container volumes fail to mount after a Windows update or system wake from sleep, restart Docker Desktop or run:
+   ```powershell
+   Restart-Service *docker*
+   ```
+
 ---
+
 
 ## 🧪 Running Tests
 

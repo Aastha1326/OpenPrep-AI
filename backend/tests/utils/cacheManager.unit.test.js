@@ -1,3 +1,26 @@
+const cacheStore = new Map();
+
+vi.mock('../../config/redis', () => ({
+  getCache: vi.fn(async (key) => cacheStore.get(key) || null),
+  setCache: vi.fn(async (key, value) => {
+    cacheStore.set(key, value);
+    return true;
+  }),
+  invalidateCache: vi.fn(async (pattern) => {
+    if (pattern.endsWith('*')) {
+      const prefix = pattern.slice(0, -1);
+      for (const key of cacheStore.keys()) {
+        if (key.startsWith(prefix)) {
+          cacheStore.delete(key);
+        }
+      }
+    } else {
+      cacheStore.delete(pattern);
+    }
+    return true;
+  }),
+}));
+
 const cacheManager = require('../../utils/cacheManager');
 const { getCache, setCache, invalidateCache } = require('../../config/redis');
 

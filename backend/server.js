@@ -74,6 +74,7 @@ const gamificationRoutes = require('./routes/gamificationRoutes');
 const battleRoutes = require('./routes/battleRoutes');
 const readinessRoutes = require('./routes/readinessRoutes');
 const squadRoutes = require('./routes/squadRoutes');
+const badgeRoutes = require('./routes/badgeRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 
@@ -103,8 +104,8 @@ app.use(requestLogger());
 const baseCspDirectives = {
   defaultSrc: ["'self'"],
   styleSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://fonts.googleapis.com'],
-  imgSrc: ["'self'", 'data:', 'https:'],
-  connectSrc: ["'self'", 'https://generativelanguage.googleapis.com'],
+  imgSrc: ["'self'", 'data:', 'https://lh3.googleusercontent.com', 'https://avatars.githubusercontent.com', 'https://avatar.com'],
+  connectSrc: ["'self'", 'https://generativelanguage.googleapis.com', 'ws://localhost:*', 'http://localhost:*'],
   fontSrc: ["'self'", 'https:', 'data:', 'https://fonts.gstatic.com'],
   objectSrc: ["'none'"],
   frameAncestors: ["'none'"],
@@ -253,6 +254,7 @@ app.use('/api/quizzes', quizRoutes);
 app.use('/api/quiz', quizRoutes);
 app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/flashcard-decks', flashcardDeckRoutes);
+app.use('/api/decks', require('./routes/publicDeckRoutes'));
 app.use('/api/share', shareRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/admin', adminRoutes);
@@ -271,11 +273,25 @@ app.use('/api/gamification', gamificationRoutes);
 app.use('/api/battles', battleRoutes);
 app.use('/api/folders', folderRoutes);
 app.use('/api/squads', squadRoutes);
+app.use('/api/badges', badgeRoutes);
 
-// Base Route
-app.get('/', (req, res) => {
-  res.json({ message: 'Welcome to OpenPrep AI Backend REST API API Services' });
-});
+// Serve static assets from frontend build folder in production
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, '../frontend/dist')));
+
+  // Catch-all route to serve index.html for SPA routing
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/')) {
+      return next();
+    }
+    res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+  });
+} else {
+  // Base Route (only in development/test)
+  app.get('/', (req, res) => {
+    res.json({ message: 'Welcome to OpenPrep AI Backend REST API API Services' });
+  });
+}
 
 // Health Check Routes
 app.get(['/api/v1/health', '/api/health'], async (req, res) => {
@@ -352,6 +368,7 @@ require('./sockets/battleHandler')(io);
 require('./sockets/chatHandler')(io);
 require('./sockets/crdtHandler')(io);
 require('./sockets/squadHandler')(io);
+require('./sockets/flashcardCollaborationHandler')(io);
 // Authenticate Socket.io connections
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;

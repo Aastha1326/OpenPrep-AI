@@ -1,8 +1,7 @@
-const weaknessAggregatorService = require('../../services/weaknessAggregatorService');
-
 const mockTopicFindAll = vi.fn();
 const mockProgressFindAll = vi.fn();
 const mockStudyPlanFindOne = vi.fn();
+const mockQuizAttemptFindAll = vi.fn();
 
 vi.mock('../../models/Topic', () => ({
   findAll: mockTopicFindAll,
@@ -16,6 +15,10 @@ vi.mock('../../models/StudyPlan', () => ({
   findOne: mockStudyPlanFindOne,
 }));
 
+vi.mock('../../models/QuizAttempt', () => ({
+  findAll: mockQuizAttemptFindAll,
+}));
+
 vi.mock('../../services/geminiService', () => ({
   analyzePerformanceAndRecommend: vi.fn().mockResolvedValue({
     weakSubjects: ['Physics'],
@@ -24,6 +27,8 @@ vi.mock('../../services/geminiService', () => ({
     ]
   }),
 }));
+
+const weaknessAggregatorService = require('../../services/weaknessAggregatorService');
 
 describe('weaknessAggregatorService', () => {
   beforeEach(() => {

@@ -1,9 +1,4 @@
 
-const { linkGoogleCalendar, syncToGoogleCalendar, getOAuthClient } = require('../services/calendarService');
-const User = require('../models/User');
-const { encryptToken, decryptToken } = require('../utils/encryption');
-const { google } = require('googleapis');
-
 // Mock User model
 vi.mock('../models/User', () => ({
   default: {
@@ -46,6 +41,11 @@ vi.mock('googleapis', () => {
     }
   };
 });
+
+const { linkGoogleCalendar, syncToGoogleCalendar, getOAuthClient, generateStudyPlanIcs } = require('../services/calendarService');
+const User = require('../models/User');
+const { encryptToken, decryptToken } = require('../utils/encryption');
+const { google } = require('googleapis');
 
 describe('Calendar Service', () => {
   afterEach(() => {
