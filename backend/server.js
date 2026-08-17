@@ -99,8 +99,8 @@ app.use(requestLogger());
 const baseCspDirectives = {
   defaultSrc: ["'self'"],
   styleSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://fonts.googleapis.com'],
-  imgSrc: ["'self'", 'data:', 'https:'],
-  connectSrc: ["'self'", 'https://generativelanguage.googleapis.com'],
+  imgSrc: ["'self'", 'data:', 'https://lh3.googleusercontent.com', 'https://avatars.githubusercontent.com', 'https://avatar.com'],
+  connectSrc: ["'self'", 'https://generativelanguage.googleapis.com', 'ws://localhost:*', 'http://localhost:*'],
   fontSrc: ["'self'", 'https:', 'data:', 'https://fonts.gstatic.com'],
   objectSrc: ["'none'"],
   frameAncestors: ["'none'"],
