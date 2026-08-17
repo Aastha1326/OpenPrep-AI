@@ -212,6 +212,42 @@ describe('Quiz Controller - Integration Tests', () => {
       expect(res.body.data.user).toBe(testUser.id.toString());
     });
 
+    it('should correctly grade quiz questions where correctAnswer is stored as an array', async () => {
+      const arrayQuiz = await Quiz.create({
+        title: 'Array CorrectAnswer Quiz',
+        subject: testSubject.id,
+        topic: testTopic.id,
+        questions: [
+          {
+            _id: uuidv4(),
+            questionText: 'Which option is correct?',
+            options: ['Option A', 'Option B', 'Option C', 'Option D'],
+            correctAnswer: [0, 2],
+            explanation: 'Both A and C are accepted',
+          },
+        ],
+        type: 'AI_Generated',
+        createdBy: testUser.id,
+      });
+
+      const ans = [
+        {
+          questionId: String(arrayQuiz.questions[0]._id),
+          selectedAnswer: 2, // 2 is in [0, 2]
+        },
+      ];
+
+      const res = await request(app)
+        .post(`/api/quizzes/${arrayQuiz.id}/submit`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ answers: ans, timeSpent: 15 });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.score).toBe(100);
+      expect(res.body.data.answers[0].isCorrect).toBe(true);
+    });
+
     it('should return the existing attempt when the same quiz is resubmitted within the 5-second window (double-click prevention)', async () => {
       const realAnswers = (testQuiz.questions || []).map((q, idx) => ({
         questionId: String(q.id || q._id || q.questionId || `00000000-0000-0000-0000-00000000000${idx + 1}`),

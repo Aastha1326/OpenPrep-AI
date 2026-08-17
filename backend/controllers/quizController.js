@@ -103,17 +103,27 @@ exports.generateAIQuiz = async (req, res, next) => {
     );
 
     // Assign unique question IDs (similar to Mongoose subdocument ids)
-    const questionsWithIds = aiQuiz.questions.map((q) => ({
-      _id: uuidv4(),
-      questionType: q.questionType || (q.options ? 'MCQ' : 'SUBJECTIVE'),
-      questionText: q.questionText,
-      options: q.options || [],
-      correctAnswer: q.correctAnswer !== undefined ? q.correctAnswer : null,
-      idealAnswer: q.idealAnswer || '',
-      rubricCriteria: q.rubricCriteria || [],
-      maxScore: q.maxScore || 10,
-      explanation: q.explanation || '',
-    }));
+    const questionsWithIds = aiQuiz.questions.map((q) => {
+      let normalizedCorrectAnswer = q.correctAnswer;
+      if (Array.isArray(normalizedCorrectAnswer)) {
+        normalizedCorrectAnswer = normalizedCorrectAnswer.length > 0 ? normalizedCorrectAnswer[0] : null;
+      }
+      if (typeof normalizedCorrectAnswer === 'string' && !isNaN(normalizedCorrectAnswer) && normalizedCorrectAnswer.trim() !== '') {
+        normalizedCorrectAnswer = parseInt(normalizedCorrectAnswer, 10);
+      }
+
+      return {
+        _id: uuidv4(),
+        questionType: q.questionType || (q.options ? 'MCQ' : 'SUBJECTIVE'),
+        questionText: q.questionText,
+        options: q.options || [],
+        correctAnswer: normalizedCorrectAnswer !== undefined ? normalizedCorrectAnswer : null,
+        idealAnswer: q.idealAnswer || '',
+        rubricCriteria: q.rubricCriteria || [],
+        maxScore: q.maxScore || 10,
+        explanation: q.explanation || '',
+      };
+    });
 
     const quiz = await Quiz.create({
       title: aiQuiz.title || `${topicName} AI Practice Quiz`,
@@ -400,7 +410,9 @@ exports.submitQuizAttempt = async (req, res, next) => {
         } else {
           totalMaxPoints += 1;
           const selected = userAns && userAns.selectedAnswer !== undefined ? userAns.selectedAnswer : -1;
-          const isCorrect = selected === q.correctAnswer;
+          const isCorrect = Array.isArray(q.correctAnswer)
+            ? q.correctAnswer.includes(selected)
+            : selected === q.correctAnswer;
           if (isCorrect) {
             correctCount++;
             totalEarnedPoints += 1;
@@ -1087,7 +1099,9 @@ exports.getQuizAttemptReportPDF = async (req, res, next) => {
       const options = q.options || [];
       options.forEach((optStr, optIdx) => {
         const isUserSelection = userAns && userAns.selectedAnswer === optIdx;
-        const isCorrectOption = q.correctAnswer === optIdx;
+        const isCorrectOption = Array.isArray(q.correctAnswer)
+          ? q.correctAnswer.includes(optIdx)
+          : q.correctAnswer === optIdx;
         
         let prefix = '   [ ] ';
         let optionColor = '#4a5568';
@@ -1223,14 +1237,24 @@ exports.generateRemediationQuiz = async (req, res, next) => {
       forceRefresh,
     });
 
-    const questionsWithIds = (aiQuiz.questions || []).map((q) => ({
-      _id: uuidv4(),
-      questionType: 'MCQ',
-      questionText: q.questionText,
-      options: q.options || [],
-      correctAnswer: q.correctAnswer !== undefined ? q.correctAnswer : null,
-      explanation: q.explanation || '',
-    }));
+    const questionsWithIds = (aiQuiz.questions || []).map((q) => {
+      let normalizedCorrectAnswer = q.correctAnswer;
+      if (Array.isArray(normalizedCorrectAnswer)) {
+        normalizedCorrectAnswer = normalizedCorrectAnswer.length > 0 ? normalizedCorrectAnswer[0] : null;
+      }
+      if (typeof normalizedCorrectAnswer === 'string' && !isNaN(normalizedCorrectAnswer) && normalizedCorrectAnswer.trim() !== '') {
+        normalizedCorrectAnswer = parseInt(normalizedCorrectAnswer, 10);
+      }
+
+      return {
+        _id: uuidv4(),
+        questionType: 'MCQ',
+        questionText: q.questionText,
+        options: q.options || [],
+        correctAnswer: normalizedCorrectAnswer !== undefined ? normalizedCorrectAnswer : null,
+        explanation: q.explanation || '',
+      };
+    });
 
     const quiz = await Quiz.create({
       title: aiQuiz.title || `Remediation Quiz: ${subject.name}`,

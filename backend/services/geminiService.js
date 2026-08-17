@@ -82,6 +82,25 @@ const resolveOptionIndex = (value, options) => {
 };
 
 /**
+ * Normalizes correctAnswer in quiz questions so array values (e.g. [0, 2])
+ * are converted to a single integer before returning.
+ */
+const normalizeQuizQuestions = (parsed) => {
+  if (parsed && Array.isArray(parsed.questions)) {
+    parsed.questions = parsed.questions.map((q) => {
+      if (Array.isArray(q.correctAnswer)) {
+        q.correctAnswer = q.correctAnswer.length > 0 ? q.correctAnswer[0] : 0;
+      }
+      if (typeof q.correctAnswer === 'string' && !isNaN(q.correctAnswer) && q.correctAnswer.trim() !== '') {
+        q.correctAnswer = parseInt(q.correctAnswer, 10);
+      }
+      return q;
+    });
+  }
+  return parsed;
+};
+
+/**
  * Timeout wrapper using Promise.race (safe for SDK versions that lack AbortSignal support).
  * @google/generative-ai ^0.11.4 does NOT support AbortSignal via requestOptions.
  *
@@ -797,6 +816,7 @@ exports.generateQuiz = async (
       return getMockQuiz(subjectName, topicName, count, normalizedLanguage, questionType);
     }
 
+    normalizeQuizQuestions(parsed);
     responseCache.set(cacheKey, parsed);
     return parsed;
   } catch (error) {
@@ -2162,6 +2182,7 @@ exports.generateCustomQuiz = async (
       throw new Error('Invalid JSON format from Gemini API');
     }
 
+    normalizeQuizQuestions(parsed);
     return parsed;
   } catch (err) {
     console.error('Gemini custom quiz generator failed:', err);
