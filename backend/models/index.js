@@ -13,6 +13,7 @@ const QuizAttempt = require('./QuizAttempt');
 const Note = require('./Note');
 const Flashcard = require('./Flashcard');
 const FlashcardDeck = require('./FlashcardDeck');
+const DeckCollaborator = require('./DeckCollaborator');
 const Progress = require('./Progress');
 const Feedback = require('./Feedback');
 const ActivityLog = require('./ActivityLog');
@@ -23,6 +24,7 @@ const QuizTelemetryEvent = require('./QuizTelemetryEvent');
 const QuizBookmark = require('./QuizBookmark');
 const DeckRating = require('./DeckRating');
 const UserBadge = require('./UserBadge');
+const Badge = require('./Badge');
 const BattleSession = require('./BattleSession');
 const BattleParticipant = require('./BattleParticipant');
 const PYQAnalysis = require('./PYQAnalysis');
@@ -76,6 +78,15 @@ FlashcardDeck.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 FlashcardDeck.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'SET NULL' });
 FlashcardDeck.hasMany(Flashcard, { foreignKey: 'deckId', onDelete: 'CASCADE' });
 Flashcard.belongsTo(FlashcardDeck, { foreignKey: 'deckId', as: 'deckRef' });
+
+// DeckCollaborator associations
+FlashcardDeck.hasMany(DeckCollaborator, { foreignKey: 'deckId', onDelete: 'CASCADE' });
+DeckCollaborator.belongsTo(FlashcardDeck, { foreignKey: 'deckId', as: 'deckRef' });
+
+User.hasMany(DeckCollaborator, { foreignKey: 'userId', onDelete: 'CASCADE' });
+DeckCollaborator.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+DeckCollaborator.belongsTo(User, { foreignKey: 'invitedBy', as: 'invitedByRef' });
 
 // Topic associations
 Topic.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'CASCADE' });
@@ -131,6 +142,10 @@ Achievement.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 
 // UserBadge associations
 UserBadge.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+// Badge associations
+Badge.hasMany(UserBadge, { foreignKey: 'badgeCode', sourceKey: 'id', as: 'userBadges' });
+UserBadge.belongsTo(Badge, { foreignKey: 'badgeCode', targetKey: 'id', as: 'badge' });
 
 // FocusSession associations
 FocusSession.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
@@ -236,6 +251,7 @@ module.exports = {  sequelize,  User,  Exam,
   QuizBookmark,
   DeckRating,
   UserBadge,
+  Badge,
   BattleSession,
   BattleParticipant,
   PYQAnalysis,
@@ -250,4 +266,5 @@ module.exports = {  sequelize,  User,  Exam,
   SquadActivity,
   SquadActivityReaction,
   FlashcardDeck,
+  DeckCollaborator,
 };
