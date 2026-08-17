@@ -6,21 +6,32 @@ const {
   checkAndUnlockBadges,
 } = require('../../services/gamificationService');
 
-const User = require('../../models/User');
-const UserBadge = require('../../models/UserBadge');
-const QuizAttempt = require('../../models/QuizAttempt');
+const models = require('../../models');
+const cacheService = require('../../services/cacheService');
 
-vi.mock('../../models/User');
-vi.mock('../../models/UserBadge');
-vi.mock('../../models/QuizAttempt');
-vi.mock('../../services/cacheService', () => ({
-  get: vi.fn().mockResolvedValue(null),
-  set: vi.fn().mockResolvedValue(true),
+vi.mock('../../services/notificationService', () => ({
+  createNotification: vi.fn().mockResolvedValue({}),
 }));
 
 describe('Gamification Service Unit Tests', () => {
+  let userSpy, badgeFindSpy, badgeCreateSpy, squadMemberSpy, squadChallengeSpy, squadContribSpy, cacheGetSpy;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    userSpy = vi.spyOn(models.User, 'findByPk').mockResolvedValue(null);
+    badgeFindSpy = vi.spyOn(models.UserBadge, 'findOne').mockResolvedValue(null);
+    badgeCreateSpy = vi.spyOn(models.UserBadge, 'create').mockResolvedValue({});
+    vi.spyOn(models.QuizAttempt, 'count').mockResolvedValue(0);
+
+    squadMemberSpy = vi.spyOn(models.SquadMember, 'findAll').mockResolvedValue([]);
+    squadChallengeSpy = vi.spyOn(models.SquadChallenge, 'findAll').mockResolvedValue([]);
+    squadContribSpy = vi.spyOn(models.SquadChallengeContribution, 'findOrCreate').mockResolvedValue([{}, false]);
+
+    vi.spyOn(models.Notification, 'create').mockResolvedValue({});
+    vi.spyOn(models.PushSubscription, 'findAll').mockResolvedValue([]);
+
+    cacheGetSpy = vi.spyOn(cacheService, 'get').mockResolvedValue(null);
+    vi.spyOn(cacheService, 'set').mockResolvedValue(true);
   });
 
   describe('Level & XP Calculation Formulas', () => {
@@ -53,7 +64,7 @@ describe('Gamification Service Unit Tests', () => {
         save: vi.fn(),
       };
 
-      User.findByPk.mockResolvedValue(mockUser);
+      userSpy.mockResolvedValue(mockUser);
 
       const result = await updateStreak('user-123', 0);
 
@@ -77,7 +88,7 @@ describe('Gamification Service Unit Tests', () => {
         save: vi.fn(),
       };
 
-      User.findByPk.mockResolvedValue(mockUser);
+      userSpy.mockResolvedValue(mockUser);
 
       const result = await updateStreak('user-123', 0);
 
@@ -101,13 +112,56 @@ describe('Gamification Service Unit Tests', () => {
         save: vi.fn(),
       };
 
-      User.findByPk.mockResolvedValue(mockUser);
+      userSpy.mockResolvedValue(mockUser);
 
       const result = await updateStreak('user-123', 0);
 
       expect(mockUser.streakFreezesAvailable).toBe(1);
       expect(mockUser.currentStreak).toBe(1);
       expect(result.currentStreak).toBe(1);
+    });
+
+    test('should adjust calculations based on local timezone offsets', async () => {
+      // Create user studying at 23:30 (11:30 PM) UTC.
+      // In timezone offset of -120 (UTC+2), local time is next day 01:30 (1:30 AM).
+      // Last active date was UTC today.
+      const now = new Date(Date.UTC(2026, 7, 17, 23, 30, 0));
+      const lastActivityDate = '2026-08-17'; // user studied earlier on August 17
+
+      const mockUser = {
+        id: 'user-123',
+        currentStreak: 5,
+        longestStreak: 5,
+        lastActivityDate,
+        streakFreezesAvailable: 0,
+        save: vi.fn(),
+      };
+
+      userSpy.mockResolvedValue(mockUser);
+
+      // System date needs to be mocked or we can temporarily override global Date constructor or mock `now` in Date.
+      // Since updateStreak does `const now = new Date();`, we can mock the Date constructor or mock Date.now()
+      const originalDate = global.Date;
+      try {
+        global.Date = class extends originalDate {
+          constructor(...args) {
+            if (args.length === 0) {
+              return new originalDate(now.getTime());
+            }
+            return new originalDate(...args);
+          }
+        };
+
+        // Timezone offset -120 translates to UTC+2.
+        // UTC time: 2026-08-17 23:30:00 -> minus -120 min = plus 2 hours -> 2026-08-18 01:30:00.
+        // Therefore, local date is 2026-08-18. Since lastActivityDate was 2026-08-17, this is consecutive!
+        const result = await updateStreak('user-123', -120);
+
+        expect(mockUser.currentStreak).toBe(6);
+        expect(mockUser.lastActivityDate).toBe('2026-08-18');
+      } finally {
+        global.Date = originalDate;
+      }
     });
   });
 
@@ -119,7 +173,7 @@ describe('Gamification Service Unit Tests', () => {
         level: 1,
         save: vi.fn(),
       };
-      User.findByPk.mockResolvedValue(mockUser);
+      userSpy.mockResolvedValue(mockUser);
 
       const result = await awardXP('user-123', 50, 'task_complete');
       expect(result.xp).toBe(150);
@@ -133,11 +187,10 @@ describe('Gamification Service Unit Tests', () => {
         level: 1,
         save: vi.fn(),
       };
-      User.findByPk.mockResolvedValue(mockUser);
+      userSpy.mockResolvedValue(mockUser);
 
       // Mock cache returning 500 XP already earned in the current hour
-      const cacheService = require('../../services/cacheService');
-      cacheService.get.mockResolvedValueOnce('500');
+      cacheGetSpy.mockResolvedValueOnce('500');
 
       const result = await awardXP('user-123', 100, 'task_complete');
       expect(result.xp).toBe(100); // XP unchanged
@@ -156,15 +209,15 @@ describe('Gamification Service Unit Tests', () => {
         save: vi.fn(),
       };
 
-      UserBadge.findOne.mockResolvedValue(null);
-      UserBadge.create.mockResolvedValue({
+      badgeFindSpy.mockResolvedValue(null);
+      badgeCreateSpy.mockResolvedValue({
         id: 'badge-30',
         badgeCode: 'thirty_day_streak',
       });
 
       const result = await checkAndUnlockBadges(mockUser, 'streak_check');
 
-      expect(UserBadge.create).toHaveBeenCalledWith(
+      expect(badgeCreateSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: 'user-123',
           badgeCode: 'thirty_day_streak',
@@ -183,8 +236,8 @@ describe('Gamification Service Unit Tests', () => {
         save: vi.fn(),
       };
 
-      UserBadge.findOne.mockResolvedValue(null);
-      UserBadge.create.mockResolvedValue({
+      badgeFindSpy.mockResolvedValue(null);
+      badgeCreateSpy.mockResolvedValue({
         id: 'badge-100',
         badgeCode: 'hundred_day_streak',
       });

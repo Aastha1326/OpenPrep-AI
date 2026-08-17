@@ -34,6 +34,7 @@ async function checkAndAwardBadges(userId, event) {
     case 'QUIZ_SUBMIT':
       if (event.payload?.score === 100) {
         candidateBadgeIds.push(BADGES.QUIZ_MASTER.id);
+        candidateBadgeIds.push('perfect_score');
       }
       if (event.payload?.consecutiveHighScores >= 3) {
         candidateBadgeIds.push(BADGES.SHARPSHOOTER.id);
@@ -58,6 +59,12 @@ async function checkAndAwardBadges(userId, event) {
         const hours = date.getHours();
         if (hours < 7) {
           candidateBadgeIds.push(BADGES.EARLY_BIRD.id);
+        }
+        if (hours >= 23 || hours < 4) {
+          candidateBadgeIds.push(BADGES.NIGHT_OWL.id);
+        }
+        if (event.payload?.durationHours >= 10) {
+          candidateBadgeIds.push(BADGES.STUDY_MARATHON.id);
         }
       }
       break;

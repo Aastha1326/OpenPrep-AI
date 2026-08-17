@@ -5,7 +5,8 @@ import API from '../services/api';
 import CreateDeckModal from '../components/dashboard/CreateDeckModal';
 import CreateFlashcardDeckModal from '../components/flashcards/CreateFlashcardDeckModal';
 import YouTubeFlashcardImporter from '../components/flashcards/YouTubeFlashcardImporter';
-import { Search, Trash2, Plus, ChevronLeft, ChevronRight, PlaySquare as Youtube, Share2, Copy, Check, BookOpen, Layers, Globe, Lock } from 'lucide-react';
+import DeckCollaboratorsModal from '../components/flashcards/DeckCollaboratorsModal';
+import { Search, Trash2, Plus, ChevronLeft, ChevronRight, PlaySquare as Youtube, Share2, Copy, Check, BookOpen, Layers, Globe, Lock, Users } from 'lucide-react';
 
 const Flashcards = () => {
   const dispatch = useDispatch();
@@ -33,6 +34,8 @@ const Flashcards = () => {
   const [showCreateCardModal, setShowCreateCardModal] = useState(false);
   const [showCreateDeckModal, setShowCreateDeckModal] = useState(false);
   const [showYoutubeModal, setShowYoutubeModal] = useState(false);
+  const [showCollaboratorsModal, setShowCollaboratorsModal] = useState(false);
+  const [selectedDeckForCollaborators, setSelectedDeckForCollaborators] = useState(null);
   
   // Create card target IDs
   const [targetDeckId, setTargetDeckId] = useState('');
@@ -111,8 +114,8 @@ const Flashcards = () => {
     try {
       const res = await API.post(`/flashcard-decks/${id}/share`);
       if (res.data?.success) {
-        const token = res.data.data.shareToken;
-        const shareLink = `${window.location.origin}/share/${token}`;
+        const deckId = res.data.data.id;
+        const shareLink = `${window.location.origin}/decks/shared/${deckId}`;
         navigator.clipboard.writeText(shareLink);
         setCopiedDeckId(id);
         setTimeout(() => setCopiedDeckId(null), 2000);
@@ -122,6 +125,12 @@ const Flashcards = () => {
       console.error('Failed to share deck', err);
       alert(err.response?.data?.error || 'Failed to share deck. Please try again.');
     }
+  };
+
+  const handleOpenCollaborators = (deck, e) => {
+    e.stopPropagation();
+    setSelectedDeckForCollaborators(deck);
+    setShowCollaboratorsModal(true);
   };
 
   const handleViewDeckCards = (id) => {
@@ -158,6 +167,13 @@ const Flashcards = () => {
           >
             <Youtube className="w-4 h-4" />
             YouTube Import
+          </button>
+          <button
+            onClick={() => setShowOCRModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold shadow-md transition cursor-pointer text-sm"
+          >
+            <FileImage className="w-4 h-4" />
+            Image/PDF Import
           </button>
           <button
             onClick={() => {
@@ -274,15 +290,21 @@ const Flashcards = () => {
                         </span>
                       )}
 
-                      {deck.isPublic ? (
-                        <span className="text-[10px] font-semibold px-2 py-0.5 bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 rounded-full flex items-center gap-1">
-                          <Globe className="w-2.5 h-2.5" /> Shared
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-semibold px-2 py-0.5 bg-neutral-50 dark:bg-neutral-800/40 text-neutral-400 dark:text-neutral-500 rounded-full flex items-center gap-1">
-                          <Lock className="w-2.5 h-2.5" /> Private
-                        </span>
-                      )}
+                      <button
+                        onClick={(e) => handleToggleVisibility(deck.id, deck.isPublic, e)}
+                        className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 transition cursor-pointer hover:opacity-80"
+                        title={deck.isPublic ? 'Make private' : 'Make public'}
+                      >
+                        {deck.isPublic ? (
+                          <span className="bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 flex items-center gap-1">
+                            <Globe className="w-2.5 h-2.5" /> Shared
+                          </span>
+                        ) : (
+                          <span className="bg-neutral-50 dark:bg-neutral-800/40 text-neutral-400 dark:text-neutral-500 flex items-center gap-1">
+                            <Lock className="w-2.5 h-2.5" /> Private
+                          </span>
+                        )}
+                      </button>
                     </div>
                   </div>
 
@@ -293,13 +315,22 @@ const Flashcards = () => {
 
                     <div className="flex gap-2">
                       <button
+                        onClick={(e) => handleOpenCollaborators(deck, e)}
+                        className="p-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer bg-white dark:bg-neutral-900 border-neutral-300 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                        title="Manage collaborators"
+                      >
+                        <Users className="w-3.5 h-3.5" />
+                        Team
+                      </button>
+
+                      <button
                         onClick={(e) => handleShareDeck(deck.id, e)}
                         className={`p-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
                           copiedDeckId === deck.id
                             ? 'bg-green-50 dark:bg-green-950/20 border-green-200 text-green-600'
                             : 'bg-white dark:bg-neutral-900 border-neutral-300 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800'
                         }`}
-                        title="Generate and copy shareable link"
+                        title="Copy public deck URL"
                       >
                         {copiedDeckId === deck.id ? <Check className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5" />}
                         {copiedDeckId === deck.id ? 'Copied!' : 'Share'}
@@ -542,6 +573,20 @@ const Flashcards = () => {
               dispatch(fetchFlashcards({ page: 1, limit: 12, sortBy, order }));
             }
           }}
+        />
+      )}
+
+      {showCollaboratorsModal && selectedDeckForCollaborators && (
+        <DeckCollaboratorsModal
+          isOpen={showCollaboratorsModal}
+          onClose={() => {
+            setShowCollaboratorsModal(false);
+            setSelectedDeckForCollaborators(null);
+          }}
+          deckId={selectedDeckForCollaborators.id}
+          deckName={selectedDeckForCollaborators.name}
+          isOwner={true}
+          canAdmin={true}
         />
       )}
     </div>

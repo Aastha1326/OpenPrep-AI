@@ -346,6 +346,13 @@ const StudyGroupChat = () => {
                                             {children}
                                           </code>
                                         );
+                                      },
+                                      a({ href, children, ...props }) {
+                                        return (
+                                          <a href={href} target="_blank" rel="noopener noreferrer" className="text-yellow-800 underline font-semibold" {...props}>
+                                            {children}
+                                          </a>
+                                        );
                                       }
                                     }}
                                   >

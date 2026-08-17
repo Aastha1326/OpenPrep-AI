@@ -55,6 +55,16 @@ const markdownComponents = {
     </th>
   ),
   td: ({ children }) => <td className="border border-slate-700 px-2 py-1">{children}</td>,
+  a: ({ href, children }) => (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-indigo-400 hover:text-indigo-300 underline"
+    >
+      {children}
+    </a>
+  ),
 };
 
 const QuestionExplanation = ({

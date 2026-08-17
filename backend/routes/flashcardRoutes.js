@@ -2,6 +2,7 @@ const express = require('express');
 const {
   generateAIFlashcards,
   generateFlashcardsFromNote,
+  generateFlashcardsFromText,
   generateFlashcardsFromAudio,
   generateFlashcardsFromYouTube,
   autoTagFlashcard,  
@@ -214,6 +215,101 @@ router.post(
   checkQuota,
   validateGenerateFlashcardsFromNote,
   generateFlashcardsFromNote
+);
+
+/**
+ * @swagger
+ * /api/flashcards/generate-from-text:
+ *   post:
+ *     summary: Generate AI flashcard preview directly from text content
+ *     tags: [Flashcards]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - subjectId
+ *               - text
+ *             properties:
+ *               subjectId:
+ *                 type: string
+ *                 format: uuid
+ *                 example: "123e4567-e89b-12d3-a456-426614174000"
+ *               text:
+ *                 type: string
+ *                 example: "The mitochondria is the powerhouse of the cell."
+ *               count:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 50
+ *                 default: 6
+ *                 example: 6
+ *     responses:
+ *       200:
+ *         description: Flashcards generated successfully (preview mode, not saved)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 count:
+ *                   type: integer
+ *                   example: 6
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       front:
+ *                         type: string
+ *                         example: "What is the mitochondria?"
+ *                       back:
+ *                         type: string
+ *                         example: "The powerhouse of the cell"
+ *       400:
+ *         description: Validation error or empty text content
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Subject not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       429:
+ *         description: Rate limit exceeded
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       503:
+ *         description: AI service unavailable
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.post(
+  '/generate-from-text',
+  protect,
+  aiLimiter,
+  checkQuota,
+  generateFlashcardsFromText
 );
 
 /**
