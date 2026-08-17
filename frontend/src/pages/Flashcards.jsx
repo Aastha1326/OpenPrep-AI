@@ -5,7 +5,8 @@ import API from '../services/api';
 import CreateDeckModal from '../components/dashboard/CreateDeckModal';
 import CreateFlashcardDeckModal from '../components/flashcards/CreateFlashcardDeckModal';
 import YouTubeFlashcardImporter from '../components/flashcards/YouTubeFlashcardImporter';
-import { Search, Trash2, Plus, ChevronLeft, ChevronRight, PlaySquare as Youtube, Share2, Copy, Check, BookOpen, Layers, Globe, Lock } from 'lucide-react';
+import DeckCollaboratorsModal from '../components/flashcards/DeckCollaboratorsModal';
+import { Search, Trash2, Plus, ChevronLeft, ChevronRight, PlaySquare as Youtube, Share2, Copy, Check, BookOpen, Layers, Globe, Lock, Users } from 'lucide-react';
 
 const Flashcards = () => {
   const dispatch = useDispatch();
@@ -33,6 +34,8 @@ const Flashcards = () => {
   const [showCreateCardModal, setShowCreateCardModal] = useState(false);
   const [showCreateDeckModal, setShowCreateDeckModal] = useState(false);
   const [showYoutubeModal, setShowYoutubeModal] = useState(false);
+  const [showCollaboratorsModal, setShowCollaboratorsModal] = useState(false);
+  const [selectedDeckForCollaborators, setSelectedDeckForCollaborators] = useState(null);
   
   // Create card target IDs
   const [targetDeckId, setTargetDeckId] = useState('');
@@ -122,6 +125,12 @@ const Flashcards = () => {
       console.error('Failed to share deck', err);
       alert(err.response?.data?.error || 'Failed to share deck. Please try again.');
     }
+  };
+
+  const handleOpenCollaborators = (deck, e) => {
+    e.stopPropagation();
+    setSelectedDeckForCollaborators(deck);
+    setShowCollaboratorsModal(true);
   };
 
   const handleViewDeckCards = (id) => {
@@ -292,6 +301,15 @@ const Flashcards = () => {
                     </div>
 
                     <div className="flex gap-2">
+                      <button
+                        onClick={(e) => handleOpenCollaborators(deck, e)}
+                        className="p-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer bg-white dark:bg-neutral-900 border-neutral-300 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                        title="Manage collaborators"
+                      >
+                        <Users className="w-3.5 h-3.5" />
+                        Team
+                      </button>
+
                       <button
                         onClick={(e) => handleShareDeck(deck.id, e)}
                         className={`p-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
@@ -542,6 +560,20 @@ const Flashcards = () => {
               dispatch(fetchFlashcards({ page: 1, limit: 12, sortBy, order }));
             }
           }}
+        />
+      )}
+
+      {showCollaboratorsModal && selectedDeckForCollaborators && (
+        <DeckCollaboratorsModal
+          isOpen={showCollaboratorsModal}
+          onClose={() => {
+            setShowCollaboratorsModal(false);
+            setSelectedDeckForCollaborators(null);
+          }}
+          deckId={selectedDeckForCollaborators.id}
+          deckName={selectedDeckForCollaborators.name}
+          isOwner={true}
+          canAdmin={true}
         />
       )}
     </div>

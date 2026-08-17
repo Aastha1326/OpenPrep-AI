@@ -13,6 +13,7 @@ const QuizAttempt = require('./QuizAttempt');
 const Note = require('./Note');
 const Flashcard = require('./Flashcard');
 const FlashcardDeck = require('./FlashcardDeck');
+const DeckCollaborator = require('./DeckCollaborator');
 const Progress = require('./Progress');
 const Feedback = require('./Feedback');
 const ActivityLog = require('./ActivityLog');
@@ -77,6 +78,15 @@ FlashcardDeck.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 FlashcardDeck.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'SET NULL' });
 FlashcardDeck.hasMany(Flashcard, { foreignKey: 'deckId', onDelete: 'CASCADE' });
 Flashcard.belongsTo(FlashcardDeck, { foreignKey: 'deckId', as: 'deckRef' });
+
+// DeckCollaborator associations
+FlashcardDeck.hasMany(DeckCollaborator, { foreignKey: 'deckId', onDelete: 'CASCADE' });
+DeckCollaborator.belongsTo(FlashcardDeck, { foreignKey: 'deckId', as: 'deckRef' });
+
+User.hasMany(DeckCollaborator, { foreignKey: 'userId', onDelete: 'CASCADE' });
+DeckCollaborator.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+DeckCollaborator.belongsTo(User, { foreignKey: 'invitedBy', as: 'invitedByRef' });
 
 // Topic associations
 Topic.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'CASCADE' });
@@ -256,4 +266,5 @@ module.exports = {  sequelize,  User,  Exam,
   SquadActivity,
   SquadActivityReaction,
   FlashcardDeck,
+  DeckCollaborator,
 };

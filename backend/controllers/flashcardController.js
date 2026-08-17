@@ -8,6 +8,8 @@ const ActivityLog = require('../models/ActivityLog');
 const Progress = require('../models/Progress');
 const User = require('../models/User');
 const Exam = require('../models/Exam');
+const FlashcardDeck = require('../models/FlashcardDeck');
+const DeckCollaborator = require('../models/DeckCollaborator');
 const { calculateTopicProficiency, getDifficultyLevel } = require('../services/proficiencyService');
 const remediationService = require('../services/remediationService');
 const { checkAndAwardBadges } = require('../services/achievementService');
@@ -16,6 +18,35 @@ const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiS
 const youtubeService = require('../services/youtubeService');
 const { fromBuffer } = require('file-type');
 const { adjustIntervalByConfidence } = require('../utils/confidenceScheduler');
+
+/**
+ * Check if user has edit access to a deck (owner or edit/admin collaborator)
+ */
+async function checkDeckEditAccess(deckId, userId) {
+  const deck = await FlashcardDeck.findOne({ where: { id: deckId } });
+  if (!deck) return { hasAccess: false, reason: 'Deck not found' };
+
+  // Owner has full access
+  if (deck.user === userId) {
+    return { hasAccess: true, role: 'owner' };
+  }
+
+  // Check collaborator access
+  const collaborator = await DeckCollaborator.findOne({
+    where: { deckId, userId, status: 'accepted' },
+  });
+
+  if (!collaborator) {
+    return { hasAccess: false, reason: 'Not a collaborator' };
+  }
+
+  // Only edit and admin roles can modify cards
+  if (collaborator.role !== 'edit' && collaborator.role !== 'admin') {
+    return { hasAccess: false, reason: 'Insufficient permissions' };
+  }
+
+  return { hasAccess: true, role: collaborator.role };
+}
 
 /**
  * Extract an 11-character YouTube video ID from common URL formats
@@ -438,6 +469,15 @@ exports.generateFlashcardsFromYouTube = async (req, res, next) => {
 exports.createFlashcard = async (req, res, next) => {
   try {
     const { subjectId, topicId, deckId, front, back, tags, difficulty } = req.body;
+
+    // Check deck access if creating card in a deck
+    if (deckId) {
+      const access = await checkDeckEditAccess(deckId, req.user.id);
+      if (!access.hasAccess) {
+        return res.status(403).json({ success: false, error: access.reason });
+      }
+    }
+
     const card = await Flashcard.create({
       user: req.user.id,
       subject: subjectId,
@@ -448,7 +488,7 @@ exports.createFlashcard = async (req, res, next) => {
       tags: tags || [],
       difficulty: difficulty || null,
     });
-    
+
     // Issue #1053: Check for Card Collector badge
     const totalCreated = await Flashcard.count({ where: { user: req.user.id } });
     await checkAndAwardBadges(req.user.id, {
@@ -662,10 +702,23 @@ exports.reviewFlashcard = async (req, res, next) => {
 // @access  Private
 exports.deleteFlashcard = async (req, res, next) => {
   try {
-    const card = await Flashcard.findOne({ where: { id: req.params.id, user: req.user.id } });
+    const card = await Flashcard.findOne({ where: { id: req.params.id } });
     if (!card) {
       return res.status(404).json({ success: false, error: 'Flashcard not found' });
     }
+
+    // Check if user owns the card or has deck edit access
+    if (card.user !== req.user.id) {
+      if (card.deckId) {
+        const access = await checkDeckEditAccess(card.deckId, req.user.id);
+        if (!access.hasAccess) {
+          return res.status(403).json({ success: false, error: 'Not authorized to delete this flashcard' });
+        }
+      } else {
+        return res.status(403).json({ success: false, error: 'Not authorized to delete this flashcard' });
+      }
+    }
+
     await card.destroy();
     res.status(200).json({ success: true, data: {} });
   } catch (error) {
