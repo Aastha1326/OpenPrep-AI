@@ -631,6 +631,26 @@ describe('Auth Controller - Integration Tests', () => {
       // Access token is same user/payload — may match if issued same second
     });
 
+    it('should rotate and issue a new refresh token using /refresh endpoint', async () => {
+      const user = await createVerifiedUser({ email: 'refreshnew@example.com' });
+
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'refreshnew@example.com', password: 'StrongPass1!' });
+
+      const oldRefreshToken = loginRes.body.refreshToken;
+
+      const res = await request(app)
+        .post('/api/auth/refresh')
+        .send({ refreshToken: oldRefreshToken });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.token).toBeDefined();
+      expect(res.body.refreshToken).toBeDefined();
+      expect(res.body.refreshToken).not.toBe(oldRefreshToken);
+    });
+
     it('should return 401 with invalid refresh token', async () => {
       const res = await request(app)
         .post('/api/auth/refresh-token')
