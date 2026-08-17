@@ -142,5 +142,16 @@ describe('SM-2 Spaced Repetition Utility Tests', () => {
 
       expect(result.interval).toBe(15); // 6 * 2.5 = 15
     });
+
+    it('should cap the next interval at 365 days to prevent integer overflow and runaway review dates', () => {
+      const result = calculateSM2({
+        interval: 300,
+        repetitions: 5,
+        efactor: 2.5,
+        quality: 5,
+      });
+
+      expect(result.interval).toBe(365);
+    });
   });
 });
