@@ -139,6 +139,56 @@ exports.autoTagFlashcard = async (req, res, next) => {
   }
 };
 
+// @desc    Preview AI-generated flashcards from text (not saved)
+// @route   POST /api/flashcards/generate-from-text
+// @access  Private
+exports.generateFlashcardsFromText = async (req, res, next) => {
+  try {
+    const { subjectId, text, count } = req.body;
+
+    if (!text || text.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Text is required to generate flashcards',
+      });
+    }
+
+    const subject = await Subject.findByPk(subjectId);
+    if (!subject) {
+      return res.status(404).json({ success: false, error: 'Subject not found' });
+    }
+
+    const subjectName = subject.name;
+    const topicName = 'Extracted Content';
+
+    const cardsList = await geminiService.generateFlashcards(
+      subjectName,
+      topicName,
+      text,
+      count || 6
+    );
+
+    res.status(200).json({
+      success: true,
+      count: cardsList.length,
+      subjectId: subjectId,
+      data: cardsList,
+    });
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({ success: false, error: error.message });
+    }
+    next(error);
+  }
+};
+
 // @desc    Preview AI-generated flashcards from a note's content (not saved)
 // @route   POST /api/flashcards/generate-from-note
 // @access  Private

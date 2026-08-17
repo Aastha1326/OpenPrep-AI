@@ -5,7 +5,8 @@ import API from '../services/api';
 import CreateDeckModal from '../components/dashboard/CreateDeckModal';
 import CreateFlashcardDeckModal from '../components/flashcards/CreateFlashcardDeckModal';
 import YouTubeFlashcardImporter from '../components/flashcards/YouTubeFlashcardImporter';
-import { Search, Trash2, Plus, ChevronLeft, ChevronRight, PlaySquare as Youtube, Share2, Copy, Check, BookOpen, Layers, Globe, Lock } from 'lucide-react';
+import GenerateFlashcardsFromOCRModal from '../components/dashboard/GenerateFlashcardsFromOCRModal';
+import { Search, Trash2, Plus, ChevronLeft, ChevronRight, PlaySquare as Youtube, Share2, Copy, Check, BookOpen, Layers, Globe, Lock, FileImage } from 'lucide-react';
 
 const Flashcards = () => {
   const dispatch = useDispatch();
@@ -33,6 +34,7 @@ const Flashcards = () => {
   const [showCreateCardModal, setShowCreateCardModal] = useState(false);
   const [showCreateDeckModal, setShowCreateDeckModal] = useState(false);
   const [showYoutubeModal, setShowYoutubeModal] = useState(false);
+  const [showOCRModal, setShowOCRModal] = useState(false);
   
   // Create card target IDs
   const [targetDeckId, setTargetDeckId] = useState('');
@@ -158,6 +160,13 @@ const Flashcards = () => {
           >
             <Youtube className="w-4 h-4" />
             YouTube Import
+          </button>
+          <button
+            onClick={() => setShowOCRModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold shadow-md transition cursor-pointer text-sm"
+          >
+            <FileImage className="w-4 h-4" />
+            Image/PDF Import
           </button>
           <button
             onClick={() => {
@@ -535,6 +544,19 @@ const Flashcards = () => {
         <YouTubeFlashcardImporter
           isOpen={showYoutubeModal}
           onClose={() => setShowYoutubeModal(false)}
+          onImported={() => {
+            setPage(1);
+            fetchDecks();
+            if (activeTab === 'cards') {
+              dispatch(fetchFlashcards({ page: 1, limit: 12, sortBy, order }));
+            }
+          }}
+        />
+      )}
+
+      {showOCRModal && (
+        <GenerateFlashcardsFromOCRModal
+          onClose={() => setShowOCRModal(false)}
           onImported={() => {
             setPage(1);
             fetchDecks();
