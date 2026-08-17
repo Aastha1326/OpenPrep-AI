@@ -383,7 +383,7 @@ exports.forgotPassword = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: 'If an account with that email exists, a password reset link has been sent.',
+      message: 'If the email exists, a reset link has been sent',
     });
   } catch (error) {
     // If email sending failed, clear the token from DB
