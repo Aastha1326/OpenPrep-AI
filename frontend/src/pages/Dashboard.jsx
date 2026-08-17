@@ -198,6 +198,17 @@ const EmptyState = ({ icon: Icon = Lightbulb, message = 'No data yet' }) => (
 );
 
 
+const formatStudyTime = (hoursVal) => {
+  if (hoursVal === undefined || hoursVal === null || Number.isNaN(hoursVal) || hoursVal <= 0) {
+    return '0h 0m';
+  }
+  const totalMins = Math.round(hoursVal * 60);
+  if (totalMins <= 0 || Number.isNaN(totalMins)) return '0h 0m';
+  const hrs = Math.floor(totalMins / 60);
+  const mins = totalMins % 60;
+  return `${hrs}h ${mins}m`;
+};
+
 // ── Main Component ──
 const Dashboard = () => {
   const { t } = useTranslation();
@@ -751,10 +762,12 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
                   <Clock className="text-neutral-600 dark:text-neutral-400 w-5 h-5" />
                 </div>
                 <p className="text-4xl font-bold text-neutral-900 dark:text-white font-playfair">
-                  {totalStudyHours.toFixed(1)}h
+                  {formatStudyTime(totalStudyHours)}
                 </p>
                 <p className="text-neutral-600 dark:text-neutral-400 text-sm mt-2 italic border-t border-neutral-300 dark:border-neutral-600 pt-2">
-                  Total study time
+                  {(!recentActivity || recentActivity.length === 0 || totalStudyHours <= 0)
+                    ? 'Start your first study session to track time!'
+                    : 'Total study time'}
                 </p>
               </VintagePaper>
 
