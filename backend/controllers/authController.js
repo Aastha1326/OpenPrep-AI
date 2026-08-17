@@ -11,6 +11,7 @@ try {
 const { Op } = require('sequelize');
 const User = require('../models/User');
 const Achievement = require('../models/Achievement');
+const sendEmail = require('../services/emailService');
 
 const getAuthCookieOptions = () => ({
   httpOnly: true,
@@ -61,6 +62,72 @@ const setRefreshTokenCookie = (res, refreshToken) => {
 
 const clearRefreshTokenCookie = (res) => {
   res.clearCookie('refreshToken', getAuthCookieOptions());
+};
+
+const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+const getClientBaseUrl = () =>
+  process.env.CLIENT_URL || process.env.FRONTEND_URL || 'http://localhost:5173';
+
+/**
+ * Issue a single-use token, store only its SHA-256 hash, and hand back the raw
+ * value for the email body.
+ *
+ * Storing the hash rather than the token itself means a leaked database dump
+ * can't be replayed to verify accounts or reset passwords — the same approach
+ * `generateRefreshToken` already takes for refresh tokens.
+ */
+const createSingleUseToken = (ttlMs) => {
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+  return { rawToken, hashedToken, expiresAt: new Date(Date.now() + ttlMs) };
+};
+
+/**
+ * Generate a fresh email-verification token for `user`, persist its hash, and
+ * send the verification link.
+ */
+const sendVerificationEmail = async (user) => {
+  const { rawToken, hashedToken, expiresAt } = createSingleUseToken(EMAIL_VERIFICATION_TTL_MS);
+
+  user.emailVerificationToken = hashedToken;
+  user.emailVerificationExpire = expiresAt;
+  await user.save();
+
+  const verifyUrl = `${getClientBaseUrl()}/verify-email/${rawToken}`;
+
+  await sendEmail({
+    to: user.email,
+    subject: 'Verify your OpenPrep AI email address',
+    text: `Hi ${user.name || 'there'},\n\nConfirm your email address to activate your OpenPrep AI account:\n\n${verifyUrl}\n\nThis link expires in 24 hours. If you didn't create an account, you can ignore this message.`,
+    html: `<p>Hi ${user.name || 'there'},</p><p>Confirm your email address to activate your OpenPrep AI account:</p><p><a href="${verifyUrl}">Verify my email</a></p><p>This link expires in 24 hours. If you didn't create an account, you can ignore this message.</p>`,
+  });
+
+  return rawToken;
+};
+
+/**
+ * Generate a password-reset token for `user`, persist its hash, and send the
+ * reset link.
+ */
+const sendPasswordResetEmail = async (user) => {
+  const { rawToken, hashedToken, expiresAt } = createSingleUseToken(PASSWORD_RESET_TTL_MS);
+
+  user.resetPasswordToken = hashedToken;
+  user.resetPasswordExpire = expiresAt;
+  await user.save();
+
+  const resetUrl = `${getClientBaseUrl()}/reset-password/${rawToken}`;
+
+  await sendEmail({
+    to: user.email,
+    subject: 'Reset your OpenPrep AI password',
+    text: `Hi ${user.name || 'there'},\n\nUse the link below to choose a new password:\n\n${resetUrl}\n\nThis link expires in 1 hour. If you didn't request a reset, no action is needed.`,
+    html: `<p>Hi ${user.name || 'there'},</p><p>Use the link below to choose a new password:</p><p><a href="${resetUrl}">Reset my password</a></p><p>This link expires in 1 hour. If you didn't request a reset, no action is needed.</p>`,
+  });
+
+  return rawToken;
 };
 
 // ---------------------------------------------------------------------------
@@ -1032,6 +1099,58 @@ exports.resendVerification = async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: 'If an unverified account with that email exists, a verification link has been sent.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// @desc    Confirm an email address from the link sent at registration
+// @route   POST /api/auth/verify-email/:token
+// @access  Public
+// ---------------------------------------------------------------------------
+exports.verifyEmail = async (req, res, next) => {
+  try {
+    const { token } = req.params;
+
+    if (!token) {
+      return res.status(400).json({ success: false, error: 'Verification token is required' });
+    }
+
+    // Only the hash is stored, so hash the incoming token to look it up.
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const user = await User.findOne({
+      where: {
+        emailVerificationToken: hashedToken,
+        emailVerificationExpire: { [Op.gt]: new Date() },
+      },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        error: 'This verification link is invalid or has expired. Request a new one.',
+      });
+    }
+
+    // Idempotent by construction: the token is cleared here, so replaying the
+    // same link finds no user and gets the message above rather than silently
+    // re-verifying.
+    user.isEmailVerified = true;
+    user.emailVerificationToken = null;
+    user.emailVerificationExpire = null;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Email verified successfully. You can now sign in.',
+      data: {
+        id: user.id,
+        email: user.email,
+        isEmailVerified: true,
+      },
     });
   } catch (error) {
     next(error);

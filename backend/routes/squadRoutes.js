@@ -3,8 +3,10 @@ const router = express.Router();
 const squadController = require('../controllers/squadController');
 const challengeController = require('../controllers/challengeController');
 const squadActivityController = require('../controllers/squadActivityController');
-const authenticateToken = require('../middleware/auth');
-router.use(authenticateToken);
+// `middleware/auth` exports { protect, authorize, requireAdmin } — passing the
+// whole module object to router.use() registers a non-function and throws.
+const { protect } = require('../middleware/auth');
+router.use(protect);
 
 router.get('/', squadController.getMySquads);
 router.post('/create', squadController.createSquad);

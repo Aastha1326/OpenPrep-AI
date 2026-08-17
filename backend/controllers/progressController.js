@@ -7,7 +7,6 @@ const QuizAttempt = require('../models/QuizAttempt');
 const Subject = require('../models/Subject');
 const Exam = require('../models/Exam');
 const Feedback = require('../models/Feedback');
-const { calculateSubjectReadiness, snapshotReadiness, getTopicTrend } = require('../services/readinessService');
 const { checkAndAwardBadges } = require('../services/achievementService');
 const FocusSession = require('../models/FocusSession');
 const Flashcard = require('../models/Flashcard');
