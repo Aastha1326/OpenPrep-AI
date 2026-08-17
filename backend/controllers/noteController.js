@@ -10,7 +10,7 @@ const User = require('../models/User');
 const { escapeLikePattern } = require('../utils/likePattern');
 const { summarizeNoteText, transcribeAndSummarizeAudio } = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
-const { extractTextFromImage } = require('../services/ocrService');
+const { extractTextFromImage, extractTextFromPDF } = require('../services/ocrService');
 
 // Helper to escape regex special characters if regex search is used anywhere
 const escapeRegex = (string) => {
@@ -176,17 +176,18 @@ exports.uploadNote = async (req, res, next) => {
   }
 };
 
-// @desc    Extract text from an uploaded image via OCR
+// @desc    Extract text from an uploaded image or PDF via OCR
 // @route   POST /api/notes/ocr-upload
 // @access  Private
 exports.uploadOcrNote = async (req, res, next) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ success: false, error: 'Please upload an image file' });
+      return res.status(400).json({ success: false, error: 'Please upload an image or PDF file' });
     }
 
     const ext = path.extname(req.file.originalname).toLowerCase();
-    const validExts = ['.png', '.jpg', '.jpeg', '.webp'];
+    const validImageExts = ['.png', '.jpg', '.jpeg', '.webp'];
+    const validPDFExts = ['.pdf'];
     const invalidExts = ['.gif', '.bmp'];
 
     if (invalidExts.includes(ext)) {
@@ -194,21 +195,41 @@ exports.uploadOcrNote = async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'Unsupported format: GIF and BMP are not allowed for OCR.' });
     }
 
-    if (!validExts.includes(ext)) {
+    if (!validImageExts.includes(ext) && !validPDFExts.includes(ext)) {
       if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-      return res.status(400).json({ success: false, error: 'Please upload a valid image file (.png, .jpg, .jpeg, .webp).' });
+      return res.status(400).json({ success: false, error: 'Please upload a valid image file (.png, .jpg, .jpeg, .webp) or PDF (.pdf).' });
     }
 
     const fileBuffer = fs.readFileSync(req.file.path);
     
-    // Process OCR
-    const { extractedText, confidence, wordCount } = await extractTextFromImage(fileBuffer);
+    // Process OCR based on file type
+    let extractedText, confidence, wordCount;
+    
+    if (validPDFExts.includes(ext)) {
+      // Extract text from PDF
+      const pdfResult = await extractTextFromPDF(fileBuffer);
+      extractedText = pdfResult.extractedText;
+      confidence = pdfResult.confidence;
+      wordCount = pdfResult.wordCount;
+    } else {
+      // Extract text from image using OCR
+      const ocrResult = await extractTextFromImage(fileBuffer);
+      extractedText = ocrResult.extractedText;
+      confidence = ocrResult.confidence;
+      wordCount = ocrResult.wordCount;
+    }
     
     // Sanitize extracted text
     const sanitizedText = sanitizeHtml(extractedText, {
       allowedTags: [], // Strip all HTML from OCR
       allowedAttributes: {}
     });
+
+    // Check for empty results
+    if (!sanitizedText || sanitizedText.trim().length === 0) {
+      if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+      return res.status(400).json({ success: false, error: 'No text could be extracted from the uploaded file. Please try a clearer image or a different file.' });
+    }
 
     // Optionally cleanup the uploaded file if we don't want to store raw image beyond this endpoint,
     // but the issue allows storing as Note later. The prompt says "Do not store unnecessary OCR worker data or raw image data beyond the project's existing upload/storage flow."

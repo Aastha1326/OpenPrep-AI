@@ -1,4 +1,4 @@
-const { FlashcardDeck, Flashcard, Subject, User } = require('../models');
+const { FlashcardDeck, Flashcard, Subject, User, DeckCollaborator } = require('../models');
 const { v4: uuidv4 } = require('uuid');
 
 // @desc    Create a new flashcard deck
@@ -67,7 +67,7 @@ exports.getDecks = async (req, res) => {
 exports.getDeckById = async (req, res) => {
   try {
     const deck = await FlashcardDeck.findOne({
-      where: { id: req.params.id, user: req.user.id },
+      where: { id: req.params.id },
       include: [
         { model: Subject, as: 'subjectRef', attributes: ['id', 'name'] },
       ],
@@ -75,6 +75,16 @@ exports.getDeckById = async (req, res) => {
 
     if (!deck) {
       return res.status(404).json({ success: false, error: 'Deck not found' });
+    }
+
+    // Check if user is owner or collaborator
+    const isOwner = deck.user === req.user.id;
+    const collaborator = await DeckCollaborator.findOne({
+      where: { deckId: deck.id, userId: req.user.id, status: 'accepted' },
+    });
+
+    if (!isOwner && !collaborator) {
+      return res.status(403).json({ success: false, error: 'Access denied' });
     }
 
     const cards = await Flashcard.findAll({
@@ -87,6 +97,12 @@ exports.getDeckById = async (req, res) => {
       data: {
         deck,
         cards,
+        access: {
+          isOwner,
+          role: isOwner ? 'owner' : collaborator.role,
+          canEdit: isOwner || collaborator.role === 'edit' || collaborator.role === 'admin',
+          canAdmin: isOwner || collaborator.role === 'admin',
+        },
       },
     });
   } catch (error) {

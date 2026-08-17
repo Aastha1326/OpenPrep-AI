@@ -325,6 +325,14 @@ const titles = {
   hundred_day_streak: '100-Day Streak 💎',
   night_owl: 'Night Owl 🦉',
   quiz_master: 'Quiz Master 🎓',
+  week_warrior: 'Week Warrior 🔥',
+  card_collector: 'Card Collector 📚',
+  sharpshooter: 'Sharpshooter 🎯',
+  early_bird: 'Early Bird 🌅',
+  century_club: 'Century Club 💯',
+  pyq_analyst: 'PYQ Analyst 🏆',
+  study_marathon: 'Study Marathon ⏰',
+  perfect_score: 'Perfect Score ⭐',
 };  return titles[code] || 'Achievement Unlocked';
 }
 
@@ -338,6 +346,14 @@ const descriptions = {
     'Maintained an incredible 100-day study streak. Earned 1 Streak Freeze.',
   night_owl: 'Completed a study task between 11 PM and 4 AM.',
   quiz_master: 'Successfully finished 10 quiz attempts.',
+  week_warrior: 'Achieve a 7-day study streak',
+  card_collector: 'Create 50 flashcards',
+  sharpshooter: 'Complete 3 consecutive quizzes with a score above 85%',
+  early_bird: 'Log a study session before 7 AM',
+  century_club: 'Review 100 flashcards in one session',
+  pyq_analyst: 'Analyze 5 PYQ PDFs',
+  study_marathon: 'Study for 10+ hours in a single session',
+  perfect_score: 'Achieve 100% on multiple quizzes',
 };  return descriptions[code] || 'Earned a study achievement badge.';
 }
 
