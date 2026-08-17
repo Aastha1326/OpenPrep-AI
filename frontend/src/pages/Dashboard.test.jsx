@@ -350,4 +350,17 @@ describe('Dashboard', () => {
     expect(screen.getByText('Bonus')).toBeInTheDocument();
     expect(screen.getByText(/1 Bonus Done/)).toBeInTheDocument();
   });
+
+  test('renders 0h 0m and onboarding message for new users with no activity logs', () => {
+    renderDashboard(
+      { user: { id: 'u1', name: 'New User' } },
+      {
+        stats: { totalStudyHours: 0 },
+        recentActivity: [],
+      }
+    );
+
+    expect(screen.getByText('0h 0m')).toBeInTheDocument();
+    expect(screen.getByText(/Start your first study session to track time!/i)).toBeInTheDocument();
+  });
 });
