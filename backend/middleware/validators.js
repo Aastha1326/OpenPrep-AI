@@ -77,8 +77,13 @@ const validateResetPassword = [
 ];
 
 const validateRefreshToken = [
-  body('refreshToken').notEmpty().withMessage('Refresh token is required'),
-  handleValidationErrors,
+  (req, res, next) => {
+    const rawToken = req.cookies?.refreshToken || req.body?.refreshToken;
+    if (!rawToken) {
+      return res.status(400).json({ success: false, error: 'Refresh token is required' });
+    }
+    next();
+  }
 ];
 
 const validateResendVerification = [

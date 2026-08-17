@@ -179,6 +179,13 @@ router.post('/verify-email/:token', verifyEmailLimiter, verifyEmail);
 
 // Refresh an expired access token
 router.post(
+  '/refresh',
+  refreshTokenLimiter,
+  validateRefreshToken,
+  refreshToken
+);
+
+router.post(
   '/refresh-token',
   refreshTokenLimiter,
   validateRefreshToken,
