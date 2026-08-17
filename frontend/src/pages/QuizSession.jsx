@@ -88,13 +88,18 @@ const resolveUserAnswerIndex = (question, rawAnswer) => {
 };
 
 const buildQuizResultRows = (quiz, answers) =>
-  quiz.questions.map((q, idx) => ({
-    questionNumber: idx + 1,
-    question: q.questionText,
-    yourAnswer: answers[q._id] ?? '',
-    correctAnswer: q.correctAnswer,
-    isCorrect: answers[q._id] === q.correctAnswer ? 'Yes' : 'No',
-  }));
+  quiz.questions.map((q, idx) => {
+    const isCorrect = Array.isArray(q.correctAnswer)
+      ? q.correctAnswer.includes(answers[q._id])
+      : answers[q._id] === q.correctAnswer;
+    return {
+      questionNumber: idx + 1,
+      question: q.questionText,
+      yourAnswer: answers[q._id] ?? '',
+      correctAnswer: q.correctAnswer,
+      isCorrect: isCorrect ? 'Yes' : 'No',
+    };
+  });
 
 const QuizSession = () => {
   const { id } = useParams();
@@ -593,7 +598,10 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
 
   const reviewCounts = { all: quiz.questions.length, correct: 0, incorrect: 0, bookmarked: 0 };
   quiz.questions.forEach((q) => {
-    if (answers[q._id] === q.correctAnswer) reviewCounts.correct += 1;
+    const isCorrect = Array.isArray(q.correctAnswer)
+      ? q.correctAnswer.includes(answers[q._id])
+      : answers[q._id] === q.correctAnswer;
+    if (isCorrect) reviewCounts.correct += 1;
     else reviewCounts.incorrect += 1;
     if (bookmarkedIds.has(q._id)) reviewCounts.bookmarked += 1;
   });
@@ -883,7 +891,9 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
 
               {filteredQuestions.map(({ q, idx }) => {
                 const userAnswer = answers[q._id];
-                const isCorrect = userAnswer === q.correctAnswer;
+                const isCorrect = Array.isArray(q.correctAnswer)
+                  ? q.correctAnswer.includes(userAnswer)
+                  : userAnswer === q.correctAnswer;
                 const isBookmarked = bookmarkedIds.has(q._id);
 
                 return (
@@ -905,7 +915,11 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
                         let btnClass =
                           'w-full text-left p-3 rounded-md border text-sm flex items-center justify-between ';
 
-                        if (opt === q.correctAnswer) {
+                        const isOptCorrect = Array.isArray(q.correctAnswer)
+                          ? (q.correctAnswer.includes(opt) || q.correctAnswer.includes(oIdx))
+                          : (opt === q.correctAnswer || oIdx === q.correctAnswer);
+
+                        if (isOptCorrect) {
                           btnClass += 'bg-emerald-500/20 border-emerald-500 text-emerald-100';
                         } else if (opt === userAnswer && !isCorrect) {
                           btnClass += 'bg-red-500/20 border-red-500 text-red-100';
@@ -918,7 +932,7 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
                             <span>
                               <MathRenderer text={opt} />
                             </span>
-                            {opt === q.correctAnswer && (
+                            {isOptCorrect && (
                               <FaCheckCircle className="text-emerald-400" />
                             )}
                             {opt === userAnswer && !isCorrect && (
