@@ -60,19 +60,28 @@ const errorHandler = (err, req, res, next) => {
   }
 
   // Multer file size limit error
-if (err.name === 'MulterError') {
-  if (err.code === 'LIMIT_FILE_SIZE') {
-    const isAudioUpload = req.path.includes('/flashcards/from-audio');
+  if (err.name === 'MulterError') {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      const isAudioUpload = req.path.includes('/flashcards/from-audio');
+      const isAvatarUpload = req.path.includes('/avatar');
 
-    return res.status(400).json(
-      withRequestId(req, {
-        success: false,
-        error: isAudioUpload
-          ? 'Audio file too large. Maximum allowed size is 25MB.'
-          : 'File too large. Maximum allowed size is 15MB.',
-      })
-    );
-  }    error = new Error(err.message);
+      return res.status(400).json(
+        withRequestId(req, {
+          success: false,
+          error: isAvatarUpload
+            ? 'File is too large. Maximum size is 2MB.'
+            : isAudioUpload
+            ? 'Audio file too large. Maximum allowed size is 25MB.'
+            : 'File too large. Maximum allowed size is 15MB.',
+          message: isAvatarUpload
+            ? 'File is too large. Maximum size is 2MB.'
+            : isAudioUpload
+            ? 'Audio file too large. Maximum allowed size is 25MB.'
+            : 'File too large. Maximum allowed size is 15MB.',
+        })
+      );
+    }
+    error = new Error(err.message);
     error.statusCode = 400;
   }
 

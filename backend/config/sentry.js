@@ -1,4 +1,13 @@
-const Sentry = require('@sentry/node');
+let Sentry;
+try {
+  Sentry = require('@sentry/node');
+} catch (e) {
+  Sentry = {
+    init: () => {},
+    captureException: () => {},
+    setUser: () => {},
+  };
+}
 
 const isSentryReady = process.env.NODE_ENV !== 'test' && !!process.env.SENTRY_DSN;
 

@@ -147,6 +147,22 @@ describe('User Controller - Avatar Upload (Integration Tests)', () => {
       expect(res.body.error).toContain('Only JPEG and PNG images are allowed');
     });
 
+    it('should return 400 Bad Request with clear error when avatar exceeds 2MB limit (#1184)', async () => {
+      const oversizedBuffer = Buffer.concat([
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        Buffer.alloc(3 * 1024 * 1024, 0),
+      ]);
+
+      const res = await request(app)
+        .put('/api/users/avatar')
+        .set('Authorization', `Bearer ${authToken}`)
+        .attach('avatar', oversizedBuffer, 'oversized.png');
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toBe('File is too large. Maximum size is 2MB.');
+    });
+
     it('should return 400 when no file is attached', async () => {
       const res = await request(app)
         .put('/api/users/avatar')

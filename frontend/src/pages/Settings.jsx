@@ -99,7 +99,7 @@ const [leaderboardVisible, setLeaderboardVisible] = useState(
       setPreviewUrl(null);
       await dispatch(loadUser());
     } catch (err) {
-      setUploadError(err.response?.data?.error || 'Failed to save avatar photo.');
+      setUploadError(err.response?.data?.error || err.response?.data?.message || 'Failed to save avatar photo.');
     } finally {
       setUploading(false);
     }
@@ -119,7 +119,7 @@ const [leaderboardVisible, setLeaderboardVisible] = useState(
       setPreviewUrl(null);
       await dispatch(loadUser());
     } catch (err) {
-      setUploadError(err.response?.data?.error || 'Failed to remove avatar photo.');
+      setUploadError(err.response?.data?.error || err.response?.data?.message || 'Failed to remove avatar photo.');
     } finally {
       setUploading(false);
     }
@@ -291,7 +291,7 @@ const [leaderboardVisible, setLeaderboardVisible] = useState(
 
             <div className="flex-1 space-y-3">
               <p className="text-sm text-neutral-600 dark:text-neutral-300">
-                Upload a JPEG, PNG, WEBP, or SVG image (max 5MB).
+                Upload a JPEG, PNG, WEBP, or SVG image (max 2MB).
               </p>
 
               <div className="flex flex-wrap gap-2.5">
