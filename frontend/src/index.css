@@ -689,6 +689,53 @@ html.dark .card-cta-theme span {
   color: #C4BA9D !important;
 }
 
+/* ───────── DEEPLY NESTED MARKDOWN LIST STYLES (#1189) ───────── */
+.prose ul, ul.markdown-list {
+  list-style-type: disc;
+  list-style-position: outside;
+  padding-left: 1.5rem;
+}
+
+.prose ol, ol.markdown-list {
+  list-style-type: decimal;
+  list-style-position: outside;
+  padding-left: 1.5rem;
+}
+
+.prose ul ul, ul ul, .prose ol ul, ol ul {
+  list-style-type: circle;
+  list-style-position: outside;
+  padding-left: 1.5rem;
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.prose ul ul ul, ul ul ul, .prose ol ul ul, ol ul ul, .prose ul ol ul, ul ol ul {
+  list-style-type: square;
+  list-style-position: outside;
+  padding-left: 1.5rem;
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.prose ul ul ul ul, ul ul ul ul, .prose ol ul ul ul, ol ul ul ul {
+  list-style-type: disc;
+  list-style-position: outside;
+  padding-left: 1.5rem;
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.prose li, li.markdown-item {
+  margin-top: 0.125rem;
+  margin-bottom: 0.125rem;
+}
+
+.prose li > p, li.markdown-item > p {
+  display: inline-block;
+  margin: 0;
+}
+
 
 
 
