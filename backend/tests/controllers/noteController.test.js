@@ -498,5 +498,34 @@ describe('Note Controller - Integration Tests', () => {
       expect(res.status).toBe(404);
       expect(res.body.success).toBe(false);
     });
+
+    it('should reject oversized audio files with 413 status', async () => {
+      // Set a smaller limit for this test to avoid huge memory allocation
+      const originalLimit = process.env.MAX_AUDIO_UPLOAD_SIZE_MB;
+      process.env.MAX_AUDIO_UPLOAD_SIZE_MB = '1';
+
+      // Create a buffer larger than 1MB limit
+      const wavHeader = Buffer.from([0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x41, 0x56, 0x45]);
+      const padding = Buffer.alloc(2 * 1024 * 1024); // 2MB
+      const oversizedWav = Buffer.concat([wavHeader, padding]);
+
+      const res = await request(app)
+        .post('/api/notes/voice')
+        .set('Authorization', `Bearer ${authToken}`)
+        .field('title', 'Oversized Voice Lecture')
+        .field('subjectId', testSubject.id.toString())
+        .attach('file', oversizedWav, 'oversized-lecture.wav');
+
+      // Restore original limit
+      if (originalLimit === undefined) {
+        delete process.env.MAX_AUDIO_UPLOAD_SIZE_MB;
+      } else {
+        process.env.MAX_AUDIO_UPLOAD_SIZE_MB = originalLimit;
+      }
+
+      expect(res.status).toBe(413);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toContain('exceeds the maximum allowed size');
+    });
   });
 });

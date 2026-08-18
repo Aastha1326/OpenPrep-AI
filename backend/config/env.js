@@ -168,6 +168,9 @@ const schema = z.object({
   CACHE_TTL: intFromString(3600, { min: 0 }),
   CACHE_MAX_KEYS: intFromString(1000, { min: 1 }),
 
+  // ── File upload limits ────────────────────────────────────────────────────
+  MAX_AUDIO_UPLOAD_SIZE_MB: intFromString(25, { min: 1, max: 500 }),
+
   // ── Test-only switches ───────────────────────────────────────────────────
   ENABLE_RATE_LIMIT_TESTS: booleanFromString(false),
   SENTRY_DSN: z.string().optional(),

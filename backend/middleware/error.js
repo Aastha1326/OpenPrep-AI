@@ -62,21 +62,24 @@ const errorHandler = (err, req, res, next) => {
   // Multer file size limit error
   if (err.name === 'MulterError') {
     if (err.code === 'LIMIT_FILE_SIZE') {
-      const isAudioUpload = req.path.includes('/flashcards/from-audio');
+      const isAudioUpload = req.path.includes('/voice') || req.path.includes('/transcribe-and-summarize') || req.path.includes('/flashcards/from-audio');
       const isAvatarUpload = req.path.includes('/avatar');
+      const { loadEnv } = require('../config/env');
+      const config = loadEnv();
+      const maxAudioSize = config?.MAX_AUDIO_UPLOAD_SIZE_MB || 25;
 
-      return res.status(400).json(
+      return res.status(413).json(
         withRequestId(req, {
           success: false,
           error: isAvatarUpload
             ? 'File is too large. Maximum size is 2MB.'
             : isAudioUpload
-            ? 'Audio file too large. Maximum allowed size is 25MB.'
+            ? `Audio file too large. Maximum allowed size is ${maxAudioSize}MB.`
             : 'File too large. Maximum allowed size is 15MB.',
           message: isAvatarUpload
             ? 'File is too large. Maximum size is 2MB.'
             : isAudioUpload
-            ? 'Audio file too large. Maximum allowed size is 25MB.'
+            ? `Audio file too large. Maximum allowed size is ${maxAudioSize}MB.`
             : 'File too large. Maximum allowed size is 15MB.',
         })
       );
@@ -88,6 +91,16 @@ const errorHandler = (err, req, res, next) => {
   // Custom file type validation error
   if (err.name === 'FileValidationError') {
     error.statusCode = 400;
+  }
+
+  // Custom file size limit error for audio uploads
+  if (err.name === 'FileSizeLimitError') {
+    return res.status(413).json(
+      withRequestId(req, {
+        success: false,
+        error: err.message,
+      })
+    );
   }
 
   // JWT Errors

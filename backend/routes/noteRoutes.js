@@ -17,6 +17,7 @@ const { transcribeAndSummarize } = require('../controllers/audioNoteController')
 const { protect } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const { uploadMarkdown } = require('../middleware/upload');
+const audioNoteUpload = require('../middleware/audioNoteUpload');
 const { validateUploadNote, validateImportNotes } = require('../middleware/validators');
 const cacheMiddleware = require('../middleware/cache');
 const clearCache = require('../middleware/clearCache');
@@ -231,7 +232,7 @@ router.post(
 router.post(
   '/voice',
   protect,
-  upload.single('file'),
+  audioNoteUpload.single('file'),
   validateUploadNote,
   clearCache('notes:*'),
   uploadVoiceNote
@@ -240,7 +241,7 @@ router.post(
 router.post(
   '/transcribe-and-summarize',
   protect,
-  upload.single('file'),
+  audioNoteUpload.single('file'),
   transcribeAndSummarize
 );
 
