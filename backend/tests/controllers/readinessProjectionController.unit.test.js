@@ -1,6 +1,29 @@
+vi.mock('../../services/readinessCalculator', () => ({
+  calculateSubjectReadiness: vi.fn().mockResolvedValue({ readinessScore: 80 }),
+}));
+
+vi.mock('../../models', () => ({
+  Subject: {
+    findAll: vi.fn().mockResolvedValue([{ id: 's1', name: 'Mathematics' }]),
+  },
+  QuizAttempt: {
+    findAll: vi.fn().mockResolvedValue([
+      { scorePercentage: 65, createdAt: new Date() },
+      { scorePercentage: 72, createdAt: new Date() },
+      { scorePercentage: 78, createdAt: new Date() },
+    ]),
+  },
+  ReadinessSnapshot: {
+    findOne: vi.fn().mockResolvedValue({ readinessScore: 80, save: vi.fn() }),
+    create: vi.fn().mockResolvedValue({}),
+  },
+  StudyPlan: {
+    findOne: vi.fn().mockResolvedValue({ endDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) }),
+  },
+}));
+
 const readinessController = require('../../controllers/readinessController');
-const QuizAttempt = require('../../models/QuizAttempt');
-const Subject = require('../../models/Subject');
+const { QuizAttempt, Subject } = require('../../models');
 
 describe('Readiness Projection Controller - Unit Tests', () => {
   it('should return 200 with readiness projection payload', async () => {

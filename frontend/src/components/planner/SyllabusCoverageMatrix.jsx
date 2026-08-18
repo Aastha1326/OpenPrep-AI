@@ -1,8 +1,6 @@
-import { FaBook, FaRegCheckCircle, FaExclamationTriangle } from 'react-icons/fa';
-import { Loader2, Sparkles as FaSparkles } from 'lucide-react';
 import React, { useState } from 'react';
 import { FaBook, FaRegCheckCircle, FaExclamationTriangle, FaMagic } from 'react-icons/fa';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Sparkles as FaSparkles } from 'lucide-react';
 import API from '../../services/api';
 
 export default function SyllabusCoverageMatrix({ syllabusName, initialCoverage = 0, initialTopics = [], syllabusId }) {

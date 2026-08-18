@@ -25,6 +25,7 @@ import html2pdf from 'html2pdf.js';
 import API from '../../services/api';
 import { toLocalDateString, formatDateOnly } from '../../utils/dateUtils';
 import StudyPlanGanttView from './StudyPlanGanttView';
+import StudyPlanCalendarView from './StudyPlanCalendarView';
 import { downloadCertificate } from '../../services/reportService';
 
 const MILESTONE_TYPE_LABELS = {
@@ -279,7 +280,7 @@ const [isRescheduling, setIsRescheduling] = useState(false);
   const [isRebalancing, setIsRebalancing] = useState(false);  const [rescheduleMessage, setRescheduleMessage] = useState(null);
   const [showWeakOnly, setShowWeakOnly] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [showTimeline, setShowTimeline] = useState(false);
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'timeline' | 'calendar'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [prefillConsumed, setPrefillConsumed] = useState(false);
@@ -720,21 +721,41 @@ const handleExportIcs = async () => {
                       <Filter className="w-4 h-4" />
                       {showWeakOnly ? 'Showing Weak Only' : 'Filter Weak Topics'}
                     </button>
-                    <button
-                      onClick={() => setShowTimeline((v) => !v)}
-                      className={`flex items-center gap-1.5 px-3 py-2 rounded-sm text-sm font-semibold transition-colors cursor-pointer border ${
-                        showTimeline
-                          ? 'bg-indigo-700 text-white border-indigo-800'
-                          : 'bg-white/70 text-[#8B4513] border-[#8B4513]/30 hover:bg-white'
-                      }`}
-                    >
-                      {showTimeline ? (
-                        <List className="w-4 h-4" />
-                      ) : (
-                        <GanttChartSquare className="w-4 h-4" />
-                      )}
-                      {showTimeline ? 'List View' : 'Timeline View'}
-                    </button>{' '}
+                    <div className="flex bg-[#ebd5b3]/40 border border-[#8B4513]/25 rounded p-0.5">
+                      <button
+                        onClick={() => setViewMode('list')}
+                        className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-bold transition-colors cursor-pointer ${
+                          viewMode === 'list'
+                            ? 'bg-[#8B4513] text-white'
+                            : 'text-[#8B4513] hover:bg-white/50'
+                        }`}
+                      >
+                        <List className="w-3.5 h-3.5" />
+                        List
+                      </button>
+                      <button
+                        onClick={() => setViewMode('timeline')}
+                        className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-bold transition-colors cursor-pointer ${
+                          viewMode === 'timeline'
+                            ? 'bg-[#8B4513] text-white'
+                            : 'text-[#8B4513] hover:bg-white/50'
+                        }`}
+                      >
+                        <GanttChartSquare className="w-3.5 h-3.5" />
+                        Timeline
+                      </button>
+                      <button
+                        onClick={() => setViewMode('calendar')}
+                        className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-bold transition-colors cursor-pointer ${
+                          viewMode === 'calendar'
+                            ? 'bg-[#8B4513] text-white'
+                            : 'text-[#8B4513] hover:bg-white/50'
+                        }`}
+                      >
+                        <CalendarDays className="w-3.5 h-3.5" />
+                        Calendar
+                      </button>
+                    </div>{' '}
                     <button
                       onClick={handleExportPDF}
                       disabled={isExporting}
@@ -836,9 +857,13 @@ const handleExportIcs = async () => {
                   prefillExamName={syllabusPrefill?.examName}
                   isAiDisabled={isAiDisabled}
                 />
-              ) : showTimeline ? (
+              ) : viewMode === 'timeline' ? (
                 <div className="bg-white/80 p-6 rounded-sm shadow-sm border border-[#8B4513]/10">
                   <StudyPlanGanttView activePlan={activePlan} onPlanUpdate={onPlanUpdate} />
+                </div>
+              ) : viewMode === 'calendar' ? (
+                <div className="bg-white/80 p-6 rounded-sm shadow-sm border border-[#8B4513]/10">
+                  <StudyPlanCalendarView activePlan={activePlan} onPlanUpdate={onPlanUpdate} />
                 </div>
               ) : (
                 <div

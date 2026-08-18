@@ -7,12 +7,12 @@ const QuizAttempt = require('../models/QuizAttempt');
 const Subject = require('../models/Subject');
 const Exam = require('../models/Exam');
 const Feedback = require('../models/Feedback');
-const { calculateSubjectReadiness, snapshotReadiness, getTopicTrend } = require('../services/readinessService');
 const { checkAndAwardBadges } = require('../services/achievementService');
 const FocusSession = require('../models/FocusSession');
 const Flashcard = require('../models/Flashcard');
 const StudyPlan = require('../models/StudyPlan');
 const SubjectGoal = require('../models/SubjectGoal');
+const cacheManager = require('../utils/cacheManager');
 // ── Mastery tier thresholds (shared with the dashboard UI) ──
 // Beginner: < 50% | Intermediate: 50-79% | Master: 80%+
 const MASTERY_TIER_BEGINNER = 50;
@@ -44,28 +44,95 @@ function combineMastery(quizAccuracy, flashcardRetention) {
   if (flashcardRetention != null) return Math.round(flashcardRetention);
   return 0;
 }
-// @desc    Get dashboard metrics & activity feed
-// @route   GET /api/progress/dashboard
-// @access  Private
+/**
+ * @swagger
+ * /api/progress/dashboard:
+ *   get:
+ *     summary: Retrieve dashboard metrics and activity feed
+ *     tags: [Progress]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Dashboard statistics retrieved successfully
+ */
 exports.getDashboardStats = async (req, res, next) => {
   try {
     const userId = req.user.id;
+
+    // Check Redis cache for 5-minute cached response
+    const cacheKey = cacheManager.generateKey(userId, 'dashboard');
+    try {
+      const cachedData = await cacheManager.get(cacheKey);
+      if (cachedData) {
+        const parsed = typeof cachedData === 'string' ? JSON.parse(cachedData) : cachedData;
+        return res.status(200).json({
+          success: true,
+          data: parsed,
+          cached: true,
+        });
+      }
+    } catch (cacheErr) {
+      // Graceful fallback if Redis is unavailable
+    }
 
     // 1. User profile stats (streak & study hours)
     const streak = req.user.streakCount || 0;
     const streakFreezes = req.user.streakFreezes || 0;
     const totalStudyHours = req.user.studyHours || 0;
 
-    // 2. Topic statistics breakdown (Strong, Medium, Weak counts) via aggregation
-    const totalTopicsCount = await Topic.count({ where: { user: userId } });
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
 
-    const topicStats = await Topic.findAll({
-      attributes: ['status', [fn('COUNT', col('status')), 'count']],
-      where: { user: userId },
-      group: ['status'],
-      raw: true,
-    });
+    // Run database aggregate queries in parallel to eliminate database latency bottlenecks
+    const [
+      totalTopicsCount,
+      topicStats,
+      totalCompletionResult,
+      attemptsCount,
+      progressHistory,
+      activePlan,
+      activities,
+    ] = await Promise.all([
+      Topic.count({ where: { user: userId } }),
+      Topic.findAll({
+        attributes: ['status', [fn('COUNT', col('status')), 'count']],
+        where: { user: userId },
+        group: ['status'],
+        raw: true,
+      }),
+      Progress.findAll({
+        attributes: [[fn('SUM', col('completionPercentage')), 'totalCompletion']],
+        where: { user: userId },
+        raw: true,
+      }),
+      QuizAttempt.count({ where: { user: userId } }),
+      Progress.findAll({
+        attributes: [
+          [fn('DATE', col('updatedAt')), 'date'],
+          [fn('SUM', col('studyHours')), 'totalStudyHours'],
+          [fn('AVG', col('completionPercentage')), 'avgCompletion'],
+        ],
+        where: {
+          user: userId,
+          updatedAt: { [Op.gte]: sevenDaysAgo },
+        },
+        group: [fn('DATE', col('updatedAt'))],
+        order: [[fn('DATE', col('updatedAt')), 'ASC']],
+        raw: true,
+      }),
+      StudyPlan.findOne({
+        where: { user: userId, status: 'active' },
+      }),
+      ActivityLog.findAll({
+        where: { user: userId },
+        order: [['createdAt', 'DESC']],
+        limit: 10,
+      }),
+    ]);
 
+    // 2. Process topic breakdown counts
     let strongCount = 0;
     let mediumCount = 0;
     let weakCount = 0;
@@ -77,39 +144,12 @@ exports.getDashboardStats = async (req, res, next) => {
       else if (t.status === 'Weak') weakCount = count;
     });
 
-    // Calculate syllabus progress percentage via aggregation
-    const [totalCompletionResult] = await Progress.findAll({
-      attributes: [[fn('SUM', col('completionPercentage')), 'totalCompletion']],
-      where: { user: userId },
-      raw: true,
-    });
-    const totalCompletionSum = parseFloat(totalCompletionResult?.totalCompletion) || 0;
+    // Calculate syllabus progress percentage
+    const totalCompletionSum = parseFloat(totalCompletionResult[0]?.totalCompletion) || 0;
     const syllabusProgress =
       totalTopicsCount > 0 ? Math.round(totalCompletionSum / totalTopicsCount) : 0;
 
-    // 3. Quiz attempts summaries
-    const attemptsCount = await QuizAttempt.count({ where: { user: userId } });
-
-    // 4. Study Hours Chart Data (weekly progression over last 7 calendar days)
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-    sevenDaysAgo.setHours(0, 0, 0, 0);
-
-    const progressHistory = await Progress.findAll({
-      attributes: [
-        [fn('DATE', col('updatedAt')), 'date'],
-        [fn('SUM', col('studyHours')), 'totalStudyHours'],
-        [fn('AVG', col('completionPercentage')), 'avgCompletion'],
-      ],
-      where: {
-        user: userId,
-        updatedAt: { [Op.gte]: sevenDaysAgo },
-      },
-      group: [fn('DATE', col('updatedAt'))],
-      order: [[fn('DATE', col('updatedAt')), 'ASC']],
-      raw: true,
-    });
-
+    // 3. Construct 7-day study hours chart data
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const weeklyChartData = [];
     for (let i = 6; i >= 0; i--) {
@@ -126,7 +166,7 @@ exports.getDashboardStats = async (req, res, next) => {
       });
     }
 
-    // Calculate countdown and required daily velocity
+    // 4. Calculate countdown and required daily velocity
     let daysUntilExam = null;
     let requiredDailyMinutes = 0;
     const targetDateStr = req.user.examCountdownPreferences?.targetExamDate;
@@ -138,10 +178,6 @@ exports.getDashboardStats = async (req, res, next) => {
       const diffTime = targetDate.getTime() - today.getTime();
       daysUntilExam = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     }
-
-    const activePlan = await StudyPlan.findOne({
-      where: { user: userId, status: 'active' },
-    });
 
     let totalUncompletedDuration = 0;
     if (activePlan && Array.isArray(activePlan.dailyGoals)) {
@@ -180,37 +216,39 @@ exports.getDashboardStats = async (req, res, next) => {
       paceStatus = null;
     }
 
-    // 5. Recent activity logs
-    const activities = await ActivityLog.findAll({
-      where: { user: userId },
-      order: [['createdAt', 'DESC']],
-      limit: 10,
-    });
+    const responsePayload = {
+      streak,
+      streakFreezes,
+      totalStudyHours,
+      syllabusProgress,
+      topicsBreakdown: {
+        total: totalTopicsCount,
+        strong: strongCount,
+        medium: mediumCount,
+        weak: weakCount,
+      },
+      attemptsCount,
+      weeklyChartData,
+      recentActivity: activities,
+      examCountdown: {
+        targetExamDate: targetDateStr || null,
+        daysUntilExam,
+        requiredDailyMinutes,
+        loggedMinutesToday,
+        paceStatus,
+      },
+    };
+
+    // Cache dashboard response for 5 minutes (300 seconds)
+    try {
+      await cacheManager.set(cacheKey, responsePayload, 300);
+    } catch (cacheErr) {
+      // Graceful fallback
+    }
 
     res.status(200).json({
       success: true,
-      data: {
-        streak,
-        streakFreezes,
-        totalStudyHours,
-        syllabusProgress,
-        topicsBreakdown: {
-          total: totalTopicsCount,
-          strong: strongCount,
-          medium: mediumCount,
-          weak: weakCount,
-        },
-        attemptsCount,
-        weeklyChartData,
-        recentActivity: activities,
-        examCountdown: {
-          targetExamDate: targetDateStr || null,
-          daysUntilExam,
-          requiredDailyMinutes,
-          loggedMinutesToday,
-          paceStatus,
-        },
-      },
+      data: responsePayload,
     });
   } catch (error) {
     next(error);
@@ -1057,9 +1095,40 @@ exports.getWeeklyFocusEfficiency = async (req, res, next) => {
   }
 };
 
-// @desc    Get daily study activity for the last 365 days (contribution heatmap)
-// @route   GET /api/analytics/activity-heatmap
-// @access  Private
+/**
+ * @swagger
+ * /api/analytics/activity-heatmap:
+ *   get:
+ *     summary: Get daily study activity for the last 365 days (contribution heatmap)
+ *     tags: [Analytics]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Daily activity heatmap data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       date:
+ *                         type: string
+ *                         format: date
+ *                       questionsSolved:
+ *                         type: integer
+ *                       flashcardsReviewed:
+ *                         type: integer
+ *                       total:
+ *                         type: integer
+ */
 exports.getActivityHeatmap = async (req, res, next) => {
   try {
     const userId = req.user.id;

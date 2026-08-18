@@ -43,6 +43,10 @@ logger.info('configuration loaded', {
   integrations: summariseIntegrations(env),
 });
 
+if (!process.env.RECAPTCHA_SECRET_KEY) {
+  console.warn('WARNING: RECAPTCHA_SECRET_KEY is not set. reCAPTCHA verification will be bypassed.');
+}
+
 // Import routes
 const authRoutes = require('./routes/authRoutes');
 const academicRoutes = require('./routes/academicRoutes');
@@ -60,6 +64,8 @@ const communityRoutes = require('./routes/communityRoutes');
 const userRoutes = require('./routes/userRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const aiRoutes = require('./routes/aiRoutes');
+const pdfAnnotationRoutes = require('./routes/pdfAnnotationRoutes');
+const folderRoutes = require('./routes/folderRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const fatigueRoutes = require('./routes/fatigueRoutes');
@@ -70,6 +76,7 @@ const gamificationRoutes = require('./routes/gamificationRoutes');
 const battleRoutes = require('./routes/battleRoutes');
 const readinessRoutes = require('./routes/readinessRoutes');
 const squadRoutes = require('./routes/squadRoutes');
+const badgeRoutes = require('./routes/badgeRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 
@@ -99,8 +106,8 @@ app.use(requestLogger());
 const baseCspDirectives = {
   defaultSrc: ["'self'"],
   styleSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://fonts.googleapis.com'],
-  imgSrc: ["'self'", 'data:', 'https:'],
-  connectSrc: ["'self'", 'https://generativelanguage.googleapis.com'],
+  imgSrc: ["'self'", 'data:', 'https://lh3.googleusercontent.com', 'https://avatars.githubusercontent.com', 'https://avatar.com'],
+  connectSrc: ["'self'", 'https://generativelanguage.googleapis.com', 'ws://localhost:*', 'http://localhost:*'],
   fontSrc: ["'self'", 'https:', 'data:', 'https://fonts.gstatic.com'],
   objectSrc: ["'none'"],
   frameAncestors: ["'none'"],
@@ -144,11 +151,12 @@ const docsSecurityHeaders = helmet({
 });
 
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api/docs')) {
+  if (req.path.startsWith('/api/docs') || req.path.startsWith('/api-docs')) {
     return docsSecurityHeaders(req, res, next);
   }
   return securityHeaders(req, res, next);
-});app.use(getCorsMiddleware());
+});
+app.use(getCorsMiddleware());
 app.use(passport.initialize());
 
 // Cookie parser (required for csurf cookie-based tokens)
@@ -249,6 +257,7 @@ app.use('/api/quizzes', quizRoutes);
 app.use('/api/quiz', quizRoutes);
 app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/flashcard-decks', flashcardDeckRoutes);
+app.use('/api/decks', require('./routes/publicDeckRoutes'));
 app.use('/api/share', shareRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/admin', adminRoutes);
@@ -267,11 +276,25 @@ app.use('/api/gamification', gamificationRoutes);
 app.use('/api/battles', battleRoutes);
 app.use('/api/folders', folderRoutes);
 app.use('/api/squads', squadRoutes);
+app.use('/api/badges', badgeRoutes);
 
-// Base Route
-app.get('/', (req, res) => {
-  res.json({ message: 'Welcome to OpenPrep AI Backend REST API API Services' });
-});
+// Serve static assets from frontend build folder in production
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, '../frontend/dist')));
+
+  // Catch-all route to serve index.html for SPA routing
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/')) {
+      return next();
+    }
+    res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+  });
+} else {
+  // Base Route (only in development/test)
+  app.get('/', (req, res) => {
+    res.json({ message: 'Welcome to OpenPrep AI Backend REST API API Services' });
+  });
+}
 
 // Health Check Routes
 app.get(['/api/v1/health', '/api/health'], async (req, res) => {
@@ -300,7 +323,7 @@ app.get('/healthz', (req, res) => {
 // Swagger UI Documentation & Spec endpoints
 const swaggerEnabled = process.env.SWAGGER_ENABLED === 'true' || process.env.NODE_ENV !== 'production';
 
-app.use('/api/docs', (req, res, next) => {
+app.use(['/api-docs', '/api/docs'], (req, res, next) => {
   if (!swaggerEnabled) {
     return res.status(403).json({ success: false, error: 'Swagger API documentation is disabled in this environment.' });
   }
@@ -314,7 +337,7 @@ app.use('/api/docs', (req, res, next) => {
   },
 }));
 
-app.get('/api/docs.json', (req, res) => {
+app.get(['/api-docs.json', '/api/docs.json'], (req, res) => {
   if (!swaggerEnabled) {
     return res.status(403).json({ success: false, error: 'Swagger API documentation is disabled in this environment.' });
   }
@@ -348,6 +371,7 @@ require('./sockets/battleHandler')(io);
 require('./sockets/chatHandler')(io);
 require('./sockets/crdtHandler')(io);
 require('./sockets/squadHandler')(io);
+require('./sockets/flashcardCollaborationHandler')(io);
 // Authenticate Socket.io connections
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;

@@ -13,6 +13,7 @@ const QuizAttempt = require('./QuizAttempt');
 const Note = require('./Note');
 const Flashcard = require('./Flashcard');
 const FlashcardDeck = require('./FlashcardDeck');
+const DeckCollaborator = require('./DeckCollaborator');
 const Progress = require('./Progress');
 const Feedback = require('./Feedback');
 const ActivityLog = require('./ActivityLog');
@@ -23,6 +24,7 @@ const QuizTelemetryEvent = require('./QuizTelemetryEvent');
 const QuizBookmark = require('./QuizBookmark');
 const DeckRating = require('./DeckRating');
 const UserBadge = require('./UserBadge');
+const Badge = require('./Badge');
 const BattleSession = require('./BattleSession');
 const BattleParticipant = require('./BattleParticipant');
 const PYQAnalysis = require('./PYQAnalysis');
@@ -36,7 +38,11 @@ const SquadChallenge = require('./SquadChallenge');
 const SquadChallengeContribution = require('./SquadChallengeContribution');
 const SquadAchievement = require('./SquadAchievement');
 const SquadActivity = require('./SquadActivity');
-const SquadActivityReaction = require('./SquadActivityReaction');// User associations
+const SquadActivityReaction = require('./SquadActivityReaction');
+const Syllabus = require('./Syllabus');
+const SyllabusTopic = require('./SyllabusTopic');
+
+// User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Topic, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -76,6 +82,15 @@ FlashcardDeck.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 FlashcardDeck.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'SET NULL' });
 FlashcardDeck.hasMany(Flashcard, { foreignKey: 'deckId', onDelete: 'CASCADE' });
 Flashcard.belongsTo(FlashcardDeck, { foreignKey: 'deckId', as: 'deckRef' });
+
+// DeckCollaborator associations
+FlashcardDeck.hasMany(DeckCollaborator, { foreignKey: 'deckId', onDelete: 'CASCADE' });
+DeckCollaborator.belongsTo(FlashcardDeck, { foreignKey: 'deckId', as: 'deckRef' });
+
+User.hasMany(DeckCollaborator, { foreignKey: 'userId', onDelete: 'CASCADE' });
+DeckCollaborator.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+DeckCollaborator.belongsTo(User, { foreignKey: 'invitedBy', as: 'invitedByRef' });
 
 // Topic associations
 Topic.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'CASCADE' });
@@ -131,6 +146,10 @@ Achievement.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 
 // UserBadge associations
 UserBadge.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+// Badge associations
+Badge.hasMany(UserBadge, { foreignKey: 'badgeCode', sourceKey: 'id', as: 'userBadges' });
+UserBadge.belongsTo(Badge, { foreignKey: 'badgeCode', targetKey: 'id', as: 'badge' });
 
 // FocusSession associations
 FocusSession.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
@@ -217,6 +236,15 @@ SquadActivityReaction.belongsTo(SquadActivity, { foreignKey: 'activityId', as: '
 User.hasMany(SquadActivityReaction, { foreignKey: 'userId', onDelete: 'CASCADE' });
 SquadActivityReaction.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 
+// Syllabus associations
+User.hasMany(Syllabus, { foreignKey: 'userId', onDelete: 'CASCADE' });
+Syllabus.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+Syllabus.hasMany(SyllabusTopic, { foreignKey: 'syllabusId', onDelete: 'CASCADE' });
+SyllabusTopic.belongsTo(Syllabus, { foreignKey: 'syllabusId', as: 'syllabusRef' });
+
+SyllabusTopic.belongsTo(Note, { foreignKey: 'linkedNoteId', as: 'linkedNote', onDelete: 'SET NULL' });
+
 module.exports = {  sequelize,  User,  Exam,
   Subject,
   Topic,
@@ -236,6 +264,7 @@ module.exports = {  sequelize,  User,  Exam,
   QuizBookmark,
   DeckRating,
   UserBadge,
+  Badge,
   BattleSession,
   BattleParticipant,
   PYQAnalysis,
@@ -247,7 +276,9 @@ module.exports = {  sequelize,  User,  Exam,
   StudySquad,  SquadMember,
   SquadChallenge,
   SquadChallengeContribution,
+  SquadAchievement,
   SquadActivity,
   SquadActivityReaction,
   FlashcardDeck,
+  DeckCollaborator,
 };

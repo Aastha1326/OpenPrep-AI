@@ -11,18 +11,27 @@ try {
 const { Op } = require('sequelize');
 const User = require('../models/User');
 const Achievement = require('../models/Achievement');
+const sendEmail = require('../services/emailService');
 
 const getAuthCookieOptions = () => ({
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
   sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
-  maxAge: 30 * 24 * 60 * 60 * 1000,
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  path: '/',
+});
+
+const getAccessTokenCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+  maxAge: 15 * 60 * 1000, // 15 minutes
   path: '/',
 });
 
 const generateAccessToken = (id) => {
   return jwt.sign({ id, type: 'access' }, process.env.JWT_SECRET || 'supersecret_openprep_key', {
-    expiresIn: process.env.JWT_EXPIRE || '30d',
+    expiresIn: process.env.JWT_EXPIRE || '15m',
   });
 };
 
@@ -41,7 +50,7 @@ const generateRefreshToken = async (user, family = null) => {
   });
 
   user.refreshTokens = userTokens;
-  user.refreshTokenExpire = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  user.refreshTokenExpire = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
   await user.save();
 
   return { rawToken, tokenFamily };
@@ -55,11 +64,125 @@ const clearRefreshTokenCookie = (res) => {
   res.clearCookie('refreshToken', getAuthCookieOptions());
 };
 
-// ---------------------------------------------------------------------------
-// @desc    Register user
-// @route   POST /api/auth/register
-// @access  Public
-// ---------------------------------------------------------------------------
+const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+const getClientBaseUrl = () =>
+  process.env.CLIENT_URL || process.env.FRONTEND_URL || 'http://localhost:5173';
+
+/**
+ * Issue a single-use token, store only its SHA-256 hash, and hand back the raw
+ * value for the email body.
+ *
+ * Storing the hash rather than the token itself means a leaked database dump
+ * can't be replayed to verify accounts or reset passwords — the same approach
+ * `generateRefreshToken` already takes for refresh tokens.
+ */
+const createSingleUseToken = (ttlMs) => {
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+  return { rawToken, hashedToken, expiresAt: new Date(Date.now() + ttlMs) };
+};
+
+/**
+ * Generate a fresh email-verification token for `user`, persist its hash, and
+ * send the verification link.
+ */
+const sendVerificationEmail = async (user) => {
+  const { rawToken, hashedToken, expiresAt } = createSingleUseToken(EMAIL_VERIFICATION_TTL_MS);
+
+  user.emailVerificationToken = hashedToken;
+  user.emailVerificationExpire = expiresAt;
+  await user.save();
+
+  const verifyUrl = `${getClientBaseUrl()}/verify-email/${rawToken}`;
+
+  await sendEmail({
+    to: user.email,
+    subject: 'Verify your OpenPrep AI email address',
+    text: `Hi ${user.name || 'there'},\n\nConfirm your email address to activate your OpenPrep AI account:\n\n${verifyUrl}\n\nThis link expires in 24 hours. If you didn't create an account, you can ignore this message.`,
+    html: `<p>Hi ${user.name || 'there'},</p><p>Confirm your email address to activate your OpenPrep AI account:</p><p><a href="${verifyUrl}">Verify my email</a></p><p>This link expires in 24 hours. If you didn't create an account, you can ignore this message.</p>`,
+  });
+
+  return rawToken;
+};
+
+/**
+ * Generate a password-reset token for `user`, persist its hash, and send the
+ * reset link.
+ */
+const sendPasswordResetEmail = async (user) => {
+  const { rawToken, hashedToken, expiresAt } = createSingleUseToken(PASSWORD_RESET_TTL_MS);
+
+  user.resetPasswordToken = hashedToken;
+  user.resetPasswordExpire = expiresAt;
+  await user.save();
+
+  const resetUrl = `${getClientBaseUrl()}/reset-password/${rawToken}`;
+
+  await sendEmail({
+    to: user.email,
+    subject: 'Reset your OpenPrep AI password',
+    text: `Hi ${user.name || 'there'},\n\nUse the link below to choose a new password:\n\n${resetUrl}\n\nThis link expires in 1 hour. If you didn't request a reset, no action is needed.`,
+    html: `<p>Hi ${user.name || 'there'},</p><p>Use the link below to choose a new password:</p><p><a href="${resetUrl}">Reset my password</a></p><p>This link expires in 1 hour. If you didn't request a reset, no action is needed.</p>`,
+  });
+
+  return rawToken;
+};
+
+/**
+ * @swagger
+ * /api/auth/register:
+ *   post:
+ *     summary: Register a new user account
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - email
+ *               - password
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "Jane Doe"
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "jane@example.com"
+ *               password:
+ *                 type: string
+ *                 example: "SecretPass123!"
+ *               role:
+ *                 type: string
+ *                 enum: [student, teacher, admin]
+ *                 default: student
+ *     responses:
+ *       201:
+ *         description: User registered successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 token:
+ *                   type: string
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *       400:
+ *         description: Invalid input or user already exists
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 exports.register = async (req, res, next) => {
   try {
     const { name, email, password, role } = req.body;
@@ -77,7 +200,7 @@ exports.register = async (req, res, next) => {
     });
 
     const accessToken = generateAccessToken(user.id);
-    res.cookie('token', accessToken, getAuthCookieOptions());
+    res.cookie('token', accessToken, getAccessTokenCookieOptions());
 
     res.status(201).json({
       success: true,
@@ -94,11 +217,51 @@ exports.register = async (req, res, next) => {
   }
 };
 
-// ---------------------------------------------------------------------------
-// @desc    Login user
-// @route   POST /api/auth/login
-// @access  Public
-// ---------------------------------------------------------------------------
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Authenticate a user and issue access token
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "jane@example.com"
+ *               password:
+ *                 type: string
+ *                 example: "SecretPass123!"
+ *     responses:
+ *       200:
+ *         description: User authenticated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 token:
+ *                   type: string
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *       401:
+ *         description: Invalid credentials
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -118,7 +281,7 @@ exports.login = async (req, res, next) => {
     }
 
     const accessToken = generateAccessToken(user.id);
-    res.cookie('token', accessToken, getAuthCookieOptions());
+    res.cookie('token', accessToken, getAccessTokenCookieOptions());
 
     res.status(200).json({
       success: true,
@@ -135,11 +298,27 @@ exports.login = async (req, res, next) => {
   }
 };
 
-// ---------------------------------------------------------------------------
-// @desc    Logout user & clear HttpOnly cookies
-// @route   POST /api/auth/logout
-// @access  Private / Public
-// ---------------------------------------------------------------------------
+/**
+ * @swagger
+ * /api/auth/logout:
+ *   post:
+ *     summary: Logout user and clear authentication cookies
+ *     tags: [Authentication]
+ *     responses:
+ *       200:
+ *         description: Logged out successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Logged out successfully"
+ */
 exports.logout = async (req, res, next) => {
   try {
     const cookieOptions = getAuthCookieOptions();
@@ -266,7 +445,7 @@ exports.verifyLogin2FA = async (req, res, next) => {
     const refreshToken = refreshResult.rawToken;
 
     setRefreshTokenCookie(res, refreshToken);
-    res.cookie('token', accessToken, getAuthCookieOptions());
+    res.cookie('token', accessToken, getAccessTokenCookieOptions());
 
     res.status(200).json({
       success: true,
@@ -285,11 +464,34 @@ exports.verifyLogin2FA = async (req, res, next) => {
   }
 };
 
-// ---------------------------------------------------------------------------
-// @desc    Get current user profile
-// @route   GET /api/auth/me
-// @access  Private
-// ---------------------------------------------------------------------------
+/**
+ * @swagger
+ * /api/auth/me:
+ *   get:
+ *     summary: Retrieve currently authenticated user profile
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User profile retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 exports.getMe = async (req, res, next) => {
   try {
     const user = await User.findByPk(req.user.id, {
@@ -329,11 +531,41 @@ exports.getMe = async (req, res, next) => {
   }
 };
 
-// ---------------------------------------------------------------------------
-// @desc    Update current user settings (e.g. leaderboard name visibility)
-// @route   PATCH /api/auth/settings
-// @access  Private
-// ---------------------------------------------------------------------------
+/**
+ * @swagger
+ * /api/auth/settings:
+ *   patch:
+ *     summary: Update user settings and preferences
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               leaderboardVisible:
+ *                 type: boolean
+ *               hideActivityFromSquad:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Settings updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *       401:
+ *         description: Not authenticated
+ */
 exports.updateSettings = async (req, res, next) => {
   try {
     const { leaderboardVisible, hideActivityFromSquad } = req.body;
@@ -366,11 +598,41 @@ exports.updateSettings = async (req, res, next) => {
     next(error);
   }
 };
-// ---------------------------------------------------------------------------
-// @desc    Forgot Password
-// @route   POST /api/auth/forgot-password
-// @access  Public
-// ---------------------------------------------------------------------------
+
+/**
+ * @swagger
+ * /api/auth/forgot-password:
+ *   post:
+ *     summary: Request a password reset link via email
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "jane@example.com"
+ *     responses:
+ *       200:
+ *         description: Password reset request accepted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "If the email exists, a reset link has been sent"
+ */
 exports.forgotPassword = async (req, res, next) => {
   try {
     const { email } = req.body;
@@ -383,7 +645,7 @@ exports.forgotPassword = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: 'If an account with that email exists, a password reset link has been sent.',
+      message: 'If the email exists, a reset link has been sent',
     });
   } catch (error) {
     // If email sending failed, clear the token from DB
@@ -397,11 +659,37 @@ exports.forgotPassword = async (req, res, next) => {
   }
 };
 
-// ---------------------------------------------------------------------------
-// @desc    Reset Password
-// @route   POST /api/auth/reset-password/:token
-// @access  Public
-// ---------------------------------------------------------------------------
+/**
+ * @swagger
+ * /api/auth/reset-password/{token}:
+ *   post:
+ *     summary: Reset user password using reset token
+ *     tags: [Authentication]
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Password reset token received via email
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - password
+ *             properties:
+ *               password:
+ *                 type: string
+ *                 example: "NewSecurePassword123!"
+ *     responses:
+ *       200:
+ *         description: Password reset successfully
+ *       400:
+ *         description: Invalid or expired reset token
+ */
 exports.resetPassword = async (req, res, next) => {
   try {
     const hashedToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
@@ -443,11 +731,41 @@ exports.resetPassword = async (req, res, next) => {
   }
 };
 
-// ---------------------------------------------------------------------------
-// @desc    Refresh access token
-// @route   POST /api/auth/refresh-token
-// @access  Public
-// ---------------------------------------------------------------------------
+/**
+ * @swagger
+ * /api/auth/refresh:
+ *   post:
+ *     summary: Refresh access token using refresh token
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Access token refreshed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 token:
+ *                   type: string
+ *       401:
+ *         description: Invalid or expired refresh token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 exports.refreshToken = async (req, res, next) => {
   try {
     // Support both cookie and body for refresh token
@@ -611,7 +929,7 @@ exports.googleLogin = async (req, res, next) => {
     const refreshToken = refreshResult.rawToken;
 
     setRefreshTokenCookie(res, refreshToken);
-    res.cookie('token', accessToken, getAuthCookieOptions());
+    res.cookie('token', accessToken, getAccessTokenCookieOptions());
 
     return res.status(200).json({
       success: true,
@@ -787,7 +1105,7 @@ exports.registerOAuthEmail = async (req, res, next) => {
     const refreshResult = await generateRefreshToken(user);
     const refreshToken = refreshResult.rawToken;
     setRefreshTokenCookie(res, refreshToken);
-    res.cookie('token', accessToken, getAuthCookieOptions());
+    res.cookie('token', accessToken, getAccessTokenCookieOptions());
 
     res.status(200).json({
       success: true,
@@ -974,6 +1292,7 @@ exports.logout = async (req, res, next) => {
     }
 
     clearRefreshTokenCookie(res);
+    res.clearCookie('token', getAuthCookieOptions());
 
     res.status(200).json({
       success: true,
@@ -983,9 +1302,29 @@ exports.logout = async (req, res, next) => {
     next(error);
   }
 };
-// @route   POST /api/auth/logout-all
-// @access  Private
-// ---------------------------------------------------------------------------
+/**
+ * @swagger
+ * /api/auth/logout-all:
+ *   post:
+ *     summary: Log out user from all devices
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Logged out from all devices successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Logged out from all devices successfully"
+ */
 exports.logoutAll = async (req, res, next) => {
   try {
     // Remove every refresh token belonging to the authenticated user.
@@ -1005,11 +1344,30 @@ exports.logoutAll = async (req, res, next) => {
     next(error);
   }
 };
-// ---------------------------------------------------------------------------
-// @desc    Resend verification email
-// @route   POST /api/auth/resend-verification
-// @access  Public
-// ---------------------------------------------------------------------------
+
+/**
+ * @swagger
+ * /api/auth/resend-verification:
+ *   post:
+ *     summary: Resend email verification link
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "jane@example.com"
+ *     responses:
+ *       200:
+ *         description: Verification email request processed
+ */
 exports.resendVerification = async (req, res, next) => {
   try {
     const { email } = req.body;
@@ -1023,6 +1381,72 @@ exports.resendVerification = async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: 'If an unverified account with that email exists, a verification link has been sent.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @swagger
+ * /api/auth/verify-email/{token}:
+ *   post:
+ *     summary: Verify email address using verification token
+ *     tags: [Authentication]
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Verification token sent via email
+ *     responses:
+ *       200:
+ *         description: Email verified successfully
+ *       400:
+ *         description: Invalid or expired verification link
+ */
+exports.verifyEmail = async (req, res, next) => {
+  try {
+    const { token } = req.params;
+
+    if (!token) {
+      return res.status(400).json({ success: false, error: 'Verification token is required' });
+    }
+
+    // Only the hash is stored, so hash the incoming token to look it up.
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const user = await User.findOne({
+      where: {
+        emailVerificationToken: hashedToken,
+        emailVerificationExpire: { [Op.gt]: new Date() },
+      },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        error: 'This verification link is invalid or has expired. Request a new one.',
+      });
+    }
+
+    // Idempotent by construction: the token is cleared here, so replaying the
+    // same link finds no user and gets the message above rather than silently
+    // re-verifying.
+    user.isEmailVerified = true;
+    user.emailVerificationToken = null;
+    user.emailVerificationExpire = null;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Email verified successfully. You can now sign in.',
+      data: {
+        id: user.id,
+        email: user.email,
+        isEmailVerified: true,
+      },
     });
   } catch (error) {
     next(error);

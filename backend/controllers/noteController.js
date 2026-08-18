@@ -10,16 +10,32 @@ const User = require('../models/User');
 const { escapeLikePattern } = require('../utils/likePattern');
 const { summarizeNoteText, transcribeAndSummarizeAudio } = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
-const { extractTextFromImage } = require('../services/ocrService');
+const { extractTextFromImage, extractTextFromPDF } = require('../services/ocrService');
 
 // Helper to escape regex special characters if regex search is used anywhere
 const escapeRegex = (string) => {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 };
 
-// @desc    Export all of the authenticated user's notes as JSON or a Markdown ZIP
-// @route   GET /api/notes/export
-// @access  Private
+/**
+ * @swagger
+ * /api/notes/export:
+ *   get:
+ *     summary: Export user's notes as JSON or Markdown ZIP
+ *     tags: [Notes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: format
+ *         schema:
+ *           type: string
+ *           enum: [json, zip]
+ *           default: json
+ *     responses:
+ *       200:
+ *         description: Notes exported successfully
+ */
 exports.exportNotes = async (req, res, next) => {
   try {
     const format = req.query.format === 'zip' ? 'zip' : 'json';
@@ -70,9 +86,18 @@ exports.exportNotes = async (req, res, next) => {
   }
 };
 
-// @desc    Import one or more Markdown files as new notes
-// @route   POST /api/notes/import
-// @access  Private
+/**
+ * @swagger
+ * /api/notes/import:
+ *   post:
+ *     summary: Import Markdown files as new notes
+ *     tags: [Notes]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201:
+ *         description: Notes imported successfully
+ */
 exports.importNotes = async (req, res, next) => {
   try {
     const { subjectId, topicId } = req.body;
@@ -124,10 +149,28 @@ exports.importNotes = async (req, res, next) => {
   }
 };
 
-// @desc    Summarize a note using AI (Gemini) and cache the result
-// @route   POST /api/notes/:id/summarize
-// @access  Private
-
+/**
+ * @swagger
+ * /api/notes/upload:
+ *   post:
+ *     summary: Upload a new study note (text, PDF, DOCX, or image)
+ *     tags: [Notes]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201:
+ *         description: Note uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/Note'
+ */
 exports.uploadNote = async (req, res, next) => {
   try {
     const { title, content, subjectId, topicId, isPublic, category, tags } = req.body;
@@ -176,17 +219,27 @@ exports.uploadNote = async (req, res, next) => {
   }
 };
 
-// @desc    Extract text from an uploaded image via OCR
-// @route   POST /api/notes/ocr-upload
-// @access  Private
+/**
+ * @swagger
+ * /api/notes/ocr-upload:
+ *   post:
+ *     summary: Extract text from image or PDF via OCR
+ *     tags: [Notes]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Text extracted successfully via OCR
+ */
 exports.uploadOcrNote = async (req, res, next) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ success: false, error: 'Please upload an image file' });
+      return res.status(400).json({ success: false, error: 'Please upload an image or PDF file' });
     }
 
     const ext = path.extname(req.file.originalname).toLowerCase();
-    const validExts = ['.png', '.jpg', '.jpeg', '.webp'];
+    const validImageExts = ['.png', '.jpg', '.jpeg', '.webp'];
+    const validPDFExts = ['.pdf'];
     const invalidExts = ['.gif', '.bmp'];
 
     if (invalidExts.includes(ext)) {
@@ -194,21 +247,41 @@ exports.uploadOcrNote = async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'Unsupported format: GIF and BMP are not allowed for OCR.' });
     }
 
-    if (!validExts.includes(ext)) {
+    if (!validImageExts.includes(ext) && !validPDFExts.includes(ext)) {
       if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-      return res.status(400).json({ success: false, error: 'Please upload a valid image file (.png, .jpg, .jpeg, .webp).' });
+      return res.status(400).json({ success: false, error: 'Please upload a valid image file (.png, .jpg, .jpeg, .webp) or PDF (.pdf).' });
     }
 
     const fileBuffer = fs.readFileSync(req.file.path);
     
-    // Process OCR
-    const { extractedText, confidence, wordCount } = await extractTextFromImage(fileBuffer);
+    // Process OCR based on file type
+    let extractedText, confidence, wordCount;
+    
+    if (validPDFExts.includes(ext)) {
+      // Extract text from PDF
+      const pdfResult = await extractTextFromPDF(fileBuffer);
+      extractedText = pdfResult.extractedText;
+      confidence = pdfResult.confidence;
+      wordCount = pdfResult.wordCount;
+    } else {
+      // Extract text from image using OCR
+      const ocrResult = await extractTextFromImage(fileBuffer);
+      extractedText = ocrResult.extractedText;
+      confidence = ocrResult.confidence;
+      wordCount = ocrResult.wordCount;
+    }
     
     // Sanitize extracted text
     const sanitizedText = sanitizeHtml(extractedText, {
       allowedTags: [], // Strip all HTML from OCR
       allowedAttributes: {}
     });
+
+    // Check for empty results
+    if (!sanitizedText || sanitizedText.trim().length === 0) {
+      if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+      return res.status(400).json({ success: false, error: 'No text could be extracted from the uploaded file. Please try a clearer image or a different file.' });
+    }
 
     // Optionally cleanup the uploaded file if we don't want to store raw image beyond this endpoint,
     // but the issue allows storing as Note later. The prompt says "Do not store unnecessary OCR worker data or raw image data beyond the project's existing upload/storage flow."
@@ -231,9 +304,46 @@ exports.uploadOcrNote = async (req, res, next) => {
   }
 };
 
-// @desc    Get all notes (with search, filter, pagination)
-// @route   GET /api/notes
-// @access  Private
+/**
+ * @swagger
+ * /api/notes:
+ *   get:
+ *     summary: Retrieve notes with search, filter, and pagination
+ *     tags: [Notes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: subjectId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: query
+ *         name: category
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Notes list retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/PaginatedResponse'
+ */
 exports.getNotes = async (req, res, next) => {
   try {
     const { subjectId, category, search, publicOnly } = req.query;
@@ -319,9 +429,27 @@ exports.getNotes = async (req, res, next) => {
   }
 };
 
-// @desc    Download / Increment note download count
-// @route   PUT /api/notes/:id/download
-// @access  Private
+/**
+ * @swagger
+ * /api/notes/{id}/download:
+ *   put:
+ *     summary: Track note download and increment download count
+ *     tags: [Notes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Download count incremented
+ *       404:
+ *         description: Note not found
+ */
 exports.downloadNote = async (req, res, next) => {
   try {
     const note = await Note.findByPk(req.params.id);
@@ -343,9 +471,27 @@ exports.downloadNote = async (req, res, next) => {
   }
 };
 
-// @desc    Delete Note
-// @route   DELETE /api/notes/:id
-// @access  Private
+/**
+ * @swagger
+ * /api/notes/{id}:
+ *   delete:
+ *     summary: Delete a note by ID
+ *     tags: [Notes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Note deleted successfully
+ *       404:
+ *         description: Note not found
+ */
 exports.deleteNote = async (req, res, next) => {
   try {
     const note = await Note.findOne({ where: { id: req.params.id, user: req.user.id } });
@@ -372,9 +518,27 @@ exports.deleteNote = async (req, res, next) => {
   }
 };
 
-// @desc    Summarize a note using AI (Gemini) and cache the result
-// @route   POST /api/notes/:id/summarize
-// @access  Private
+/**
+ * @swagger
+ * /api/notes/{id}/summarize:
+ *   post:
+ *     summary: Generate AI summary of a note using Gemini
+ *     tags: [Notes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: AI summary generated or returned from cache
+ *       404:
+ *         description: Note not found
+ */
 exports.summarizeNote = async (req, res, next) => {
   try {
     const note = await Note.findOne({
@@ -428,9 +592,18 @@ exports.summarizeNote = async (req, res, next) => {
   }
 };
 
-// @desc    Upload & Process Voice Note
-// @route   POST /api/notes/voice
-// @access  Private
+/**
+ * @swagger
+ * /api/notes/voice:
+ *   post:
+ *     summary: Upload and process voice note audio file with Gemini AI
+ *     tags: [Notes]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201:
+ *         description: Voice note transcribed and summarized successfully
+ */
 exports.uploadVoiceNote = async (req, res, next) => {
   try {
     const { title, subjectId, topicId, isPublic } = req.body;
@@ -503,9 +676,42 @@ exports.uploadVoiceNote = async (req, res, next) => {
   }
 };
 
-// @desc    Update Note
-// @route   PUT /api/notes/:id
-// @access  Private
+/**
+ * @swagger
+ * /api/notes/{id}:
+ *   put:
+ *     summary: Update an existing note
+ *     tags: [Notes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               content:
+ *                 type: string
+ *               isPublic:
+ *                 type: boolean
+ *               category:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Note updated successfully
+ *       404:
+ *         description: Note not found
+ */
 exports.updateNote = async (req, res, next) => {
   try {
     const { title, content, isPublic, category, tags } = req.body;
@@ -553,9 +759,37 @@ exports.shareCollaboration = async (req, res, next) => {
   }
 };
 
-// @desc    Get single note details
-// @route   GET /api/notes/:id
-// @access  Private
+/**
+ * @swagger
+ * /api/notes/{id}:
+ *   get:
+ *     summary: Retrieve single note by ID
+ *     tags: [Notes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Note details retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/Note'
+ *       404:
+ *         description: Note not found
+ */
 exports.getNote = async (req, res, next) => {
   try {
     const note = await Note.findByPk(req.params.id, {
