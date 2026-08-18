@@ -52,26 +52,43 @@ Most students waste critical preparation hours trying to figure out:
 
 ## 📂 Project Structure
 
-```bash
-OpenPrep-AI/
-├── .github/             # GitHub actions, templates & labelers
-├── backend/             # Node.js + Express backend
-│   ├── config/          # Database configuration
-│   ├── controllers/     # MVC controller logic
-│   ├── middleware/      # Auth, upload, and validation middleware
-│   ├── models/          # Sequelize database schemas
-│   ├── routes/          # Express API route declarations
-│   └── services/        # Gemini API integration service
-├── docs/                # Comprehensive system documentation
-└── frontend/            # React + Vite + Tailwind CSS frontend
-    ├── public/          # Static files and assets
-    └── src/
-        ├── components/  # Reusable UI components
-        ├── context/     # Global contexts (Theme, etc.)
-        ├── services/    # Axios API client integrations
-        └── store/       # Redux Toolkit global state store
-```
+The repository is organized into separate frontend, backend, documentation, and development-support directories.
 
+```text
+OpenPrep-AI/
+├── .github/                 # GitHub Actions, issue templates, and repository automation
+├── backend/                 # Node.js + Express backend
+│   ├── config/              # Application and database configuration
+│   ├── controllers/         # Request and business logic controllers
+│   ├── jobs/                # Background and scheduled jobs
+│   ├── middleware/          # Authentication, validation, and request middleware
+│   ├── migrations/          # Database migration files
+│   ├── models/              # Sequelize database models
+│   ├── routes/              # API route definitions
+│   ├── scripts/             # Backend utility and maintenance scripts
+│   ├── services/            # External service and AI integrations
+│   ├── sockets/              # Socket.IO event handling
+│   ├── tests/                # Backend test suites
+│   └── utils/                # Shared backend utilities
+├── frontend/                # React + Vite frontend application
+│   ├── e2e/                  # End-to-end tests
+│   ├── public/               # Static public assets
+│   └── src/                  # Frontend source code
+├── docs/                     # Project and technical documentation
+│   └── adr/                  # Architecture Decision Records
+├── issues/                   # Issue-related project resources
+├── pr/                       # Pull request-related resources
+├── scripts/                  # Repository-level development and automation scripts
+├── docker-compose.yml        # Local Docker service configuration
+├── package.json              # Root project scripts and dependencies
+├── pnpm-workspace.yaml       # pnpm workspace configuration
+├── CONTRIBUTING.md           # Contribution guidelines
+├── CODE_OF_CONDUCT.md        # Community guidelines
+├── SECURITY.md               # Security policy
+├── ROADMAP.md                # Project roadmap
+├── CHANGELOG.md              # Project change history
+└── README.md                 # Project overview and setup instructions
+```
 ---
 
 ## 🚦 Getting Started
