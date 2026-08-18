@@ -818,9 +818,13 @@ const options = {
         name: 'Community',
         description: 'Feedback and roadmap endpoints',
       },
+      {
+        name: 'Analytics',
+        description: 'Study analytics and activity insights',
+      },
     ],
   },
-  apis: ['./routes/*.js'],
+  apis: ['./routes/*.js', './controllers/*.js'],
 };
 
 const swaggerSpec = swaggerJsdoc(options);

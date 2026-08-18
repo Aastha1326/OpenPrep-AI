@@ -100,9 +100,36 @@ function foldRating(currentRating, currentCount, newStars) {
   };
 }
 
-// @desc    Generate AI Flashcards
-// @route   POST /api/flashcards/generate-ai
-// @access  Private
+/**
+ * @swagger
+ * /api/flashcards/generate-ai:
+ *   post:
+ *     summary: Generate AI Flashcards for subject and topic using Gemini
+ *     tags: [Flashcards]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - subjectId
+ *             properties:
+ *               subjectId:
+ *                 type: string
+ *                 format: uuid
+ *               topicId:
+ *                 type: string
+ *                 format: uuid
+ *               count:
+ *                 type: integer
+ *                 default: 6
+ *     responses:
+ *       201:
+ *         description: AI flashcards generated and saved successfully
+ */
 exports.generateAIFlashcards = async (req, res, next) => {
   try {
     const { subjectId, topicId, count } = req.body;
@@ -179,9 +206,18 @@ exports.generateAIFlashcards = async (req, res, next) => {
   }
 };
 
-// @desc    Suggest AI tags & difficulty rating for a flashcard (not saved)
-// @route   POST /api/flashcards/auto-tag
-// @access  Private
+/**
+ * @swagger
+ * /api/flashcards/auto-tag:
+ *   post:
+ *     summary: Suggest AI tags and difficulty rating for a flashcard
+ *     tags: [Flashcards]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Tags suggested successfully
+ */
 exports.autoTagFlashcard = async (req, res, next) => {
   try {
     const { front, back } = req.body;
@@ -207,9 +243,18 @@ exports.autoTagFlashcard = async (req, res, next) => {
   }
 };
 
-// @desc    Preview AI-generated flashcards from text (not saved)
-// @route   POST /api/flashcards/generate-from-text
-// @access  Private
+/**
+ * @swagger
+ * /api/flashcards/generate-from-text:
+ *   post:
+ *     summary: Preview AI-generated flashcards from custom text
+ *     tags: [Flashcards]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Flashcards preview generated successfully
+ */
 exports.generateFlashcardsFromText = async (req, res, next) => {
   try {
     const { subjectId, text, count } = req.body;
@@ -384,8 +429,49 @@ exports.generateFlashcardsFromYouTube = async (req, res, next) => {
   }
 };
 
-// @desc    Create manual Flashcard// @route   POST /api/flashcards
-// @access  Private
+/**
+ * @swagger
+ * /api/flashcards:
+ *   post:
+ *     summary: Create a manual flashcard
+ *     tags: [Flashcards]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - front
+ *               - back
+ *               - subjectId
+ *             properties:
+ *               front:
+ *                 type: string
+ *               back:
+ *                 type: string
+ *               subjectId:
+ *                 type: string
+ *                 format: uuid
+ *               topicId:
+ *                 type: string
+ *                 format: uuid
+ *     responses:
+ *       201:
+ *         description: Flashcard created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/Flashcard'
+ */
 exports.createFlashcard = async (req, res, next) => {
   try {
     const { subjectId, topicId, deckId, front, back, tags, difficulty } = req.body;
@@ -421,9 +507,42 @@ exports.createFlashcard = async (req, res, next) => {
   }
 };
 
-// @desc    Get flashcards for review (due cards)
-// @route   GET /api/flashcards
-// @access  Private
+/**
+ * @swagger
+ * /api/flashcards:
+ *   get:
+ *     summary: Retrieve flashcards for review or by subject
+ *     tags: [Flashcards]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: subjectId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: query
+ *         name: dueOnly
+ *         schema:
+ *           type: boolean
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Flashcards retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/PaginatedResponse'
+ */
 exports.getFlashcards = async (req, res, next) => {
   try {
     const { subjectId, dueOnly } = req.query;
@@ -476,9 +595,43 @@ exports.getFlashcards = async (req, res, next) => {
   }
 };
 
-// @desc    Review a Flashcard (Update SM-2 variables)
-// @route   PUT /api/flashcards/:id/review
-// @access  Private
+/**
+ * @swagger
+ * /api/flashcards/{id}/review:
+ *   put:
+ *     summary: Submit a review for a flashcard (SuperMemo SM-2 calculation)
+ *     tags: [Flashcards]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - quality
+ *             properties:
+ *               quality:
+ *                 type: integer
+ *                 minimum: 0
+ *                 maximum: 5
+ *                 description: Recall quality rating (0=complete blackout, 5=perfect response)
+ *     responses:
+ *       200:
+ *         description: Flashcard updated with next review date and SM-2 parameters
+ *       400:
+ *         description: Invalid quality rating
+ *       404:
+ *         description: Flashcard not found
+ */
 exports.reviewFlashcard = async (req, res, next) => {
   try {
     const { quality } = req.body; // quality rating: 0 to 5
@@ -562,9 +715,27 @@ exports.reviewFlashcard = async (req, res, next) => {
   }
 };
 
-// @desc    Delete flashcard
-// @route   DELETE /api/flashcards/:id
-// @access  Private
+/**
+ * @swagger
+ * /api/flashcards/{id}:
+ *   delete:
+ *     summary: Delete a flashcard by ID
+ *     tags: [Flashcards]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Flashcard deleted successfully
+ *       404:
+ *         description: Flashcard not found
+ */
 exports.deleteFlashcard = async (req, res, next) => {
   try {
     const card = await Flashcard.findOne({ where: { id: req.params.id } });

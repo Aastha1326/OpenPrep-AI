@@ -44,9 +44,18 @@ function combineMastery(quizAccuracy, flashcardRetention) {
   if (flashcardRetention != null) return Math.round(flashcardRetention);
   return 0;
 }
-// @desc    Get dashboard metrics & activity feed
-// @route   GET /api/progress/dashboard
-// @access  Private
+/**
+ * @swagger
+ * /api/progress/dashboard:
+ *   get:
+ *     summary: Retrieve dashboard metrics and activity feed
+ *     tags: [Progress]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Dashboard statistics retrieved successfully
+ */
 exports.getDashboardStats = async (req, res, next) => {
   try {
     const userId = req.user.id;
@@ -1086,9 +1095,40 @@ exports.getWeeklyFocusEfficiency = async (req, res, next) => {
   }
 };
 
-// @desc    Get daily study activity for the last 365 days (contribution heatmap)
-// @route   GET /api/analytics/activity-heatmap
-// @access  Private
+/**
+ * @swagger
+ * /api/analytics/activity-heatmap:
+ *   get:
+ *     summary: Get daily study activity for the last 365 days (contribution heatmap)
+ *     tags: [Analytics]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Daily activity heatmap data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       date:
+ *                         type: string
+ *                         format: date
+ *                       questionsSolved:
+ *                         type: integer
+ *                       flashcardsReviewed:
+ *                         type: integer
+ *                       total:
+ *                         type: integer
+ */
 exports.getActivityHeatmap = async (req, res, next) => {
   try {
     const userId = req.user.id;

@@ -130,11 +130,59 @@ const sendPasswordResetEmail = async (user) => {
   return rawToken;
 };
 
-// ---------------------------------------------------------------------------
-// @desc    Register user
-// @route   POST /api/auth/register
-// @access  Public
-// ---------------------------------------------------------------------------
+/**
+ * @swagger
+ * /api/auth/register:
+ *   post:
+ *     summary: Register a new user account
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - email
+ *               - password
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "Jane Doe"
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "jane@example.com"
+ *               password:
+ *                 type: string
+ *                 example: "SecretPass123!"
+ *               role:
+ *                 type: string
+ *                 enum: [student, teacher, admin]
+ *                 default: student
+ *     responses:
+ *       201:
+ *         description: User registered successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 token:
+ *                   type: string
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *       400:
+ *         description: Invalid input or user already exists
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 exports.register = async (req, res, next) => {
   try {
     const { name, email, password, role } = req.body;
@@ -169,11 +217,51 @@ exports.register = async (req, res, next) => {
   }
 };
 
-// ---------------------------------------------------------------------------
-// @desc    Login user
-// @route   POST /api/auth/login
-// @access  Public
-// ---------------------------------------------------------------------------
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Authenticate a user and issue access token
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "jane@example.com"
+ *               password:
+ *                 type: string
+ *                 example: "SecretPass123!"
+ *     responses:
+ *       200:
+ *         description: User authenticated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 token:
+ *                   type: string
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *       401:
+ *         description: Invalid credentials
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -210,11 +298,27 @@ exports.login = async (req, res, next) => {
   }
 };
 
-// ---------------------------------------------------------------------------
-// @desc    Logout user & clear HttpOnly cookies
-// @route   POST /api/auth/logout
-// @access  Private / Public
-// ---------------------------------------------------------------------------
+/**
+ * @swagger
+ * /api/auth/logout:
+ *   post:
+ *     summary: Logout user and clear authentication cookies
+ *     tags: [Authentication]
+ *     responses:
+ *       200:
+ *         description: Logged out successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Logged out successfully"
+ */
 exports.logout = async (req, res, next) => {
   try {
     const cookieOptions = getAuthCookieOptions();
@@ -360,11 +464,34 @@ exports.verifyLogin2FA = async (req, res, next) => {
   }
 };
 
-// ---------------------------------------------------------------------------
-// @desc    Get current user profile
-// @route   GET /api/auth/me
-// @access  Private
-// ---------------------------------------------------------------------------
+/**
+ * @swagger
+ * /api/auth/me:
+ *   get:
+ *     summary: Retrieve currently authenticated user profile
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User profile retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 exports.getMe = async (req, res, next) => {
   try {
     const user = await User.findByPk(req.user.id, {
@@ -404,11 +531,41 @@ exports.getMe = async (req, res, next) => {
   }
 };
 
-// ---------------------------------------------------------------------------
-// @desc    Update current user settings (e.g. leaderboard name visibility)
-// @route   PATCH /api/auth/settings
-// @access  Private
-// ---------------------------------------------------------------------------
+/**
+ * @swagger
+ * /api/auth/settings:
+ *   patch:
+ *     summary: Update user settings and preferences
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               leaderboardVisible:
+ *                 type: boolean
+ *               hideActivityFromSquad:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Settings updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *       401:
+ *         description: Not authenticated
+ */
 exports.updateSettings = async (req, res, next) => {
   try {
     const { leaderboardVisible, hideActivityFromSquad } = req.body;
@@ -441,11 +598,41 @@ exports.updateSettings = async (req, res, next) => {
     next(error);
   }
 };
-// ---------------------------------------------------------------------------
-// @desc    Forgot Password
-// @route   POST /api/auth/forgot-password
-// @access  Public
-// ---------------------------------------------------------------------------
+
+/**
+ * @swagger
+ * /api/auth/forgot-password:
+ *   post:
+ *     summary: Request a password reset link via email
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "jane@example.com"
+ *     responses:
+ *       200:
+ *         description: Password reset request accepted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "If the email exists, a reset link has been sent"
+ */
 exports.forgotPassword = async (req, res, next) => {
   try {
     const { email } = req.body;
@@ -472,11 +659,37 @@ exports.forgotPassword = async (req, res, next) => {
   }
 };
 
-// ---------------------------------------------------------------------------
-// @desc    Reset Password
-// @route   POST /api/auth/reset-password/:token
-// @access  Public
-// ---------------------------------------------------------------------------
+/**
+ * @swagger
+ * /api/auth/reset-password/{token}:
+ *   post:
+ *     summary: Reset user password using reset token
+ *     tags: [Authentication]
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Password reset token received via email
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - password
+ *             properties:
+ *               password:
+ *                 type: string
+ *                 example: "NewSecurePassword123!"
+ *     responses:
+ *       200:
+ *         description: Password reset successfully
+ *       400:
+ *         description: Invalid or expired reset token
+ */
 exports.resetPassword = async (req, res, next) => {
   try {
     const hashedToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
@@ -518,11 +731,41 @@ exports.resetPassword = async (req, res, next) => {
   }
 };
 
-// ---------------------------------------------------------------------------
-// @desc    Refresh access token
-// @route   POST /api/auth/refresh-token
-// @access  Public
-// ---------------------------------------------------------------------------
+/**
+ * @swagger
+ * /api/auth/refresh:
+ *   post:
+ *     summary: Refresh access token using refresh token
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Access token refreshed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 token:
+ *                   type: string
+ *       401:
+ *         description: Invalid or expired refresh token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 exports.refreshToken = async (req, res, next) => {
   try {
     // Support both cookie and body for refresh token
@@ -1059,9 +1302,29 @@ exports.logout = async (req, res, next) => {
     next(error);
   }
 };
-// @route   POST /api/auth/logout-all
-// @access  Private
-// ---------------------------------------------------------------------------
+/**
+ * @swagger
+ * /api/auth/logout-all:
+ *   post:
+ *     summary: Log out user from all devices
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Logged out from all devices successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Logged out from all devices successfully"
+ */
 exports.logoutAll = async (req, res, next) => {
   try {
     // Remove every refresh token belonging to the authenticated user.
@@ -1081,11 +1344,30 @@ exports.logoutAll = async (req, res, next) => {
     next(error);
   }
 };
-// ---------------------------------------------------------------------------
-// @desc    Resend verification email
-// @route   POST /api/auth/resend-verification
-// @access  Public
-// ---------------------------------------------------------------------------
+
+/**
+ * @swagger
+ * /api/auth/resend-verification:
+ *   post:
+ *     summary: Resend email verification link
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "jane@example.com"
+ *     responses:
+ *       200:
+ *         description: Verification email request processed
+ */
 exports.resendVerification = async (req, res, next) => {
   try {
     const { email } = req.body;
@@ -1105,11 +1387,25 @@ exports.resendVerification = async (req, res, next) => {
   }
 };
 
-// ---------------------------------------------------------------------------
-// @desc    Confirm an email address from the link sent at registration
-// @route   POST /api/auth/verify-email/:token
-// @access  Public
-// ---------------------------------------------------------------------------
+/**
+ * @swagger
+ * /api/auth/verify-email/{token}:
+ *   post:
+ *     summary: Verify email address using verification token
+ *     tags: [Authentication]
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Verification token sent via email
+ *     responses:
+ *       200:
+ *         description: Email verified successfully
+ *       400:
+ *         description: Invalid or expired verification link
+ */
 exports.verifyEmail = async (req, res, next) => {
   try {
     const { token } = req.params;

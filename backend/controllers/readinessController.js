@@ -158,6 +158,34 @@ exports.recalculateReadiness = async (req, res, next) => {
   }
 };
 
+/**
+ * @swagger
+ * /api/analytics/readiness-projection:
+ *   get:
+ *     summary: Retrieve predictive exam readiness trajectory and daily hours simulation data
+ *     tags: [Analytics]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: targetExamDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: dailyHours
+ *         schema:
+ *           type: integer
+ *           default: 2
+ *       - in: query
+ *         name: targetScore
+ *         schema:
+ *           type: integer
+ *           default: 85
+ *     responses:
+ *       200:
+ *         description: Predictive readiness trajectory and recommendations
+ */
 exports.getReadinessProjection = async (req, res, next) => {
   try {
     const userId = req.user.id;
