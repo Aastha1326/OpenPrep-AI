@@ -1,3 +1,5 @@
+const { Sentry, isSentryReady } = require('../config/sentry');
+
 const errorHandler = (err, req, res, next) => {
   let error = { ...err };
   error.message = err.message;
@@ -37,17 +39,6 @@ const errorHandler = (err, req, res, next) => {
     error.statusCode = 400;
   }
 
-  // Multer file size limit error
-  if (err.name === 'MulterError') {
-    if (err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({
-        message: 'File too large. Maximum file size is 15MB.',
-      });
-    }
-    error = new Error(err.message);
-    error.statusCode = 400;
-  }
-
   // Custom file type validation error
   if (err.name === 'FileValidationError') {
     error.statusCode = 400;
@@ -59,9 +50,27 @@ const errorHandler = (err, req, res, next) => {
     error.message = err.message || 'Request processing timed out. Please try again with a smaller file.';
   }
 
-  res.status(error.statusCode || 500).json({
+  const statusCode = error.statusCode || 500;
+
+  if (isSentryReady && statusCode >= 500) {
+    Sentry.withScope((scope) => {
+      if (req.user) {
+        scope.setUser({ id: req.user.id, email: req.user.email });
+      }
+      if (req) {
+        scope.setTag('method', req.method);
+        scope.setTag('url', req.originalUrl || req.url);
+        scope.setExtra('requestId', req.id);
+      }
+      Sentry.captureException(err);
+    });
+  }
+
+  const responseMessage = statusCode === 500 ? 'Internal Server Error' : (error.message || 'Server Error');
+
+  res.status(statusCode).json({
     success: false,
-    error: error.message || 'Server Error',
+    error: responseMessage,
   });
 };
 

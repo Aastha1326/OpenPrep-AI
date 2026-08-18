@@ -1,4 +1,5 @@
 require('dotenv').config();
+const { Sentry } = require('./config/sentry');
 const express = require('express');
 const compression = require('compression');
 const cors = require('cors');
@@ -183,8 +184,19 @@ app.get('/healthz', (req, res) => {
   res.status(200).send('OK');
 });
 
-// Swagger UI Documentation
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+app.get('/api/test-error', (req, res) => {
+  throw new Error('Test error for Sentry verification');
+});
+
+// Swagger UI Documentation & Spec endpoints
+const swaggerEnabled = process.env.SWAGGER_ENABLED === 'true' || process.env.NODE_ENV !== 'production';
+
+app.use(['/api-docs', '/api/docs'], (req, res, next) => {
+  if (!swaggerEnabled) {
+    return res.status(403).json({ success: false, error: 'Swagger API documentation is disabled in this environment.' });
+  }
+  next();
+}, swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   customCss: '.swagger-ui .topbar { display: none }',
   customSiteTitle: 'OpenPrep AI API Documentation',
   swaggerOptions: {
@@ -194,6 +206,9 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
 }));
 
 // Error Handler Middleware
+if (process.env.NODE_ENV !== 'test' && process.env.SENTRY_DSN) {
+  Sentry.setupExpressErrorHandler(app);
+}
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
