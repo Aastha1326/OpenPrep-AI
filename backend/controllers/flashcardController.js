@@ -8,14 +8,43 @@ const ActivityLog = require('../models/ActivityLog');
 const Progress = require('../models/Progress');
 const User = require('../models/User');
 const Exam = require('../models/Exam');
+const FlashcardDeck = require('../models/FlashcardDeck');
+const DeckCollaborator = require('../models/DeckCollaborator');
 const { calculateTopicProficiency, getDifficultyLevel } = require('../services/proficiencyService');
 const remediationService = require('../services/remediationService');
 const { checkAndAwardBadges } = require('../services/achievementService');
 const geminiService = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
-const youtubeService = require('../services/youtubeService');
-const { fromBuffer } = require('file-type');
-const { adjustIntervalByConfidence } = require('../utils/confidenceScheduler');
+const { YoutubeTranscript } = require('youtube-transcript');
+
+/**
+ * Check if user has edit access to a deck (owner or edit/admin collaborator)
+ */
+async function checkDeckEditAccess(deckId, userId) {
+  const deck = await FlashcardDeck.findOne({ where: { id: deckId } });
+  if (!deck) return { hasAccess: false, reason: 'Deck not found' };
+
+  // Owner has full access
+  if (deck.user === userId) {
+    return { hasAccess: true, role: 'owner' };
+  }
+
+  // Check collaborator access
+  const collaborator = await DeckCollaborator.findOne({
+    where: { deckId, userId, status: 'accepted' },
+  });
+
+  if (!collaborator) {
+    return { hasAccess: false, reason: 'Not a collaborator' };
+  }
+
+  // Only edit and admin roles can modify cards
+  if (collaborator.role !== 'edit' && collaborator.role !== 'admin') {
+    return { hasAccess: false, reason: 'Insufficient permissions' };
+  }
+
+  return { hasAccess: true, role: collaborator.role };
+}
 
 /**
  * Extract an 11-character YouTube video ID from common URL formats
@@ -29,10 +58,47 @@ function extractYouTubeVideoId(url) {
     /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/
   );
   return match ? match[1] : null;
-}
-const { default: Exporter } = require('anki-apkg-export');
+}const { default: Exporter } = require('anki-apkg-export');
 const { calculateSM2 } = require('../utils/sm2');
 const { parseCSV, validateCSVHeaders } = require('../utils/csvParser');
+
+/**
+ * Largest offline batch accepted in one request.
+ *
+ * Kept well below the 10 KB `express.json` body limit set in server.js: at
+ * roughly 100 bytes per review entry, 80 entries is ~8 KB, so a full batch
+ * still fits with headroom instead of bouncing off the parser with a 413.
+ */
+const MAX_OFFLINE_SYNC_BATCH = 80;
+
+/** Bounds a client-supplied card count to a sane range for AI generation. */
+function clampCardCount(value, fallback = 6) {
+  const parsed = parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.min(parsed, 20);
+}
+
+/**
+ * Fold a new score into a deck's running average.
+ *
+ * Kept as a running mean over `ratingCount` rather than a re-aggregation of
+ * every rating row: the deck list sorts and filters on `Subject.rating`, so
+ * the value has to stay on the row itself.
+ *
+ * @returns {{ rating: number, ratingCount: number }} rounded to 2 decimals
+ */
+function foldRating(currentRating, currentCount, newStars) {
+  const count = Number.isFinite(currentCount) && currentCount > 0 ? currentCount : 0;
+  const rating = Number.isFinite(currentRating) ? currentRating : 0;
+
+  const nextCount = count + 1;
+  const nextRating = (rating * count + newStars) / nextCount;
+
+  return {
+    rating: parseFloat(nextRating.toFixed(2)),
+    ratingCount: nextCount,
+  };
+}
 
 // @desc    Generate AI Flashcards
 // @route   POST /api/flashcards/generate-ai
@@ -63,7 +129,9 @@ exports.generateAIFlashcards = async (req, res, next) => {
     }
     let notesText = '';
     if (notes && notes.length > 0) {
-      notesText = notes.map((n) => n.content || '').join('\n');
+      notesText = notes
+        .map((n) => n.content || '')
+        .join('\n');
     }
 
     // Call Gemini
@@ -139,11 +207,60 @@ exports.autoTagFlashcard = async (req, res, next) => {
   }
 };
 
+// @desc    Preview AI-generated flashcards from text (not saved)
+// @route   POST /api/flashcards/generate-from-text
+// @access  Private
+exports.generateFlashcardsFromText = async (req, res, next) => {
+  try {
+    const { subjectId, text, count } = req.body;
+
+    if (!text || text.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Text is required to generate flashcards',
+      });
+    }
+
+    const subject = await Subject.findByPk(subjectId);
+    if (!subject) {
+      return res.status(404).json({ success: false, error: 'Subject not found' });
+    }
+
+    const subjectName = subject.name;
+    const topicName = 'Extracted Content';
+
+    const cardsList = await geminiService.generateFlashcards(
+      subjectName,
+      topicName,
+      text,
+      count || 6
+    );
+
+    res.status(200).json({
+      success: true,
+      count: cardsList.length,
+      subjectId: subjectId,
+      data: cardsList,
+    });
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({ success: false, error: error.message });
+    }
+    next(error);
+  }
+};
+
 // @desc    Preview AI-generated flashcards from a note's content (not saved)
 // @route   POST /api/flashcards/generate-from-note
 // @access  Private
-exports.generateFlashcardsFromNote = async (req, res, next) => {
-  try {
+exports.generateFlashcardsFromNote = async (req, res, next) => {  try {
     const { noteId, count } = req.body;
 
     const note = await Note.findOne({
@@ -189,7 +306,7 @@ exports.generateFlashcardsFromNote = async (req, res, next) => {
         retryAfter: error.retryAfter,
       });
     }
-    if (error instanceof GeminiServerError) {
+if (error instanceof GeminiServerError) {
       return res.status(503).json({ success: false, error: error.message });
     }
     next(error);
@@ -199,224 +316,58 @@ exports.generateFlashcardsFromNote = async (req, res, next) => {
 // @desc    Extract a YouTube lecture transcript and preview AI-generated flashcards (not saved)
 // @route   POST /api/flashcards/from-youtube
 // @access  Private
-// @desc    Transcribe audio and generate AI flashcards preview
-// @route   POST /api/flashcards/from-audio
-// @access  Private
-exports.generateFlashcardsFromAudio = async (req, res, next) => {
+exports.generateFlashcardsFromYouTube = async (req, res, next) => {
   try {
-    const { subjectId, topicId, count } = req.body;
+    const { youtubeUrl, subjectId, topicId, count } = req.body;
 
-    if (!req.file) {
-      return res.status(400).json({
+    const videoId = extractYouTubeVideoId(youtubeUrl);
+    if (!videoId) {
+      return res.status(400).json({ success: false, error: 'Please provide a valid YouTube video URL' });
+    }
+
+    let transcriptItems;
+    try {
+      transcriptItems = await YoutubeTranscript.fetchTranscript(videoId);
+    } catch (err) {
+      return res.status(422).json({
         success: false,
-        error: 'Please upload an MP3, WAV, or M4A audio file.',
+        error: 'Could not retrieve a transcript for this video. It may not have captions enabled.',
       });
     }
 
-    if (req.file.size === 0) {
-      return res.status(400).json({
+    const transcriptText = (transcriptItems || []).map((item) => item.text).join(' ').trim();
+    if (!transcriptText) {
+      return res.status(422).json({
         success: false,
-        error: 'The uploaded audio file is empty.',
-      });
-    }
-
-    const detectedType = await fromBuffer(req.file.buffer);
-
-    const validAudioTypes = new Set(['mp3', 'wav', 'm4a']);
-
-    if (!detectedType || !validAudioTypes.has(detectedType.ext)) {
-      return res.status(400).json({
-        success: false,
-        error: 'The audio file could not be read. Please upload a valid MP3, WAV, or M4A file.',
+        error: 'This video does not appear to contain any educational transcript content',
       });
     }
 
     let subjectName = 'General';
     if (subjectId) {
-      const subject = await Subject.findOne({
-        where: {
-          id: subjectId,
-          user: req.user.id,
-        },
-      });
-
-      if (!subject) {
-        return res.status(404).json({
-          success: false,
-          error: 'Subject not found',
-        });
-      }
-
-      subjectName = subject.name;
+      const subject = await Subject.findByPk(subjectId);
+      if (subject) subjectName = subject.name;
     }
 
-    let topicName = 'Audio Lecture';
-
+    let topicName = 'YouTube Lecture';
     if (topicId) {
-      const topic = await Topic.findOne({
-        where: {
-          id: topicId,
-          user: req.user.id,
-        },
-      });
-
-      if (topic) {
-        topicName = topic.name;
-      }
-    }
-
-    const audioResult = await geminiService.transcribeAndSummarizeAudio(
-      req.file.buffer,
-      req.file.mimetype,
-      subjectName
-    );
-
-    const transcription = audioResult?.transcription?.trim();
-
-    if (
-      !transcription ||
-      transcription.length < 10 ||
-      transcription.toLowerCase().startsWith('unable to transcribe')
-    ) {
-      return res.status(422).json({
-        success: false,
-        error: 'No understandable speech was detected in the audio. Please upload a clear recording with spoken content.',
-      });
+      const topicObj = await Topic.findByPk(topicId);
+      if (topicObj) topicName = topicObj.name;
     }
 
     const cardsList = await geminiService.generateFlashcards(
       subjectName,
       topicName,
-      transcription,
-      Math.min(Math.max(parseInt(count, 10) || 6, 1), 20)
+      transcriptText,
+      count || 6
     );
-
-    if (!Array.isArray(cardsList) || cardsList.length === 0) {
-      return res.status(422).json({
-        success: false,
-        error: 'The audio was transcribed, but no useful concepts could be converted into flashcards.',
-      });
-    }
 
     res.status(200).json({
       success: true,
       count: cardsList.length,
+      videoId,
       subjectId: subjectId || null,
-      transcription,
       data: cardsList,
-    });
-  } catch (error) {
-    if (error instanceof GeminiRateLimitError) {
-      return res.status(429).json({
-        success: false,
-        error: error.message,
-        retryAfter: error.retryAfter,
-      });
-    }
-
-    if (error instanceof GeminiServerError) {
-      return res.status(503).json({
-        success: false,
-        error: error.message,
-      });
-    }
-
-    next(error);
-  }
-};
-exports.generateFlashcardsFromYouTube = async (req, res, next) => {
-  try {
-    const { youtubeUrl, subjectId, topicId, count } = req.body;
-
-    const videoId = youtubeService.extractVideoId(youtubeUrl);
-    if (!videoId) {
-      return res
-        .status(400)
-        .json({ success: false, error: 'Please provide a valid YouTube video URL' });
-    }
-
-    let transcriptItems;
-    try {
-      transcriptItems = await youtubeService.fetchTranscript(youtubeUrl);
-    } catch (err) {
-      return res.status(422).json({
-        success: false,
-        error: err.message || 'Could not retrieve a transcript for this video.',
-      });
-    }
-
-    // Chunk the transcript into segments (60-second segments)
-    const segments = [];
-    let currentText = '';
-    let currentStart = 0;
-
-    transcriptItems.forEach((item, index) => {
-      const text = item.text || '';
-      const start = typeof item.start === 'number' ? item.start : (item.offset ? item.offset / 1000 : 0);
-
-      if (!currentText) {
-        currentStart = Math.floor(start);
-      }
-
-      currentText += ' ' + text;
-
-      const duration = start - currentStart;
-      const isLast = index === transcriptItems.length - 1;
-      if (duration >= 60 || isLast) {
-        segments.push({
-          text: currentText.trim(),
-          start: currentStart,
-        });
-        currentText = '';
-      }
-    });
-
-    if (segments.length === 0) {
-      return res.status(422).json({
-        success: false,
-        error: 'This video does not contain any usable transcript content.',
-      });
-    }
-
-    let finalSubjectId = subjectId;
-    if (!finalSubjectId) {
-      const firstSubject = await Subject.findOne({ where: { user: req.user.id } });
-      if (firstSubject) {
-        finalSubjectId = firstSubject.id;
-      } else {
-        return res.status(400).json({
-          success: false,
-          error: 'Subject ID is required. Please create a subject category first.',
-        });
-      }
-    }
-
-    const cardsList = await geminiService.generateFlashcardsFromTranscript(segments);
-
-    const cardsToInsert = cardsList.map((card) => ({
-      user: req.user.id,
-      subject: finalSubjectId,
-      topic: topicId || null,
-      front: card.front,
-      back: card.back,
-      sourceUrl: youtubeUrl,
-      timestampSeconds: card.timestampSeconds || 0,
-    }));
-
-    const createdCards = await Flashcard.bulkCreate(cardsToInsert);
-
-    // Log activity
-    await ActivityLog.create({
-      user: req.user.id,
-      activityType: 'flashcard_review',
-      description: `Generated ${createdCards.length} AI flashcards from YouTube lecture video`,
-    });
-
-    res.status(201).json({
-      success: true,
-      count: createdCards.length,
-      subjectId: finalSubjectId,
-      data: createdCards,
     });
   } catch (error) {
     if (error instanceof GeminiRateLimitError) {
@@ -438,17 +389,25 @@ exports.generateFlashcardsFromYouTube = async (req, res, next) => {
 exports.createFlashcard = async (req, res, next) => {
   try {
     const { subjectId, topicId, deckId, front, back, tags, difficulty } = req.body;
+
+    // Check deck access if creating card in a deck
+    if (deckId) {
+      const access = await checkDeckEditAccess(deckId, req.user.id);
+      if (!access.hasAccess) {
+        return res.status(403).json({ success: false, error: access.reason });
+      }
+    }
+
     const card = await Flashcard.create({
       user: req.user.id,
       subject: subjectId,
       topic: topicId || null,
-      deckId: deckId || null,
       front,
       back,
       tags: tags || [],
       difficulty: difficulty || null,
     });
-    
+
     // Issue #1053: Check for Card Collector badge
     const totalCreated = await Flashcard.count({ where: { user: req.user.id } });
     await checkAndAwardBadges(req.user.id, {
@@ -467,7 +426,7 @@ exports.createFlashcard = async (req, res, next) => {
 // @access  Private
 exports.getFlashcards = async (req, res, next) => {
   try {
-    const { subjectId, topicId, deckId, dueOnly, search, sortBy, order } = req.query;
+    const { subjectId, dueOnly } = req.query;
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const offset = (page - 1) * limit;
@@ -475,30 +434,8 @@ exports.getFlashcards = async (req, res, next) => {
     const filter = { user: req.user.id };
 
     if (subjectId) filter.subject = subjectId;
-    if (topicId) filter.topic = topicId;
-    if (deckId) filter.deckId = deckId;
-
     if (dueOnly === 'true') {
       filter.nextReviewDate = { [Op.lte]: new Date() };
-    }
-
-    if (search) {
-      filter[Op.or] = [
-        { front: { [Op.iLike]: `%${search}%` } },
-        { back: { [Op.iLike]: `%${search}%` } },
-      ];
-    }
-
-    const allowedSortFields = ['nextReviewDate', 'createdAt', 'front', 'back', 'id'];
-    const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'nextReviewDate';
-    const sortOrder = (order || 'ASC').toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
-
-    const orderClause = [[sortField, sortOrder]];
-    if (sortField !== 'createdAt') {
-      orderClause.push(['createdAt', 'ASC']);
-    }
-    if (sortField !== 'id') {
-      orderClause.push(['id', 'ASC']);
     }
 
     const { count: total, rows: cards } = await Flashcard.findAndCountAll({
@@ -508,7 +445,11 @@ exports.getFlashcards = async (req, res, next) => {
         { model: Subject, as: 'subjectRef' },
         { model: Topic, as: 'topicRef' },
       ],
-      order: orderClause,
+      order: [
+        ['nextReviewDate', 'ASC'],
+        ['createdAt', 'ASC'],
+        ['id', 'ASC'],
+      ],
       offset,
       limit,
       subQuery: false,
@@ -529,13 +470,6 @@ exports.getFlashcards = async (req, res, next) => {
       limit,
       totalPages: Math.ceil(total / limit),
       data: populatedCards,
-      flashcards: populatedCards,
-      pagination: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
     });
   } catch (error) {
     next(error);
@@ -547,7 +481,7 @@ exports.getFlashcards = async (req, res, next) => {
 // @access  Private
 exports.reviewFlashcard = async (req, res, next) => {
   try {
-    const { quality, confidence } = req.body;
+    const { quality } = req.body; // quality rating: 0 to 5
     if (quality === undefined || quality < 0 || quality > 5) {
       return res
         .status(400)
@@ -560,34 +494,25 @@ exports.reviewFlashcard = async (req, res, next) => {
     }
 
     // SuperMemo SM-2 Algorithm with User customizable parameters
-    let { interval, repetitions, efactor } = card;
     const easyFactorModifier = req.user.sm2EasyFactorModifier ?? 1.0;
     const intervalModifier = req.user.sm2IntervalModifier ?? 1.0;
     const step1Interval = req.user.sm2Step1Interval ?? 1;
     const step2Interval = req.user.sm2Step2Interval ?? 6;
 
-    if (quality >= 3) {
-      if (repetitions === 0) {
-        interval = step1Interval;
-      } else if (repetitions === 1) {
-        interval = step2Interval;
-      } else {
-        interval = Math.round(interval * efactor * intervalModifier);
-      }
-      repetitions += 1;
-    } else {
-      repetitions = 0;
-      interval = step1Interval;
-    }
-    interval = adjustIntervalByConfidence({ interval, confidence });
-    // Adjust E-Factor
-    const deltaEF = 0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02);
-    efactor = efactor + deltaEF * easyFactorModifier;
-    if (efactor < 1.3) efactor = 1.3;
+    const { interval: nextInterval, repetitions: nextRepetitions, efactor: nextEfactor } = calculateSM2({
+      interval: card.interval,
+      repetitions: card.repetitions,
+      efactor: card.efactor,
+      quality,
+      easyFactorModifier,
+      intervalModifier,
+      step1Interval,
+      step2Interval,
+    });
 
-    card.interval = interval;
-    card.repetitions = repetitions;
-    card.efactor = efactor;
+    card.interval = nextInterval;
+    card.repetitions = nextRepetitions;
+    card.efactor = nextEfactor;
 
     // Set next review date from now
     card.nextReviewDate = new Date(Date.now() + card.interval * 24 * 60 * 60 * 1000);
@@ -631,26 +556,6 @@ exports.reviewFlashcard = async (req, res, next) => {
     });
     progression.newBadges = newBadges;
 
-    // Issue #1053: Check for Century Club badge
-    // Determine how many flashcards have been reviewed today
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const sessionReviewedCount = await Flashcard.count({
-      where: {
-        user: req.user.id,
-        lastReviewed: { [Op.gte]: today }
-      }
-    });
-
-    const earnedAchievements = await checkAndAwardBadges(req.user.id, {
-      type: 'FLASHCARD_REVIEW_SESSION',
-      payload: { sessionReviewedCount }
-    });
-    
-    if (earnedAchievements.length > 0) {
-      progression.earnedAchievements = earnedAchievements;
-    }
-
     res.status(200).json({ success: true, data: card, progression });
   } catch (error) {
     next(error);
@@ -662,10 +567,23 @@ exports.reviewFlashcard = async (req, res, next) => {
 // @access  Private
 exports.deleteFlashcard = async (req, res, next) => {
   try {
-    const card = await Flashcard.findOne({ where: { id: req.params.id, user: req.user.id } });
+    const card = await Flashcard.findOne({ where: { id: req.params.id } });
     if (!card) {
       return res.status(404).json({ success: false, error: 'Flashcard not found' });
     }
+
+    // Check if user owns the card or has deck edit access
+    if (card.user !== req.user.id) {
+      if (card.deckId) {
+        const access = await checkDeckEditAccess(card.deckId, req.user.id);
+        if (!access.hasAccess) {
+          return res.status(403).json({ success: false, error: 'Not authorized to delete this flashcard' });
+        }
+      } else {
+        return res.status(403).json({ success: false, error: 'Not authorized to delete this flashcard' });
+      }
+    }
+
     await card.destroy();
     res.status(200).json({ success: true, data: {} });
   } catch (error) {
@@ -701,9 +619,7 @@ exports.exportFlashcards = async (req, res, next) => {
     const { subjectId, format = 'json' } = req.query;
 
     if (!['json', 'csv', 'apkg'].includes(format)) {
-      return res
-        .status(400)
-        .json({ success: false, error: 'format must be "json", "csv", or "apkg"' });
+      return res.status(400).json({ success: false, error: 'format must be "json", "csv", or "apkg"' });
     }
 
     const filter = { user: req.user.id };
@@ -718,7 +634,7 @@ exports.exportFlashcards = async (req, res, next) => {
       order: [['createdAt', 'ASC']],
     });
 
-    const payload = cards.map((c) => ({
+const payload = cards.map((c) => ({
       front: c.front,
       back: c.back,
       subject: c.subjectRef ? c.subjectRef.name : null,
@@ -726,7 +642,7 @@ exports.exportFlashcards = async (req, res, next) => {
       tags: Array.isArray(c.tags) ? c.tags.join(' ') : '',
       hint: c.hint || '',
     }));
-    if (format === 'csv') {
+if (format === 'csv') {
       const header = 'front,back,subject,topic,tags,hint';
       const rows = payload.map(
         (p) =>
@@ -740,21 +656,21 @@ exports.exportFlashcards = async (req, res, next) => {
 
     if (format === 'apkg') {
       const exporter = new Exporter('OpenPrep Flashcards');
-
-      payload.forEach((c) => {
+      
+      payload.forEach(c => {
         const tags = [];
         if (c.subject) tags.push(c.subject.replace(/\s+/g, '_'));
         if (c.topic) tags.push(c.topic.replace(/\s+/g, '_'));
-
+        
         // Add basic HTML formatting for cards
         const frontHtml = `<div style="text-align:center;font-size:24px;">${c.front}</div>`;
         const backHtml = `<div style="text-align:center;font-size:20px;">${c.back}</div>`;
-
+        
         exporter.addCard(frontHtml, backHtml, { tags });
       });
 
       const zipBuffer = await exporter.save();
-
+      
       res.setHeader('Content-Type', 'application/octet-stream');
       res.setHeader('Content-Disposition', 'attachment; filename="flashcards.apkg"');
       return res.status(200).send(zipBuffer);
@@ -781,9 +697,7 @@ exports.importFlashcards = async (req, res, next) => {
 
     if (!subjectId) {
       if (req.file) fs.unlinkSync(req.file.path);
-      return res
-        .status(400)
-        .json({ success: false, error: 'subjectId query parameter is required' });
+      return res.status(400).json({ success: false, error: 'subjectId query parameter is required' });
     }
 
     const subject = await Subject.findOne({
@@ -809,7 +723,7 @@ exports.importFlashcards = async (req, res, next) => {
           return res.status(400).json({ success: false, error: 'Invalid JSON file' });
         }
         records = Array.isArray(parsed) ? parsed : parsed.data || [];
-      } else {
+} else {
         // CSV (supports standard Anki CSV exports, including their
         // leading "#"-prefixed metadata lines)
         records = parseCSV(raw);
@@ -818,8 +732,7 @@ exports.importFlashcards = async (req, res, next) => {
           return res.status(400).json({ success: false, error: csvError });
         }
       }
-    } else if (req.body && Array.isArray(req.body.cards)) {
-      // Raw JSON body fallback
+    } else if (req.body && Array.isArray(req.body.cards)) {      // Raw JSON body fallback
       records = req.body.cards;
     } else {
       return res.status(400).json({
@@ -832,7 +745,7 @@ exports.importFlashcards = async (req, res, next) => {
     const valid = [];
     const invalid = [];
 
-    for (let i = 0; i < records.length; i++) {
+for (let i = 0; i < records.length; i++) {
       const r = records[i];
       const front = typeof r.front === 'string' ? r.front.trim() : '';
       const back = typeof r.back === 'string' ? r.back.trim() : '';
@@ -856,8 +769,7 @@ exports.importFlashcards = async (req, res, next) => {
       }
 
       const hintRaw = typeof r.hint === 'string' ? r.hint : r.hints;
-      const hint =
-        typeof hintRaw === 'string' && hintRaw.trim() ? hintRaw.trim().slice(0, 1000) : null;
+      const hint = typeof hintRaw === 'string' && hintRaw.trim() ? hintRaw.trim().slice(0, 1000) : null;
 
       valid.push({
         user: req.user.id,
@@ -894,11 +806,7 @@ exports.importFlashcards = async (req, res, next) => {
     });
   } catch (error) {
     if (req.file) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch {
-        /* ignore */
-      }
+      try { fs.unlinkSync(req.file.path); } catch { /* ignore */ }
     }
     next(error);
   }
@@ -911,7 +819,7 @@ exports.getReviewForecast = async (req, res, next) => {
   try {
     const userId = req.user.id;
     const now = new Date();
-
+    
     // We want to forecast the next 30 days starting from today.
     const forecast = [];
     const dateCounts = {};
@@ -939,7 +847,7 @@ exports.getReviewForecast = async (req, res, next) => {
 
     cards.forEach((card) => {
       if (!card.nextReviewDate) return;
-
+      
       const cardDate = new Date(card.nextReviewDate);
       const cardDateStr = cardDate.toISOString().split('T')[0];
 
@@ -980,15 +888,13 @@ exports.shareFlashcardDeck = async (req, res, next) => {
     if (isPublic) {
       const cards = await Flashcard.findAll({ where: { subject: subjectId } });
       if (!cards || cards.length === 0) {
-        return res
-          .status(400)
-          .json({ success: false, error: 'Cannot share an empty flashcard deck' });
+        return res.status(400).json({ success: false, error: 'Cannot share an empty flashcard deck' });
       }
 
       // Automatically generate summary tags and description via Gemini AI
       const review = await geminiService.reviewFlashcardDeck(
         subject.name,
-        cards.map((c) => ({ front: c.front, back: c.back }))
+        cards.map(c => ({ front: c.front, back: c.back }))
       );
 
       subject.isPublic = true;
@@ -1018,7 +924,7 @@ exports.shareFlashcardDeck = async (req, res, next) => {
 // @access  Private
 exports.getCommunityDecks = async (req, res, next) => {
   try {
-    const { search, subject, subjectId, exam, rating, sort } = req.query;
+    const { search, subject, exam, rating } = req.query;
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const offset = (page - 1) * limit;
@@ -1037,30 +943,8 @@ exports.getCommunityDecks = async (req, res, next) => {
       filter.name = { [Op.like]: `%${subject}%` };
     }
 
-    if (subjectId) {
-      filter.id = subjectId;
-    }
-
     if (rating) {
       filter.rating = { [Op.gte]: parseFloat(rating) };
-    }
-
-    let orderClause = [
-      ['cloneCount', 'DESC'],
-      ['rating', 'DESC'],
-    ];
-    if (sort === 'popular') {
-      orderClause = [
-        ['cloneCount', 'DESC'],
-        ['rating', 'DESC'],
-      ];
-    } else if (sort === 'rating') {
-      orderClause = [
-        ['rating', 'DESC'],
-        ['cloneCount', 'DESC'],
-      ];
-    } else if (sort === 'newest') {
-      orderClause = [['createdAt', 'DESC']];
     }
 
     const { count: total, rows: decks } = await Subject.findAndCountAll({
@@ -1072,19 +956,15 @@ exports.getCommunityDecks = async (req, res, next) => {
       ],
       offset,
       limit,
-      order: [
-        ['cloneCount', 'DESC'],
-        ['rating', 'DESC'],
-      ],
+      order: [['cloneCount', 'DESC'], ['rating', 'DESC']],
     });
 
     // If filtering by exam specifically after loading relationships
     let filteredDecks = decks;
     if (exam) {
-      filteredDecks = decks.filter(
-        (deck) =>
-          (deck.examRef && deck.examRef.name.toLowerCase().includes(exam.toLowerCase())) ||
-          deck.exam === exam
+      filteredDecks = decks.filter(deck => 
+        (deck.examRef && deck.examRef.name.toLowerCase().includes(exam.toLowerCase())) ||
+        deck.exam === exam
       );
     }
 
@@ -1099,8 +979,6 @@ exports.getCommunityDecks = async (req, res, next) => {
         clonedFromId: deck.clonedFromId,
         cloneCount: deck.cloneCount,
         rating: deck.rating,
-        ratingsCount: deck.ratingsCount || 0,
-        starCount: deck.starCount || 0,
         tags: deck.tags ? JSON.parse(deck.tags) : [],
         cardCount,
         ownerName: deck.userRef ? deck.userRef.name : 'Peer Student',
@@ -1131,9 +1009,7 @@ exports.cloneCommunityDeck = async (req, res, next) => {
 
     const sourceSubject = await Subject.findByPk(subjectId);
     if (!sourceSubject || (!sourceSubject.isPublic && sourceSubject.user !== req.user.id)) {
-      return res
-        .status(404)
-        .json({ success: false, error: 'Flashcard deck not found or not public' });
+      return res.status(404).json({ success: false, error: 'Flashcard deck not found or not public' });
     }
 
     // Resolve user's exam to place cloned subject under
@@ -1157,13 +1033,13 @@ exports.cloneCommunityDeck = async (req, res, next) => {
         user: req.user.id,
         clonedFromId: subjectId,
         exam: targetExamId,
-      },
+      }
     });
 
     if (existingClone) {
       return res.status(400).json({
         success: false,
-        error: 'You have already cloned this flashcard deck to your selected exam',
+        error: 'You have already cloned this flashcard deck to your selected exam'
       });
     }
 
@@ -1210,138 +1086,220 @@ exports.cloneCommunityDeck = async (req, res, next) => {
   }
 };
 
-// @desc    Rate a community flashcard deck
+// @desc    Transcribe an uploaded lecture recording and preview flashcards from it
+// @route   POST /api/flashcards/from-audio
+// @access  Private
+exports.generateFlashcardsFromAudio = async (req, res, next) => {
+  try {
+    if (!req.file || !req.file.buffer || req.file.buffer.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'An audio recording is required to generate flashcards',
+      });
+    }
+
+    const { subjectId } = req.body;
+    const count = clampCardCount(req.body.count);
+
+    const subject = await Subject.findOne({ where: { id: subjectId, user: req.user.id } });
+    if (!subject) {
+      return res.status(404).json({ success: false, error: 'Subject not found' });
+    }
+
+    const { transcription, summary } = await geminiService.transcribeAndSummarizeAudio(
+      req.file.buffer,
+      req.file.mimetype,
+      subject.name
+    );
+
+    // Prefer the raw transcript: it carries the wording the student actually
+    // heard. The summary is a lossy fallback for recordings Gemini could only
+    // partially transcribe.
+    const sourceText = (transcription || '').trim() || (summary || '').trim();
+    if (!sourceText) {
+      return res.status(422).json({
+        success: false,
+        error: 'The recording could not be transcribed. Try a clearer or louder recording.',
+      });
+    }
+
+    const cardsList = await geminiService.generateFlashcards(
+      subject.name,
+      'Lecture Recording',
+      sourceText,
+      count
+    );
+
+    // Preview only — nothing is persisted until the user confirms the cards
+    // in the modal and posts them back through the normal create endpoint.
+    res.status(200).json({
+      success: true,
+      count: cardsList.length,
+      subjectId: subject.id,
+      transcription: transcription || '',
+      summary: summary || '',
+      data: cardsList,
+    });
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({ success: false, error: error.message });
+    }
+    next(error);
+  }
+};
+
+// @desc    Rate a public community deck (1-5 stars)
 // @route   POST /api/flashcards/decks/:subjectId/rate
 // @access  Private
 exports.rateCommunityDeck = async (req, res, next) => {
   try {
     const { subjectId } = req.params;
-    const { rating } = req.body;
+    // The community modal posts `rating`; the deck preview posts `stars`.
+    // Accept either rather than making one of the two existing callers wrong.
+    const raw = req.body.rating !== undefined ? req.body.rating : req.body.stars;
 
-    if (rating === undefined || rating < 1 || rating > 5) {
-      return res.status(400).json({ success: false, error: 'Please provide a rating between 1 and 5' });
+    const stars = Number(raw);
+    if (!Number.isInteger(stars) || stars < 1 || stars > 5) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'Provide a star rating between 1 and 5' });
     }
 
-    const subject = await Subject.findOne({ where: { id: subjectId, isPublic: true } });
-    if (!subject) {
-      return res.status(404).json({ success: false, error: 'Public flashcard deck not found' });
+    const deck = await Subject.findOne({ where: { id: subjectId } });
+    if (!deck || !deck.isPublic) {
+      return res.status(404).json({ success: false, error: 'Public community deck not found' });
     }
 
-    const currentRating = subject.rating || 0.0;
-    const currentCount = subject.ratingCount || 0;
-    const newCount = currentCount + 1;
-    const newRating = ((currentRating * currentCount) + parseFloat(rating)) / newCount;
+    if (deck.user && deck.user === req.user.id) {
+      return res.status(400).json({ success: false, error: 'You cannot rate your own deck' });
+    }
 
-    subject.rating = parseFloat(newRating.toFixed(2));
-    subject.ratingCount = newCount;
-    await subject.save();
+    const { rating, ratingCount } = foldRating(deck.rating, deck.ratingCount, stars);
 
-    res.status(200).json({ success: true, data: { rating: subject.rating, ratingCount: subject.ratingCount } });
+    deck.rating = rating;
+    deck.ratingCount = ratingCount;
+    await deck.save();
+
+    res.status(200).json({
+      success: true,
+      data: { rating, ratingCount },
+    });
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Star a community flashcard deck
+// @desc    Star a public community deck
 // @route   POST /api/flashcards/decks/:subjectId/star
 // @access  Private
 exports.starCommunityDeck = async (req, res, next) => {
   try {
     const { subjectId } = req.params;
 
-    const subject = await Subject.findOne({ where: { id: subjectId, isPublic: true } });
-    if (!subject) {
-      return res.status(404).json({ success: false, error: 'Public flashcard deck not found' });
+    const deck = await Subject.findOne({ where: { id: subjectId } });
+    if (!deck || !deck.isPublic) {
+      return res.status(404).json({ success: false, error: 'Public community deck not found' });
     }
 
-    subject.starCount = (subject.starCount || 0) + 1;
-    await subject.save();
+    const current = Number.isFinite(deck.starCount) ? deck.starCount : 0;
+    deck.starCount = current + 1;
+    await deck.save();
 
-    res.status(200).json({ success: true, data: { starCount: subject.starCount } });
+    res.status(200).json({
+      success: true,
+      data: { starCount: deck.starCount },
+    });
   } catch (error) {
     next(error);
   }
 };
-// @desc    Batch sync offline flashcard reviews (SM-2 updates)
+
+// @desc    Apply a batch of reviews recorded while the client was offline
 // @route   POST /api/flashcards/batch-sync
 // @access  Private
 exports.batchSyncOfflineReviews = async (req, res, next) => {
   try {
     const { reviews } = req.body;
+
     if (!Array.isArray(reviews) || reviews.length === 0) {
-      return res.status(400).json({ success: false, error: 'Provide a non-empty reviews array' });
+      return res.status(400).json({
+        success: false,
+        error: 'Provide a non-empty array of offline reviews to sync',
+      });
     }
 
-    const results = { synced: 0, skipped: 0, errors: [] };
+    if (reviews.length > MAX_OFFLINE_SYNC_BATCH) {
+      return res.status(400).json({
+        success: false,
+        error: `A batch may contain at most ${MAX_OFFLINE_SYNC_BATCH} reviews`,
+      });
+    }
 
+    const easyFactorModifier = req.user.sm2EasyFactorModifier ?? 1.0;
+    const intervalModifier = req.user.sm2IntervalModifier ?? 1.0;
+    const step1Interval = req.user.sm2Step1Interval ?? 1;
+    const step2Interval = req.user.sm2Step2Interval ?? 6;
+
+    let synced = 0;
+    let skipped = 0;
+    const errors = [];
+
+    // Sequential rather than Promise.all: two queued reviews of the *same*
+    // card must compose in order, otherwise the second overwrites the first's
+    // SM-2 state instead of building on it.
     for (const review of reviews) {
-      const { cardId, score, reviewedAt } = review;
+      const { cardId, score, reviewedAt } = review || {};
 
-      if (score === undefined || score < 0 || score > 5) {
-        results.errors.push({ cardId, reason: 'Invalid score' });
-        results.skipped += 1;
+      const quality = Number(score);
+      if (!Number.isInteger(quality) || quality < 0 || quality > 5) {
+        skipped += 1;
+        errors.push({ cardId: cardId || null, error: 'Score must be an integer between 0 and 5' });
         continue;
       }
 
       const card = await Flashcard.findOne({ where: { id: cardId, user: req.user.id } });
       if (!card) {
-        // Card deleted server-side while offline — skip gracefully
-        results.skipped += 1;
+        skipped += 1;
+        errors.push({ cardId: cardId || null, error: 'Flashcard not found' });
         continue;
       }
 
-      // Reject stale reviews: if reviewedAt is older than the card's last review date, skip
-      if (reviewedAt && card.updatedAt && new Date(reviewedAt) < new Date(card.updatedAt)) {
-        results.skipped += 1;
-        continue;
-      }
-
-      // SM-2 algorithm
-      let { interval, repetitions, efactor } = card;
-      const quality = score;
-      if (quality >= 3) {
-        if (repetitions === 0) {
-          interval = 1;
-        } else if (repetitions === 1) {
-          interval = 6;
-        } else {
-          interval = Math.round(interval * efactor);
-        }
-        repetitions += 1;
-      } else {
-        repetitions = 0;
-        interval = 1;
-      }
-
-      const deltaEF = 0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02);
-      efactor = Math.max(1.3, efactor + deltaEF);
+      const { interval, repetitions, efactor } = calculateSM2({
+        interval: card.interval,
+        repetitions: card.repetitions,
+        efactor: card.efactor,
+        quality,
+        easyFactorModifier,
+        intervalModifier,
+        step1Interval,
+        step2Interval,
+      });
 
       card.interval = interval;
       card.repetitions = repetitions;
       card.efactor = efactor;
-      card.nextReviewDate = new Date(Date.now() + interval * 24 * 60 * 60 * 1000);
+
+      // Schedule from when the review actually happened, not from now — an
+      // hour-old offline review shouldn't push the next due date an hour out.
+      const reviewedTimestamp = Date.parse(reviewedAt);
+      const reviewedDate = Number.isNaN(reviewedTimestamp) ? Date.now() : reviewedTimestamp;
+      card.nextReviewDate = new Date(reviewedDate + interval * 24 * 60 * 60 * 1000);
+
       await card.save();
-
-      if (quality >= 4) {
-        const [progress] = await Progress.findOrCreate({
-          where: { user: req.user.id, subject: card.subject, topic: card.topic || null },
-          defaults: {
-            user: req.user.id,
-            subject: card.subject,
-            topic: card.topic || null,
-            flashcardsMastered: 0,
-            completionPercentage: 0,
-            studyHours: 0,
-          },
-        });
-        progress.flashcardsMastered += 1;
-        await progress.save();
-      }
-
-      results.synced += 1;
+      synced += 1;
     }
 
-    res.status(200).json({ success: true, data: results });
+    res.status(200).json({
+      success: true,
+      data: { synced, skipped, errors },
+    });
   } catch (error) {
     next(error);
   }

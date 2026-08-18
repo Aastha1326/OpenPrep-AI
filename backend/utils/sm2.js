@@ -47,6 +47,12 @@ exports.calculateSM2 = ({
     nextInterval = s1Int;
   }
 
+  // Cap interval at 365 days (1 year) to prevent integer overflow and runaway review dates
+  const MAX_INTERVAL = 365;
+  if (nextInterval > MAX_INTERVAL) {
+    nextInterval = MAX_INTERVAL;
+  }
+
   // Adjust E-Factor
   const efactorChange = (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02)) * efMod;
   nextEfactor = efactor + efactorChange;

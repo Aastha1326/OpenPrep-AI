@@ -1,6 +1,6 @@
 import { describe, test, expect, vi, afterEach } from 'vitest';
 import { useState } from 'react';
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Modal from './Modal';
 
@@ -174,6 +174,54 @@ describe('Modal', () => {
       renderModal({ onClose, closeOnBackdrop: false });
 
       await user.click(screen.getByTestId('modal-backdrop'));
+
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    test('closes when backdrop is tapped on touch devices', () => {
+      const onClose = vi.fn();
+      renderModal({ onClose });
+
+      const backdrop = screen.getByTestId('modal-backdrop');
+      fireEvent.touchStart(backdrop, { target: backdrop });
+      fireEvent.touchEnd(backdrop, { target: backdrop });
+
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    test('does not close when touch starts inside and ends on backdrop', () => {
+      const onClose = vi.fn();
+      renderModal({ onClose });
+
+      const backdrop = screen.getByTestId('modal-backdrop');
+      const innerButton = screen.getByTestId('body-button');
+      
+      fireEvent.touchStart(innerButton, { target: innerButton });
+      fireEvent.touchEnd(backdrop, { target: backdrop });
+
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    test('does not close when touch starts on backdrop and ends inside', () => {
+      const onClose = vi.fn();
+      renderModal({ onClose });
+
+      const backdrop = screen.getByTestId('modal-backdrop');
+      const innerButton = screen.getByTestId('body-button');
+      
+      fireEvent.touchStart(backdrop, { target: backdrop });
+      fireEvent.touchEnd(innerButton, { target: innerButton });
+
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    test('respects closeOnBackdrop={false} on touch devices', () => {
+      const onClose = vi.fn();
+      renderModal({ onClose, closeOnBackdrop: false });
+
+      const backdrop = screen.getByTestId('modal-backdrop');
+      fireEvent.touchStart(backdrop, { target: backdrop });
+      fireEvent.touchEnd(backdrop, { target: backdrop });
 
       expect(onClose).not.toHaveBeenCalled();
     });

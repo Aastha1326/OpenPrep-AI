@@ -77,8 +77,13 @@ const validateResetPassword = [
 ];
 
 const validateRefreshToken = [
-  body('refreshToken').notEmpty().withMessage('Refresh token is required'),
-  handleValidationErrors,
+  (req, res, next) => {
+    const rawToken = req.cookies?.refreshToken || req.body?.refreshToken;
+    if (!rawToken) {
+      return res.status(400).json({ success: false, error: 'Refresh token is required' });
+    }
+    next();
+  }
 ];
 
 const validateResendVerification = [
@@ -141,7 +146,34 @@ const validateCreateSubject = [
 ];
 
 const validateCreateTopic = [
-  body('name').trim().notEmpty().withMessage('Please provide a topic name'),
+  body('name')
+    .trim()
+    .notEmpty()
+    .withMessage('Please provide a topic name')
+    .isLength({ max: 100 })
+    .withMessage('Topic name must not exceed 100 characters')
+    .matches(/^[a-zA-Z0-9\s\-_.,()&'/]+$/)
+    .withMessage('Topic name contains invalid characters')
+    .custom((value) => {
+      const forbiddenPhrases = [
+        'ignore previous instructions',
+        'ignore instructions',
+        'ignore the instructions',
+        'system prompt',
+        'bypass instructions',
+        'you are now',
+        'act as',
+        'ignore above',
+        'ignore below'
+      ];
+      const normalized = value.toLowerCase();
+      for (const phrase of forbiddenPhrases) {
+        if (normalized.includes(phrase)) {
+          throw new Error('Invalid topic name format or suspected prompt injection');
+        }
+      }
+      return true;
+    }),
   body('subjectId').isUUID(4).withMessage('Valid subject ID is required'),
   handleValidationErrors,
 ];
@@ -155,7 +187,35 @@ const validateUpdateTopic = [
     .optional()
     .isFloat({ min: 0 })
     .withMessage('Weightage must be a non-negative number'),
-  body('name').optional().trim().notEmpty().withMessage('Name cannot be empty'),
+  body('name')
+    .optional()
+    .trim()
+    .notEmpty()
+    .withMessage('Name cannot be empty')
+    .isLength({ max: 100 })
+    .withMessage('Topic name must not exceed 100 characters')
+    .matches(/^[a-zA-Z0-9\s\-_.,()&'/]+$/)
+    .withMessage('Topic name contains invalid characters')
+    .custom((value) => {
+      const forbiddenPhrases = [
+        'ignore previous instructions',
+        'ignore instructions',
+        'ignore the instructions',
+        'system prompt',
+        'bypass instructions',
+        'you are now',
+        'act as',
+        'ignore above',
+        'ignore below'
+      ];
+      const normalized = value.toLowerCase();
+      for (const phrase of forbiddenPhrases) {
+        if (normalized.includes(phrase)) {
+          throw new Error('Invalid topic name format or suspected prompt injection');
+        }
+      }
+      return true;
+    }),
   handleValidationErrors,
 ];
 
@@ -553,6 +613,7 @@ validateGenerateAIFlashcards,
   validateExportFlashcards,
   validateImportFlashcards, // Quiz
   validateGenerateAIQuiz,
+  validateExplainQuestion,
   validateEvaluateSubjective,
   validateGenerateRevisionSheet,
   validateGenerateRemediationPlan,

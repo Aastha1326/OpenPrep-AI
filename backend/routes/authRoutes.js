@@ -25,6 +25,7 @@ const {
 
 const { protect } = require('../middleware/auth');
 const passport = require('passport');
+const verifyCaptcha = require('../middleware/captchaMiddleware');
 
 const {
   validateRegister,
@@ -76,13 +77,13 @@ const registerLimiter = rateLimit({
   legacyHeaders: true,
 });
 
-// Limit password reset requests to 5 per hour per IP
+// Limit password reset requests to 3 per 15 minutes per IP
 const forgotPasswordLimiter = rateLimit({
-  windowMs: RATE_LIMIT.WINDOWS.ONE_HOUR,
-  max: RATE_LIMIT.MAX_REQUESTS.FORGOT_PASSWORD,
+  windowMs: RATE_LIMIT.WINDOWS.FIFTEEN_MINUTES,
+  max: 3,
   skip: shouldSkip,
   message: createRateLimitResponse(
-    'Too many password reset requests. Please try again after an hour.'
+    'Too many requests. Please try again after 15 minutes.'
   ),
   standardHeaders: true,
   legacyHeaders: true,
@@ -134,15 +135,71 @@ const resetPasswordLimiter = rateLimit({
  */
 
 // Register a new user account
-router.post('/register', registerLimiter, validateRequest(registerSchema), register);
+router.post('/register', registerLimiter, verifyCaptcha, validateRegister, register);
+
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Authenticate a user and issue access/refresh tokens
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "john@example.com"
+ *               password:
+ *                 type: string
+ *                 example: "securePassword123"
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/AuthTokens'
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Invalid credentials
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       429:
+ *         description: Too many requests
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 
 // Authenticate a user and issue access/refresh tokens
-router.post('/login', loginLimiter, validateLogin, login);
+router.post('/login', loginLimiter, verifyCaptcha, validateLogin, login);
 
 // Request a password reset email
 router.post(
   '/forgot-password',
-  authEmailLimiter,
+  forgotPasswordLimiter,
   validateForgotPassword,
   forgotPassword
 );
@@ -178,6 +235,13 @@ router.post('/reset-password/:token', resetPasswordLimiter, validateResetPasswor
 router.post('/verify-email/:token', verifyEmailLimiter, verifyEmail);
 
 // Refresh an expired access token
+router.post(
+  '/refresh',
+  refreshTokenLimiter,
+  validateRefreshToken,
+  refreshToken
+);
+
 router.post(
   '/refresh-token',
   refreshTokenLimiter,

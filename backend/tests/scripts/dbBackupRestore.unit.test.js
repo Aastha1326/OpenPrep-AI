@@ -1,7 +1,3 @@
-const { vi, describe, test, expect, afterEach } = require('vitest');
-const fs = require('fs');
-const path = require('path');
-
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal();
   return {
@@ -12,6 +8,9 @@ vi.mock('fs', async (importOriginal) => {
     existsSync: vi.fn().mockReturnValue(true),
   };
 });
+
+const fs = require('fs');
+const path = require('path');
 
 describe('Database Backup & Restore Script Helpers', () => {
   afterEach(() => {
