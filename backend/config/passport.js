@@ -39,7 +39,7 @@ passport.use(
               googleId: profile.id,
               authProvider: 'google',
               avatarUrl: profile.photos && profile.photos[0] ? profile.photos[0].value : null,
-              password: crypto.randomBytes(16).toString('hex'),
+              password: null,
             });
           }
         }
@@ -85,7 +85,7 @@ passport.use(
                 githubId: profile.id,
                 authProvider: 'github',
                 avatarUrl,
-                password: crypto.randomBytes(16).toString('hex'),
+                password: null,
               });
             }
           } else {

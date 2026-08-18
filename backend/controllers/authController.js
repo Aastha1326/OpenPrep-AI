@@ -912,7 +912,7 @@ exports.googleLogin = async (req, res, next) => {
         provider: 'google',
         avatar: picture || '',
         isEmailVerified: true,
-        password: crypto.randomBytes(16).toString('hex'),
+        password: null,
       });
     } else {
       if (!user.socialId) {
