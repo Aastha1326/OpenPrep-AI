@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import SquadLeaderboard from './SquadLeaderboard';
-import SquadActivityFeed from './SquadActivityFeed';import { Share2, LogOut, Award, Target } from 'lucide-react';
-import Confetti from 'react-confetti';
+import SquadActivityFeed from './SquadActivityFeed';
+import { Share2, LogOut, Award, Target } from 'lucide-react';
+import confetti from 'canvas-confetti';
 import { io } from 'socket.io-client';
 
 export default function StudySquadDashboard({ squadData, currentUserRole, onLeaveSquad, onRefresh }) {
-  const [showConfetti, setShowConfetti] = useState(false);
   const [localChallenge, setLocalChallenge] = useState(null);
   
   const squad = squadData.squad;
@@ -43,16 +43,14 @@ export default function StudySquadDashboard({ squadData, currentUserRole, onLeav
 
     socket.on('squad:achievement_unlocked', (data) => {
       if (data.squadId === squad.id) {
-        setShowConfetti(true);
-        setTimeout(() => setShowConfetti(false), 5000);
+        confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
         onRefresh();
       }
     });
     
     socket.on('squad:challenge_completed', (data) => {
        if (data.squadId === squad.id) {
-        setShowConfetti(true);
-        setTimeout(() => setShowConfetti(false), 5000);
+        confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
         onRefresh();
       }
     });
@@ -67,7 +65,6 @@ export default function StudySquadDashboard({ squadData, currentUserRole, onLeav
 
   return (
     <div className="w-full max-w-4xl mx-auto text-slate-100">
-      {showConfetti && <Confetti recycle={false} numberOfPieces={500} />}
       
       <div className="flex items-center justify-between mb-8 bg-slate-800 p-6 rounded-lg shadow-md border border-slate-700">
         <div>
