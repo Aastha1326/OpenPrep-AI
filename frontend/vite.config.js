@@ -1,17 +1,10 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
-import { visualizer } from 'rollup-plugin-visualizer'
 
 export default defineConfig({
   plugins: [
     react(),
-    visualizer({
-      open: false,
-      filename: 'bundle-stats.html',
-      gzipSize: true,
-      brotliSize: true,
-    }),
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
@@ -42,9 +35,32 @@ export default defineConfig({
             purpose: 'any maskable',
           },
         ],
-      }
-    })
+      },
+    }),
   ],
+  build: {
+    chunkSizeWarningLimit: 1500,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('recharts')) {
+              return 'vendor-charts';
+            }
+            if (id.includes('react-quill') || id.includes('react-markdown') || id.includes('@tiptap')) {
+              return 'vendor-editor';
+            }
+            if (id.includes('lucide-react')) {
+              return 'vendor-icons';
+            }
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom') || id.includes('@reduxjs/toolkit') || id.includes('react-redux')) {
+              return 'vendor-core';
+            }
+          }
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {
