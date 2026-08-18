@@ -17,9 +17,25 @@ const escapeRegex = (string) => {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 };
 
-// @desc    Export all of the authenticated user's notes as JSON or a Markdown ZIP
-// @route   GET /api/notes/export
-// @access  Private
+/**
+ * @swagger
+ * /api/notes/export:
+ *   get:
+ *     summary: Export user's notes as JSON or Markdown ZIP
+ *     tags: [Notes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: format
+ *         schema:
+ *           type: string
+ *           enum: [json, zip]
+ *           default: json
+ *     responses:
+ *       200:
+ *         description: Notes exported successfully
+ */
 exports.exportNotes = async (req, res, next) => {
   try {
     const format = req.query.format === 'zip' ? 'zip' : 'json';
@@ -70,9 +86,18 @@ exports.exportNotes = async (req, res, next) => {
   }
 };
 
-// @desc    Import one or more Markdown files as new notes
-// @route   POST /api/notes/import
-// @access  Private
+/**
+ * @swagger
+ * /api/notes/import:
+ *   post:
+ *     summary: Import Markdown files as new notes
+ *     tags: [Notes]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201:
+ *         description: Notes imported successfully
+ */
 exports.importNotes = async (req, res, next) => {
   try {
     const { subjectId, topicId } = req.body;
@@ -124,10 +149,28 @@ exports.importNotes = async (req, res, next) => {
   }
 };
 
-// @desc    Summarize a note using AI (Gemini) and cache the result
-// @route   POST /api/notes/:id/summarize
-// @access  Private
-
+/**
+ * @swagger
+ * /api/notes/upload:
+ *   post:
+ *     summary: Upload a new study note (text, PDF, DOCX, or image)
+ *     tags: [Notes]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201:
+ *         description: Note uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/Note'
+ */
 exports.uploadNote = async (req, res, next) => {
   try {
     const { title, content, subjectId, topicId, isPublic, category, tags } = req.body;
@@ -176,9 +219,18 @@ exports.uploadNote = async (req, res, next) => {
   }
 };
 
-// @desc    Extract text from an uploaded image or PDF via OCR
-// @route   POST /api/notes/ocr-upload
-// @access  Private
+/**
+ * @swagger
+ * /api/notes/ocr-upload:
+ *   post:
+ *     summary: Extract text from image or PDF via OCR
+ *     tags: [Notes]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Text extracted successfully via OCR
+ */
 exports.uploadOcrNote = async (req, res, next) => {
   try {
     if (!req.file) {
@@ -252,9 +304,46 @@ exports.uploadOcrNote = async (req, res, next) => {
   }
 };
 
-// @desc    Get all notes (with search, filter, pagination)
-// @route   GET /api/notes
-// @access  Private
+/**
+ * @swagger
+ * /api/notes:
+ *   get:
+ *     summary: Retrieve notes with search, filter, and pagination
+ *     tags: [Notes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: subjectId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: query
+ *         name: category
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Notes list retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/PaginatedResponse'
+ */
 exports.getNotes = async (req, res, next) => {
   try {
     const { subjectId, category, search, publicOnly } = req.query;
@@ -340,9 +429,27 @@ exports.getNotes = async (req, res, next) => {
   }
 };
 
-// @desc    Download / Increment note download count
-// @route   PUT /api/notes/:id/download
-// @access  Private
+/**
+ * @swagger
+ * /api/notes/{id}/download:
+ *   put:
+ *     summary: Track note download and increment download count
+ *     tags: [Notes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Download count incremented
+ *       404:
+ *         description: Note not found
+ */
 exports.downloadNote = async (req, res, next) => {
   try {
     const note = await Note.findByPk(req.params.id);
@@ -364,9 +471,27 @@ exports.downloadNote = async (req, res, next) => {
   }
 };
 
-// @desc    Delete Note
-// @route   DELETE /api/notes/:id
-// @access  Private
+/**
+ * @swagger
+ * /api/notes/{id}:
+ *   delete:
+ *     summary: Delete a note by ID
+ *     tags: [Notes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Note deleted successfully
+ *       404:
+ *         description: Note not found
+ */
 exports.deleteNote = async (req, res, next) => {
   try {
     const note = await Note.findOne({ where: { id: req.params.id, user: req.user.id } });
@@ -393,9 +518,27 @@ exports.deleteNote = async (req, res, next) => {
   }
 };
 
-// @desc    Summarize a note using AI (Gemini) and cache the result
-// @route   POST /api/notes/:id/summarize
-// @access  Private
+/**
+ * @swagger
+ * /api/notes/{id}/summarize:
+ *   post:
+ *     summary: Generate AI summary of a note using Gemini
+ *     tags: [Notes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: AI summary generated or returned from cache
+ *       404:
+ *         description: Note not found
+ */
 exports.summarizeNote = async (req, res, next) => {
   try {
     const note = await Note.findOne({
@@ -449,9 +592,18 @@ exports.summarizeNote = async (req, res, next) => {
   }
 };
 
-// @desc    Upload & Process Voice Note
-// @route   POST /api/notes/voice
-// @access  Private
+/**
+ * @swagger
+ * /api/notes/voice:
+ *   post:
+ *     summary: Upload and process voice note audio file with Gemini AI
+ *     tags: [Notes]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201:
+ *         description: Voice note transcribed and summarized successfully
+ */
 exports.uploadVoiceNote = async (req, res, next) => {
   try {
     const { title, subjectId, topicId, isPublic } = req.body;
@@ -524,9 +676,42 @@ exports.uploadVoiceNote = async (req, res, next) => {
   }
 };
 
-// @desc    Update Note
-// @route   PUT /api/notes/:id
-// @access  Private
+/**
+ * @swagger
+ * /api/notes/{id}:
+ *   put:
+ *     summary: Update an existing note
+ *     tags: [Notes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               content:
+ *                 type: string
+ *               isPublic:
+ *                 type: boolean
+ *               category:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Note updated successfully
+ *       404:
+ *         description: Note not found
+ */
 exports.updateNote = async (req, res, next) => {
   try {
     const { title, content, isPublic, category, tags } = req.body;
@@ -574,9 +759,37 @@ exports.shareCollaboration = async (req, res, next) => {
   }
 };
 
-// @desc    Get single note details
-// @route   GET /api/notes/:id
-// @access  Private
+/**
+ * @swagger
+ * /api/notes/{id}:
+ *   get:
+ *     summary: Retrieve single note by ID
+ *     tags: [Notes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Note details retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/Note'
+ *       404:
+ *         description: Note not found
+ */
 exports.getNote = async (req, res, next) => {
   try {
     const note = await Note.findByPk(req.params.id, {

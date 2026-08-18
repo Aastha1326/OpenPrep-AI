@@ -151,11 +151,12 @@ const docsSecurityHeaders = helmet({
 });
 
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api/docs')) {
+  if (req.path.startsWith('/api/docs') || req.path.startsWith('/api-docs')) {
     return docsSecurityHeaders(req, res, next);
   }
   return securityHeaders(req, res, next);
-});app.use(getCorsMiddleware());
+});
+app.use(getCorsMiddleware());
 app.use(passport.initialize());
 
 // Cookie parser (required for csurf cookie-based tokens)
@@ -322,7 +323,7 @@ app.get('/healthz', (req, res) => {
 // Swagger UI Documentation & Spec endpoints
 const swaggerEnabled = process.env.SWAGGER_ENABLED === 'true' || process.env.NODE_ENV !== 'production';
 
-app.use('/api/docs', (req, res, next) => {
+app.use(['/api-docs', '/api/docs'], (req, res, next) => {
   if (!swaggerEnabled) {
     return res.status(403).json({ success: false, error: 'Swagger API documentation is disabled in this environment.' });
   }
@@ -336,7 +337,7 @@ app.use('/api/docs', (req, res, next) => {
   },
 }));
 
-app.get('/api/docs.json', (req, res) => {
+app.get(['/api-docs.json', '/api/docs.json'], (req, res) => {
   if (!swaggerEnabled) {
     return res.status(403).json({ success: false, error: 'Swagger API documentation is disabled in this environment.' });
   }
