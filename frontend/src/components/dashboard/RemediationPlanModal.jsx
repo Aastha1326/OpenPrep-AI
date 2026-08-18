@@ -190,7 +190,7 @@ const RemediationPlanModal = ({
                               <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                                 <BookOpen className="w-3.5 h-3.5" /> Objectives
                               </p>
-                              <ul className="space-y-1.5 list-disc list-inside text-slate-300">
+                              <ul className="space-y-1.5 list-disc list-outside pl-6 text-slate-300">
                                 {day.objectives.map((objective, idx) => (
                                   <li key={idx}>{objective}</li>
                                 ))}

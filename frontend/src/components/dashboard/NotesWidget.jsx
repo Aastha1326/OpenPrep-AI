@@ -331,7 +331,7 @@ const NotesWidget = ({ limit = 5 }) => {
                       )}
 
                     {Array.isArray(summary.data.examTips) && summary.data.examTips.length > 0 && (
-                      <ul className="mt-3 space-y-1 list-disc list-inside text-xs text-neutral-600 font-serif">
+                      <ul className="mt-3 space-y-1 list-disc list-outside pl-6 text-xs text-neutral-600 font-serif">
                         {summary.data.examTips.map((tip, idx) => (
                           <li key={idx}>{tip}</li>
                         ))}
