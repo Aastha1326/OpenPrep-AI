@@ -21,6 +21,7 @@ Welcome to the OpenPrep AI docs. Start here to find the right guide.
 ## Contributing
 - [Contribution Guide](./contribution-guide.md)
 - [Coding Standards](./coding-standards.md)
+- [Frontend Component Guidelines](./FRONTEND_GUIDELINES.md)
 - [Branching Strategy](./branching-strategy.md)
 
 ## Project
