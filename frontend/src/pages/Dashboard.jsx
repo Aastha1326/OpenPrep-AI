@@ -1,5 +1,5 @@
 import Skeleton from '../components/dashboard/Skeleton';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -34,7 +34,8 @@ import {
   Brain,
   Bot,
   Users,
-} from 'lucide-react';import API from '../services/api';
+} from 'lucide-react';
+import API from '../services/api';
 import { toDateOnlyString } from '../utils/dateUtils';
 import SkillTree from '../components/dashboard/SkillTree';
 import {
@@ -61,9 +62,6 @@ import BadgeGrid from '../components/dashboard/BadgeGrid';
 import PinnedTasks from '../components/dashboard/PinnedTasks';
 import FatigueMonitor from '../components/dashboard/FatigueMonitor';
 import UploadMaterial from '../components/dashboard/UploadMaterial';
-import CreateNoteModal from '../components/dashboard/CreateNoteModal';
-import StudyPlanModal from '../components/dashboard/StudyPlanModal';
-import PyqAnalysisModal from '../components/dashboard/PyqAnalysisModal';
 import WeaknessDashboardWidget from '../components/dashboard/WeaknessDashboardWidget';
 import SubjectMasteryWidget from '../components/dashboard/SubjectMasteryWidget';
 import FocusEfficiencyWidget from '../components/dashboard/FocusEfficiencyWidget';
@@ -73,21 +71,26 @@ import LeaderboardWidget from '../components/dashboard/LeaderboardWidget';
 import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
 import ExamCountdownCard from '../components/dashboard/ExamCountdownCard';
 import TargetExamOverviewWidget from '../components/dashboard/TargetExamOverviewWidget';
-import CompositeBundleModal from '../components/dashboard/CompositeBundleModal';
-import SyllabusImportModal from '../components/dashboard/SyllabusImportModal';
 import NotesWidget from '../components/dashboard/NotesWidget';
 import ThemeToggle from '../components/ThemeToggle';
 import ReadinessWidget from '../components/dashboard/ReadinessWidget';
 import BadgesList from '../components/BadgesList';
-import SM2SettingsModal from '../components/dashboard/SM2SettingsModal';
 import LevelProgressBar from '../components/gamification/LevelProgressBar';
 import StreakWidget from '../components/gamification/StreakWidget';
 import BadgeCard from '../components/gamification/BadgeCard';
-import BadgeUnlockModal from '../components/gamification/BadgeUnlockModal';
-import LevelUpModal from '../components/gamification/LevelUpModal';
-import CommunityDecksModal from '../components/dashboard/CommunityDecksModal';
-import QuizSetupModal from '../components/dashboard/QuizSetupModal';
-import GenerateFlashcardsFromYouTubeModal from '../components/dashboard/GenerateFlashcardsFromYouTubeModal';
+
+// Lazy-loaded heavy modal components for bundle size reduction
+const CreateNoteModal = lazy(() => import('../components/dashboard/CreateNoteModal'));
+const StudyPlanModal = lazy(() => import('../components/dashboard/StudyPlanModal'));
+const PyqAnalysisModal = lazy(() => import('../components/dashboard/PyqAnalysisModal'));
+const CompositeBundleModal = lazy(() => import('../components/dashboard/CompositeBundleModal'));
+const SyllabusImportModal = lazy(() => import('../components/dashboard/SyllabusImportModal'));
+const SM2SettingsModal = lazy(() => import('../components/dashboard/SM2SettingsModal'));
+const BadgeUnlockModal = lazy(() => import('../components/gamification/BadgeUnlockModal'));
+const LevelUpModal = lazy(() => import('../components/gamification/LevelUpModal'));
+const CommunityDecksModal = lazy(() => import('../components/dashboard/CommunityDecksModal'));
+const QuizSetupModal = lazy(() => import('../components/dashboard/QuizSetupModal'));
+const GenerateFlashcardsFromYouTubeModal = lazy(() => import('../components/dashboard/GenerateFlashcardsFromYouTubeModal'));
 import {
   fetchDashboardStats,
   fetchSubjectBreakdown,
@@ -1228,11 +1231,12 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           </VintagePaper>
         </div>
 {/* --- CREATE NOTE MODAL --- */}
-      <CreateNoteModal
-        isOpen={isNoteModalOpen}
-        onClose={() => setIsNoteModalOpen(false)}
-        onNoteCreated={() => setIsNoteModalOpen(false)}
-      />
+      <Suspense fallback={null}>
+        <CreateNoteModal
+          isOpen={isNoteModalOpen}
+          onClose={() => setIsNoteModalOpen(false)}
+          onNoteCreated={() => setIsNoteModalOpen(false)}
+        />
 
       {/* --- YOUTUBE FLASHCARD DECK MODAL --- */}
       {isYoutubeFlashcardModalOpen && (
@@ -1406,6 +1410,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
         description={activeBadgeUnlock?.description}
         onClose={() => setActiveBadgeUnlock(null)}
       />
+      </Suspense>
 
       {/* --- SECURITY SETTINGS (2FA) --- */}
       <div className="my-6">
