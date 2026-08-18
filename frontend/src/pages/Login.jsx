@@ -9,6 +9,7 @@ import { loginUser, loadUser, clearError } from '../store/slices/authSlice';
 import ThemeToggle from '../components/ThemeToggle';
 import SoundToggle from '../components/SoundToggle';
 import ForgotPasswordModal from '../components/auth/ForgotPasswordModal';
+import LazyImage from '../components/common/LazyImage';
 
 const Login = () => {
   const dispatch = useDispatch();
@@ -252,9 +253,11 @@ const Login = () => {
         {/* ── RIGHT COLUMN: Hero Visual & Brand Panel (45% Width) ── */}
         <div className="hidden md:flex md:w-[45%] flex-col justify-between p-8 md:p-10 relative overflow-hidden bg-[#0D0A08] text-[#E1DCC9] border-l border-[#CEAB93]/30 dark:border-[#412D15]">
           {/* Abstract Hero Image Background */}
-          <img
+          <LazyImage
             src="/assets/abstract_hero.png"
+            webpSrc="/assets/abstract_hero.webp"
             alt="OpenPrep Abstract Sculpture"
+            loading="lazy"
             className="absolute inset-0 w-full h-full object-cover opacity-80 mix-blend-screen scale-105 -z-0"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#0D0A08] via-[#0D0A08]/40 to-[#0D0A08]/70 -z-0" />

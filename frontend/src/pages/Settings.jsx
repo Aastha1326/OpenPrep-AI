@@ -24,6 +24,7 @@ import { getVapidPublicKey, subscribeToPush, unsubscribeFromPush, updateNotifica
 import { loadUser } from '../store/slices/authSlice';
 import { validateAvatarFile } from '../utils/fileValidation';
 import { BADGE_LIST, BADGE_ICONS } from '../config/badges';
+import LazyImage from '../components/common/LazyImage';
 
 const urlBase64ToUint8Array = (base64String) => {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -269,19 +270,17 @@ const [leaderboardVisible, setLeaderboardVisible] = useState(
             {/* Avatar Preview */}
             <div className="relative shrink-0">
               {previewUrl || avatarUrl ? (
-                <img
+                <LazyImage
                   src={previewUrl || avatarUrl}
                   alt="Profile Avatar"
+                  loading="lazy"
                   className={`w-24 h-24 rounded-full border-2 border-amber-600 shadow-[0_4px_10px_rgba(0,0,0,0.2)] object-cover bg-white ${
                     (previewUrl || avatarUrl).endsWith('.svg') ||
                     (previewUrl || avatarUrl).includes('image/svg+xml')
                       ? 'p-2 object-contain'
                       : ''
                   }`}
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = 'https://www.transparenttextures.com/patterns/cream-paper.png';
-                  }}
+                  fallbackSrc="https://www.transparenttextures.com/patterns/cream-paper.png"
                 />
               ) : (
                 <div className="w-24 h-24 rounded-full bg-gradient-to-br from-amber-600 to-amber-700 text-white font-playfair font-bold text-4xl flex items-center justify-center border-2 border-amber-500 shadow-md">

@@ -1,4 +1,5 @@
 import React from 'react';
+import LazyImage from '../common/LazyImage';
 
 export default function SquadLeaderboard({ members, contributions, targetXp }) {
   // Combine members and their contributions
@@ -16,9 +17,11 @@ export default function SquadLeaderboard({ members, contributions, targetXp }) {
           <div key={member.userId} className="flex items-center justify-between p-3 bg-slate-700 rounded-lg">
             <div className="flex items-center gap-3">
               <span className="text-slate-400 font-bold w-6">{index + 1}.</span>
-              <img 
+              <LazyImage 
                 src={member.userRef?.avatar || '/default-avatar.png'} 
-                alt={member.userRef?.name} 
+                alt={member.userRef?.name || 'Member avatar'} 
+                fallbackSrc="/default-avatar.png"
+                loading="lazy"
                 className="w-10 h-10 rounded-full"
               />
               <div>

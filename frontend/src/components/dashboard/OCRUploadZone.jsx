@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Upload, FileText, Check, Loader2, Sparkles } from 'lucide-react';
+import LazyImage from '../common/LazyImage';
 import API from '../../services/api';
 
 export default function OCRUploadZone({ onNoteSaved }) {
@@ -94,7 +95,7 @@ export default function OCRUploadZone({ onNoteSaved }) {
             {/* Original Image Preview */}
             <div className="border border-[#CEAB93]/40 dark:border-[#412D15] rounded-xl p-3 bg-black/5 dark:bg-black/20 flex flex-col items-center">
               <span className="text-xs font-bold uppercase tracking-wider mb-2 text-[#8C6A53] dark:text-[#C4BA9D]">Original Photo</span>
-              <img src={previewUrl} alt="Handwritten notes preview" className="max-h-80 object-contain rounded-lg" />
+              <LazyImage src={previewUrl} alt="Handwritten notes preview" loading="lazy" className="max-h-80 object-contain rounded-lg" />
               <button
                 onClick={() => { setFile(null); setPreviewUrl(null); setMarkdownText(''); }}
                 className="mt-3 text-xs text-red-500 hover:underline font-semibold"
