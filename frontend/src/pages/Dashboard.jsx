@@ -957,28 +957,38 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
               </div>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {gamificationData?.badges?.length > 0 ? (
+                  gamificationData.badges.slice(0, 4).map((badge) => (
+                    <BadgeCard
+                      key={badge.id}
+                      badgeCode={badge.badgeCode}
+                      title={badge.title}
+                      description={badge.description}
+                      isUnlocked={true}
+                      unlockedAt={badge.unlockedAt}
+                      svgIcon={badge.svgIcon}
+                    />
+                  ))
+                ) : (
+                  <div className="col-span-2 text-center text-stone-500 text-sm py-4">
+                    No badges earned yet. Start studying to unlock achievements!
+                  </div>
+                )}
+                
+                {/* Show example locked badges */}
                 <BadgeCard
-                  badgeCode="seven_day_streak"
-                  title="7-Day Streak 🔥"
-                  description="Studied consistently for 7 consecutive days."
-                  isUnlocked={!!gamificationData?.badges?.some(b => b.badgeCode === 'seven_day_streak')}
-                  unlockedAt={gamificationData?.badges?.find(b => b.badgeCode === 'seven_day_streak')?.unlockedAt}
+                  badgeCode="week_warrior"
+                  title="Week Warrior 🔥"
+                  description="Achieve a 7-day study streak"
+                  isUnlocked={!!gamificationData?.badges?.some(b => b.badgeCode === 'week_warrior')}
+                  unlockedAt={gamificationData?.badges?.find(b => b.badgeCode === 'week_warrior')?.unlockedAt}
                 />
-
                 <BadgeCard
-                  badgeCode="night_owl"
-                  title="Night Owl 🦉"
-                  description="Completed a study task between 11 PM and 4 AM."
-                  isUnlocked={!!gamificationData?.badges?.some(b => b.badgeCode === 'night_owl')}
-                  unlockedAt={gamificationData?.badges?.find(b => b.badgeCode === 'night_owl')?.unlockedAt}
-                />
-
-                <BadgeCard
-                  badgeCode="quiz_master"
-                  title="Quiz Master 🎓"
-                  description="Successfully finished 10 quiz attempts."
-                  isUnlocked={!!gamificationData?.badges?.some(b => b.badgeCode === 'quiz_master')}
-                  unlockedAt={gamificationData?.badges?.find(b => b.badgeCode === 'quiz_master')?.unlockedAt}
+                  badgeCode="card_collector"
+                  title="Card Collector 📚"
+                  description="Create 50 flashcards"
+                  isUnlocked={!!gamificationData?.badges?.some(b => b.badgeCode === 'card_collector')}
+                  unlockedAt={gamificationData?.badges?.find(b => b.badgeCode === 'card_collector')?.unlockedAt}
                 />
               </div>
             </div>

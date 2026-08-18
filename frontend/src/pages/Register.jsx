@@ -1,13 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Mail, User, Lock, Eye, EyeOff, AlertCircle, CheckCircle, BookOpen, ArrowRight, Sparkles } from 'lucide-react';
-import GoogleLoginButton from '../components/auth/GoogleLoginButton';
-import GitHubLoginButton from '../components/auth/GitHubLoginButton';
-import { registerUser, loadUser, clearError, clearRegistrationSuccess } from '../store/slices/authSlice';
-import ThemeToggle from '../components/ThemeToggle';
-import SoundToggle from '../components/SoundToggle';
+import { Mail, User, Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
+import { registerUser, clearError, clearRegistrationSuccess } from '../store/slices/authSlice';
+import { useReCaptcha } from '../hooks/useReCaptcha';
 
 // Password validation criteria (synced with backend validators.js)
 const PASSWORD_CRITERIA = [
@@ -22,20 +18,11 @@ const Register = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { loading, error, registrationSuccess, message, isAuthenticated } = useSelector((state) => state.auth);
+  const { executeCaptcha } = useReCaptcha();
 
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
 
-  const getApiBaseUrl = () => {
-    if (import.meta.env.VITE_API_URL) {
-      return import.meta.env.VITE_API_URL;
-    }
-    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      return `${window.location.origin}/api`;
-    }
-    return 'http://localhost:5000/api';
-  };
-  const googleAuthUrl = `${getApiBaseUrl().replace(/\/$/, '')}/auth/google`;
   const [oauthError, setOauthError] = useState(null);
 
   useEffect(() => {
@@ -63,16 +50,8 @@ const Register = () => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const allPassed = PASSWORD_CRITERIA.every((rule) => rule.test(formData.password));
-    if (!allPassed) {
-      dispatch({
-        type: 'auth/register/rejected',
-        payload: 'Password must be 8+ characters, with uppercase, lowercase, number, and special character.',
-      });
-      return;
-    }
     dispatch(registerUser(formData));
   };
 
@@ -103,7 +82,7 @@ const Register = () => {
 
   // ── Main Non-Scrollable Split Screen ──
   return (
-    <div className="h-screen w-screen max-h-screen overflow-hidden flex items-center justify-center p-3 sm:p-6 bg-[#FFFBE9] dark:bg-[#000000] text-[#1F150C] dark:text-[#E1DCC9] font-inter relative select-none">
+    <div className="min-h-screen w-screen md:h-screen md:max-h-screen md:overflow-hidden flex items-center justify-center p-3 sm:p-6 bg-[#FFFBE9] dark:bg-[#000000] text-[#1F150C] dark:text-[#E1DCC9] font-inter relative select-none overflow-y-auto">
       {/* Background Ambient Glows */}
       <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(circle_at_70%_20%,rgba(173,139,115,0.12),transparent_50%)] pointer-events-none" />
 
@@ -112,10 +91,10 @@ const Register = () => {
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="w-full max-w-5xl h-full max-h-[660px] sm:max-h-[700px] bg-[#FFFBE9] dark:bg-[#16120E] rounded-3xl border border-[#CEAB93]/60 dark:border-[#412D15] shadow-2xl overflow-hidden flex flex-col md:flex-row relative z-10"
+        className="w-full max-w-5xl h-auto md:h-full md:max-h-[660px] sm:md:max-h-[700px] bg-[#FFFBE9] dark:bg-[#16120E] rounded-3xl border border-[#CEAB93]/60 dark:border-[#412D15] shadow-2xl overflow-hidden flex flex-col md:flex-row relative z-10"
       >
         {/* ── LEFT COLUMN: Sign Up Form Panel (55% Width) ── */}
-        <div className="w-full md:w-[55%] flex flex-col justify-between p-6 sm:p-8 md:p-10 bg-[#FFFBE9] dark:bg-[#16120E] text-[#1F150C] dark:text-[#E1DCC9] overflow-y-auto md:overflow-hidden">
+        <div className="w-full md:w-[55%] flex flex-col justify-between gap-6 md:gap-0 p-6 sm:p-8 md:p-10 bg-[#FFFBE9] dark:bg-[#16120E] text-[#1F150C] dark:text-[#E1DCC9] overflow-y-auto md:overflow-hidden">
           {/* Top Logo / Mobile Controls */}
           <div className="flex items-center justify-between">
             <Link to="/" className="flex items-center gap-2 group">
@@ -133,7 +112,7 @@ const Register = () => {
           </div>
 
           {/* Form Content */}
-          <div className="my-auto py-2">
+          <div className="my-auto py-2 flex flex-col gap-3.5 mt-6 md:mt-0">
             <div className="mb-5">
               <h1 className="text-2xl sm:text-3xl font-extrabold font-playfair tracking-tight text-[#1F150C] dark:text-[#E1DCC9]">
                 Sign up

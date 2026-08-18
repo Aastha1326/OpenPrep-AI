@@ -1,5 +1,6 @@
 const { google } = require('googleapis');
-const ical = require('ical-generator');
+const icalGenerator = require('ical-generator');
+const ical = typeof icalGenerator === 'function' ? icalGenerator : (icalGenerator.ical || icalGenerator.default || icalGenerator);
 const { encryptToken, decryptToken } = require('../utils/encryption');
 const User = require('../models/User');
 

@@ -1,3 +1,115 @@
+let usersStore = [];
+let subjectsStore = [];
+let progressStore = [];
+let topicsStore = [];
+let activityLogsStore = [];
+
+vi.mock('../../models/User', () => {
+  return {
+    create: vi.fn(async (data) => {
+      const u = { id: `u-${Math.random()}`, ...data };
+      u.update = vi.fn(async (uData) => Object.assign(u, uData));
+      usersStore.push(u);
+      return u;
+    }),
+    findAll: vi.fn(async (options) => {
+      let res = [...usersStore];
+      if (options && options.where) {
+        if (options.where.receiveWeeklyDigest !== undefined) {
+          res = res.filter(u => u.receiveWeeklyDigest === options.where.receiveWeeklyDigest);
+        }
+      }
+      return res;
+    }),
+    destroy: vi.fn(async () => {
+      usersStore = [];
+    }),
+  };
+});
+
+vi.mock('../../models/Subject', () => {
+  return {
+    create: vi.fn(async (data) => {
+      const s = { ...data };
+      subjectsStore.push(s);
+      return s;
+    }),
+    findAll: vi.fn(async () => {
+      return [...subjectsStore];
+    }),
+    destroy: vi.fn(async () => {
+      subjectsStore = [];
+    }),
+  };
+});
+
+vi.mock('../../models/Progress', () => {
+  return {
+    create: vi.fn(async (data) => {
+      const p = { ...data };
+      progressStore.push(p);
+      return p;
+    }),
+    findAll: vi.fn(async (options) => {
+      let res = [...progressStore];
+      if (options && options.where) {
+        if (options.where.completionPercentage === 100) {
+          res = res.filter(p => p.completionPercentage === 100);
+        }
+      }
+      return res;
+    }),
+    destroy: vi.fn(async () => {
+      progressStore = [];
+    }),
+  };
+});
+
+vi.mock('../../models/Topic', () => {
+  return {
+    create: vi.fn(async (data) => {
+      const t = { ...data };
+      topicsStore.push(t);
+      return t;
+    }),
+    findAll: vi.fn(async (options) => {
+      let res = [...topicsStore];
+      if (options && options.where) {
+        if (options.where.status) {
+          res = res.filter(t => t.status === options.where.status);
+        }
+      }
+      return res;
+    }),
+    destroy: vi.fn(async () => {
+      topicsStore = [];
+    }),
+  };
+});
+
+vi.mock('../../models/ActivityLog', () => {
+  return {
+    create: vi.fn(async (data) => {
+      const a = { ...data, createdAt: new Date() };
+      activityLogsStore.push(a);
+      return a;
+    }),
+    findAll: vi.fn(async () => {
+      return [...activityLogsStore];
+    }),
+    destroy: vi.fn(async () => {
+      activityLogsStore = [];
+    }),
+  };
+});
+
+// Mock nodemailer email service
+vi.mock('../../services/emailService', () => {
+  return {
+    default: vi.fn().mockImplementation(() => Promise.resolve({ success: true })),
+  };
+});
+
 const { sendWeeklyDigests } = require('../../services/weeklyDigestService');
 const User = require('../../models/User');
 const Progress = require('../../models/Progress');
@@ -6,13 +118,6 @@ const Subject = require('../../models/Subject');
 const ActivityLog = require('../../models/ActivityLog');
 const sendEmail = require('../../services/emailService');
 const { v4: uuidv4 } = require('uuid');
-
-// Mock nodemailer email service
-vi.mock('../../services/emailService', () => {
-  return {
-    default: vi.fn().mockImplementation(() => Promise.resolve({ success: true })),
-  };
-});
 
 describe('Weekly Email Study Summary Service Tests', () => {
   let testUser;

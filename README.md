@@ -141,141 +141,119 @@ We use Sequelize CLI for managing database schema changes.
 
 If you encounter problems while setting up or running OpenPrep AI locally, check the common issues and solutions below.
 
-### 1. Dependencies fail to install
+### 1. `SequelizeConnectionRefusedError` / `SequelizeConnectionError: connect ECONNREFUSED`
+This error occurs when the Node.js backend cannot connect to your PostgreSQL database instance.
 
-**Possible causes:**
-
-* Unsupported or outdated Node.js version.
-* Network problems while downloading packages.
-* Corrupted npm cache.
-
-**Solutions:**
-
-Check your Node.js and npm versions:
-
-```bash
-node --version
-npm --version
-```
-
-If npm reports cache-related errors, clear the npm cache and retry:
-
-```bash
-npm cache clean --force
-npm install
-```
-
-Run the installation commands separately inside both the `backend` and `frontend` directories.
-
----
-
-### 2. Missing `.env` configuration
-
-If the backend fails to start because required environment variables are missing, make sure you have created a `.env` file from the provided example.
-
-From the `backend` directory:
-
-```bash
-cp .env.example .env
-```
-
-On Windows CMD:
-
-```cmd
-copy .env.example .env
-```
-
-Open the `.env` file and configure the required values, such as:
-
-```env
-DB_URI=your_postgresql_connection_string
-JWT_SECRET=your_secret_key
-```
-
-Make sure all required environment variables are configured before starting the backend.
-
-**Important:** Never commit your `.env` file or expose secret values publicly.
+* **Ensure PostgreSQL is running**:
+  * **Windows (PowerShell as Administrator):**
+    ```powershell
+    Get-Service postgresql*
+    Start-Service postgresql-x64-18  # Replace with your actual service version if different
+    ```
+  * **Linux/macOS:**
+    ```bash
+    sudo systemctl status postgresql
+    sudo systemctl start postgresql
+    ```
+* **Verify database existence**:
+  Make sure you created the `openprep` database. You can create it with:
+  ```bash
+  psql -U postgres -c "CREATE DATABASE openprep;"
+  ```
+* **Check `.env` Connection String**:
+  Open `backend/.env` and verify that `DATABASE_URL` matches your local database credentials:
+  ```env
+  DATABASE_URL=postgres://your_username:your_password@localhost:5432/openprep
+  ```
 
 ---
 
-### 3. Backend cannot connect to PostgreSQL
+### 2. React Vite Port `5173` (or Backend Port `5000`) Already in Use
+This happens when another local server or background process is already listening on ports `5173` (frontend) or `5000` (backend).
 
-If the backend reports a PostgreSQL connection error:
-
-* Make sure PostgreSQL is installed and running.
-* Verify the database name, username, password, host, and port in `.env`.
-* Check that the `DB_URI` points to the correct PostgreSQL instance.
-* If using Docker, make sure the PostgreSQL container is running.
-
-Check the Docker container status with:
-
-```bash
-docker-compose ps
-```
-
-If the database service is not running, restart the Docker services:
-
-```bash
-docker-compose up --build
-```
-
----
-
-### 4. Frontend or backend is running on the wrong port
-
-OpenPrep AI normally uses:
-
-* Frontend: `http://localhost:5173`
-* Backend API: `http://localhost:5000`
-
-If either port is already being used by another application, stop the conflicting process or configure the application to use another available port.
-
-After changing the port configuration, restart the affected development server.
+* **Quickly kill the port**:
+  Use `npx kill-port` to automatically terminate any processes occupying the dev ports:
+  ```bash
+  npx kill-port 5173 5000
+  ```
+* **Manually find and kill the process**:
+  * **Windows (PowerShell):**
+    ```powershell
+    # Find process ID (PID) using the port
+    Get-NetTCPConnection -LocalPort 5173 | Select-Object OwningProcess
+    # Kill the process
+    Stop-Process -Id <PID> -Force
+    ```
+  * **Linux/macOS (Terminal):**
+    ```bash
+    # Find PID using the port
+    lsof -i :5173
+    # Kill the process
+    kill -9 <PID>
+    ```
 
 ---
 
-### 5. Docker containers fail to start
+### 3. Missing `.env` / Environment Variable Issues on Startup
+The backend will immediately crash or exit if required variables (like `JWT_SECRET`) are missing or incorrectly configured.
 
-If Docker containers fail to start, first make sure Docker is running.
-
-Check the Docker and Docker Compose versions:
-
-```bash
-docker --version
-docker-compose --version
-```
-
-Check the status of the containers:
-
-```bash
-docker-compose ps
-```
-
-View the container logs to identify the cause of the failure:
-
-```bash
-docker-compose logs
-```
-
-If existing containers are causing conflicts, stop them and start the services again:
-
-```bash
-docker-compose down
-docker-compose up --build
-```
+* **Verify `.env` exists**:
+  Check that you copied `.env.example` to `.env` in the `backend/` directory:
+  ```bash
+  # Linux/macOS
+  cp backend/.env.example backend/.env
+  # Windows PowerShell
+  Copy-Item backend/.env.example backend/.env
+  ```
+* **Set Required Variables**:
+  Make sure `JWT_SECRET` is set to a long, random string in `backend/.env`.
 
 ---
 
-### 6. Backend API is not reachable from the frontend
+### 4. Dependencies fail to install / npm Cache Errors
+This occurs due to outdated Node.js versions, corrupted npm cache, or package conflicts.
 
-If the frontend loads but API requests fail:
+* **Clear npm cache & reinstall**:
+  ```bash
+  npm cache clean --force
+  npm install
+  ```
+* **Verify Node.js version**:
+  Ensure you are using Node v18.x or v20.x:
+  ```bash
+  node --version
+  ```
 
-* Make sure the backend server is running.
-* Verify that the backend is available at `http://localhost:5000`.
-* Check that the frontend API configuration points to the correct backend URL.
-* Open the browser Developer Tools and check the **Console** and **Network** tabs for failed API requests.
+---
 
-If the API URL is incorrect, update the frontend API configuration to use the correct backend address and restart the frontend development server.
+### 5. Docker: `port is already allocated` or Volume Mount Issues on Windows
+This occurs when local services (like a native PostgreSQL database) are using port `5432`, or due to file sharing path permissions in Docker Desktop.
+
+* **Stop native local services**:
+  * Stop local PostgreSQL so the Docker PostgreSQL container can bind to port `5432`:
+    ```powershell
+    # Windows PowerShell
+    Stop-Service postgresql*
+    ```
+    ```bash
+    # Linux/macOS
+    sudo systemctl stop postgresql
+    ```
+* **Line ending errors in Docker (`\r: command not found`)**:
+  If shell scripts fail inside the container, configure git to preserve LF line endings and re-clone/re-normalize:
+  ```bash
+  git config --global core.autocrlf input
+  git add --renormalize .
+  git checkout-index --force --all
+  ```
+* **WSL2 Setup and Mounting Details**:
+  For comprehensive WSL2 configurations, volume mounting, and file system speed enhancements on Windows, see the [Windows Setup & Docker Troubleshooting Guide](./docs/setup-guide.md#windows-setup-via-wsl2-recommended).
+
+---
+
+### 7. Windows & Docker specific issues (Line endings & WSL2)
+
+If you are running Docker on Windows and encounter execution errors (like `\r: command not found` in shell scripts) or hot-reloading volume mounting issues, please refer to the dedicated [Windows Setup & Docker Troubleshooting Guide](./docs/setup-guide.md#windows-setup-via-wsl2-recommended) in our documentation.
 
 ---
 

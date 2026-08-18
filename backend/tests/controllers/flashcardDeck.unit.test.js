@@ -3,6 +3,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const flashcardDeckRoutes = require('../../routes/flashcardDeckRoutes');
 const shareRoutes = require('../../routes/shareRoutes');
+const publicDeckRoutes = require('../../routes/publicDeckRoutes');
 const errorHandler = require('../../middleware/error');
 const User = require('../../models/User');
 const Subject = require('../../models/Subject');
@@ -14,6 +15,7 @@ const app = express();
 app.use(express.json());
 app.use('/api/flashcard-decks', flashcardDeckRoutes);
 app.use('/api/share', shareRoutes);
+app.use('/api/decks', publicDeckRoutes);
 app.use(errorHandler);
 
 describe('Flashcard Deck Sharing & Cloning API', () => {
@@ -172,5 +174,139 @@ describe('Flashcard Deck Sharing & Cloning API', () => {
 
     expect(res.status).toBe(404);
     expect(res.body.error).toContain('not found');
+  });
+
+  it('should allow owner to update deck visibility to public', async () => {
+    const deck = await FlashcardDeck.create({
+      name: 'Test Deck',
+      subject: testSubject.id,
+      user: testUser.id,
+      isPublic: false,
+    });
+
+    await Flashcard.create({
+      user: testUser.id,
+      subject: testSubject.id,
+      front: 'Q',
+      back: 'A',
+      deckId: deck.id,
+    });
+
+    const res = await request(app)
+      .patch(`/api/flashcard-decks/${deck.id}/visibility`)
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({ isPublic: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.isPublic).toBe(true);
+    expect(res.body.data.shareToken).toBeDefined();
+  });
+
+  it('should allow owner to update deck visibility to private', async () => {
+    const deck = await FlashcardDeck.create({
+      name: 'Test Deck',
+      subject: testSubject.id,
+      user: testUser.id,
+      isPublic: true,
+      shareToken: '123e4567-e89b-12d3-a456-426614174000',
+    });
+
+    const res = await request(app)
+      .patch(`/api/flashcard-decks/${deck.id}/visibility`)
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({ isPublic: false });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.isPublic).toBe(false);
+  });
+
+  it('should reject visibility update from non-owner', async () => {
+    const deck = await FlashcardDeck.create({
+      name: 'Test Deck',
+      subject: testSubject.id,
+      user: testUser.id,
+      isPublic: false,
+    });
+
+    const res = await request(app)
+      .patch(`/api/flashcard-decks/${deck.id}/visibility`)
+      .set('Authorization', `Bearer ${peerToken}`)
+      .send({ isPublic: true });
+
+    expect(res.status).toBe(404);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('should get public deck by deck ID without authentication', async () => {
+    const deck = await FlashcardDeck.create({
+      name: 'Public Deck',
+      subject: testSubject.id,
+      user: testUser.id,
+      isPublic: true,
+      shareToken: '123e4567-e89b-12d3-a456-426614174000',
+    });
+
+    await Flashcard.create({
+      user: testUser.id,
+      subject: testSubject.id,
+      front: 'Public Q',
+      back: 'Public A',
+      deckId: deck.id,
+    });
+
+    const res = await request(app)
+      .get(`/api/decks/shared/${deck.id}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.deck.id).toBe(deck.id);
+    expect(res.body.data.deck.name).toBe('Public Deck');
+    expect(res.body.data.cards).toHaveLength(1);
+    expect(res.body.data.cards[0].front).toBe('Public Q');
+  });
+
+  it('should return 404 when accessing private deck by deck ID', async () => {
+    const deck = await FlashcardDeck.create({
+      name: 'Private Deck',
+      subject: testSubject.id,
+      user: testUser.id,
+      isPublic: false,
+    });
+
+    const res = await request(app)
+      .get(`/api/decks/shared/${deck.id}`);
+
+    expect(res.status).toBe(404);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toContain('not publicly accessible');
+  });
+
+  it('should return 404 when accessing non-existent deck by deck ID', async () => {
+    const res = await request(app)
+      .get('/api/decks/shared/00000000-0000-0000-0000-000000000000');
+
+    expect(res.status).toBe(404);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toContain('not found');
+  });
+
+  it('should prevent making empty deck public', async () => {
+    const deck = await FlashcardDeck.create({
+      name: 'Empty Deck',
+      subject: testSubject.id,
+      user: testUser.id,
+      isPublic: false,
+    });
+
+    const res = await request(app)
+      .patch(`/api/flashcard-decks/${deck.id}/visibility`)
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({ isPublic: true });
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toContain('empty deck');
   });
 });

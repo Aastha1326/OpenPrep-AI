@@ -1,10 +1,18 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { splitSentences } from '../utils/textUtils';
+import { splitSentences, findSentenceAt } from '../utils/textUtils';
 
 const DEFAULT_RATES = [1, 1.25, 1.5];
 
 const supportsSpeech = () =>
   typeof window !== 'undefined' && 'speechSynthesis' in window;
+
+/**
+ * The exact string handed to the speech engine. `charIndex` on a boundary
+ * event is an offset into *this*, so sentence offsets have to be derived from
+ * the same value — deriving them from the raw prop shifted every comparison by
+ * however much leading whitespace `trim()` removed.
+ */
+const toSpokenContent = (value) => (value || '').trim();
 
 export function useTextToSpeech(text, { rates = DEFAULT_RATES, initialRate = 1 } = {}) {
   const [supported] = useState(supportsSpeech);
@@ -13,12 +21,12 @@ export function useTextToSpeech(text, { rates = DEFAULT_RATES, initialRate = 1 }
   const [activeSentenceIndex, setActiveSentenceIndex] = useState(-1);
 
   const textRef = useRef(text);
-  const sentencesRef = useRef(splitSentences(text));
+  const sentencesRef = useRef(splitSentences(toSpokenContent(text)));
   const rateRef = useRef(initialRate);
 
   useEffect(() => {
     textRef.current = text;
-    sentencesRef.current = splitSentences(text);
+    sentencesRef.current = splitSentences(toSpokenContent(text));
   }, [text]);
 
   // Stop reading whenever the source text changes
@@ -42,25 +50,23 @@ export function useTextToSpeech(text, { rates = DEFAULT_RATES, initialRate = 1 }
   const speak = useCallback(() => {
     if (!supported) return;
 
-    const content = (textRef.current || '').trim();
+    const content = toSpokenContent(textRef.current);
     if (!content) return;
 
     window.speechSynthesis.cancel();
     setIsSpeaking(false);
     setActiveSentenceIndex(-1);
 
+    // Re-derive from `content` rather than trusting the ref: `speak` can be
+    // called in the same tick as a text change, before the effect has run.
+    const sentences = splitSentences(content);
+    sentencesRef.current = sentences;
+
     const utterance = new SpeechSynthesisUtterance(content);
     utterance.rate = rateRef.current;
     utterance.onboundary = (event) => {
-      const sentences = sentencesRef.current;
-      for (let i = 0; i < sentences.length; i += 1) {
-        const sentence = sentences[i];
-        if (event.charIndex >= sentence.start && event.charIndex <= sentence.end) {
-          setActiveSentenceIndex(i);
-          return;
-        }
-      }
-      if (sentences.length > 0) setActiveSentenceIndex(sentences.length - 1);
+      const index = findSentenceAt(sentencesRef.current, event.charIndex);
+      if (index >= 0) setActiveSentenceIndex(index);
     };
     const finish = () => {
       setIsSpeaking(false);
