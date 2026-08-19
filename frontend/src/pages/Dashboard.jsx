@@ -39,6 +39,7 @@ import API from '../services/api';
 import { toDateOnlyString } from '../utils/dateUtils';
 import SkillTree from '../components/dashboard/SkillTree';
 import ModelViewer from '../components/dashboard/ModelViewer';
+import StudyTimetable from '../components/dashboard/StudyTimetable';
 import {
   LineChart,
   Line,
@@ -347,6 +348,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isSkillTreeOpen, setIsSkillTreeOpen] = useState(false);
   const [isModelViewerOpen, setIsModelViewerOpen] = useState(false);
+  const [isTimetableOpen, setIsTimetableOpen] = useState(false);
   const [showLevelUpModal, setShowLevelUpModal] = useState(false);
   const [levelUpLevel, setLevelUpLevel] = useState(null);
   const [prevLevel, setPrevLevel] = useState(null);
@@ -515,6 +517,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             onClick={() => setIsPyqModalOpen(true)}
           />
           <GoldTabButton icon={Box} label="3D Anatomy" delay={0.25} onClick={() => setIsModelViewerOpen(true)} />
+          <GoldTabButton icon={Calendar} label="Timetable DnD" delay={0.3} onClick={() => setIsTimetableOpen(true)} />
         <GoldTabButton
           icon={Calendar}
           label="Study Plan"
@@ -1361,6 +1364,13 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
       <AnimatePresence>
         {isModelViewerOpen && (
           <ModelViewer onClose={() => setIsModelViewerOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* --- TIMETABLE DND MVP --- */}
+      <AnimatePresence>
+        {isTimetableOpen && (
+          <StudyTimetable onClose={() => setIsTimetableOpen(false)} />
         )}
       </AnimatePresence>
 
