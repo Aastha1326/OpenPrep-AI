@@ -39,6 +39,13 @@ export const ThemeProvider = ({ children }) => {
     }
   };
 
+  const toggleTheme = () => {
+    setThemeState((prevTheme) => {
+      const currentResolved = prevTheme === 'system' ? (systemDark ? 'dark' : 'light') : prevTheme;
+      return currentResolved === 'dark' ? 'light' : 'dark';
+    });
+  };
+
   // Listen for OS system preference changes (used while theme === 'system')
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
@@ -79,7 +86,7 @@ export const ThemeProvider = ({ children }) => {
   }, [theme, resolvedTheme]);
 
   return (
-    <ThemeContext.Provider value={{ theme, resolvedTheme, setTheme }}>
+    <ThemeContext.Provider value={{ theme, resolvedTheme, setTheme, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   );

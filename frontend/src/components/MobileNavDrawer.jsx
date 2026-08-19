@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
 import NotificationBell from './notifications/NotificationBell';
+import ThemeToggle from './ThemeToggle';
 
 const NAV_LINKS = [
   { to: '/dashboard', label: 'Dashboard', preload: () => import('../pages/Dashboard') },
@@ -29,6 +30,7 @@ const MobileNavDrawer = () => {
 
   return (
     <div className="md:hidden flex items-center gap-3 fixed top-4 right-4 z-[60]">
+      <ThemeToggle />
       <div className="bg-slate-800 rounded-full border border-slate-700/50">
         <NotificationBell />
       </div>
