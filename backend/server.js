@@ -327,6 +327,10 @@ app.get('/healthz', (req, res) => {
   res.status(200).send('OK');
 });
 
+app.get('/api/test-error', (req, res) => {
+  throw new Error('Test error for Sentry verification');
+});
+
 // Swagger UI Documentation & Spec endpoints
 const swaggerEnabled = process.env.SWAGGER_ENABLED === 'true' || process.env.NODE_ENV !== 'production';
 
@@ -465,3 +469,4 @@ const gracefulShutdown = (signal) => {
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
