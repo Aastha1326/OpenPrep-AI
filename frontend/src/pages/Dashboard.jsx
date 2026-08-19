@@ -34,10 +34,15 @@ import {
   Brain,
   Bot,
   Users,
+  Swords,
 } from 'lucide-react';
 import API from '../services/api';
 import { toDateOnlyString } from '../utils/dateUtils';
 import SkillTree from '../components/dashboard/SkillTree';
+import ModelViewer from '../components/dashboard/ModelViewer';
+import StudyTimetable from '../components/dashboard/StudyTimetable';
+import FocusRoom from '../components/dashboard/FocusRoom';
+import QuizBattleArena from '../components/dashboard/QuizBattleArena';
 import {
   LineChart,
   Line,
@@ -80,7 +85,7 @@ import StreakWidget from '../components/gamification/StreakWidget';
 import BadgeCard from '../components/gamification/BadgeCard';
 
 // Lazy-loaded heavy modal components for bundle size reduction
-const CreateNoteModal = lazy(() => import('../components/dashboard/CreateNoteModal'));
+const RichTextEditor = lazy(() => import('../components/dashboard/RichTextEditor'));
 const StudyPlanModal = lazy(() => import('../components/dashboard/StudyPlanModal'));
 const PyqAnalysisModal = lazy(() => import('../components/dashboard/PyqAnalysisModal'));
 const CompositeBundleModal = lazy(() => import('../components/dashboard/CompositeBundleModal'));
@@ -345,6 +350,10 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [sessionStartTime] = useState(Date.now());
   const [isExporting, setIsExporting] = useState(false);
   const [isSkillTreeOpen, setIsSkillTreeOpen] = useState(false);
+  const [isModelViewerOpen, setIsModelViewerOpen] = useState(false);
+  const [isTimetableOpen, setIsTimetableOpen] = useState(false);
+  const [isFocusRoomOpen, setIsFocusRoomOpen] = useState(false);
+  const [isBattleOpen, setIsBattleOpen] = useState(false);
   const [showLevelUpModal, setShowLevelUpModal] = useState(false);
   const [levelUpLevel, setLevelUpLevel] = useState(null);
   const [prevLevel, setPrevLevel] = useState(null);
@@ -499,19 +508,23 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   return (
     <LeatherBoard>
       {/* --- QUICK ACTIONS TABS --- */}
-      <div className="absolute -left-4 top-24 flex-col gap-4 z-30 hidden md:flex">
-        <GoldTabButton
+        <div className="absolute -left-4 top-24 flex-col gap-4 z-30 hidden md:flex">
+          <GoldTabButton icon={Swords} label="Battle Arena" delay={0.05} onClick={() => setIsBattleOpen(true)} />
+          <GoldTabButton
           icon={Play}
           label="Start Quiz"
           delay={0.1}
           onClick={() => setIsQuizSetupOpen(true)}
         />
-        <GoldTabButton
-          icon={FileText}
-          label="PYQ Intelligence"
-          delay={0.2}
-          onClick={() => navigate('/pyqs')}
-        />
+          <GoldTabButton
+            icon={FileText}
+            label="PYQ Intelligence"
+            delay={0.2}
+            onClick={() => setIsPyqModalOpen(true)}
+          />
+          <GoldTabButton icon={Box} label="3D Anatomy" delay={0.25} onClick={() => setIsModelViewerOpen(true)} />
+          <GoldTabButton icon={Calendar} label="Timetable DnD" delay={0.3} onClick={() => setIsTimetableOpen(true)} />
+          <GoldTabButton icon={Headphones} label="Lofi Room" delay={0.45} onClick={() => setIsFocusRoomOpen(true)} />
         <GoldTabButton
           icon={Calendar}
           label="Study Plan"
@@ -1230,13 +1243,13 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             </p>
           </VintagePaper>
         </div>
-{/* --- CREATE NOTE MODAL --- */}
-      <Suspense fallback={null}>
-        <CreateNoteModal
-          isOpen={isNoteModalOpen}
-          onClose={() => setIsNoteModalOpen(false)}
-          onNoteCreated={() => setIsNoteModalOpen(false)}
-        />
+  {/* --- RICH TEXT EDITOR (AI MVP) --- */}
+        <Suspense fallback={null}>
+          <AnimatePresence>
+            {isNoteModalOpen && (
+              <RichTextEditor onClose={() => setIsNoteModalOpen(false)} />
+            )}
+          </AnimatePresence>
 
       {/* --- YOUTUBE FLASHCARD DECK MODAL --- */}
       {isYoutubeFlashcardModalOpen && (
@@ -1351,6 +1364,34 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
       <AnimatePresence>
         {isSkillTreeOpen && (
           <SkillTree onClose={() => setIsSkillTreeOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* --- MODEL VIEWER (3D MVP) --- */}
+      <AnimatePresence>
+        {isModelViewerOpen && (
+          <ModelViewer onClose={() => setIsModelViewerOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* --- TIMETABLE DND MVP --- */}
+      <AnimatePresence>
+        {isTimetableOpen && (
+          <StudyTimetable onClose={() => setIsTimetableOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* --- LOFI FOCUS ROOM MVP --- */}
+      <AnimatePresence>
+        {isFocusRoomOpen && (
+          <FocusRoom onClose={() => setIsFocusRoomOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* --- QUIZ BATTLE ARENA MVP --- */}
+      <AnimatePresence>
+        {isBattleOpen && (
+          <QuizBattleArena onClose={() => setIsBattleOpen(false)} />
         )}
       </AnimatePresence>
 
