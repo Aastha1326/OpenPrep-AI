@@ -10,6 +10,7 @@ import MobileNavDrawer from './components/MobileNavDrawer';
 import PageSkeleton from './components/PageSkeleton';
 import SessionTimeoutModal from './components/SessionTimeoutModal';
 import QuotaExceededModal from './components/dashboard/QuotaExceededModal';
+import MobileBottomNav from './components/common/MobileBottomNav';
 import './App.css';
 
 const Landing = lazy(() => import('./pages/Landing'));
@@ -212,6 +213,7 @@ function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
+      <MobileBottomNav />
     </>
   );
 }
