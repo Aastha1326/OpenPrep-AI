@@ -67,9 +67,9 @@ describe('AudioReader', () => {
     expect(utterances[0].rate).toBe(1);
   });
 
-  it('cycles the reading speed between 1x, 1.25x and 1.5x', () => {
+  it('cycles the reading speed between 0.5x, 1x, 1.25x and 1.5x', () => {
     setupSpeech();
-    render(<AudioReader text="Speed control test." />);
+    render(<AudioReader text="Speed control test." initialRate={1} rates={[0.5, 1, 1.25, 1.5]} />);
 
     expect(screen.getByLabelText('Speech rate: 1x')).toBeInTheDocument();
 
@@ -80,7 +80,7 @@ describe('AudioReader', () => {
     expect(screen.getByLabelText('Speech rate: 1.5x')).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText('Speech rate: 1.5x'));
-    expect(screen.getByLabelText('Speech rate: 1x')).toBeInTheDocument();
+    expect(screen.getByLabelText('Speech rate: 0.5x')).toBeInTheDocument();
   });
 
   it('restarts speech with the new rate when speed changes while reading', () => {
