@@ -243,7 +243,11 @@ Syllabus.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 Syllabus.hasMany(SyllabusTopic, { foreignKey: 'syllabusId', onDelete: 'CASCADE' });
 SyllabusTopic.belongsTo(Syllabus, { foreignKey: 'syllabusId', as: 'syllabusRef' });
 
-SyllabusTopic.belongsTo(Note, { foreignKey: 'linkedNoteId', as: 'linkedNote', onDelete: 'SET NULL' });
+// DeckRating associations
+DeckRating.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+User.hasMany(DeckRating, { foreignKey: 'userId', as: 'ratings', onDelete: 'CASCADE' });
+DeckRating.belongsTo(Subject, { foreignKey: 'deckId', as: 'deckRef', onDelete: 'CASCADE' });
+Subject.hasMany(DeckRating, { foreignKey: 'deckId', as: 'ratings', onDelete: 'CASCADE' });
 
 module.exports = {  sequelize,  User,  Exam,
   Subject,
