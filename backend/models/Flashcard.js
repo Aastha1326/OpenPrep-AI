@@ -50,6 +50,30 @@ const Flashcard = sequelize.define(
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
     },
+    tags: {
+      type: DataTypes.ARRAY(DataTypes.STRING),
+      defaultValue: [],
+    },
+    difficulty: {
+      type: DataTypes.ENUM('Easy', 'Medium', 'Hard'),
+      allowNull: true,
+    },
+    hint: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    sourceUrl: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    timestampSeconds: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    deckId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
   },
   {
     timestamps: true,
@@ -70,8 +94,36 @@ const Flashcard = sequelize.define(
         name: 'flashcard_user_subject_idx',
         fields: ['user', 'subject'],
       },
+      {
+        name: 'idx_flashcards_user_next_review',
+        fields: ['user', 'nextReviewDate'],
+      },
+      {
+        name: 'idx_flashcards_user_topic',
+        fields: ['user', 'topic'],
+      },
     ],
   }
 );
+
+const cacheManager = require('../utils/cacheManager');
+
+Flashcard.afterSave(async (flashcard, options) => {
+  try {
+    const pattern = `user_${flashcard.user}:*`;
+    await cacheManager.invalidate(pattern);
+  } catch (err) {
+    console.error('Error invalidating cache after Flashcard save:', err);
+  }
+});
+
+Flashcard.afterDestroy(async (flashcard, options) => {
+  try {
+    const pattern = `user_${flashcard.user}:*`;
+    await cacheManager.invalidate(pattern);
+  } catch (err) {
+    console.error('Error invalidating cache after Flashcard destroy:', err);
+  }
+});
 
 module.exports = Flashcard;

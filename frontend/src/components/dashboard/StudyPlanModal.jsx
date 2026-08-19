@@ -1,11 +1,108 @@
 import { useRef, useState, useMemo, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Download, Calendar as CalendarIcon, CheckCircle, Circle, AlertTriangle, ClockPlus, Filter, Plus, RefreshCw, AlertCircle } from 'lucide-react';
+import {
+  X,
+  Download,
+  Calendar as CalendarIcon,
+  CheckCircle,
+  Circle,
+  AlertTriangle,
+  ClockPlus,
+  Filter,
+  Plus,
+  RefreshCw,
+  AlertCircle,
+  CalendarDays,
+  GanttChartSquare,
+  List,
+  Gauge,
+  Sparkles,
+  Loader,
+} from 'lucide-react';
+import CalendarExportDropdown from '../CalendarExportDropdown';
 import html2pdf from 'html2pdf.js';
 import API from '../../services/api';
+import { toLocalDateString, formatDateOnly } from '../../utils/dateUtils';
+import StudyPlanGanttView from './StudyPlanGanttView';
+import StudyPlanCalendarView from './StudyPlanCalendarView';
+import { downloadCertificate } from '../../services/reportService';
+
+const MILESTONE_TYPE_LABELS = {
+  weekly_checkpoint: 'Weekly Checkpoint',
+  mid_course_review: 'Mid-Course Review',
+  final_review: 'Final Review',
+  exam_day: 'Target Exam',
+};
+
+const MilestoneBadge = ({ date, status }) => {
+  if (status === 'completed') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-800 border border-green-200 shadow-sm">
+        <CheckCircle className="w-4 h-4" />
+        Completed
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-[#8B4513]/10 text-[#8B4513] border border-[#8B4513]/20 shadow-sm">
+      <CalendarIcon className="w-4 h-4" />
+      {formatDateOnly(date)}
+    </span>
+  );
+};
+
+const MilestonesSection = ({ milestones }) => (
+  <div className="mt-12 mb-8">
+    <div className="flex items-center gap-2 mb-6 border-b border-[#8B4513]/20 pb-2">
+      <Sparkles className="w-6 h-6 text-yellow-600" />
+      <h3 className="text-2xl font-bold font-playfair text-[#3E2723]">
+        Milestones & Checkpoints
+      </h3>
+    </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {milestones.map((m) => (
+        <div
+          key={m.id}
+          className="bg-white rounded-md border border-[#8B4513]/20 p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group"
+        >
+          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:scale-110 transition-transform">
+            <Sparkles className="w-24 h-24" />
+          </div>
+          <div className="flex justify-between items-start mb-3 relative z-10">
+            <div>
+              <span className="inline-block px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-[#8B4513]/5 text-[#8B4513]/70 mb-2">
+                {MILESTONE_TYPE_LABELS[m.type] || 'Milestone'}
+              </span>
+              <h4 className="text-lg font-bold text-neutral-800 font-playfair">
+                {m.title}
+              </h4>
+            </div>
+            <MilestoneBadge date={m.date} status={m.status} />
+          </div>
+          <p className="text-sm text-neutral-600 relative z-10">
+            {m.description}
+          </p>
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 // Create Study Plan Form Component
-const CreateStudyPlanForm = ({ onClose, onSubmit, loading, error, formData, handleInputChange, minStartDate, minEndDate, exams }) => (
+const CreateStudyPlanForm = ({
+  onClose,
+  onSubmit,
+  loading,
+  error,
+  formData,
+  handleInputChange,
+  minStartDate,
+  minEndDate,
+  exams,
+  prefillExamName,
+  isAiDisabled,
+}) => (
   <div className="max-w-xl mx-auto">
     <div className="flex items-center justify-between mb-6">
       <h3 className="text-2xl font-bold font-playfair text-[#3E2723]">Create Study Plan</h3>
@@ -25,6 +122,23 @@ const CreateStudyPlanForm = ({ onClose, onSubmit, loading, error, formData, hand
         </div>
       )}
 
+      {isAiDisabled && (
+        <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-750 dark:text-red-200 text-sm rounded flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>AI creation is temporarily disabled due to rate limits/quota exhaustion.</span>
+        </div>
+      )}
+
+      {prefillExamName && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm rounded flex items-start gap-2">
+          <Sparkles className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>
+            Prefilled from imported syllabus: <span className="font-semibold">{prefillExamName}</span>. Adjust the
+            dates if needed.
+          </span>
+        </div>
+      )}
+
       <div>
         <label className="block text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
           Select Exam
@@ -40,7 +154,7 @@ const CreateStudyPlanForm = ({ onClose, onSubmit, loading, error, formData, hand
           ) : (
             exams.map((exam) => (
               <option key={exam.id} value={exam.id}>
-                {exam.name} ({exam.date ? new Date(exam.date).toLocaleDateString() : 'No date'})
+                {exam.name} ({exam.date ? formatDateOnly(exam.date) : 'No date'})
               </option>
             ))
           )}
@@ -103,7 +217,7 @@ const CreateStudyPlanForm = ({ onClose, onSubmit, loading, error, formData, hand
         </button>
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || isAiDisabled}
           className="px-6 py-2 bg-gradient-to-r from-yellow-600 to-yellow-700 text-white rounded shadow hover:shadow-lg font-medium transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? (
@@ -145,15 +259,31 @@ const BumpTimeButton = ({ onClick, disabled = false }) => (
   </button>
 );
 
-const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated, onPlanUpdate }) => {
+const StudyPlanModal = ({
+  isOpen,
+  onClose,
+  activePlan,
+  onBumpTime,
+  onPlanCreated,
+  onPlanUpdate,
+  syllabusPrefill,
+}) => {
+  const { aiQuotaExceededUntil } = useSelector((state) => state.auth);
+  const isAiDisabled = !!(aiQuotaExceededUntil && Date.now() < aiQuotaExceededUntil);
+
   const contentRef = useRef(null);
   const [isExporting, setIsExporting] = useState(false);
-  const [isRescheduling, setIsRescheduling] = useState(false);
-  const [rescheduleMessage, setRescheduleMessage] = useState(null);
+  const [isExportingServerPdf, setIsExportingServerPdf] = useState(false);
+  const [exportPdfError, setExportPdfError] = useState(null);
+  const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
+const [isRescheduling, setIsRescheduling] = useState(false);
+  const [isRebalancing, setIsRebalancing] = useState(false);  const [rescheduleMessage, setRescheduleMessage] = useState(null);
   const [showWeakOnly, setShowWeakOnly] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'timeline' | 'calendar'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [prefillConsumed, setPrefillConsumed] = useState(false);
   const [formData, setFormData] = useState({
     examId: '',
     startDate: '',
@@ -161,6 +291,8 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
     studyHoursPerDay: 3,
   });
   const [exams, setExams] = useState([]);
+
+  const createFormVisible = showCreateForm || !activePlan;
 
   const dailyGoals = useMemo(() => activePlan?.dailyGoals || [], [activePlan?.dailyGoals]);
 
@@ -172,7 +304,7 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
     }));
   }, [dailyGoals, showWeakOnly]);
 
-  const totalWeakCount = useMemo(() => {
+const totalWeakCount = useMemo(() => {
     let count = 0;
     dailyGoals.forEach((day) => {
       (day.tasks || []).forEach((task) => {
@@ -182,16 +314,23 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
     return count;
   }, [dailyGoals]);
 
+  const completionForecast = activePlan?.completionForecast || null;
   // Fetch exams when create form is shown
   useEffect(() => {
-    if (showCreateForm && exams.length === 0) {
+    if (createFormVisible && exams.length === 0) {
       const fetchExams = async () => {
         try {
           const res = await API.get('/academic/exams');
           const fetchedExams = Array.isArray(res.data?.data) ? res.data.data : [];
           setExams(fetchedExams);
           if (fetchedExams.length > 0) {
-            setFormData((prev) => ({ ...prev, examId: fetchedExams[0].id }));
+            setFormData((prev) => {
+              // Keep a prefilled exam from the syllabus import if present
+              if (prev.examId && fetchedExams.some((e) => e.id === prev.examId)) {
+                return prev;
+              }
+              return { ...prev, examId: fetchedExams[0].id };
+            });
           }
         } catch (err) {
           console.error('Failed to load exams:', err);
@@ -199,7 +338,25 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
       };
       fetchExams();
     }
-  }, [showCreateForm, exams.length]);
+  }, [createFormVisible, exams.length]);
+
+  // Apply the syllabus import prefill to the create form once
+  useEffect(() => {
+    if (createFormVisible && syllabusPrefill && !prefillConsumed) {
+      const today = toLocalDateString(new Date());
+      const examDate =
+        syllabusPrefill.examDate && syllabusPrefill.examDate >= today
+          ? syllabusPrefill.examDate
+          : '';
+      setFormData((prev) => ({
+        ...prev,
+        examId: syllabusPrefill.examId || prev.examId,
+        startDate: today,
+        endDate: examDate || prev.endDate,
+      }));
+      setPrefillConsumed(true);
+    }
+  }, [createFormVisible, syllabusPrefill, prefillConsumed]);
 
   // Reset form when modal closes
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
@@ -208,37 +365,134 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
     if (!isOpen) {
       setShowCreateForm(false);
       setError(null);
+      setPrefillConsumed(false);
       setFormData({ examId: '', startDate: '', endDate: '', studyHoursPerDay: 3 });
     }
   }
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (!contentRef.current) return;
     setIsExporting(true);
 
-    const element = contentRef.current;
-    
-    const opt = {
-      margin: 10,
-      filename: 'My_Study_Plan.pdf',
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
+    try {
+      const { default: html2pdf } = await import('html2pdf.js');
 
-    html2pdf()
-      .set(opt)
-      .from(element)
-      .save()
-      .then(() => {
-        setIsExporting(false);
-      })
-      .catch(err => {
-        console.error('PDF export failed:', err);
-        setIsExporting(false);
-      });
+      const element = contentRef.current;
+
+      const opt = {
+        margin: 10,
+        filename: 'My_Study_Plan.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      };
+
+      await html2pdf().set(opt).from(element).save();
+    } catch (err) {
+      console.error('PDF export failed:', err);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
+  // Issue #1056: Server-side study plan PDF export
+  const handleExportServerPdf = async () => {
+    if (!activePlan?.id) return;
+    setIsExportingServerPdf(true);
+    setExportPdfError(null);
+    try {
+      const response = await API.get(`/study-plans/${activePlan.id}/export-pdf`, {
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const dateStr = new Date().toISOString().split('T')[0];
+      link.setAttribute('download', `openprep-studyplan-${dateStr}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Server PDF export failed:', err);
+      setExportPdfError('Failed to export PDF. Please try again.');
+      setTimeout(() => setExportPdfError(null), 5000);
+    } finally {
+      setIsExportingServerPdf(false);
+    }
+  };
+
+
+const handleExportIcs = async () => {
+  if (!activePlan?.id) {
+    return;
+  }
+
+  setIsSyncingCalendar(true);
+
+  try {
+    const timeZone =
+      Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    const response = await API.get(
+      `/study-plans/${activePlan.id}/export-ics`,
+      {
+        responseType: 'blob',
+        headers: {
+          'x-timezone': timeZone,
+        },
+      }
+    );
+
+    const blob = new Blob(
+      [response.data],
+      {
+        type: 'text/calendar;charset=utf-8',
+      }
+    );
+
+    const url =
+      window.URL.createObjectURL(blob);
+
+    const link =
+      document.createElement('a');
+
+    link.href = url;
+
+    link.setAttribute(
+      'download',
+      `study-plan-${activePlan.id}.ics`
+    );
+
+    document.body.appendChild(link);
+
+    link.click();
+
+    link.parentNode.removeChild(link);
+
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error(
+      'iCal export failed:',
+      err
+    );
+
+    setRescheduleMessage({
+      type: 'error',
+      text:
+        err.response?.data?.error ||
+        'Failed to export calendar .ics file',
+    });
+
+    setTimeout(
+      () => setRescheduleMessage(null),
+      4000
+    );
+  } finally {
+    setIsSyncingCalendar(false);
+  }
+};
   const handleReschedule = async () => {
     if (!activePlan?.id) return;
 
@@ -247,12 +501,46 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
 
     try {
       const response = await API.post(`/study-plans/${activePlan.id}/reschedule`, {
-        useAIRebalance: false
+        useAIRebalance: false,
       });
 
       setRescheduleMessage({
         type: 'success',
-        text: response.data.message || 'Study plan rescheduled successfully'
+        text: response.data.message || 'Study plan rescheduled successfully',
+      });
+
+      // Notify parent component to refresh the plan
+      if (onPlanUpdate) {
+        onPlanUpdate();
+      }
+
+      setTimeout(() => setRescheduleMessage(null), 4000);
+} catch (error) {
+      console.error('Reschedule failed:', error);
+      setRescheduleMessage({
+        type: 'error',
+        text: error.response?.data?.error || 'Failed to reschedule study plan',
+      });
+      setTimeout(() => setRescheduleMessage(null), 4000);
+    } finally {
+      setIsRescheduling(false);
+    }
+  };
+
+  const handleRebalance = async () => {
+    if (!activePlan?.id) return;
+
+    setIsRebalancing(true);
+    setRescheduleMessage(null);
+
+    try {
+      const response = await API.post('/study-plans/rebalance', {
+        examId: activePlan.exam?.id,
+      });
+
+      setRescheduleMessage({
+        type: 'success',
+        text: response.data.message || 'Study plan rebalanced successfully',
       });
 
       // Notify parent component to refresh the plan
@@ -262,19 +550,18 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
 
       setTimeout(() => setRescheduleMessage(null), 4000);
     } catch (error) {
-      console.error('Reschedule failed:', error);
+      console.error('Rebalance failed:', error);
       setRescheduleMessage({
         type: 'error',
-        text: error.response?.data?.error || 'Failed to reschedule study plan'
+        text: error.response?.data?.error || 'Failed to rebalance study plan',
       });
       setTimeout(() => setRescheduleMessage(null), 4000);
     } finally {
-      setIsRescheduling(false);
+      setIsRebalancing(false);
     }
   };
 
-  const handleInputChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+  const handleInputChange = (field, value) => {    setFormData((prev) => ({ ...prev, [field]: value }));
     if (field === 'startDate' && value) {
       // Ensure endDate is not before startDate
       setFormData((prev) => {
@@ -320,7 +607,7 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
     }
   };
 
-  const minStartDate = new Date().toISOString().split('T')[0];
+  const minStartDate = toLocalDateString(new Date());
   const minEndDate = formData.startDate || minStartDate;
 
   const showForm = showCreateForm || !activePlan;
@@ -358,27 +645,68 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
                   <h2 className="text-3xl font-bold font-playfair text-[#3E2723]">Study Plan</h2>
                   {totalWeakCount > 0 && (
                     <p className="text-xs text-[#8B4513]/70 mt-0.5">
-                      {totalWeakCount} weak topic{totalWeakCount === 1 ? '' : 's'} flagged — prioritize these!
+                      {totalWeakCount} weak topic{totalWeakCount === 1 ? '' : 's'} flagged —
+                      prioritize these!
                     </p>
                   )}
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-3">
-                {!showForm && (
+                {!showForm && activePlan && (
                   <>
+                    <CalendarExportDropdown 
+                      activePlanId={activePlan.id}
+                      isSyncingCalendar={isSyncingCalendar}
+                      setIsSyncingCalendar={setIsSyncingCalendar}
+                      onExportIcs={handleExportIcs}
+                    />
+                    {/* Issue #1056: Export study plan as server-rendered PDF */}
+                    <button
+                      onClick={handleExportServerPdf}
+                      disabled={isExportingServerPdf}
+                      aria-label="Export study plan as PDF"
+                      className="flex items-center space-x-2 bg-gradient-to-r from-emerald-700 to-emerald-900 text-white px-4 py-2 rounded-sm hover:from-emerald-600 hover:to-emerald-800 transition-colors disabled:opacity-50 cursor-pointer"
+                      title="Download a printable PDF of your study plan"
+                    >
+                      {isExportingServerPdf
+                        ? <Loader className="w-4 h-4 animate-spin" />
+                        : <Download className="w-4 h-4" />}
+                      <span className="font-semibold">
+                        {isExportingServerPdf ? 'Exporting...' : 'Export PDF'}
+                      </span>
+                    </button>
+                    {exportPdfError && (
+                      <span className="text-xs text-red-600 font-semibold">{exportPdfError}</span>
+                    )}
                     <button
                       onClick={handleReschedule}
                       disabled={isRescheduling}
                       className="flex items-center space-x-2 bg-gradient-to-r from-blue-700 to-blue-900 text-white px-4 py-2 rounded-sm hover:from-blue-600 hover:to-blue-800 transition-colors disabled:opacity-50 cursor-pointer"
                       title="Reschedule overdue tasks"
                     >
-                      <RefreshCw className={`w-5 h-5 ${isRescheduling ? 'animate-spin' : ''}`} />
-                      <span className="font-semibold">{isRescheduling ? 'Rescheduling...' : 'Reschedule Tasks'}</span>
+<RefreshCw className={`w-5 h-5 ${isRescheduling ? 'animate-spin' : ''}`} />
+                      <span className="font-semibold">
+                        {isRescheduling ? 'Rescheduling...' : 'Reschedule Tasks'}
+                      </span>
+                    </button>
+                    <button
+                      onClick={handleRebalance}
+                      disabled={isRebalancing}
+                      className={`flex items-center space-x-2 px-4 py-2 rounded-sm text-white transition-colors disabled:opacity-50 cursor-pointer ${
+                        completionForecast?.atRisk
+                          ? 'bg-gradient-to-r from-red-600 to-red-800 hover:from-red-500 hover:to-red-700'
+                          : 'bg-gradient-to-r from-purple-700 to-purple-900 hover:from-purple-600 hover:to-purple-800'
+                      }`}
+                      title="Evenly redistribute pending tasks across the remaining study days"
+                    >
+                      <Gauge className={`w-5 h-5 ${isRebalancing ? 'animate-spin' : ''}`} />
+                      <span className="font-semibold">
+                        {isRebalancing ? 'Rebalancing...' : 'Rebalance Schedule'}
+                      </span>
                     </button>
                     <button
                       onClick={() => setShowCreateForm(true)}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-sm text-sm font-semibold transition-colors cursor-pointer border bg-white/70 text-[#8B4513] border-[#8B4513]/30 hover:bg-white"
-                    >
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-sm text-sm font-semibold transition-colors cursor-pointer border bg-white/70 text-[#8B4513] border-[#8B4513]/30 hover:bg-white"                    >
                       <Plus className="w-4 h-4" />
                       New Plan
                     </button>
@@ -393,14 +721,73 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
                       <Filter className="w-4 h-4" />
                       {showWeakOnly ? 'Showing Weak Only' : 'Filter Weak Topics'}
                     </button>
+                    <div className="flex bg-[#ebd5b3]/40 border border-[#8B4513]/25 rounded p-0.5">
+                      <button
+                        onClick={() => setViewMode('list')}
+                        className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-bold transition-colors cursor-pointer ${
+                          viewMode === 'list'
+                            ? 'bg-[#8B4513] text-white'
+                            : 'text-[#8B4513] hover:bg-white/50'
+                        }`}
+                      >
+                        <List className="w-3.5 h-3.5" />
+                        List
+                      </button>
+                      <button
+                        onClick={() => setViewMode('timeline')}
+                        className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-bold transition-colors cursor-pointer ${
+                          viewMode === 'timeline'
+                            ? 'bg-[#8B4513] text-white'
+                            : 'text-[#8B4513] hover:bg-white/50'
+                        }`}
+                      >
+                        <GanttChartSquare className="w-3.5 h-3.5" />
+                        Timeline
+                      </button>
+                      <button
+                        onClick={() => setViewMode('calendar')}
+                        className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-bold transition-colors cursor-pointer ${
+                          viewMode === 'calendar'
+                            ? 'bg-[#8B4513] text-white'
+                            : 'text-[#8B4513] hover:bg-white/50'
+                        }`}
+                      >
+                        <CalendarDays className="w-3.5 h-3.5" />
+                        Calendar
+                      </button>
+                    </div>{' '}
                     <button
                       onClick={handleExportPDF}
                       disabled={isExporting}
                       className="flex items-center space-x-2 bg-gradient-to-r from-yellow-700 to-yellow-900 text-white px-4 py-2 rounded-sm hover:from-yellow-600 hover:to-yellow-800 transition-colors disabled:opacity-50 cursor-pointer"
                     >
                       <Download className="w-5 h-5" />
-                      <span className="font-semibold">{isExporting ? 'Exporting...' : 'Export to PDF'}</span>
+                      <span className="font-semibold">
+                        {isExporting ? 'Exporting...' : 'Export to PDF'}
+                      </span>
                     </button>
+                    {activePlan?.status === 'completed' || (completionForecast && completionForecast.progress === 100) ? (
+                      <button
+                        onClick={async () => {
+                          setIsExporting(true);
+                          try {
+                            await downloadCertificate(activePlan.id);
+                          } catch (err) {
+                            console.error(err);
+                          } finally {
+                            setIsExporting(false);
+                          }
+                        }}
+                        disabled={isExporting}
+                        className="flex items-center space-x-2 bg-gradient-to-r from-indigo-700 to-indigo-900 text-white px-4 py-2 rounded-sm hover:from-indigo-600 hover:to-indigo-800 transition-colors disabled:opacity-50 cursor-pointer"
+                        title="Download Certificate of Achievement"
+                      >
+                        <Download className="w-5 h-5" />
+                        <span className="font-semibold">
+                          Certificate
+                        </span>
+                      </button>
+                    ) : null}
                   </>
                 )}
                 <button
@@ -409,11 +796,35 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
                 >
                   <X className="w-6 h-6" />
                 </button>
-              </div>
+</div>
             </div>
 
-            {/* Reschedule Message Toast */}
-            <AnimatePresence>
+            {/* Syllabus Completion Risk Banner */}
+            {!showForm && activePlan && completionForecast?.atRisk && (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-6 py-3 bg-red-50 border-b border-red-200 text-red-800">
+                <div className="flex items-start sm:items-center gap-2 text-sm">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 sm:mt-0" />
+                  <span>
+                    At your current pace, the syllabus is projected to finish on{' '}
+                    <span className="font-semibold">
+                      {formatDateOnly(completionForecast.projectedCompletionDate)}
+                    </span>{' '}
+                    — after your exam on{' '}
+                    <span className="font-semibold">{formatDateOnly(completionForecast.examDate)}</span>.
+                    A schedule rebalance is recommended.
+                  </span>
+                </div>
+                <button
+                  onClick={handleRebalance}
+                  disabled={isRebalancing}
+                  className="shrink-0 px-3 py-1.5 rounded-sm text-xs font-semibold bg-red-700 text-white hover:bg-red-800 transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  {isRebalancing ? 'Rebalancing...' : 'Rebalance Now'}
+                </button>
+              </div>
+            )}
+
+            {/* Reschedule Message Toast */}            <AnimatePresence>
               {rescheduleMessage && (
                 <motion.div
                   initial={{ opacity: 0, y: -20 }}
@@ -443,109 +854,147 @@ const StudyPlanModal = ({ isOpen, onClose, activePlan, onBumpTime, onPlanCreated
                   minStartDate={minStartDate}
                   minEndDate={minEndDate}
                   exams={exams}
+                  prefillExamName={syllabusPrefill?.examName}
+                  isAiDisabled={isAiDisabled}
                 />
-              ) : (
-              <div ref={contentRef} className="bg-white/80 p-8 rounded-sm shadow-sm border border-[#8B4513]/10 max-w-3xl mx-auto" id="study-plan-content">
-                <div className="text-center mb-10">
-                  <h1 className="text-4xl font-bold font-playfair text-[#3E2723] mb-2 border-b-2 border-[#8B4513]/30 pb-4 inline-block">
-                    My Study Journey
-                  </h1>
-                  <p className="text-[#8B4513]/80 italic mt-2 text-lg">
-                    Generated for your success
-                  </p>
-                  {showWeakOnly && (
-                    <p className="mt-4 inline-block px-3 py-1 rounded-full bg-red-100 text-red-700 text-sm font-semibold border border-red-200">
-                      <AlertTriangle className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
-                      Weak topics view — focus mode enabled
-                    </p>
-                  )}
+              ) : viewMode === 'timeline' ? (
+                <div className="bg-white/80 p-6 rounded-sm shadow-sm border border-[#8B4513]/10">
+                  <StudyPlanGanttView activePlan={activePlan} onPlanUpdate={onPlanUpdate} />
                 </div>
-
-                <div className="space-y-8">
-                  {filteredDailyGoals && filteredDailyGoals.length > 0 ? (
-                    filteredDailyGoals.map((day, idx) => {
-                      const dateStr = day.date ? new Date(day.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : `Day ${idx + 1}`;
-                      const hasTasks = day.tasks && day.tasks.length > 0;
-                      const weakDayCount = (day.tasks || []).filter((t) => t.topic?.status === 'Weak').length;
-                      return (
-                        <div key={idx} className="bg-white rounded border border-[#8B4513]/20 overflow-hidden shadow-sm break-inside-avoid">
-                          <div className="bg-[#8B4513]/5 p-4 border-b border-[#8B4513]/20 flex items-center justify-between">
-                            <h3 className="text-xl font-bold font-playfair text-[#8B4513]">{dateStr}</h3>
-                            {weakDayCount > 0 && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-50 text-red-600 border border-red-200">
-                                <AlertTriangle className="w-3 h-3" />
-                                {weakDayCount} weak
-                              </span>
-                            )}
-                          </div>
-                          <div className="p-4 space-y-3">
-                            {hasTasks ? (
-                              day.tasks.map((task, tIdx) => {
-                                const isWeak = task.topic?.status === 'Weak';
-                                return (
-                                  <div
-                                    key={tIdx}
-                                    className={`flex items-start space-x-3 p-2 rounded transition-colors ${
-                                      isWeak ? 'bg-red-50/60 hover:bg-red-50 border border-red-100' : 'hover:bg-[#8B4513]/5'
-                                    }`}
-                                  >
-                                    {task.completed ? (
-                                      <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
-                                    ) : (
-                                      <Circle className={`w-5 h-5 mt-0.5 shrink-0 ${isWeak ? 'text-red-400' : 'text-[#8B4513]/40'}`} />
-                                    )}
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex flex-wrap items-center gap-y-1">
-                                        <p className="font-semibold text-neutral-800">
-                                          {task.title || task.topic?.name || 'Untitled Task'}
-                                        </p>
-                                        {isWeak && <WeakBadge />}
-                                      </div>
-                                      {(task.description || task.duration) && (
-                                        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-                                          {task.description && (
-                                            <p className="text-sm text-neutral-600">{task.description}</p>
-                                          )}
-                                          {task.duration && (
-                                            <span className="inline-flex items-center gap-1 text-xs text-neutral-500 font-medium">
-                                              <ClockPlus className="w-3 h-3" />
-                                              {task.duration} min
-                                            </span>
-                                          )}
-                                        </div>
-                                      )}
-                                      {isWeak && onBumpTime && (
-                                        <BumpTimeButton
-                                          onClick={() => onBumpTime(task.id || task._id, 30)}
+              ) : viewMode === 'calendar' ? (
+                <div className="bg-white/80 p-6 rounded-sm shadow-sm border border-[#8B4513]/10">
+                  <StudyPlanCalendarView activePlan={activePlan} onPlanUpdate={onPlanUpdate} />
+                </div>
+              ) : (
+                <div
+                  ref={contentRef}
+                  className="bg-white/80 p-8 rounded-sm shadow-sm border border-[#8B4513]/10 max-w-3xl mx-auto"
+                  id="study-plan-content"
+                >
+                  {' '}
+                  <div className="text-center mb-10">
+                    <h1 className="text-4xl font-bold font-playfair text-[#3E2723] mb-2 border-b-2 border-[#8B4513]/30 pb-4 inline-block">
+                      My Study Journey
+                    </h1>
+                    <p className="text-[#8B4513]/80 italic mt-2 text-lg">
+                      Generated for your success
+                    </p>
+                    {showWeakOnly && (
+                      <p className="mt-4 inline-block px-3 py-1 rounded-full bg-red-100 text-red-700 text-sm font-semibold border border-red-200">
+                        <AlertTriangle className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
+                        Weak topics view — focus mode enabled
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-8">
+                    {filteredDailyGoals && filteredDailyGoals.length > 0 ? (
+                      filteredDailyGoals.map((day, idx) => {
+                        const dateStr = day.date
+                          ? formatDateOnly(day.date, {
+                              weekday: 'long',
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                            })
+                          : `Day ${idx + 1}`;
+                        const hasTasks = day.tasks && day.tasks.length > 0;
+                        const weakDayCount = (day.tasks || []).filter(
+                          (t) => t.topic?.status === 'Weak'
+                        ).length;
+                        return (
+                          <div
+                            key={idx}
+                            className="bg-white rounded border border-[#8B4513]/20 overflow-hidden shadow-sm break-inside-avoid"
+                          >
+                            <div className="bg-[#8B4513]/5 p-4 border-b border-[#8B4513]/20 flex items-center justify-between">
+                              <h3 className="text-xl font-bold font-playfair text-[#8B4513]">
+                                {dateStr}
+                              </h3>
+                              {weakDayCount > 0 && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-50 text-red-600 border border-red-200">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  {weakDayCount} weak
+                                </span>
+                              )}
+                            </div>
+                            <div className="p-4 space-y-3">
+                              {hasTasks ? (
+                                day.tasks.map((task, tIdx) => {
+                                  const isWeak = task.topic?.status === 'Weak';
+                                  return (
+                                    <div
+                                      key={tIdx}
+                                      className={`flex items-start space-x-3 p-2 rounded transition-colors ${
+                                        isWeak
+                                          ? 'bg-red-50/60 hover:bg-red-50 border border-red-100'
+                                          : 'hover:bg-[#8B4513]/5'
+                                      }`}
+                                    >
+                                      {task.completed ? (
+                                        <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
+                                      ) : (
+                                        <Circle
+                                          className={`w-5 h-5 mt-0.5 shrink-0 ${isWeak ? 'text-red-400' : 'text-[#8B4513]/40'}`}
                                         />
                                       )}
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex flex-wrap items-center gap-y-1">
+                                          <p className="font-semibold text-neutral-800">
+                                            {task.title || task.topic?.name || 'Untitled Task'}
+                                          </p>
+                                          {isWeak && <WeakBadge />}
+                                        </div>
+                                        {(task.description || task.duration) && (
+                                          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                                            {task.description && (
+                                              <p className="text-sm text-neutral-600">
+                                                {task.description}
+                                              </p>
+                                            )}
+                                            {task.duration && (
+                                              <span className="inline-flex items-center gap-1 text-xs text-neutral-500 font-medium">
+                                                <ClockPlus className="w-3 h-3" />
+                                                {task.duration} min
+                                              </span>
+                                            )}
+                                          </div>
+                                        )}
+                                        {isWeak && onBumpTime && (
+                                          <BumpTimeButton
+                                            onClick={() => onBumpTime(task.id || task._id, 30)}
+                                          />
+                                        )}
+                                      </div>
                                     </div>
-                                  </div>
-                                );
-                              })
-                            ) : (
-                              <p className="text-neutral-500 italic">
-                                {showWeakOnly ? 'No weak topics scheduled for this day.' : 'No tasks scheduled for this day.'}
-                              </p>
-                            )}
+                                  );
+                                })
+                              ) : (
+                                <p className="text-neutral-500 italic">
+                                  {showWeakOnly
+                                    ? 'No weak topics scheduled for this day.'
+                                    : 'No tasks scheduled for this day.'}
+                                </p>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="text-center text-neutral-500 italic py-12">
-                      {showWeakOnly
-                        ? 'No weak topics found in your study plan. Great work!'
-                        : 'No study plan data available.'}
-                    </div>
+                        );
+                      })
+                    ) : (
+                      <div className="text-center text-neutral-500 italic py-12">
+                        {showWeakOnly
+                          ? 'No weak topics found in your study plan. Great work!'
+                          : 'No study plan data available.'}
+                      </div>
+                    )}
+                  </div>
+                  {activePlan?.milestones?.length > 0 && (
+                    <MilestonesSection milestones={activePlan.milestones} />
                   )}
+                  {/* PDF Footer spacer */}
+                  <div className="mt-12 pt-4 border-t border-[#8B4513]/20 text-center text-sm text-[#8B4513]/60 italic font-playfair">
+                    Stay consistent. The roots of education are bitter, but the fruit is sweet.
+                  </div>
                 </div>
-                
-                {/* PDF Footer spacer */}
-                <div className="mt-12 pt-4 border-t border-[#8B4513]/20 text-center text-sm text-[#8B4513]/60 italic font-playfair">
-                  Stay consistent. The roots of education are bitter, but the fruit is sweet.
-                </div>
-              </div>
               )}
             </div>
           </motion.div>

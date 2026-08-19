@@ -3,6 +3,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const jwt = require('jsonwebtoken');
 const progressRoutes = require('../../routes/progressRoutes');
+const analyticsRoutes = require('../../routes/analyticsRoutes');
 const errorHandler = require('../../middleware/error');
 const User = require('../../models/User');
 const Exam = require('../../models/Exam');
@@ -12,10 +13,12 @@ const Progress = require('../../models/Progress');
 const ActivityLog = require('../../models/ActivityLog');
 const QuizAttempt = require('../../models/QuizAttempt');
 const Quiz = require('../../models/Quiz');
+const Flashcard = require('../../models/Flashcard');
 
 const app = express();
 app.use(express.json());
 app.use('/api/progress', progressRoutes);
+app.use('/api/analytics', analyticsRoutes);
 app.use(errorHandler);
 
 describe('Progress Controller - Integration Tests', () => {
@@ -187,6 +190,147 @@ describe('Progress Controller - Integration Tests', () => {
 
     it('should return 401 without auth token', async () => {
       const res = await request(app).get('/api/progress/subjects');
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // =========================================================================
+  // GET /api/progress/mastery
+  // =========================================================================
+  describe('GET /api/progress/mastery', () => {
+    let masteryUser;
+    let masteryToken;
+    let masteryExam;
+    let masterySubject;
+    let masteryTopic;
+
+    beforeAll(async () => {
+      masteryUser = await User.create({
+        name: 'Mastery User',
+        email: 'mastery@example.com',
+        password: 'password123',
+      });
+      masteryToken = jwt.sign({ id: masteryUser.id, type: 'access' }, process.env.JWT_SECRET);
+
+      masteryExam = await Exam.create({
+        name: 'Mastery Exam',
+        description: 'Exam for mastery tests',
+        date: '2026-12-31',
+        user: masteryUser.id,
+      });
+
+      masterySubject = await Subject.create({
+        name: 'Physics',
+        description: 'Physics subject',
+        exam: masteryExam.id,
+        user: masteryUser.id,
+      });
+
+      masteryTopic = await Topic.create({
+        name: 'Mechanics',
+        description: 'Mechanics fundamentals',
+        subject: masterySubject.id,
+        user: masteryUser.id,
+      });
+    });
+
+    it('should return overall mastery, tier, and subject breakdown', async () => {
+      const res = await request(app)
+        .get('/api/progress/mastery')
+        .set('Authorization', `Bearer ${masteryToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveProperty('overallMastery');
+      expect(res.body.data).toHaveProperty('overallTier');
+      expect(['Beginner', 'Intermediate', 'Master']).toContain(res.body.data.overallTier);
+      expect(Array.isArray(res.body.data.subjects)).toBe(true);
+
+      const physics = res.body.data.subjects.find((s) => s.name === 'Physics');
+      expect(physics).toBeDefined();
+      expect(physics).toHaveProperty('masteryPercentage');
+      expect(physics).toHaveProperty('tier');
+      expect(Array.isArray(physics.chapters)).toBe(true);
+    });
+
+    it('should compute Master tier from high quiz accuracy and flashcard retention', async () => {
+      // Seed progress with high quiz scores (90+) for the topic
+      await Progress.create({
+        user: masteryUser.id,
+        subject: masterySubject.id,
+        topic: masteryTopic.id,
+        completionPercentage: 90,
+        quizScores: [
+          { attempt: 'a1', score: 90, date: new Date() },
+          { attempt: 'a2', score: 95, date: new Date() },
+        ],
+      });
+
+      // Seed mastered flashcards (interval >= 21 days)
+      await Flashcard.create({
+        user: masteryUser.id,
+        subject: masterySubject.id,
+        topic: masteryTopic.id,
+        front: 'Q1',
+        back: 'A1',
+        interval: 30,
+      });
+      await Flashcard.create({
+        user: masteryUser.id,
+        subject: masterySubject.id,
+        topic: masteryTopic.id,
+        front: 'Q2',
+        back: 'A2',
+        interval: 25,
+      });
+
+      const res = await request(app)
+        .get('/api/progress/mastery')
+        .set('Authorization', `Bearer ${masteryToken}`);
+
+      expect(res.status).toBe(200);
+      const physics = res.body.data.subjects.find((s) => s.name === 'Physics');
+      expect(physics).toBeDefined();
+      // quiz avg = 92.5, flashcard retention = 100% -> 0.6*92.5 + 0.4*100 = 95.5 -> 96
+      expect(physics.masteryPercentage).toBeGreaterThanOrEqual(80);
+      expect(physics.tier).toBe('Master');
+      expect(physics.chapters[0].tier).toBe('Master');
+    });
+
+    it('should compute Beginner tier when no quiz or flashcard data exists', async () => {
+      // Use a fresh user with a subject but no progress/flashcards
+      const emptyUser = await User.create({
+        name: 'Empty Mastery User',
+        email: 'empty_mastery@example.com',
+        password: 'password123',
+      });
+      const emptyToken = jwt.sign({ id: emptyUser.id, type: 'access' }, process.env.JWT_SECRET);
+
+      const emptyExam = await Exam.create({
+        name: 'Empty Exam',
+        date: '2026-12-31',
+        user: emptyUser.id,
+      });
+      await Subject.create({
+        name: 'Chemistry',
+        description: 'Chemistry subject',
+        exam: emptyExam.id,
+        user: emptyUser.id,
+      });
+
+      const res = await request(app)
+        .get('/api/progress/mastery')
+        .set('Authorization', `Bearer ${emptyToken}`);
+
+      expect(res.status).toBe(200);
+      const chemistry = res.body.data.subjects.find((s) => s.name === 'Chemistry');
+      expect(chemistry).toBeDefined();
+      expect(chemistry.masteryPercentage).toBe(0);
+      expect(chemistry.tier).toBe('Beginner');
+    });
+
+    it('should return 401 without auth token', async () => {
+      const res = await request(app).get('/api/progress/mastery');
       expect(res.status).toBe(401);
     });
   });
@@ -435,6 +579,85 @@ describe('Progress Controller - Integration Tests', () => {
 
       const resPdf = await request(app).get('/api/progress/export/pdf');
       expect(resPdf.status).toBe(401);
+    });
+  });
+
+  // =========================================================================
+  // GET /api/analytics/activity-heatmap
+  // =========================================================================
+  describe('GET /api/analytics/activity-heatmap', () => {
+    it('should return 365 zero-filled days when user has no activity', async () => {
+      const res = await request(app)
+        .get('/api/analytics/activity-heatmap')
+        .set('Authorization', `Bearer ${otherAuthToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
+      expect(res.body.data).toHaveLength(365);
+      expect(res.body.data[0]).toHaveProperty('date');
+      expect(res.body.data[0]).toHaveProperty('questionsSolved', 0);
+      expect(res.body.data[0]).toHaveProperty('flashcardsReviewed', 0);
+      expect(res.body.data[0]).toHaveProperty('total', 0);
+      // Dates should be ascending (oldest → newest)
+      expect(res.body.data[0].date < res.body.data[364].date).toBe(true);
+    });
+
+    it('should aggregate quiz attempts and flashcard reviews per day', async () => {
+      // Seed a quiz attempt and a flashcard for the test user today
+      const heatmapQuiz = await Quiz.create({
+        title: 'Heatmap Test Quiz',
+        subject: testSubject.id,
+        topic: testTopic.id,
+        createdBy: testUser.id,
+        questions: [
+          {
+            _id: uuidv4(),
+            questionText: 'Heatmap question 1',
+            options: ['A', 'B', 'C', 'D'],
+            correctAnswer: 0,
+            explanation: 'Test',
+          },
+        ],
+      });
+      await QuizAttempt.create({
+        user: testUser.id,
+        quiz: heatmapQuiz.id,
+        score: 80,
+        totalQuestions: 14,
+        answers: [],
+        weakTopics: [],
+        strongTopics: [],
+      });
+      await Flashcard.create({
+        user: testUser.id,
+        subject: testSubject.id,
+        front: 'Heatmap test question',
+        back: 'Heatmap test answer',
+      });
+
+      const res = await request(app)
+        .get('/api/analytics/activity-heatmap')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveLength(365);
+
+      // Timezone-agnostic: find the day that received the seeded activity
+      const activeEntry = res.body.data.find(
+        (d) => d.questionsSolved >= 14 && d.flashcardsReviewed >= 1
+      );
+      expect(activeEntry).toBeDefined();
+      expect(activeEntry.questionsSolved).toBeGreaterThanOrEqual(14);
+      expect(activeEntry.flashcardsReviewed).toBeGreaterThanOrEqual(1);
+      expect(activeEntry.total).toBe(activeEntry.questionsSolved + activeEntry.flashcardsReviewed);
+    });
+
+    it('should return 401 without auth token', async () => {
+      const res = await request(app).get('/api/analytics/activity-heatmap');
+      expect(res.status).toBe(401);
+      expect(res.body.success).toBe(false);
     });
   });
 });

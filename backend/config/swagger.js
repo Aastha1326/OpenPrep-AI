@@ -32,7 +32,8 @@ const options = {
           type: 'http',
           scheme: 'bearer',
           bearerFormat: 'JWT',
-          description: 'JWT Authorization header using the Bearer scheme. Example: "Authorization: Bearer {token}"',
+          description:
+            'JWT Authorization header using the Bearer scheme. Example: "Authorization: Bearer {token}"',
         },
         cookieAuth: {
           type: 'apiKey',
@@ -336,26 +337,77 @@ const options = {
             id: {
               type: 'string',
               format: 'uuid',
+              example: '123e4567-e89b-12d3-a456-426614174000',
             },
             title: {
               type: 'string',
-            },
-            subjectId: {
-              type: 'string',
-              format: 'uuid',
+              example: 'Calculus Chapter 1 Notes',
             },
             content: {
               type: 'string',
+              nullable: true,
+              example: 'Derivatives and rates of change...',
             },
-            isPublic: {
-              type: 'boolean',
+            subject: {
+              type: 'string',
+              format: 'uuid',
+              example: '123e4567-e89b-12d3-a456-426614174001',
+            },
+            topic: {
+              type: 'string',
+              format: 'uuid',
+              nullable: true,
+              example: '123e4567-e89b-12d3-a456-426614174002',
             },
             fileUrl: {
               type: 'string',
+              nullable: true,
+              example: '/uploads/notes-12345.pdf',
+            },
+            fileType: {
+              type: 'string',
+              enum: ['text', 'pdf', 'image', 'docx', 'audio'],
+              example: 'pdf',
+            },
+            isPublic: {
+              type: 'boolean',
+              example: false,
+            },
+            category: {
+              type: 'string',
+              enum: ['Lecture Notes', 'Study Guide', 'Cheat Sheet', 'Summary', 'Other'],
+              example: 'Lecture Notes',
+            },
+            downloadsCount: {
+              type: 'integer',
+              example: 5,
             },
             user: {
               type: 'string',
               format: 'uuid',
+              example: '123e4567-e89b-12d3-a456-426614174003',
+            },
+            aiSummary: {
+              type: 'object',
+              nullable: true,
+              properties: {
+                summary: {
+                  type: 'string',
+                  example: 'Key lecture summary points...',
+                },
+                keyConcepts: {
+                  type: 'array',
+                  items: {
+                    type: 'string',
+                  },
+                },
+                examTips: {
+                  type: 'array',
+                  items: {
+                    type: 'string',
+                  },
+                },
+              },
             },
             createdAt: {
               type: 'string',
@@ -373,24 +425,50 @@ const options = {
             id: {
               type: 'string',
               format: 'uuid',
+              example: '123e4567-e89b-12d3-a456-426614174000',
             },
             front: {
               type: 'string',
+              example: 'What is the derivative of sin(x)?',
             },
             back: {
               type: 'string',
+              example: 'cos(x)',
             },
             subject: {
               type: 'string',
               format: 'uuid',
+              example: '123e4567-e89b-12d3-a456-426614174001',
             },
             topic: {
               type: 'string',
               format: 'uuid',
+              nullable: true,
+              example: '123e4567-e89b-12d3-a456-426614174002',
+            },
+            interval: {
+              type: 'integer',
+              example: 1,
+              description: 'SM-2 interval in days',
+            },
+            repetitions: {
+              type: 'integer',
+              example: 0,
+              description: 'Number of consecutive successful reviews',
+            },
+            efactor: {
+              type: 'number',
+              example: 2.5,
+              description: 'SM-2 easiness factor',
+            },
+            nextReviewDate: {
+              type: 'string',
+              format: 'date-time',
             },
             user: {
               type: 'string',
               format: 'uuid',
+              example: '123e4567-e89b-12d3-a456-426614174003',
             },
             createdAt: {
               type: 'string',
@@ -740,9 +818,13 @@ const options = {
         name: 'Community',
         description: 'Feedback and roadmap endpoints',
       },
+      {
+        name: 'Analytics',
+        description: 'Study analytics and activity insights',
+      },
     ],
   },
-  apis: ['./routes/*.js'],
+  apis: ['./routes/*.js', './controllers/*.js'],
 };
 
 const swaggerSpec = swaggerJsdoc(options);

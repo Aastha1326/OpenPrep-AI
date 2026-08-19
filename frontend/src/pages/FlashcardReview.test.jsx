@@ -31,8 +31,84 @@ describe('FlashcardReview', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
+
+    // jsdom ships neither Web Speech API, so the hands-free controls stay
+    // hidden unless both are stubbed before the component mounts —
+    // useVoiceControl captures window.speechSynthesis in a ref on first render.
+    window.SpeechRecognition = function SpeechRecognitionStub() {
+      this.start = vi.fn();
+      this.stop = vi.fn();
+      this.abort = vi.fn();
+      this.continuous = false;
+      this.interimResults = false;
+      this.lang = '';
+    };
+    window.speechSynthesis = {
+      speak: vi.fn(),
+      cancel: vi.fn(),
+      getVoices: vi.fn(() => []),
+    };
+    window.SpeechSynthesisUtterance = function SpeechSynthesisUtteranceStub(text) {
+      this.text = text;
+      this.rate = 1;
+      this.lang = '';
+    };
+
+    API.get.mockImplementation((url) => {
+      if (url === '/auth/me') {
+        return Promise.resolve({
+          data: {
+            success: true,
+            user: {
+              sm2EasyFactorModifier: 1.0,
+              sm2IntervalModifier: 1.0,
+              sm2Step1Interval: 1,
+              sm2Step2Interval: 6,
+            }
+          }
+        });
+      }
+      return Promise.resolve({ data: { data: [] } });
+    });
   });
 
+  afterEach(() => {
+    delete window.SpeechRecognition;
+    delete window.speechSynthesis;
+    delete window.SpeechSynthesisUtterance;
+  });
+
+  test('shows hands-free voice controls when browser speech APIs are supported', async () => {
+  API.get.mockResolvedValue({ data: { data: sampleCards } });
+
+  renderReview();
+
+  expect(
+    await screen.findByRole('button', {
+      name: /enable hands-free mode/i,
+    })
+  ).toBeInTheDocument();
+});
+
+test('allows speech speed and language controls when hands-free mode is enabled', async () => {
+  API.get.mockResolvedValue({ data: { data: sampleCards } });
+
+  renderReview();
+
+  const toggle = await screen.findByRole('button', {
+    name: /enable hands-free mode/i,
+  });
+
+  fireEvent.click(toggle);
+
+  expect(
+    await screen.findByLabelText(/speech speed/i)
+  ).toBeInTheDocument();
+
+  expect(
+    screen.getByLabelText(/speech language/i)
+  ).toBeInTheDocument();
+});
   test('shows loading state while fetching due cards', () => {
     API.get.mockReturnValue(new Promise(() => {}));
     renderReview();
@@ -57,7 +133,7 @@ describe('FlashcardReview', () => {
 
     renderReview();
     await flipCurrentCard('What is React?');
-    fireEvent.click(screen.getByRole('button', { name: 'Good' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Good / }));
 
     await waitFor(() => {
       expect(API.put).toHaveBeenCalledWith('/flashcards/c1/review', { quality: 4 });
@@ -71,7 +147,7 @@ describe('FlashcardReview', () => {
 
     renderReview();
     await flipCurrentCard('What is React?');
-    fireEvent.click(screen.getByRole('button', { name: 'Good' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Good / }));
 
     expect(await screen.findByText(/Could not save this rating/, {}, { timeout: 4000 })).toBeInTheDocument();
     expect(screen.getByText('What is React?')).toBeInTheDocument();
@@ -84,7 +160,7 @@ describe('FlashcardReview', () => {
 
     renderReview();
     await flipCurrentCard('What is React?');
-    fireEvent.click(screen.getByRole('button', { name: 'Good' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Good / }));
 
     const dismissBtn = await screen.findByRole('button', { name: /dismiss/i }, { timeout: 4000 });
     fireEvent.click(dismissBtn);
@@ -101,7 +177,7 @@ describe('FlashcardReview', () => {
 
     renderReview();
     await flipCurrentCard('What is React?');
-    fireEvent.click(screen.getByRole('button', { name: 'Good' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Good / }));
 
     await waitFor(() => {
       const parsed = JSON.parse(sessionStorage.getItem('flashcardReviewSession'));
@@ -125,7 +201,7 @@ describe('FlashcardReview', () => {
 
     renderReview();
     expect(await screen.findByText('What is Redux?')).toBeInTheDocument();
-    expect(API.get).not.toHaveBeenCalled();
+    expect(API.get).not.toHaveBeenCalledWith(expect.stringContaining('/flashcards'));
   });
 
   test('clears the saved session once the queue is complete', async () => {
@@ -142,7 +218,7 @@ describe('FlashcardReview', () => {
 
     renderReview();
     await flipCurrentCard('What is JSX?');
-    fireEvent.click(screen.getByRole('button', { name: 'Good' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Good / }));
 
     expect(await screen.findByText('Session Complete')).toBeInTheDocument();
     expect(sessionStorage.getItem('flashcardReviewSession')).toBeNull();
@@ -180,5 +256,90 @@ describe('FlashcardReview', () => {
       expect(API.put).toHaveBeenCalledWith('/flashcards/c1/review', { quality: 4 });
     });
     expect(await screen.findByText('What is Redux?')).toBeInTheDocument();
+  });
+
+  test('disables rating buttons and ignores rapid clicks while a review is pending', async () => {
+    API.get.mockResolvedValue({ data: { data: sampleCards } });
+
+    // Keep the API.put request pending so we can observe the in-flight state.
+    let resolvePut;
+    API.put.mockImplementationOnce(() => new Promise((resolve) => { resolvePut = resolve; }));
+
+    renderReview();
+    await screen.findByText('What is React?');
+
+    // Flip the card and start a review that stays pending.
+    fireEvent.keyDown(window, { key: ' ' });
+    const goodButton = screen.getByRole('button', { name: /^Good / });
+    fireEvent.click(goodButton);
+
+    // Rating buttons are disabled while the request is pending...
+    await waitFor(() => expect(goodButton).toBeDisabled());
+
+    // ...so rapid keyboard input is debounced and only one request fires.
+    fireEvent.keyDown(window, { key: '4' });
+    fireEvent.keyDown(window, { key: '5' });
+    await waitFor(() => expect(API.put).toHaveBeenCalledTimes(1));
+    expect(API.put).toHaveBeenCalledWith('/flashcards/c1/review', { quality: 4 });
+
+    // Resolving the request advances to the next card and re-enables buttons.
+    resolvePut({ data: { data: { id: 'c1' } } });
+    expect(await screen.findByText('What is Redux?')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Good / })).toBeEnabled();
+  });
+
+  test('toggles Keyboard Shortcuts Guide modal on ? keypress', async () => {
+    API.get.mockResolvedValue({ data: { data: sampleCards } });
+    renderReview();
+    await screen.findByText('What is React?');
+
+    fireEvent.keyDown(window, { key: '?' });
+
+    expect(await screen.findByText('Keyboard Shortcuts Guide')).toBeInTheDocument();
+    expect(screen.getByText('Flip flashcard front or back')).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    await waitFor(() => {
+      expect(screen.queryByText('Keyboard Shortcuts Guide')).not.toBeInTheDocument();
+    });
+  });
+
+  test('navigates next and previous cards using ArrowRight/N and ArrowLeft/P', async () => {
+    API.get.mockResolvedValue({ data: { data: sampleCards } });
+    renderReview();
+    await screen.findByText('What is React?');
+
+    // ArrowRight / N to go to next card
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+    expect(await screen.findByText('What is Redux?')).toBeInTheDocument();
+
+    // ArrowLeft / P to go back to previous card
+    fireEvent.keyDown(window, { key: 'ArrowLeft' });
+    expect(await screen.findByText('What is React?')).toBeInTheDocument();
+  });
+
+  test('ignores keyboard shortcuts when user is typing inside an input element', async () => {
+    API.get.mockResolvedValue({ data: { data: sampleCards } });
+    renderReview();
+    await screen.findByText('What is React?');
+
+    // The card itself renders both faces at all times and only rotates in CSS,
+    // so flip state is not observable from the DOM. The shortcuts modal is —
+    // it returns null while closed — which makes it the reliable probe for
+    // whether a shortcut was handled or correctly suppressed.
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    input.focus();
+
+    fireEvent.keyDown(input, { key: '?' });
+    expect(screen.queryByText('Flip flashcard front or back')).not.toBeInTheDocument();
+
+    // With focus back outside the input the same key must take effect, so the
+    // assertion above cannot pass just because the shortcut is broken.
+    input.blur();
+    document.body.removeChild(input);
+
+    fireEvent.keyDown(window, { key: '?' });
+    expect(await screen.findByText('Flip flashcard front or back')).toBeInTheDocument();
   });
 });

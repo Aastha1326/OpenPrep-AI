@@ -9,6 +9,7 @@ const User = require('../../models/User');
 const Subject = require('../../models/Subject');
 const Exam = require('../../models/Exam');
 const PYQ = require('../../models/PYQ');
+const cacheService = require('../../services/cacheService');
 
 const app = express();
 app.use(express.json());
@@ -62,6 +63,12 @@ describe('PYQ Controller - Integration Tests', () => {
 
     authToken = jwt.sign({ id: testUser.id, type: 'access' }, process.env.JWT_SECRET);
     otherToken = jwt.sign({ id: otherUser.id, type: 'access' }, process.env.JWT_SECRET);
+  });
+
+  afterEach(async () => {
+    if (testUser?.id) {
+      await cacheService.del([`pyqs:${testUser.id}:*`, `pyqs:${otherUser?.id}:*`]);
+    }
   });
 
   afterAll(() => {
@@ -203,6 +210,24 @@ describe('PYQ Controller - Integration Tests', () => {
       expect(res.status).toBe(200);
       expect(res.body.count).toBe(0);
       expect(res.body.data).toEqual([]);
+    });
+
+    it('should set X-Cache = MISS on first request and HIT on second request for GET /api/pyqs', async () => {
+      const firstRes = await request(app)
+        .get('/api/pyqs')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(firstRes.status).toBe(200);
+      expect(firstRes.headers['x-cache']).toBe('MISS');
+      expect(firstRes.body.success).toBe(true);
+
+      const secondRes = await request(app)
+        .get('/api/pyqs')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(secondRes.status).toBe(200);
+      expect(secondRes.headers['x-cache']).toBe('HIT');
+      expect(secondRes.body.success).toBe(true);
     });
 
     it('should return 401 without authentication', async () => {
@@ -434,6 +459,148 @@ describe('PYQ Controller - Integration Tests', () => {
 
       // Cleanup
       await maliciousPyq.destroy();
+    });
+  });
+
+  describe('GET /api/pyqs/forecast', () => {
+    it('should generate and return upcoming exam forecasting', async () => {
+      const res = await request(app)
+        .get('/api/pyqs/forecast')
+        .query({ subjectId: testSubject.id.toString() })
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveProperty('predictedDifficulty');
+      expect(res.body.data).toHaveProperty('expectedEasyPercent');
+      expect(res.body.data).toHaveProperty('topicTrends');
+      expect(res.body.data.topicTrends).toBeInstanceOf(Array);
+      expect(res.body.data).toHaveProperty('recommendedFocusAreas');
+    });
+
+    it('should return 400 if subjectId is missing', async () => {
+      const res = await request(app)
+        .get('/api/pyqs/forecast')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(400);
+    });
+  });
+
+  // =========================================================================
+  // GET /api/pyqs/search — Full-Text Search
+  // =========================================================================
+  describe('GET /api/pyqs/search', () => {
+    let searchablePyq;
+
+    beforeAll(async () => {
+      searchablePyq = await PYQ.create({
+        title: 'Advanced Binary Tree & Dynamic Programming Question Paper',
+        exam: testExam.id,
+        subject: testSubject.id.toString(),
+        year: 2024,
+        chapters: ['Data Structures', 'Algorithms'],
+        fileUrl: '/uploads/pyq-search-test.pdf',
+        analyzed: true,
+        analysisResults: {
+          chapterWeightage: [{ chapterName: 'Algorithms', weightagePercent: 30 }],
+          importantTopics: [{ topicName: 'Dynamic Programming Recursion', frequency: 5, importance: 'High' }],
+          repeatedQuestions: [{ questionText: 'Explain binary search tree recursion and time complexity.', years: [2022, 2024] }],
+          trendAnalysis: 'Focus on recursion and dynamic programming algorithms.',
+        },
+        user: testUser.id,
+      });
+    });
+
+    afterAll(async () => {
+      if (searchablePyq) {
+        await searchablePyq.destroy();
+      }
+    });
+
+    it('should perform multi-keyword search and return ranked results with sub-100ms timing', async () => {
+      const res = await request(app)
+        .get('/api/pyqs/search')
+        .query({ q: 'Binary Tree Dynamic Programming' })
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toBeInstanceOf(Array);
+      expect(res.body.count).toBeGreaterThanOrEqual(1);
+      expect(res.body.data[0].title).toContain('Binary Tree');
+      expect(res.body).toHaveProperty('queryExecutionTimeMs');
+      expect(res.body.queryExecutionTimeMs).toBeLessThan(100);
+    });
+
+    it('should support search via /api/pyqs?search=query parameter', async () => {
+      const res = await request(app)
+        .get('/api/pyqs')
+        .query({ search: 'Algorithms Recursion' })
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toBeInstanceOf(Array);
+      expect(res.body.count).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should return 400 when search query is empty', async () => {
+      const res = await request(app)
+        .get('/api/pyqs/search')
+        .query({ q: '   ' })
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toContain('Search query is required');
+    });
+
+    it('should cache search results and respond with X-Cache HIT on duplicate query', async () => {
+      const query = 'Dynamic Programming';
+      const firstRes = await request(app)
+        .get('/api/pyqs/search')
+        .query({ q: query })
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(firstRes.status).toBe(200);
+      expect(firstRes.headers['x-cache']).toBe('MISS');
+
+      const secondRes = await request(app)
+        .get('/api/pyqs/search')
+        .query({ q: query })
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(secondRes.status).toBe(200);
+      expect(secondRes.headers['x-cache']).toBe('HIT');
+    });
+  });
+
+  describe('PYQ Batch Analyzer Endpoints', () => {
+    it('should upload a list of past papers and return structured weightages', async () => {
+      const pdfBuffer = createTestPdfBuffer();
+
+      const res = await request(app)
+        .post('/api/pyqs/analyze')
+        .set('Authorization', `Bearer ${authToken}`)
+        .field('subjectId', testSubject.id.toString())
+        .field('examName', 'Batch Board Exam')
+        .attach('files', pdfBuffer, { filename: 'test1.pdf', contentType: 'application/pdf' });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.yearRange).toBeDefined();
+      expect(res.body.data.weightageData.chapterWeightage).toBeInstanceOf(Array);
+    });
+
+    it('should retrieve list of historical analyses for a subject', async () => {
+      const res = await request(app)
+        .get(`/api/pyqs/subject/${testSubject.id}`)
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toBeInstanceOf(Array);
     });
   });
 });

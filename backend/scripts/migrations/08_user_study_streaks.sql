@@ -1,0 +1,17 @@
+-- Migration to add study streak and gamification columns to Users
+ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "currentStreak" INTEGER DEFAULT 0;
+ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "longestStreak" INTEGER DEFAULT 0;
+ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "lastActivityDate" DATE;
+ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "streakFreezesAvailable" INTEGER DEFAULT 0;
+
+-- Create UserBadges table
+CREATE TABLE IF NOT EXISTS "UserBadges" (
+  "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "userId" UUID NOT NULL REFERENCES "Users"("id") ON DELETE CASCADE,
+  "badgeCode" VARCHAR(255) NOT NULL,
+  "unlockedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS "user_badges_user_id_idx" ON "UserBadges"("userId");

@@ -5,16 +5,27 @@ const { RATE_LIMIT } = require('../config/constants');
 const {
   register,
   login,
+  googleLogin,
+  googlePassportCallback,
   getMe,
   forgotPassword,
   verifyEmail,
+  resendVerification,
   resetPassword,
+  verifyOtp,
+  resetPasswordOtp,
   refreshToken,
   logout,
+  logoutAll,
+  updateSettings,  updateSM2Settings,
+  resetSM2Settings,
+  oauthSuccessCallback,
+  registerOAuthEmail,
 } = require('../controllers/authController');
 
 const { protect } = require('../middleware/auth');
 const passport = require('passport');
+const verifyCaptcha = require('../middleware/captchaMiddleware');
 
 const {
   validateRegister,
@@ -22,7 +33,12 @@ const {
   validateForgotPassword,
   validateResetPassword,
   validateRefreshToken,
+  validateResendVerification,
+  validateUpdateSettings,
+  validateVerifyOtp,
+  validateResetPasswordOtp,
 } = require('../middleware/validators');
+const { validateRequest, registerSchema } = require('../middleware/validate');
 
 const router = express.Router();
 
@@ -61,17 +77,19 @@ const registerLimiter = rateLimit({
   legacyHeaders: true,
 });
 
-// Limit password reset requests to 5 per hour per IP
+// Limit password reset requests to 3 per 15 minutes per IP
 const forgotPasswordLimiter = rateLimit({
-  windowMs: RATE_LIMIT.WINDOWS.ONE_HOUR,
-  max: RATE_LIMIT.MAX_REQUESTS.FORGOT_PASSWORD,
+  windowMs: RATE_LIMIT.WINDOWS.FIFTEEN_MINUTES,
+  max: 3,
   skip: shouldSkip,
   message: createRateLimitResponse(
-    'Too many password reset requests. Please try again after an hour.'
+    'Too many requests. Please try again after 15 minutes.'
   ),
   standardHeaders: true,
   legacyHeaders: true,
 });
+
+const { authEmailLimiter } = require('../middleware/rateLimiter');
 
 // Refresh token rate limiter: 10 attempts per 15 minutes per IP
 const refreshTokenLimiter = rateLimit({
@@ -116,65 +134,8 @@ const resetPasswordLimiter = rateLimit({
  *   description: User authentication and authorization endpoints
  */
 
-/**
- * @swagger
- * /api/auth/register:
- *   post:
- *     summary: Register a new user account
- *     tags: [Authentication]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - name
- *               - email
- *               - password
- *             properties:
- *               name:
- *                 type: string
- *                 minLength: 2
- *                 maxLength: 50
- *                 example: "John Doe"
- *               email:
- *                 type: string
- *                 format: email
- *                 example: "john@example.com"
- *               password:
- *                 type: string
- *                 minLength: 8
- *                 example: "securePassword123"
- *     responses:
- *       201:
- *         description: User registered successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   $ref: '#/components/schemas/AuthTokens'
- *       400:
- *         description: Validation error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       429:
- *         description: Too many requests
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
-
 // Register a new user account
-router.post('/register', registerLimiter, validateRegister, register);
+router.post('/register', registerLimiter, verifyCaptcha, validateRegister, register);
 
 /**
  * @swagger
@@ -233,57 +194,7 @@ router.post('/register', registerLimiter, validateRegister, register);
  */
 
 // Authenticate a user and issue access/refresh tokens
-router.post('/login', loginLimiter, validateLogin, login);
-
-/**
- * @swagger
- * /api/auth/forgot-password:
- *   post:
- *     summary: Request a password reset email
- *     tags: [Authentication]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *                 example: "john@example.com"
- *     responses:
- *       200:
- *         description: Password reset email sent
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     message:
- *                       type: string
- *                       example: "Password reset email sent"
- *       400:
- *         description: Validation error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       429:
- *         description: Too many requests
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
+router.post('/login', loginLimiter, verifyCaptcha, validateLogin, login);
 
 // Request a password reset email
 router.post(
@@ -293,164 +204,44 @@ router.post(
   forgotPassword
 );
 
-/**
- * @swagger
- * /api/auth/reset-password/{token}:
- *   post:
- *     summary: Reset password using a valid reset token
- *     tags: [Authentication]
- *     parameters:
- *       - in: path
- *         name: token
- *         required: true
- *         schema:
- *           type: string
- *         description: Password reset token
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - password
- *             properties:
- *               password:
- *                 type: string
- *                 minLength: 8
- *                 example: "newSecurePassword123"
- *     responses:
- *       200:
- *         description: Password reset successful
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     message:
- *                       type: string
- *                       example: "Password has been reset"
- *       400:
- *         description: Validation error or invalid token
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       429:
- *         description: Too many requests
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
+// Verify OTP reset code
+router.post(
+  '/verify-otp',
+  resetPasswordLimiter,
+  validateVerifyOtp,
+  verifyOtp
+);
+
+// Reset password using OTP
+router.post(
+  '/reset-password',
+  resetPasswordLimiter,
+  validateResetPasswordOtp,
+  resetPasswordOtp
+);
+
+// Resend email verification link
+router.post(
+  '/resend-verification',
+  authEmailLimiter,
+  validateResendVerification,
+  resendVerification
+);
 
 // Reset password using a valid reset token
 router.post('/reset-password/:token', resetPasswordLimiter, validateResetPassword, resetPassword);
 
-/**
- * @swagger
- * /api/auth/verify-email/{token}:
- *   post:
- *     summary: Verify a user's email address using the verification token
- *     tags: [Authentication]
- *     parameters:
- *       - in: path
- *         name: token
- *         required: true
- *         schema:
- *           type: string
- *         description: Email verification token
- *     responses:
- *       200:
- *         description: Email verified successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     message:
- *                       type: string
- *                       example: "Email verified successfully"
- *       400:
- *         description: Invalid or expired token
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       429:
- *         description: Too many requests
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
-
 // Verify a user's email address using the verification token
 router.post('/verify-email/:token', verifyEmailLimiter, verifyEmail);
 
-/**
- * @swagger
- * /api/auth/refresh-token:
- *   post:
- *     summary: Refresh an expired access token
- *     tags: [Authentication]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - refreshToken
- *             properties:
- *               refreshToken:
- *                 type: string
- *     responses:
- *       200:
- *         description: Token refreshed successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   $ref: '#/components/schemas/AuthTokens'
- *       400:
- *         description: Validation error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       401:
- *         description: Invalid or expired refresh token
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       429:
- *         description: Too many requests
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
-
 // Refresh an expired access token
+router.post(
+  '/refresh',
+  refreshTokenLimiter,
+  validateRefreshToken,
+  refreshToken
+);
+
 router.post(
   '/refresh-token',
   refreshTokenLimiter,
@@ -458,85 +249,39 @@ router.post(
   refreshToken
 );
 
-/**
- * @swagger
- * /api/auth/logout:
- *   post:
- *     summary: Log out the current user
- *     tags: [Authentication]
- *     security:
- *       - cookieAuth: []
- *     responses:
- *       200:
- *         description: Logged out successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     message:
- *                       type: string
- *                       example: "Logged out successfully"
- *       401:
- *         description: Not authenticated
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
-
 // Log out the current user
-router.post('/logout', logout);
-
-/**
- * @swagger
- * /api/auth/me:
- *   get:
- *     summary: Retrieve the authenticated user's profile
- *     tags: [Authentication]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: User profile retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   $ref: '#/components/schemas/User'
- *       401:
- *         description: Not authenticated
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
-
+// Log out the authenticated user from all devices
+router.post('/logout-all', protect, logoutAll);
 // Retrieve the authenticated user's profile
-// Requires authentication
 router.get('/me', protect, getMe);
 
+// Update authenticated user settings
+router.patch('/settings', protect, validateUpdateSettings, updateSettings);
+
 // OAuth2 Google routes
+router.post('/google', googleLogin);
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
 router.get(
   '/google/callback',
   passport.authenticate('google', { failureRedirect: '/login', session: false }),
-  (req, res) => {
-    // Generate token in production, but for now just redirect
-    res.redirect('/dashboard');
-  }
+  oauthSuccessCallback
 );
+
+// OAuth2 GitHub routes
+router.get('/github', passport.authenticate('github', { scope: ['user:email'] }));
+router.get(
+  '/github/callback',
+  passport.authenticate('github', { failureRedirect: '/login', session: false }),
+  oauthSuccessCallback
+);
+
+// Finalize OAuth registration (e.g. if email was private/missing)
+router.post('/oauth/register-email', registerOAuthEmail);
+
+// User settings routes
+router.patch('/settings', protect, updateSettings);
+router.put('/sm2-settings', protect, updateSM2Settings);
+router.post('/sm2-settings/reset', protect, resetSM2Settings);
 
 module.exports = router;

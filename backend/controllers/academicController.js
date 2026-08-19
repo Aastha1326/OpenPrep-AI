@@ -11,6 +11,8 @@ const Progress = require('../models/Progress');
 const StudyPlan = require('../models/StudyPlan');
 const PYQ = require('../models/PYQ');
 const ActivityLog = require('../models/ActivityLog');
+const QuizBookmark = require('../models/QuizBookmark');
+const QuizTelemetryEvent = require('../models/QuizTelemetryEvent');
 const {
   validateSyllabusPayload,
   readFile,
@@ -20,7 +22,6 @@ const {
   parseSyllabusPdfWithAI,
   normalizeSyllabusPayload,
 } = require('../services/syllabusParserService');
-
 
 // ==========================================
 // EXAMS CONTROLLER
@@ -42,7 +43,6 @@ exports.createExam = async (req, res, next) => {
     next(error);
   }
 };
-
 
 exports.getExams = async (req, res, next) => {
   try {
@@ -83,63 +83,28 @@ exports.deleteExam = async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'Exam not found' });
     }
 
-    // Collect all subject IDs for this exam
+    // PYQ has an afterDestroy hook that deletes uploaded files from disk.
+    // Sequelize-level CASCADE does not fire model hooks, so we must delete PYQs
+    // explicitly with individualHooks: true before destroying the exam.
     const subjects = await Subject.findAll({ where: { exam: exam.id }, transaction: t });
     const subjectIds = subjects.map((sub) => sub.id);
 
-    let topicIds = [];
     if (subjectIds.length > 0) {
-      // Collect all topics for these subjects
-      const topics = await Topic.findAll({ where: { subject: { [Op.in]: subjectIds } }, transaction: t });
-      topicIds = topics.map((top) => top.id);
-    }
-
-    // Build OR conditions only when IDs exist to avoid invalid Op.in: [] queries
-    const quizOrConditions = [];
-    if (subjectIds.length > 0) quizOrConditions.push({ subject: { [Op.in]: subjectIds } });
-    if (topicIds.length > 0) quizOrConditions.push({ topic: { [Op.in]: topicIds } });
-
-    if (quizOrConditions.length > 0) {
-      // 1. Delete QuizAttempts for quizzes under these subjects and topics
-      const quizzes = await Quiz.findAll({
-        where: { [Op.or]: quizOrConditions },
+      await PYQ.destroy({
+        where: { [Op.or]: [{ exam: exam.id }, { subject: { [Op.in]: subjectIds } }] },
         transaction: t,
+        individualHooks: true,
       });
-      const quizIds = quizzes.map((q) => q.id);
-
-      if (quizIds.length > 0) {
-        await QuizAttempt.destroy({ where: { quiz: { [Op.in]: quizIds } }, transaction: t });
-      }
-
-      // 2. Delete quizzes
-      await Quiz.destroy({ where: { [Op.or]: quizOrConditions }, transaction: t });
-    }
-
-    await StudyPlan.destroy({ where: { exam: exam.id }, transaction: t });
-
-    if (subjectIds.length > 0) {
-      await PYQ.destroy({ where: { [Op.or]: [{ exam: exam.id }, { subject: { [Op.in]: subjectIds } }] }, transaction: t });
-      await Note.destroy({ where: { subject: { [Op.in]: subjectIds } }, transaction: t });
-      await Flashcard.destroy({ where: { subject: { [Op.in]: subjectIds } }, transaction: t });
     } else {
-      await PYQ.destroy({ where: { exam: exam.id }, transaction: t });
+      await PYQ.destroy({ where: { exam: exam.id }, transaction: t, individualHooks: true });
     }
 
-    const progressOrConditions = [];
-    if (subjectIds.length > 0) progressOrConditions.push({ subject: { [Op.in]: subjectIds } });
-    if (topicIds.length > 0) progressOrConditions.push({ topic: { [Op.in]: topicIds } });
-
-    if (progressOrConditions.length > 0) {
-      await Progress.destroy({ where: { [Op.or]: progressOrConditions }, transaction: t });
-    }
-
-    // 3. Ensure child Topic records are deleted BEFORE parent Subject records
-    if (subjectIds.length > 0) {
-      await Topic.destroy({ where: { subject: { [Op.in]: subjectIds } }, transaction: t });
-    }
-    await Subject.destroy({ where: { exam: exam.id }, transaction: t });
-    
-    // 4. Delete the exam itself
+    // All other dependent records (Subjects, Topics, Quizzes, QuizAttempts,
+    // Notes, Flashcards, Progress, StudyPlan) are covered by onDelete: 'CASCADE'
+    // associations in models/index.js and will be removed automatically.
+    // Associations configured with onDelete: 'CASCADE' in models/index.js
+    // will automatically clean up Subjects, Topics, Quizzes, QuizAttempts, QuizBookmarks, QuizTelemetryEvents,
+    // Notes, Flashcards, Progress, StudyPlans, and PYQs at the DB level.
     await exam.destroy({ transaction: t });
 
     await t.commit();
@@ -149,6 +114,7 @@ exports.deleteExam = async (req, res, next) => {
     next(error);
   }
 };
+
 
 // ==========================================
 // SUBJECTS CONTROLLER
@@ -192,26 +158,35 @@ exports.createCompositeBundle = async (req, res, next) => {
     }
 
     // Create the master composite Exam
-    const exam = await Exam.create({
-      name,
-      description,
-      date,
-      isBundle: true,
-      targetExamType: targetExamType || 'Custom',
-      user: req.user.id,
-    }, { transaction: t });
+    const exam = await Exam.create(
+      {
+        name,
+        description,
+        date,
+        isBundle: true,
+        targetExamType: targetExamType || 'Custom',
+        user: req.user.id,
+      },
+      { transaction: t }
+    );
 
     // Create subjects with percentage weightages if provided
     const createdSubjects = [];
     if (Array.isArray(subjects) && subjects.length > 0) {
       for (const sub of subjects) {
-        const newSub = await Subject.create({
-          name: sub.name,
-          description: sub.description || '',
-          weightage: sub.weightage !== undefined ? parseFloat(sub.weightage) : Math.round(100 / subjects.length),
-          exam: exam.id,
-          user: req.user.id,
-        }, { transaction: t });
+        const newSub = await Subject.create(
+          {
+            name: sub.name,
+            description: sub.description || '',
+            weightage:
+              sub.weightage !== undefined
+                ? parseFloat(sub.weightage)
+                : Math.round(100 / subjects.length),
+            exam: exam.id,
+            user: req.user.id,
+          },
+          { transaction: t }
+        );
         createdSubjects.push(newSub);
       }
     }
@@ -274,7 +249,6 @@ exports.updateSubjectWeightages = async (req, res, next) => {
   }
 };
 
-
 exports.getSubjects = async (req, res, next) => {
   try {
     const { examId } = req.query;
@@ -322,6 +296,8 @@ exports.deleteSubject = async (req, res, next) => {
     const quizIds = quizzes.map((q) => q.id);
     if (quizIds.length > 0) {
       await QuizAttempt.destroy({ where: { quiz: { [Op.in]: quizIds } }, transaction: t });
+      await QuizBookmark.destroy({ where: { quiz: { [Op.in]: quizIds } }, transaction: t });
+      await QuizTelemetryEvent.destroy({ where: { quiz: { [Op.in]: quizIds } }, transaction: t });
     }
 
     // 2. Delete child records that reference this subject
@@ -336,7 +312,7 @@ exports.deleteSubject = async (req, res, next) => {
     await Topic.destroy({ where: { subject: subject.id }, transaction: t });
 
     // 5. Delete PYQs for this subject
-    await PYQ.destroy({ where: { subject: subject.id }, transaction: t });
+    await PYQ.destroy({ where: { subject: subject.id }, transaction: t, individualHooks: true });
 
     // 6. Delete the subject itself
     await subject.destroy({ transaction: t });
@@ -437,7 +413,48 @@ exports.deleteTopic = async (req, res, next) => {
     // 2. Nullify topic reference on quizzes (quiz itself is preserved)
     await Quiz.update({ topic: null }, { where: { topic: topic.id }, transaction: t });
 
-    // 3. Delete the topic itself
+    // 3. Remove topic references from QuizAttempt arrays
+    await QuizAttempt.update(
+      {
+        weakTopics: sequelize.fn('array_remove', sequelize.col('weakTopics'), topic.id),
+        strongTopics: sequelize.fn('array_remove', sequelize.col('strongTopics'), topic.id),
+      },
+      {
+        where: {
+          [Op.or]: [
+            { weakTopics: { [Op.contains]: [topic.id] } },
+            { strongTopics: { [Op.contains]: [topic.id] } },
+          ],
+        },
+        transaction: t,
+      }
+    );
+
+    // 4. Nullify topic reference inside StudyPlan dailyGoals JSONB structure
+    const studyPlans = await StudyPlan.findAll({
+      where: { user: req.user.id },
+      transaction: t,
+    });
+    for (const plan of studyPlans) {
+      let updated = false;
+      const dailyGoals = plan.dailyGoals || [];
+      const newGoals = dailyGoals.map(day => {
+        const tasks = (day.tasks || []).map(task => {
+          if (task.topic === topic.id) {
+            updated = true;
+            return { ...task, topic: null };
+          }
+          return task;
+        });
+        return { ...day, tasks };
+      });
+      if (updated) {
+        plan.dailyGoals = newGoals;
+        await plan.save({ transaction: t });
+      }
+    }
+
+    // 5. Delete the topic itself
     await topic.destroy({ transaction: t });
 
     await t.commit();
@@ -471,7 +488,8 @@ exports.importSyllabus = async (req, res, next) => {
       cleanup = false;
       return res.status(400).json({
         success: false,
-        error: 'Unsupported file type. Please upload either a .pdf syllabus or a .json file matching the bulk import schema.',
+        error:
+          'Unsupported file type. Please upload either a .pdf syllabus or a .json file matching the bulk import schema.',
       });
     }
 
@@ -520,7 +538,10 @@ exports.importSyllabus = async (req, res, next) => {
 
       const createdSubjects = [];
       let totalTopics = 0;
-      const subjectWeightage = normalized.subjects.length > 0 ? Math.max(1, Math.round(100 / normalized.subjects.length)) : 0;
+      const subjectWeightage =
+        normalized.subjects.length > 0
+          ? Math.max(1, Math.round(100 / normalized.subjects.length))
+          : 0;
 
       for (const sub of normalized.subjects) {
         const subWeightage = Number(sub.weightage) || subjectWeightage;
@@ -536,7 +557,8 @@ exports.importSyllabus = async (req, res, next) => {
         );
 
         const createdTopics = [];
-        const topicWeightage = sub.topics.length > 0 ? Math.max(1, Math.round(100 / sub.topics.length)) : 0;
+        const topicWeightage =
+          sub.topics.length > 0 ? Math.max(1, Math.round(100 / sub.topics.length)) : 0;
         for (const topicName of sub.topics) {
           const topic = await Topic.create(
             {
@@ -598,7 +620,14 @@ exports.importSyllabus = async (req, res, next) => {
         },
         prefill,
         data: {
-          exam: { id: exam.id, name: exam.name, description: exam.description, date: exam.date, isBundle: exam.isBundle, targetExamType: exam.targetExamType },
+          exam: {
+            id: exam.id,
+            name: exam.name,
+            description: exam.description,
+            date: exam.date,
+            isBundle: exam.isBundle,
+            targetExamType: exam.targetExamType,
+          },
           subjects: createdSubjects,
         },
       });

@@ -9,8 +9,7 @@
 
 **OpenPrep AI** is an advanced AI-powered exam preparation platform designed to help students optimize their study habits, analyze previous exam papers, identify knowledge gaps, and study smarter.
 
-[Explore Architecture](./docs/architecture.md) • [Getting Started](./docs/setup-guide.md) • [Contribution Guidelines](./CONTRIBUTING.md) • [API Documentation](./docs/api-reference.md)
-
+[Explore Architecture](./docs/architecture.md) • [Getting Started](./docs/setup-guide.md) • [Contribution Guidelines](./CONTRIBUTING.md) • [API Documentation](./docs/api-reference.md) • [Socket.IO Events](./docs/socket-events.md)
 </div>
 
 ---
@@ -53,26 +52,43 @@ Most students waste critical preparation hours trying to figure out:
 
 ## 📂 Project Structure
 
-```bash
-OpenPrep-AI/
-├── .github/             # GitHub actions, templates & labelers
-├── backend/             # Node.js + Express backend
-│   ├── config/          # Database configuration
-│   ├── controllers/     # MVC controller logic
-│   ├── middleware/      # Auth, upload, and validation middleware
-│   ├── models/          # Sequelize database schemas
-│   ├── routes/          # Express API route declarations
-│   └── services/        # Gemini API integration service
-├── docs/                # Comprehensive system documentation
-└── frontend/            # React + Vite + Tailwind CSS frontend
-    ├── public/          # Static files and assets
-    └── src/
-        ├── components/  # Reusable UI components
-        ├── context/     # Global contexts (Theme, etc.)
-        ├── services/    # Axios API client integrations
-        └── store/       # Redux Toolkit global state store
-```
+The repository is organized into separate frontend, backend, documentation, and development-support directories.
 
+```text
+OpenPrep-AI/
+├── .github/                 # GitHub Actions, issue templates, and repository automation
+├── backend/                 # Node.js + Express backend
+│   ├── config/              # Application and database configuration
+│   ├── controllers/         # Request and business logic controllers
+│   ├── jobs/                # Background and scheduled jobs
+│   ├── middleware/          # Authentication, validation, and request middleware
+│   ├── migrations/          # Database migration files
+│   ├── models/              # Sequelize database models
+│   ├── routes/              # API route definitions
+│   ├── scripts/             # Backend utility and maintenance scripts
+│   ├── services/            # External service and AI integrations
+│   ├── sockets/              # Socket.IO event handling
+│   ├── tests/                # Backend test suites
+│   └── utils/                # Shared backend utilities
+├── frontend/                # React + Vite frontend application
+│   ├── e2e/                  # End-to-end tests
+│   ├── public/               # Static public assets
+│   └── src/                  # Frontend source code
+├── docs/                     # Project and technical documentation
+│   └── adr/                  # Architecture Decision Records
+├── issues/                   # Issue-related project resources
+├── pr/                       # Pull request-related resources
+├── scripts/                  # Repository-level development and automation scripts
+├── docker-compose.yml        # Local Docker service configuration
+├── package.json              # Root project scripts and dependencies
+├── pnpm-workspace.yaml       # pnpm workspace configuration
+├── CONTRIBUTING.md           # Contribution guidelines
+├── CODE_OF_CONDUCT.md        # Community guidelines
+├── SECURITY.md               # Security policy
+├── ROADMAP.md                # Project roadmap
+├── CHANGELOG.md              # Project change history
+└── README.md                 # Project overview and setup instructions
+```
 ---
 
 ## 🚦 Getting Started
@@ -111,6 +127,165 @@ The React frontend will be available at `http://localhost:5173` and the Express 
    npm install
    npm run dev
    ```
+
+### 🗄️ Database Migrations with Sequelize CLI
+
+We use Sequelize CLI for managing database schema changes.
+
+- **Run all pending migrations**:
+  ```bash
+  npx sequelize-cli db:migrate
+  ```
+
+- **Revert the last migration**:
+  ```bash
+  npx sequelize-cli db:migrate:undo
+  ```
+
+- **Revert all migrations**:
+  ```bash
+  npx sequelize-cli db:migrate:undo:all
+  ```
+
+- **Seed the database with demo users**:
+  ```bash
+  npx sequelize-cli db:seed:all
+  ```
+
+---
+
+## 🛠️ Troubleshooting
+
+If you encounter problems while setting up or running OpenPrep AI locally, check the common issues and solutions below.
+
+### 1. `SequelizeConnectionRefusedError` / `SequelizeConnectionError: connect ECONNREFUSED`
+This error occurs when the Node.js backend cannot connect to your PostgreSQL database instance.
+
+* **Ensure PostgreSQL is running**:
+  * **Windows (PowerShell as Administrator):**
+    ```powershell
+    Get-Service postgresql*
+    Start-Service postgresql-x64-18  # Replace with your actual service version if different
+    ```
+  * **Linux/macOS:**
+    ```bash
+    sudo systemctl status postgresql
+    sudo systemctl start postgresql
+    ```
+* **Verify database existence**:
+  Make sure you created the `openprep` database. You can create it with:
+  ```bash
+  psql -U postgres -c "CREATE DATABASE openprep;"
+  ```
+* **Check `.env` Connection String**:
+  Open `backend/.env` and verify that `DATABASE_URL` matches your local database credentials:
+  ```env
+  DATABASE_URL=postgres://your_username:your_password@localhost:5432/openprep
+  ```
+
+---
+
+### 2. React Vite Port `5173` (or Backend Port `5000`) Already in Use
+This happens when another local server or background process is already listening on ports `5173` (frontend) or `5000` (backend).
+
+* **Quickly kill the port**:
+  Use `npx kill-port` to automatically terminate any processes occupying the dev ports:
+  ```bash
+  npx kill-port 5173 5000
+  ```
+* **Manually find and kill the process**:
+  * **Windows (PowerShell):**
+    ```powershell
+    # Find process ID (PID) using the port
+    Get-NetTCPConnection -LocalPort 5173 | Select-Object OwningProcess
+    # Kill the process
+    Stop-Process -Id <PID> -Force
+    ```
+  * **Linux/macOS (Terminal):**
+    ```bash
+    # Find PID using the port
+    lsof -i :5173
+    # Kill the process
+    kill -9 <PID>
+    ```
+
+---
+
+### 3. Missing `.env` / Environment Variable Issues on Startup
+The backend will immediately crash or exit if required variables (like `JWT_SECRET`) are missing or incorrectly configured.
+
+* **Verify `.env` exists**:
+  Check that you copied `.env.example` to `.env` in the `backend/` directory:
+  ```bash
+  # Linux/macOS
+  cp backend/.env.example backend/.env
+  # Windows PowerShell
+  Copy-Item backend/.env.example backend/.env
+  ```
+* **Set Required Variables**:
+  Make sure `JWT_SECRET` is set to a long, random string in `backend/.env`.
+
+---
+
+### 4. Dependencies fail to install / npm Cache Errors
+This occurs due to outdated Node.js versions, corrupted npm cache, or package conflicts.
+
+* **Clear npm cache & reinstall**:
+  ```bash
+  npm cache clean --force
+  npm install
+  ```
+* **Verify Node.js version**:
+  Ensure you are using Node v18.x or v20.x:
+  ```bash
+  node --version
+  ```
+
+---
+
+### 5. Docker: `port is already allocated` or Volume Mount Issues on Windows
+This occurs when local services (like a native PostgreSQL database) are using port `5432`, or due to file sharing path permissions in Docker Desktop.
+
+* **Stop native local services**:
+  * Stop local PostgreSQL so the Docker PostgreSQL container can bind to port `5432`:
+    ```powershell
+    # Windows PowerShell
+    Stop-Service postgresql*
+    ```
+    ```bash
+    # Linux/macOS
+    sudo systemctl stop postgresql
+    ```
+* **Line ending errors in Docker (`\r: command not found`)**:
+  If shell scripts fail inside the container, configure git to preserve LF line endings and re-clone/re-normalize:
+  ```bash
+  git config --global core.autocrlf input
+  git add --renormalize .
+  git checkout-index --force --all
+  ```
+* **WSL2 Setup and Mounting Details**:
+  For comprehensive WSL2 configurations, volume mounting, and file system speed enhancements on Windows, see the [Windows Setup & Docker Troubleshooting Guide](./docs/setup-guide.md#windows-setup-via-wsl2-recommended).
+
+---
+
+### 7. Windows & Docker specific issues (Line endings & WSL2)
+
+If you are running Docker on Windows and encounter execution errors (like `\r: command not found` in shell scripts) or hot-reloading volume mounting issues, please refer to the dedicated [Windows Setup & Docker Troubleshooting Guide](./docs/setup-guide.md#windows-setup-via-wsl2-recommended) in our documentation.
+
+---
+
+### Still having problems?
+
+If none of the solutions above resolve the issue, open a GitHub issue with:
+
+1. The error message.
+2. The command that produced the error.
+3. Your Node.js version.
+4. Your operating system.
+5. Relevant Docker or backend logs.
+6. Steps to reproduce the problem.
+
+Providing this information will help maintainers and contributors investigate the problem more efficiently.
 
 ---
 

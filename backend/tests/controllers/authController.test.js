@@ -1,6 +1,7 @@
 const request = require('supertest');
 const express = require('express');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const authRoutes = require('../../routes/authRoutes');
 const errorHandler = require('../../middleware/error');
 const User = require('../../models/User');
@@ -22,7 +23,94 @@ const createVerifiedUser = async (overrides = {}) => {
     ...overrides,
   });
 };
+// =========================================================================
+// POST /api/auth/logout-all
+// =========================================================================
+describe('POST /api/auth/logout-all', () => {
+  it('should revoke refresh tokens from all devices', async () => {
+    const user = await createVerifiedUser({
+      email: 'logout-all@example.com',
+      refreshTokens: [
+        {
+          token: crypto.createHash('sha256').update('device-token-1').digest('hex'),
+          family: 'device-family-1',
+          createdAt: new Date().toISOString(),
+        },
+        {
+          token: crypto.createHash('sha256').update('device-token-2').digest('hex'),
+          family: 'device-family-2',
+          createdAt: new Date().toISOString(),
+        },
+      ],
+      refreshTokenExpire: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
 
+    const accessToken = jwt.sign(
+      { id: user.id, type: 'access' },
+      process.env.JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+
+    const res = await request(app)
+      .post('/api/auth/logout-all')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+
+    const updatedUser = await User.findByPk(user.id);
+
+    expect(updatedUser.refreshTokens).toEqual([]);
+    expect(updatedUser.refreshTokenExpire).toBeNull();
+  });
+
+  it('should reject refresh tokens after logout-all', async () => {
+    const deviceToken1 = 'device-refresh-token-1';
+    const deviceToken2 = 'device-refresh-token-2';
+
+    const user = await createVerifiedUser({
+      email: 'logout-all-refresh@example.com',
+      refreshTokens: [
+        {
+          token: crypto.createHash('sha256').update(deviceToken1).digest('hex'),
+          family: 'device-family-1',
+          createdAt: new Date().toISOString(),
+        },
+        {
+          token: crypto.createHash('sha256').update(deviceToken2).digest('hex'),
+          family: 'device-family-2',
+          createdAt: new Date().toISOString(),
+        },
+      ],
+      refreshTokenExpire: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
+
+    const accessToken = jwt.sign(
+      { id: user.id, type: 'access' },
+      process.env.JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+
+    const logoutResponse = await request(app)
+      .post('/api/auth/logout-all')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(logoutResponse.status).toBe(200);
+
+    const device1Refresh = await request(app)
+      .post('/api/auth/refresh-token')
+      .send({ refreshToken: deviceToken1 });
+
+    const device2Refresh = await request(app)
+      .post('/api/auth/refresh-token')
+      .send({ refreshToken: deviceToken2 });
+
+    expect(device1Refresh.status).toBe(401);
+    expect(device2Refresh.status).toBe(401);
+    expect(device1Refresh.body.error).toBe('Invalid or expired refresh token');
+    expect(device2Refresh.body.error).toBe('Invalid or expired refresh token');
+  });
+});
 describe('Auth Controller - Integration Tests', () => {
   // =========================================================================
   // POST /api/auth/register
@@ -395,7 +483,7 @@ describe('Auth Controller - Integration Tests', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.message).toContain('password reset link');
+      expect(res.body.message).toContain('reset link');
     });
 
     it('should return 200 even when email does not exist', async () => {
@@ -405,6 +493,7 @@ describe('Auth Controller - Integration Tests', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
+      expect(res.body.message).toBe('If the email exists, a reset link has been sent');
     });
 
     it('should return same response for existing and non-existing emails', async () => {
@@ -421,6 +510,31 @@ describe('Auth Controller - Integration Tests', () => {
       expect(resExisting.status).toBe(resMissing.status);
       expect(resExisting.body.success).toBe(resMissing.body.success);
       expect(resExisting.body.message).toBe(resMissing.body.message);
+      expect(resExisting.body.message).toBe('If the email exists, a reset link has been sent');
+    });
+
+    it('should enforce rate limits of 3 requests per 15 minutes', async () => {
+      process.env.ENABLE_RATE_LIMIT_TESTS = 'true';
+      try {
+        // Send 3 requests - all should succeed
+        for (let i = 0; i < 3; i++) {
+          const res = await request(app)
+            .post('/api/auth/forgot-password')
+            .send({ email: 'rate@example.com' });
+          expect(res.status).toBe(200);
+        }
+
+        // 4th request should exceed the limit and return 429
+        const resBlocked = await request(app)
+          .post('/api/auth/forgot-password')
+          .send({ email: 'rate@example.com' });
+
+        expect(resBlocked.status).toBe(429);
+        expect(resBlocked.body.success).toBe(false);
+        expect(resBlocked.body.error).toBe('Too many requests. Please try again after 15 minutes.');
+      } finally {
+        delete process.env.ENABLE_RATE_LIMIT_TESTS;
+      }
     });
   });
 
@@ -517,6 +631,26 @@ describe('Auth Controller - Integration Tests', () => {
       // Access token is same user/payload — may match if issued same second
     });
 
+    it('should rotate and issue a new refresh token using /refresh endpoint', async () => {
+      const user = await createVerifiedUser({ email: 'refreshnew@example.com' });
+
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'refreshnew@example.com', password: 'StrongPass1!' });
+
+      const oldRefreshToken = loginRes.body.refreshToken;
+
+      const res = await request(app)
+        .post('/api/auth/refresh')
+        .send({ refreshToken: oldRefreshToken });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.token).toBeDefined();
+      expect(res.body.refreshToken).toBeDefined();
+      expect(res.body.refreshToken).not.toBe(oldRefreshToken);
+    });
+
     it('should return 401 with invalid refresh token', async () => {
       const res = await request(app)
         .post('/api/auth/refresh-token')
@@ -576,6 +710,99 @@ describe('Auth Controller - Integration Tests', () => {
         .post('/api/auth/refresh-token')
         .send({ refreshToken: secondToken });
       expect(secondReplay.status).toBe(401);
+    });
+  });
+
+  // =========================================================================
+  // PATCH /api/auth/settings
+  // =========================================================================
+  describe('PATCH /api/auth/settings', () => {
+    it('should update user general settings when authenticated', async () => {
+      const user = await createVerifiedUser({ email: 'settingsupdate@example.com' });
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'settingsupdate@example.com', password: 'StrongPass1!' });
+      const token = loginRes.body.token;
+
+      const res = await request(app)
+        .patch('/api/auth/settings')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ leaderboardVisible: false, receiveWeeklyDigest: false });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.user.leaderboardVisible).toBe(false);
+      expect(res.body.user.receiveWeeklyDigest).toBe(false);
+
+      const dbUser = await User.findByPk(user.id);
+      expect(dbUser.leaderboardVisible).toBe(false);
+      expect(dbUser.receiveWeeklyDigest).toBe(false);
+    });
+  });
+
+  // =========================================================================
+  // PUT /api/auth/sm2-settings
+  // =========================================================================
+  describe('PUT /api/auth/sm2-settings', () => {
+    it('should update user SM-2 parameters when authenticated', async () => {
+      const user = await createVerifiedUser({ email: 'sm2settings@example.com' });
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'sm2settings@example.com', password: 'StrongPass1!' });
+      const token = loginRes.body.token;
+
+      const res = await request(app)
+        .put('/api/auth/sm2-settings')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          sm2EasyFactorModifier: 1.25,
+          sm2IntervalModifier: 1.15,
+          sm2Step1Interval: 2,
+          sm2Step2Interval: 8
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.user.sm2EasyFactorModifier).toBe(1.25);
+      expect(res.body.user.sm2IntervalModifier).toBe(1.15);
+      expect(res.body.user.sm2Step1Interval).toBe(2);
+      expect(res.body.user.sm2Step2Interval).toBe(8);
+
+      const dbUser = await User.findByPk(user.id);
+      expect(dbUser.sm2EasyFactorModifier).toBe(1.25);
+    });
+  });
+
+  // =========================================================================
+  // POST /api/auth/sm2-settings/reset
+  // =========================================================================
+  describe('POST /api/auth/sm2-settings/reset', () => {
+    it('should reset user SM-2 parameters to default values when authenticated', async () => {
+      const user = await createVerifiedUser({
+        email: 'sm2reset@example.com',
+        sm2EasyFactorModifier: 1.5,
+        sm2IntervalModifier: 2.0,
+        sm2Step1Interval: 3,
+        sm2Step2Interval: 10
+      });
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'sm2reset@example.com', password: 'StrongPass1!' });
+      const token = loginRes.body.token;
+
+      const res = await request(app)
+        .post('/api/auth/sm2-settings/reset')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.user.sm2EasyFactorModifier).toBe(1.0);
+      expect(res.body.user.sm2IntervalModifier).toBe(1.0);
+      expect(res.body.user.sm2Step1Interval).toBe(1);
+      expect(res.body.user.sm2Step2Interval).toBe(6);
+
+      const dbUser = await User.findByPk(user.id);
+      expect(dbUser.sm2EasyFactorModifier).toBe(1.0);
     });
   });
 });

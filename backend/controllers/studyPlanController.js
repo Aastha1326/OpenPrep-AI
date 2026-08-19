@@ -1,14 +1,19 @@
 const { Op } = require('sequelize');
 const { v4: uuidv4 } = require('uuid');
 const StudyPlan = require('../models/StudyPlan');
+const cacheService = require('../services/cacheService');
 const Exam = require('../models/Exam');
 const Subject = require('../models/Subject');
 const Topic = require('../models/Topic');
 const ActivityLog = require('../models/ActivityLog');
 const User = require('../models/User');
+const QuizAttempt = require('../models/QuizAttempt');
 const geminiService = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
-
+const { toDateOnlyString, toLocalDateString } = require('../utils/dateUtils');
+const { generateMilestones } = require('../services/milestoneGeneratorService');
+const calendarService = require('../services/calendarService');
+const schedulePredictorService = require('../services/schedulePredictorService');
 // @desc    Generate AI Study Plan
 // @route   POST /api/study-plans/generate-ai
 // @access  Private
@@ -78,7 +83,9 @@ exports.generateAIPlan = async (req, res, next) => {
         });
       }
       formattedGoals.push({
-        date: new Date(day.date),
+        // Store plain YYYY-MM-DD date strings (local day) instead of UTC
+        // timestamps so schedule items never shift by a day across timezones.
+        date: toDateOnlyString(day.date),
         tasks,
       });
     }
@@ -89,12 +96,20 @@ exports.generateAIPlan = async (req, res, next) => {
       { where: { user: req.user.id, exam: examId, status: 'active' } }
     );
 
+    const milestones = generateMilestones({
+      startDate: toDateOnlyString(startDate),
+      endDate: toDateOnlyString(endDate),
+      dailyGoals: formattedGoals,
+      examName: exam.name,
+    });
+
     const studyPlan = await StudyPlan.create({
       exam: examId,
       user: req.user.id,
       startDate: new Date(startDate),
       endDate: new Date(endDate),
       dailyGoals: formattedGoals,
+      milestones,
       status: 'active',
     });
 
@@ -104,6 +119,8 @@ exports.generateAIPlan = async (req, res, next) => {
       activityType: 'study_plan_create',
       description: `Generated AI Study Plan for exam: ${exam.name}`,
     });
+
+    await cacheService.del(`study_plan:active:${req.user.id}`);
 
     res.status(201).json({
       success: true,
@@ -135,6 +152,21 @@ exports.generateAIPlan = async (req, res, next) => {
 exports.getActivePlan = async (req, res, next) => {
   try {
     const { examId } = req.query;
+    const cacheKey = `study_plan:active:${req.user.id}`;
+
+    // Read cache
+    const cached = await cacheService.get(cacheKey);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (!examId || (parsed && parsed.exam && parsed.exam.id === examId)) {
+          return res.status(200).json({ success: true, data: parsed });
+        }
+      } catch (err) {
+        console.warn('Failed to parse cached study plan:', err.message);
+      }
+    }
+
     const filter = { user: req.user.id, status: 'active' };
     if (examId) filter.exam = examId;
 
@@ -179,6 +211,14 @@ exports.getActivePlan = async (req, res, next) => {
     const planJson = plan.toJSON();
     planJson.exam = planJson.examRef; // populate parity
     planJson.dailyGoals = resolvedGoals;
+    planJson.completionForecast = schedulePredictorService.getCompletionForecast({
+      dailyGoals: plan.dailyGoals,
+      referenceDateStr: toLocalDateString(new Date()),
+      examDateStr: plan.examRef ? plan.examRef.date : null,
+    });
+
+    // Store in cache for 5 minutes (300 seconds)
+    await cacheService.set(cacheKey, JSON.stringify(planJson), 300);
 
     res.status(200).json({ success: true, data: planJson });
   } catch (error) {
@@ -229,6 +269,21 @@ exports.toggleTaskCompletion = async (req, res, next) => {
     //   false -> true : add hours (task was just completed)
     //   true  -> false: subtract hours (task was unmarked)
     //   same state    : no change (prevents double-counting)
+    let progression = null;
+    if (completed && !wasCompleted) {
+      const gamificationService = require('../services/gamificationService');
+      progression = await gamificationService.awardXP(req.user.id, 50, 'task_complete');
+
+      const timezoneOffset = Number(req.headers['x-timezone-offset']) || 0;
+      await gamificationService.updateStreak(req.user.id, timezoneOffset);
+
+      const user = await User.findByPk(req.user.id);
+      const newBadges = await gamificationService.checkAndUnlockBadges(user, 'task_complete', {
+        timezoneOffsetMinutes: timezoneOffset
+      });
+      progression.newBadges = newBadges;
+    }
+
     if (studyTimeMinutes) {
       const hours = studyTimeMinutes / 60;
 
@@ -250,6 +305,69 @@ exports.toggleTaskCompletion = async (req, res, next) => {
       // If state unchanged (completed === wasCompleted), do nothing
     }
 
+    const { recalculateReadinessInBackground } = require('./readinessController');
+    recalculateReadinessInBackground(req.user.id).catch((err) => console.error('Background readiness recalculation error:', err));
+
+    await cacheService.del(`study_plan:active:${req.user.id}`);
+
+    res.status(200).json({ success: true, data: plan, progression });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Move a task to a new date (used by the Gantt/timeline drag view)
+// @route   PUT /api/study-plans/:planId/tasks/:taskId/date
+// @access  Private
+exports.moveTaskDate = async (req, res, next) => {
+  try {
+    const { planId, taskId } = req.params;
+    const { newDate } = req.body;
+
+    const plan = await StudyPlan.findOne({ where: { id: planId, user: req.user.id } });
+    if (!plan) {
+      return res.status(404).json({ success: false, error: 'Study plan not found' });
+    }
+
+    const planStart = toDateOnlyString(plan.startDate);
+    const planEnd = toDateOnlyString(plan.endDate);
+    const targetDate = toDateOnlyString(newDate);
+
+    if (targetDate < planStart || targetDate > planEnd) {
+      return res.status(400).json({
+        success: false,
+        error: `Date must be between ${planStart} and ${planEnd}`,
+      });
+    }
+
+    const dailyGoals = JSON.parse(JSON.stringify(plan.dailyGoals));
+    let movedTask = null;
+
+    for (const goal of dailyGoals) {
+      const idx = (goal.tasks || []).findIndex((t) => t._id === taskId || t.id === taskId);
+      if (idx !== -1) {
+        [movedTask] = goal.tasks.splice(idx, 1);
+        break;
+      }
+    }
+
+    if (!movedTask) {
+      return res.status(404).json({ success: false, error: 'Task not found in plan' });
+    }
+
+    let targetGoal = dailyGoals.find((g) => toDateOnlyString(g.date) === targetDate);
+    if (!targetGoal) {
+      targetGoal = { date: newDate, tasks: [] };
+      dailyGoals.push(targetGoal);
+      dailyGoals.sort((a, b) => new Date(a.date) - new Date(b.date));
+    }
+    targetGoal.tasks.push(movedTask);
+
+    plan.dailyGoals = dailyGoals;
+    await plan.save();
+
+    await cacheService.del(`study_plan:active:${req.user.id}`);
+
     res.status(200).json({ success: true, data: plan });
   } catch (error) {
     next(error);
@@ -259,8 +377,7 @@ exports.toggleTaskCompletion = async (req, res, next) => {
 // @desc    Get all Study Plans
 // @route   GET /api/study-plans/plans
 // @access  Private
-exports.getPlans = async (req, res, next) => {
-  try {
+exports.getPlans = async (req, res, next) => {  try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
     const offset = (page - 1) * limit;
@@ -309,6 +426,8 @@ exports.rescheduleOverdueTasks = async (req, res, next) => {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    // Plain local-date string (YYYY-MM-DD) immune to timezone drift
+    const todayStr = toLocalDateString(new Date());
     const examDate = new Date(exam.date);
     const daysUntilExam = Math.ceil((examDate - today) / (1000 * 60 * 60 * 24));
 
@@ -339,8 +458,8 @@ exports.rescheduleOverdueTasks = async (req, res, next) => {
       const generatedGoals = await geminiService.generateStudyPlan(
         exam.name,
         syllabus,
-        today.toISOString().split('T')[0],
-        examDate.toISOString().split('T')[0],
+        todayStr,
+        toDateOnlyString(exam.date),
         3, // Default 3 hours per day
         true // Force refresh
       );
@@ -372,7 +491,7 @@ exports.rescheduleOverdueTasks = async (req, res, next) => {
           });
         }
         formattedGoals.push({
-          date: new Date(day.date),
+          date: toDateOnlyString(day.date),
           tasks,
         });
       }
@@ -386,6 +505,8 @@ exports.rescheduleOverdueTasks = async (req, res, next) => {
         description: `AI Re-balanced study plan for exam: ${exam.name}`,
       });
 
+      await cacheService.del(`study_plan:active:${req.user.id}`);
+
       return res.status(200).json({
         success: true,
         data: plan,
@@ -398,12 +519,13 @@ exports.rescheduleOverdueTasks = async (req, res, next) => {
     const overdueTasks = [];
     const futureGoals = [];
 
-    // Separate overdue incomplete tasks from future goals
+    // Separate overdue incomplete tasks from future goals.
+    // Compare plain YYYY-MM-DD strings so the reschedule never drifts a day
+    // based on the server/client timezone.
     for (const goal of dailyGoals) {
-      const goalDate = new Date(goal.date);
-      goalDate.setHours(0, 0, 0, 0);
+      const goalDateStr = toDateOnlyString(goal.date);
 
-      if (goalDate < today) {
+      if (goalDateStr < todayStr) {
         // This is a past date - collect incomplete tasks
         for (const task of goal.tasks) {
           if (!task.completed) {
@@ -472,11 +594,7 @@ exports.rescheduleOverdueTasks = async (req, res, next) => {
     }
 
     // Rebuild dailyGoals with today's date onwards
-    const todayGoals = dailyGoals.filter(g => {
-      const goalDate = new Date(g.date);
-      goalDate.setHours(0, 0, 0, 0);
-      return goalDate >= today;
-    });
+    const todayGoals = dailyGoals.filter((g) => toDateOnlyString(g.date) >= todayStr);
 
     plan.dailyGoals = [...todayGoals, ...rescheduledGoals];
     await plan.save();
@@ -486,6 +604,8 @@ exports.rescheduleOverdueTasks = async (req, res, next) => {
       activityType: 'study_plan_reschedule',
       description: `Rescheduled ${overdueTasks.length} overdue tasks for exam: ${exam.name}`,
     });
+
+    await cacheService.del(`study_plan:active:${req.user.id}`);
 
     res.status(200).json({
       success: true,
@@ -520,7 +640,256 @@ exports.rescheduleAdaptivePlan = async (req, res, next) => {
     if (!result) {
       return res.status(404).json({ success: false, error: 'No active study plan found to reschedule' });
     }
+
+    await cacheService.del(`study_plan:active:${req.user.id}`);
+
     res.status(200).json({ success: true, data: result, message: 'Adaptive study plan rescheduled successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+// @desc    Export Study Plan as RFC 5545 .ics calendar file
+// @route   GET /api/study-plans/:id/export-ics
+// @access  Private
+exports.exportStudyPlanIcs = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const plan = await StudyPlan.findOne({
+      where: { id, user: req.user.id },
+      include: [{ model: Exam, as: 'examRef' }],
+    });
+
+    if (!plan) {
+      return res.status(404).json({
+        success: false,
+        error: 'Study plan not found',
+      });
+    }
+
+    const timeZone = req.headers['x-timezone'] || 'UTC';
+
+    try {
+      new Intl.DateTimeFormat('en-US', {
+        timeZone,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid timezone supplied',
+      });
+    }
+
+    const calendarService = require('../services/calendarService');
+
+    const icsContent = calendarService.generateStudyPlanIcs(
+      plan,
+      timeZone
+    );
+
+    res.setHeader(
+      'Content-Type',
+      'text/calendar; charset=utf-8'
+    );
+
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="study-plan-${id}.ics"`
+    );
+
+    return res.status(200).send(icsContent);
+  } catch (error) {
+    next(error);
+  }
+};
+// @desc    Predict syllabus completion date and evenly rebalance pending tasks
+//          across the remaining study days
+// @route   POST /api/study-plans/rebalance
+// @access  Private
+exports.rebalanceStudyPlan = async (req, res, next) => {
+  try {
+    const { examId } = req.body;
+    const filter = { user: req.user.id, status: 'active' };
+    if (examId) filter.exam = examId;
+
+    const plan = await StudyPlan.findOne({ where: filter, include: [{ model: Exam, as: 'examRef' }] });
+    if (!plan) {
+      return res.status(404).json({ success: false, error: 'No active study plan found' });
+    }
+
+    const exam = plan.examRef;
+    if (!exam) {
+      return res.status(404).json({ success: false, error: 'Associated exam not found' });
+    }
+
+    const referenceDateStr = toLocalDateString(new Date());
+    const examDateStr = toDateOnlyString(exam.date);
+
+    // Fold in recent quiz accuracy (last 14 days) so a slipping quiz score
+    // pulls the projected pace down even if tasks are still being checked off.
+    const windowStart = new Date();
+    windowStart.setDate(windowStart.getDate() - schedulePredictorService.DEFAULT_VELOCITY_WINDOW_DAYS);
+    const recentAttempts = await QuizAttempt.findAll({
+      where: { user: req.user.id, createdAt: { [Op.gte]: windowStart } },
+    });
+    const quizAccuracy = recentAttempts.length
+      ? recentAttempts.reduce((sum, a) => sum + (a.score || 0), 0) / recentAttempts.length / 100
+      : null;
+
+    const forecast = schedulePredictorService.getCompletionForecast({
+      dailyGoals: plan.dailyGoals,
+      referenceDateStr,
+      examDateStr,
+      quizAccuracy,
+    });
+
+    const { dailyGoals, remainingDays, pendingTaskCount, rebalanced, reason } =
+      schedulePredictorService.rebalanceScheduleEvenly({
+        dailyGoals: plan.dailyGoals,
+        referenceDateStr,
+        examDateStr,
+      });
+
+    if (rebalanced) {
+      plan.dailyGoals = dailyGoals;
+      await plan.save();
+
+      await ActivityLog.create({
+        user: req.user.id,
+        activityType: 'study_plan_reschedule',
+        description: `Rebalanced ${pendingTaskCount} pending task(s) across ${remainingDays} remaining day(s) for exam: ${exam.name}`,
+      });
+    }
+
+    let message = 'No pending tasks to rebalance';
+    if (rebalanced) {
+      message = `Rebalanced ${pendingTaskCount} pending task(s) across ${remainingDays} remaining day(s)`;
+    } else if (reason === 'NO_DAYS_REMAINING') {
+      message = 'No study days remain before the exam date';
+    }
+
+    await cacheService.del(`study_plan:active:${req.user.id}`);
+
+    res.status(200).json({ success: true, data: plan, forecast, rebalanced, reason, message });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Export active study plan as a downloadable PDF
+// @route   GET /api/study-plans/:id/export-pdf
+// @access  Private
+exports.exportStudyPlanPdf = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Load plan and verify ownership in one query — prevents cross-user leaks
+    const plan = await StudyPlan.findOne({
+      where: { id, user: req.user.id },
+      include: [{ model: Exam, as: 'examRef' }],
+    });
+
+    if (!plan) {
+      return res.status(404).json({ success: false, error: 'Study plan not found' });
+    }
+
+    // Resolve topic names for tasks that reference a topic ID
+    const topicIds = new Set();
+    (plan.dailyGoals || []).forEach((goal) => {
+      (goal.tasks || []).forEach((task) => {
+        if (task.topic && typeof task.topic === 'string') topicIds.add(task.topic);
+      });
+    });
+
+    const topicMap = {};
+    if (topicIds.size > 0) {
+      const topics = await Topic.findAll({
+        where: { id: { [Op.in]: Array.from(topicIds) }, user: req.user.id },
+      });
+      topics.forEach((t) => { topicMap[t.id] = t.name; });
+    }
+
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+
+    const dateStr = new Date().toISOString().split('T')[0];
+    const filename = `openprep-studyplan-${dateStr}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    doc.pipe(res);
+
+    // ── Header ──────────────────────────────────────────────────────────────
+    doc.fillColor('#1a365d').fontSize(22).text('OpenPrep AI — Study Plan', { align: 'center' });
+    doc.moveDown(0.4);
+    doc.fillColor('#4a5568').fontSize(11)
+      .text(`Student: ${req.user.name || 'Scholar'}`, { align: 'center' })
+      .text(`Generated: ${new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}`, { align: 'center' });
+    doc.moveDown(0.8);
+
+    // ── Exam Info ────────────────────────────────────────────────────────────
+    doc.fillColor('#2b6cb0').fontSize(14).text('Exam Details', { underline: true });
+    doc.moveDown(0.3);
+    doc.fillColor('#2d3748').fontSize(10);
+    const exam = plan.examRef;
+    doc.text(`• Exam: ${exam ? exam.name : 'N/A'}`);
+    doc.text(`• Plan Start: ${plan.startDate ? new Date(plan.startDate).toLocaleDateString() : 'N/A'}`);
+    doc.text(`• Exam Date: ${exam?.date ? new Date(exam.date).toLocaleDateString() : 'N/A'}`);
+    doc.text(`• Status: ${plan.status}`);
+    doc.moveDown(1);
+
+    // ── Progress Summary ─────────────────────────────────────────────────────
+    const allTasks = (plan.dailyGoals || []).flatMap((g) => g.tasks || []);
+    const totalTasks = allTasks.length;
+    const completedTasks = allTasks.filter((t) => t.completed).length;
+    const progressPct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+    doc.fillColor('#2b6cb0').fontSize(14).text('Progress Summary', { underline: true });
+    doc.moveDown(0.3);
+    doc.fillColor('#2d3748').fontSize(10);
+    doc.text(`• Total Tasks: ${totalTasks}`);
+    doc.text(`• Completed: ${completedTasks}`);
+    doc.text(`• Pending: ${totalTasks - completedTasks}`);
+    doc.text(`• Completion: ${progressPct}%`);
+    doc.moveDown(1);
+
+    // ── Daily Task Sections ──────────────────────────────────────────────────
+    doc.fillColor('#2b6cb0').fontSize(14).text('Daily Study Schedule', { underline: true });
+    doc.moveDown(0.5);
+
+    const sortedGoals = [...(plan.dailyGoals || [])].sort(
+      (a, b) => new Date(a.date) - new Date(b.date)
+    );
+
+    for (const goal of sortedGoals) {
+      const dayTasks = goal.tasks || [];
+      if (dayTasks.length === 0) continue;
+
+      if (doc.y > 700) doc.addPage();
+
+      const dayLabel = goal.date
+        ? new Date(goal.date).toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })
+        : 'Unknown Date';
+
+      doc.fillColor('#1a202c').fontSize(11).font('Helvetica-Bold').text(dayLabel);
+      doc.font('Helvetica').fontSize(9).fillColor('#4a5568');
+
+      for (const task of dayTasks) {
+        if (doc.y > 720) doc.addPage();
+        const status = task.completed ? '✓' : '○';
+        const topicName = task.topic
+          ? (typeof task.topic === 'object' ? task.topic.name : (topicMap[task.topic] || task.topic))
+          : null;
+        const durationLabel = task.duration ? ` (${task.duration} min)` : '';
+        const topicLabel = topicName ? ` — ${topicName}` : '';
+        doc.fillColor(task.completed ? '#276749' : '#4a5568');
+        doc.text(`  ${status} ${task.title}${topicLabel}${durationLabel}`);
+      }
+      doc.moveDown(0.6);
+    }
+
+    doc.moveDown(1.5);
+    doc.fillColor('#718096').fontSize(8).text('Generated by OpenPrep AI Learning Platform', { align: 'center' });
+    doc.end();
   } catch (error) {
     next(error);
   }

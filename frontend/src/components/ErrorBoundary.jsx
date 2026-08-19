@@ -1,5 +1,4 @@
 import { Component } from 'react';
-
 import { AlertTriangle, RotateCcw, Home } from 'lucide-react';
 
 class ErrorBoundary extends Component {
@@ -14,33 +13,60 @@ class ErrorBoundary extends Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
+    // Auto-reload on deployment chunk mismatch
+    const isChunkError =
+      error?.message?.includes('Failed to fetch dynamically imported module') ||
+      error?.message?.includes('Importing a module script failed');
+
+    if (isChunkError) {
+      const lastReload = sessionStorage.getItem('chunk_reload');
+      const now = Date.now();
+      if (!lastReload || now - parseInt(lastReload, 10) > 10000) {
+        sessionStorage.setItem('chunk_reload', now.toString());
+        window.location.reload();
+      }
+    }
   }
 
   handleRetry = () => {
-    this.setState({ hasError: false, error: null });
+    const isChunkError =
+      this.state.error?.message?.includes('Failed to fetch dynamically imported module') ||
+      this.state.error?.message?.includes('Importing a module script failed');
+
+    if (isChunkError) {
+      window.location.reload();
+    } else {
+      this.setState({ hasError: false, error: null });
+    }
   };
 
   render() {
     if (this.state.hasError) {
+      const isChunkError =
+        this.state.error?.message?.includes('Failed to fetch dynamically imported module') ||
+        this.state.error?.message?.includes('Importing a module script failed');
+
       return (
-        <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-amber-900 via-stone-900 to-stone-950 p-4">
-          <div className="w-full max-w-md bg-gradient-to-br from-amber-50 to-amber-100 rounded-sm shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-amber-700/50 p-8 text-center">
+        <div className="flex min-h-screen items-center justify-center bg-[#FFFBE9] dark:bg-[#000000] p-4 text-[#1F150C] dark:text-[#E1DCC9] font-inter">
+          <div className="w-full max-w-md bg-[#E3CAA5]/70 dark:bg-[#1F150C]/95 backdrop-blur-xl rounded-3xl border border-[#CEAB93] dark:border-[#412D15] shadow-2xl p-8 text-center">
             <div className="flex justify-center mb-6">
-              <div className="h-16 w-16 rounded-full bg-red-100 border border-red-300 flex items-center justify-center">
-                <AlertTriangle className="h-8 w-8 text-red-600" />
+              <div className="h-16 w-16 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-center">
+                <AlertTriangle className="h-8 w-8 text-red-600 dark:text-red-400" />
               </div>
             </div>
 
-            <h1 className="text-2xl font-bold font-playfair text-stone-900 mb-2">
-              Something went wrong
+            <h1 className="text-2xl font-extrabold font-playfair text-[#1F150C] dark:text-[#E1DCC9] mb-2">
+              {isChunkError ? 'New Version Available' : 'Something went wrong'}
             </h1>
-            <p className="text-stone-600 text-sm mb-6">
-              An unexpected error occurred. Please try again or return to the home page.
+            <p className="text-[#412D15] dark:text-[#C4BA9D] text-sm mb-6 font-medium">
+              {isChunkError
+                ? 'A new version of OpenPrep AI was just deployed. Please reload to load the latest features.'
+                : 'An unexpected error occurred. Please try again or return to the home page.'}
             </p>
 
             {this.state.error && (
-              <div className="bg-red-50 border border-red-200 rounded-sm p-3 mb-6 text-left">
-                <p className="text-xs text-red-700 font-mono break-all">
+              <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-3.5 mb-6 text-left">
+                <p className="text-xs text-red-700 dark:text-red-300 font-mono break-all">
                   {this.state.error.message || 'Unknown error'}
                 </p>
               </div>
@@ -49,14 +75,14 @@ class ErrorBoundary extends Component {
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <button
                 onClick={this.handleRetry}
-                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-amber-700 hover:bg-amber-800 text-amber-50 font-semibold rounded-sm transition-colors text-sm"
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 btn-primary-theme font-bold rounded-xl shadow-md transition-all text-sm cursor-pointer"
               >
                 <RotateCcw className="h-4 w-4" />
-                Try Again
+                {isChunkError ? 'Reload Page' : 'Try Again'}
               </button>
               <a
                 href="/"
-                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-white border border-stone-300 hover:bg-slate-50 text-stone-700 font-semibold rounded-sm transition-colors text-sm"
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 btn-secondary-theme font-bold rounded-xl shadow-sm transition-all text-sm cursor-pointer"
               >
                 <Home className="h-4 w-4" />
                 Go Home

@@ -1,33 +1,35 @@
-import { createContext, useContext, useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { toggleTheme as toggleThemeAction, setTheme as setThemeAction } from '../store/slices/dashboardSlice';
+import { createContext, useContext, useEffect, useState } from 'react';
 
-const ThemeContext = createContext();
+export const ThemeContext = createContext({
+  theme: 'system',
+  setTheme: () => {},
+});
 
 export const ThemeProvider = ({ children }) => {
-  const dispatch = useDispatch();
-  const reduxTheme = useSelector((state) => state.dashboard?.theme);
-
-  // Fallback initial theme logic if Redux is not yet populated or in isolated context
-  const getInitialTheme = () => {
-    const saved = localStorage.getItem('openprep_theme') || localStorage.getItem('theme');
-    if (saved) return saved;
-    if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      return 'dark';
+  // Theme can be: 'light', 'dark', 'high-contrast', 'system'
+  const [theme, setThemeState] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('openprep_theme') || localStorage.getItem('theme');
+      return saved || 'system';
     }
-    return 'dark';
+    return 'system';
+  });
+
+  const setTheme = (newTheme) => {
+    setThemeState(newTheme);
   };
 
-  const theme = reduxTheme || getInitialTheme();
-
-  // Handle OS system preference changes dynamically if user hasn't explicitly set a preference
+  // Handle OS system preference changes dynamically
   useEffect(() => {
+    if (theme !== 'system') return;
+
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (e) => {
-      const saved = localStorage.getItem('openprep_theme') || localStorage.getItem('theme');
-      if (!saved) {
-        const newSystemTheme = e.matches ? 'dark' : 'light';
-        dispatch(setThemeAction(newSystemTheme));
+      const root = window.document.documentElement;
+      if (e.matches) {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
       }
     };
 
@@ -44,30 +46,36 @@ export const ThemeProvider = ({ children }) => {
         mediaQuery.removeListener(handleChange);
       }
     };
-  }, [dispatch]);
+  }, [theme]);
 
+
+  // Sync theme changes with DOM root (html tag) and localStorage
   useEffect(() => {
     const root = window.document.documentElement;
+    
+    // Clear old classes
+    root.classList.remove('dark', 'oled', 'high-contrast');
+
     if (theme === 'dark') {
       root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
+    } else if (theme === 'high-contrast') {
+      root.classList.add('high-contrast');
+    } else if (theme === 'system') {
+      const isSystemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (isSystemDark) {
+        root.classList.add('dark');
+      }
     }
+    
     localStorage.setItem('openprep_theme', theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
 
-  const toggleTheme = () => {
-    dispatch(toggleThemeAction());
-  };
-
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, setTheme }}>
       {children}
     </ThemeContext.Provider>
   );
 };
 
 export const useTheme = () => useContext(ThemeContext);
-
-

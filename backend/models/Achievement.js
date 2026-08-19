@@ -13,20 +13,23 @@ const Achievement = sequelize.define(
       type: DataTypes.UUID,
       allowNull: false,
     },
-    badgeName: {
+    badgeId: {
       type: DataTypes.STRING,
       allowNull: false,
     },
-    description: {
-      type: DataTypes.STRING,
-    },
-    awardedAt: {
+    earnedAt: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
     },
   },
   {
     timestamps: true,
+    indexes: [
+      {
+        unique: true,
+        fields: ['userId', 'badgeId'],
+      },
+    ],
   }
 );
 

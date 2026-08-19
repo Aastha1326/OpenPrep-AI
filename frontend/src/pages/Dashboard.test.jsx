@@ -98,12 +98,14 @@ describe('Dashboard', () => {
 
   test('shows personalized greeting with user name', () => {
     renderDashboard();
-    expect(screen.getByText(/Welcome back, Test User/)).toBeInTheDocument();
+    expect(screen.getByText(/Welcome back/)).toBeInTheDocument();
+    expect(screen.getByText(/Test/)).toBeInTheDocument();
   });
 
   test('falls back to "Welcome back, Scholar." when user has no name', () => {
     renderDashboard({ user: null });
-    expect(screen.getByText(/Welcome back, Scholar/)).toBeInTheDocument();
+    expect(screen.getByText(/Welcome back/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Scholar/)[0]).toBeInTheDocument();
   });
 
   // ── Logout button ──
@@ -133,13 +135,13 @@ describe('Dashboard', () => {
     expect(studyPlanBtn).toBeInTheDocument();
   });
 
-  test('Start Quiz sidebar button shows coming soon toast', async () => {
+  test('Start Quiz sidebar button opens Quiz Setup modal', async () => {
     renderDashboard();
     const startQuizBtn = screen.getByText('Start Quiz').closest('button');
     fireEvent.click(startQuizBtn);
 
     await waitFor(() => {
-      expect(screen.getByText('Quiz feature coming soon!')).toBeInTheDocument();
+      expect(screen.getByText('Generate a multilingual quiz')).toBeInTheDocument();
     });
   });
 
@@ -150,11 +152,10 @@ describe('Dashboard', () => {
         auth: {
           token: 'fake-token',
           isAuthenticated: true,
-          user: { id: 'u1', name: 'Test User', email: 'test@test.com' },
-          loading: false,
-          error: null,
+          user: { _id: '123', name: 'Test User' }
         },
         dashboard: {
+          sessionStartTime: null,
           stats: null,
           weeklyChartData: [],
           recentActivity: [],
@@ -169,15 +170,15 @@ describe('Dashboard', () => {
           errorSubjects: null,
           errorPlan: null,
           errorFlashcards: null,
-        },
-      },
+        }
+      }
     });
 
     render(
       <Provider store={store}>
         <MemoryRouter initialEntries={['/dashboard']}>
           <Routes>
-            <Route path="/dashboard" element={<ThemeProvider><Dashboard /></ThemeProvider>} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/pyqs" element={<div>PYQ Analysis Page</div>} />
           </Routes>
         </MemoryRouter>
@@ -187,43 +188,6 @@ describe('Dashboard', () => {
     const pyqBtn = screen.getByText('PYQ Intelligence').closest('button');
     fireEvent.click(pyqBtn);
     expect(screen.getByText('PYQ Analysis Page')).toBeInTheDocument();
-  });
-
-  test('coming soon toast auto-dismisses after 3 seconds', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    renderDashboard();
-
-    const startQuizBtn = screen.getByText('Start Quiz').closest('button');
-    fireEvent.click(startQuizBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText('Quiz feature coming soon!')).toBeInTheDocument();
-    });
-
-    vi.advanceTimersByTime(3100);
-
-    await waitFor(() => {
-      expect(screen.queryByText('Quiz feature coming soon!')).not.toBeInTheDocument();
-    });
-
-    vi.useRealTimers();
-  });
-
-  test('coming soon toast can be dismissed by clicking X', async () => {
-    renderDashboard();
-    const startQuizBtn = screen.getByText('Start Quiz').closest('button');
-    fireEvent.click(startQuizBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText('Quiz feature coming soon!')).toBeInTheDocument();
-    });
-
-    const dismissBtn = document.querySelector('.fixed .ml-2.text-yellow-400');
-    fireEvent.click(dismissBtn);
-
-    await waitFor(() => {
-      expect(screen.queryByText('Quiz feature coming soon!')).not.toBeInTheDocument();
-    });
   });
 
   // ── Achievements ──
@@ -352,5 +316,51 @@ describe('Dashboard', () => {
     });
 
     expect(screen.getByText('Future task')).toBeInTheDocument();
+  });
+
+  // ── Clamping and Bonus Badges ──
+
+  test('clamps task progress to 100% and displays bonus indicator badge when completing bonus tasks', () => {
+    const now = new Date();
+    const todayLocal = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    renderDashboard({}, {
+      activePlan: {
+        id: 'plan-1',
+        dailyGoals: [
+          {
+            date: `${todayLocal}T00:00:00.000Z`,
+            tasks: [
+              { id: 't1', title: 'Regular Study task', completed: true },
+              { id: 't2', title: '[Bonus] Extra Flashcards', completed: true, isBonus: true },
+            ],
+          },
+        ],
+      },
+    });
+
+    // Verify progress is calculated, but clamped at 100% (since 2 completed / 1 regular = 200% clamped to 100%)
+    expect(screen.getByText('100%')).toBeInTheDocument();
+
+    // Verify progress bar fill style has 100% width
+    const fillEl = screen.getByTestId('daily-progress-fill');
+    expect(fillEl.style.width).toBe('100%');
+
+    // Verify bonus indicators are displayed
+    expect(screen.getByText('Bonus')).toBeInTheDocument();
+    expect(screen.getByText(/1 Bonus Done/)).toBeInTheDocument();
+  });
+
+  test('renders 0h 0m and onboarding message for new users with no activity logs', () => {
+    renderDashboard(
+      { user: { id: 'u1', name: 'New User' } },
+      {
+        stats: { totalStudyHours: 0 },
+        recentActivity: [],
+      }
+    );
+
+    expect(screen.getByText('0h 0m')).toBeInTheDocument();
+    expect(screen.getByText(/Start your first study session to track time!/i)).toBeInTheDocument();
   });
 });

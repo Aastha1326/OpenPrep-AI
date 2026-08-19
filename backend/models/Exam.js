@@ -47,6 +47,10 @@ const Exam = sequelize.define(
         name: 'exam_user_idx',
         fields: ['user'],
       },
+      {
+        name: 'exam_user_created_idx',
+        fields: ['user', 'createdAt'],
+      },
     ],
   }
 );

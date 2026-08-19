@@ -18,6 +18,13 @@ const ALLOWED_MIME_TYPES = {
   '.jpeg': 'image/jpeg',
   '.jpg': 'image/jpeg',
   '.png': 'image/png',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.webm': 'audio/webm',
+  '.ogg': 'audio/ogg',
+  '.m4a': 'audio/mp4',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml',
 };
 
 // Expected binary magic-byte signature (file-type ext) per allowed extension.
@@ -29,10 +36,16 @@ const MAGIC_BYTE_TYPES = {
   '.jpeg': 'jpg',
   '.jpg': 'jpg',
   '.png': 'png',
+  '.mp3': 'mp3',
+  '.wav': 'wav',
+  '.webm': 'webm',
+  '.ogg': 'ogg',
+  '.m4a': ['m4a', 'mp4'],
+  '.webp': 'webp',
 };
 
 function createFileValidationError() {
-  const error = new Error('Only PDFs, documents, and images are allowed!');
+  const error = new Error('Only PDFs, documents, images, and audio files are allowed!');
   error.name = 'FileValidationError';
   return error;
 }
@@ -70,8 +83,18 @@ async function verifyMagicBytes(ext, buffer) {
     return;
   }
 
-  if (!detected || detected.ext !== expected) {
+  if (!detected) {
     throw createFileValidationError();
+  }
+
+  if (Array.isArray(expected)) {
+    if (!expected.includes(detected.ext)) {
+      throw createFileValidationError();
+    }
+  } else {
+    if (detected.ext !== expected) {
+      throw createFileValidationError();
+    }
   }
 }
 
@@ -79,7 +102,11 @@ async function verifyMagicBytes(ext, buffer) {
 function checkFileType(file, cb) {
   const ext = path.extname(file.originalname).toLowerCase();
   const extname = Object.prototype.hasOwnProperty.call(ALLOWED_MIME_TYPES, ext);
-  const mimetype = ALLOWED_MIME_TYPES[ext] === file.mimetype;
+
+  const isAudioExt = ['.mp3', '.wav', '.webm', '.ogg', '.m4a'].includes(ext);
+  const mimetype = isAudioExt
+    ? file.mimetype.startsWith('audio/')
+    : ALLOWED_MIME_TYPES[ext] === file.mimetype;
 
   if (mimetype && extname) {
     return cb(null, true);
@@ -136,6 +163,21 @@ const upload = multer({
   },
 });
 
+// Separate in-memory multer instance for Markdown note imports — these files
+// are parsed straight into Note records and never need to touch disk.
+const uploadMarkdown = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024, files: 20 }, // 2MB per file, 20 files max
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ext === '.md' || ext === '.markdown') {
+      return cb(null, true);
+    }
+    return cb(createFileValidationError());
+  },
+});
+
 // Expose helper for unit testing while keeping the multer instance as default
 module.exports = upload;
 module.exports.verifyMagicBytes = verifyMagicBytes;
+module.exports.uploadMarkdown = uploadMarkdown;

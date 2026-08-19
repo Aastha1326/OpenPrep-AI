@@ -28,24 +28,49 @@ export const registerUser = createAsyncThunk(
   }
 );
 
-/** Login with email + password. Backend returns { token, refreshToken, user }. */
+/** Login with email + password. Backend returns { token, refreshToken, user } or { requires2FA: true }. */
 export const loginUser = createAsyncThunk(
   'auth/login',
   async (userData, { rejectWithValue }) => {
     try {
       const response = await API.post('/auth/login', userData);
+      
+      // If 2FA is enabled, backend returns requires2FA instead of tokens immediately
+      if (response.data.requires2FA) {
+        return { requires2FA: true, email: userData.email };
+      }
+
       const { token, refreshToken } = response.data;
       localStorage.setItem('token', token);
       localStorage.setItem('refreshToken', refreshToken);
       return response.data;
     } catch (err) {
-      // Pass through the backend error (e.g. "Please verify your email before logging in")
       const message = err.response?.data?.error || 'Login failed';
       const status = err.response?.status;
       return rejectWithValue(status === 403
         ? { error: message, needsVerification: true }
         : { error: message, needsVerification: false }
       );
+    }
+  }
+);
+
+/** Login / Register using Google ID token or OAuth access token. Backend returns { token, refreshToken, user }. */
+export const googleLoginUser = createAsyncThunk(
+  'auth/googleLogin',
+  async (payload, { rejectWithValue }) => {
+    try {
+      const body = typeof payload === 'string' ? { credential: payload } : payload;
+      const response = await API.post('/auth/google', body);
+      const { token, refreshToken } = response.data;
+      if (token) {
+        localStorage.setItem('token', token);
+        localStorage.setItem('refreshToken', refreshToken);
+      }
+      return response.data;
+    } catch (err) {
+      const message = err.response?.data?.error || 'Google login failed';
+      return rejectWithValue(message);
     }
   }
 );
@@ -127,6 +152,62 @@ export const refreshTokenThunk = createAsyncThunk(
   }
 );
 
+/** Update custom SM-2 algorithm preferences */
+export const updateSM2Settings = createAsyncThunk(
+  'auth/updateSM2Settings',
+  async (settingsData, { rejectWithValue }) => {
+    try {
+      const response = await API.put('/auth/sm2-settings', settingsData);
+      return response.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.error || 'Failed to update SM-2 settings');
+    }
+  }
+);
+
+/** Update general user settings (e.g. leaderboard, weekly email digest) */
+export const updateSettings = createAsyncThunk(
+  'auth/updateSettings',
+  async (settingsData, { rejectWithValue }) => {
+    try {
+      const response = await API.patch('/auth/settings', settingsData);
+      return response.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.error || 'Failed to update settings');
+    }
+  }
+);
+
+/** Reset custom SM-2 algorithm preferences to default values */
+export const resetSM2Settings = createAsyncThunk(
+  'auth/resetSM2Settings',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await API.post('/auth/sm2-settings/reset');
+      return response.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.error || 'Failed to reset SM-2 settings');
+    }
+  }
+);
+
+// Helper to safely parse JWT payload
+const parseJwt = (token) => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
+};
+
 // ── Initial State ──
 const initialState = {
   get token() { return getInitialToken(); },
@@ -137,6 +218,9 @@ const initialState = {
   get loading() { return !!getInitialToken(); },
   error: null,
   message: null,
+  sessionExpired: false,
+  aiQuotaExceededUntil: null,
+  aiQuotaErrorMsg: null,
 };
 
 // ── Slice ──
@@ -154,6 +238,7 @@ const authSlice = createSlice({
       state.user = null;
       state.error = null;
       state.message = null;
+      state.sessionExpired = false;
     },
     clearError: (state) => {
       state.error = null;
@@ -163,6 +248,36 @@ const authSlice = createSlice({
     },
     clearRegistrationSuccess: (state) => {
       state.registrationSuccess = false;
+    },
+    clearSessionExpired: (state) => {
+      state.sessionExpired = false;
+    },
+    setAiQuotaExceededUntil: (state, action) => {
+      state.aiQuotaExceededUntil = action.payload;
+    },
+    setAiQuotaErrorMsg: (state, action) => {
+      state.aiQuotaErrorMsg = action.payload;
+    },
+    checkTokenFreshness: (state) => {
+      const token = localStorage.getItem('token');
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (!token && !refreshToken) return;
+
+      const decodedToken = token ? parseJwt(token) : null;
+      const decodedRefresh = refreshToken ? parseJwt(refreshToken) : null;
+
+      const now = Math.floor(Date.now() / 1000);
+      
+      // If refresh token exists but has expired, trigger session timeout
+      if (decodedRefresh && decodedRefresh.exp && decodedRefresh.exp < now) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        state.token = null;
+        state.refreshToken = null;
+        state.isAuthenticated = false;
+        state.user = null;
+        state.sessionExpired = true;
+      }
     },
   },
   extraReducers: (builder) => {
@@ -202,6 +317,10 @@ const authSlice = createSlice({
       })
       .addCase(loginUser.fulfilled, (state, action) => {
         state.loading = false;
+        if (action.payload.requires2FA) {
+          // Do not set authenticated state yet; waiting for 2FA verification code
+          return;
+        }
         state.isAuthenticated = true;
         state.token = action.payload.token;
         state.refreshToken = action.payload.refreshToken;
@@ -214,6 +333,26 @@ const authSlice = createSlice({
         // action.payload is { error, needsVerification }
         const payload = action.payload || { error: 'Login failed', needsVerification: false };
         state.error = typeof payload === 'string' ? payload : payload.error;
+      })
+
+      // ── Google Login ──
+      .addCase(googleLoginUser.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.message = null;
+      })
+      .addCase(googleLoginUser.fulfilled, (state, action) => {
+        state.loading = false;
+        state.isAuthenticated = true;
+        state.token = action.payload.token;
+        state.refreshToken = action.payload.refreshToken;
+        state.user = action.payload.user;
+        state.registrationSuccess = false;
+      })
+      .addCase(googleLoginUser.rejected, (state, action) => {
+        state.loading = false;
+        state.isAuthenticated = false;
+        state.error = action.payload || 'Google login failed';
       })
 
       // ── Load User ──
@@ -304,9 +443,57 @@ const authSlice = createSlice({
         state.token = null;
         state.refreshToken = null;
         state.error = 'Session expired. Please log in again.';
+      })
+      // ── Update SM-2 Settings ──
+      .addCase(updateSM2Settings.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateSM2Settings.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload.user;
+      })
+      .addCase(updateSM2Settings.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // ── Reset SM-2 Settings ──
+      .addCase(resetSM2Settings.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(resetSM2Settings.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload.user;
+      })
+      .addCase(resetSM2Settings.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // ── Update General Settings ──
+      .addCase(updateSettings.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateSettings.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload.user;
+      })
+      .addCase(updateSettings.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
       });
   },
 });
 
-export const { logout, clearError, clearMessage, clearRegistrationSuccess } = authSlice.actions;
+export const {
+  logout,
+  clearError,
+  clearMessage,
+  clearRegistrationSuccess,
+  clearSessionExpired,
+  checkTokenFreshness,
+  setAiQuotaExceededUntil,
+  setAiQuotaErrorMsg,
+} = authSlice.actions;
 export default authSlice.reducer;
