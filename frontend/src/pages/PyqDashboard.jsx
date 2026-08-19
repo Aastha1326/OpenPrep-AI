@@ -351,6 +351,13 @@ const [activeInsightTab, setActiveInsightTab] = useState('paper');
             </p>
           </div>
           <div className="flex items-center gap-4">
+            <Link
+              to="/pyq-analytics"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-amber-800 hover:bg-amber-900 border border-amber-950/40 text-white rounded-lg text-xs font-bold shadow-sm transition-all uppercase tracking-wider"
+            >
+              <TrendingUp className="w-4 h-4 text-amber-250" />
+              Batch Trend Analyzer
+            </Link>
             <ThemeToggle />
           </div>
         </div>

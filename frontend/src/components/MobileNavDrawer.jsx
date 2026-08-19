@@ -13,6 +13,8 @@ const NAV_LINKS = [
   { to: '/squads', label: 'Study Squads', preload: () => import('../pages/SquadsPage') },
   { to: '/ai-assistant', label: 'AI Mentor Chat', preload: () => import('../pages/AiAssistant') },
   { to: '/community/decks', label: 'Community Library', preload: () => import('../pages/CommunityDecks') },
+  { to: '/pyqs', label: 'PYQ Intelligence', preload: () => import('../pages/PyqDashboard') },
+  { to: '/pyq-analytics', label: 'PYQ Trend Analyzer', preload: () => import('../pages/PYQAnalytics') },
   { to: '/settings', label: 'Settings', preload: () => import('../pages/Settings') },
 ];
 
