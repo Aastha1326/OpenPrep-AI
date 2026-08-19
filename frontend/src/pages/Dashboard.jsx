@@ -34,6 +34,7 @@ import {
   Brain,
   Bot,
   Users,
+  Swords,
 } from 'lucide-react';
 import API from '../services/api';
 import { toDateOnlyString } from '../utils/dateUtils';
@@ -41,6 +42,7 @@ import SkillTree from '../components/dashboard/SkillTree';
 import ModelViewer from '../components/dashboard/ModelViewer';
 import StudyTimetable from '../components/dashboard/StudyTimetable';
 import FocusRoom from '../components/dashboard/FocusRoom';
+import QuizBattleArena from '../components/dashboard/QuizBattleArena';
 import {
   LineChart,
   Line,
@@ -351,6 +353,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isModelViewerOpen, setIsModelViewerOpen] = useState(false);
   const [isTimetableOpen, setIsTimetableOpen] = useState(false);
   const [isFocusRoomOpen, setIsFocusRoomOpen] = useState(false);
+  const [isBattleOpen, setIsBattleOpen] = useState(false);
   const [showLevelUpModal, setShowLevelUpModal] = useState(false);
   const [levelUpLevel, setLevelUpLevel] = useState(null);
   const [prevLevel, setPrevLevel] = useState(null);
@@ -505,8 +508,9 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   return (
     <LeatherBoard>
       {/* --- QUICK ACTIONS TABS --- */}
-      <div className="absolute -left-4 top-24 flex-col gap-4 z-30 hidden md:flex">
-        <GoldTabButton
+        <div className="absolute -left-4 top-24 flex-col gap-4 z-30 hidden md:flex">
+          <GoldTabButton icon={Swords} label="Battle Arena" delay={0.05} onClick={() => setIsBattleOpen(true)} />
+          <GoldTabButton
           icon={Play}
           label="Start Quiz"
           delay={0.1}
@@ -1381,6 +1385,13 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
       <AnimatePresence>
         {isFocusRoomOpen && (
           <FocusRoom onClose={() => setIsFocusRoomOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* --- QUIZ BATTLE ARENA MVP --- */}
+      <AnimatePresence>
+        {isBattleOpen && (
+          <QuizBattleArena onClose={() => setIsBattleOpen(false)} />
         )}
       </AnimatePresence>
 
