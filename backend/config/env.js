@@ -168,6 +168,9 @@ const schema = z.object({
   CACHE_TTL: intFromString(3600, { min: 0 }),
   CACHE_MAX_KEYS: intFromString(1000, { min: 1 }),
 
+  // ── OCR ───────────────────────────────────────────────────────────────────
+  OCR_TIMEOUT_MS: intFromString(60000, { min: 1000 }),
+
   // ── Test-only switches ───────────────────────────────────────────────────
   ENABLE_RATE_LIMIT_TESTS: booleanFromString(false),
   SENTRY_DSN: z.string().optional(),
