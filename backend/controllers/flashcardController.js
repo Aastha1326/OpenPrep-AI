@@ -380,7 +380,7 @@ exports.generateFlashcardsFromYouTube = async (req, res, next) => {
       });
     }
 
-    const transcriptText = (transcriptItems || []).map((item) => item.text).join(' ').trim();
+    const transcriptText = (transcriptItems || []).map((item) => `[${Math.floor(item.offset / 1000)}s]: ${item.text}`).join('\n').trim();
     if (!transcriptText) {
       return res.status(422).json({
         success: false,
@@ -404,15 +404,23 @@ exports.generateFlashcardsFromYouTube = async (req, res, next) => {
       subjectName,
       topicName,
       transcriptText,
-      count || 6
+      count || 6,
+      false, // forceRefresh
+      true // isYouTube
     );
+
+    // Attach youtubeUrl to cards
+    const annotatedCards = cardsList.map((c) => ({
+      ...c,
+      sourceUrl: youtubeUrl,
+    }));
 
     res.status(200).json({
       success: true,
-      count: cardsList.length,
+      count: annotatedCards.length,
       videoId,
       subjectId: subjectId || null,
-      data: cardsList,
+      data: annotatedCards,
     });
   } catch (error) {
     if (error instanceof GeminiRateLimitError) {
@@ -950,6 +958,8 @@ for (let i = 0; i < records.length; i++) {
         back,
         tags,
         hint,
+        sourceUrl: typeof r.sourceUrl === 'string' ? r.sourceUrl : null,
+        timestampSeconds: typeof r.timestampSeconds === 'number' ? r.timestampSeconds : null,
       });
     }
     if (valid.length === 0) {

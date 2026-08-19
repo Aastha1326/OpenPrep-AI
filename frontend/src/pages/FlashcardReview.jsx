@@ -893,10 +893,21 @@ useEffect(() => {
                 </div>
               </div>
 
-              <div className="flex-1 w-full flex items-center justify-center">
+              <div className="flex-1 w-full flex flex-col items-center justify-center">
                 <p className="text-xl md:text-2xl text-neutral-800 dark:text-neutral-200 font-inter leading-relaxed text-center">
                   <MathRenderer text={currentCard.back} />
                 </p>
+                {currentCard.sourceUrl && currentCard.timestampSeconds !== undefined && currentCard.timestampSeconds !== null && (
+                  <a 
+                    href={`${currentCard.sourceUrl}&t=${currentCard.timestampSeconds}s`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-6 flex items-center gap-2 px-4 py-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-full text-sm font-medium hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                  >
+                    <Video className="w-4 h-4" />
+                    Jump to Video ({Math.floor(currentCard.timestampSeconds / 60)}:{(currentCard.timestampSeconds % 60).toString().padStart(2, '0')})
+                  </a>
+                )}
               </div>
 
               {currentCard.sourceUrl && (
