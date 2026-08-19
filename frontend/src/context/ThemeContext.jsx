@@ -1,37 +1,50 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 export const ThemeContext = createContext({
   theme: 'system',
+  resolvedTheme: 'light',
   setTheme: () => {},
 });
 
+const STORAGE_KEY = 'openprep_theme';
+const LEGACY_STORAGE_KEY = 'theme';
+const VALID_THEMES = ['light', 'dark', 'high-contrast', 'system'];
+
+const readSavedTheme = () => {
+  if (typeof window === 'undefined') return 'system';
+  const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
+  return VALID_THEMES.includes(saved) ? saved : 'system';
+};
+
+const systemPrefersDark = () =>
+  typeof window !== 'undefined' &&
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(prefers-color-scheme: dark)').matches;
+
 export const ThemeProvider = ({ children }) => {
   // Theme can be: 'light', 'dark', 'high-contrast', 'system'
-  const [theme, setThemeState] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('openprep_theme') || localStorage.getItem('theme');
-      return saved || 'system';
-    }
-    return 'system';
-  });
+  const [theme, setThemeState] = useState(readSavedTheme);
+  // Tracks the live OS preference so 'system' mode can react to changes
+  const [systemDark, setSystemDark] = useState(systemPrefersDark);
+
+  // The theme actually applied to the UI, resolving 'system' against the OS preference
+  const resolvedTheme = useMemo(() => {
+    if (theme === 'system') return systemDark ? 'dark' : 'light';
+    return theme;
+  }, [theme, systemDark]);
 
   const setTheme = (newTheme) => {
-    setThemeState(newTheme);
+    if (VALID_THEMES.includes(newTheme)) {
+      setThemeState(newTheme);
+    }
   };
 
-  // Handle OS system preference changes dynamically
+  // Listen for OS system preference changes (used while theme === 'system')
   useEffect(() => {
-    if (theme !== 'system') return;
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e) => {
-      const root = window.document.documentElement;
-      if (e.matches) {
-        root.classList.add('dark');
-      } else {
-        root.classList.remove('dark');
-      }
-    };
+    const handleChange = (e) => setSystemDark(e.matches);
 
     if (mediaQuery.addEventListener) {
       mediaQuery.addEventListener('change', handleChange);
@@ -46,33 +59,27 @@ export const ThemeProvider = ({ children }) => {
         mediaQuery.removeListener(handleChange);
       }
     };
-  }, [theme]);
+  }, []);
 
-
-  // Sync theme changes with DOM root (html tag) and localStorage
+  // Sync the resolved theme to the DOM <html> root and persist the user's selection
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
     const root = window.document.documentElement;
-    
-    // Clear old classes
     root.classList.remove('dark', 'oled', 'high-contrast');
 
-    if (theme === 'dark') {
+    if (resolvedTheme === 'dark') {
       root.classList.add('dark');
-    } else if (theme === 'high-contrast') {
+    } else if (resolvedTheme === 'high-contrast') {
       root.classList.add('high-contrast');
-    } else if (theme === 'system') {
-      const isSystemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-      if (isSystemDark) {
-        root.classList.add('dark');
-      }
     }
-    
-    localStorage.setItem('openprep_theme', theme);
-    localStorage.setItem('theme', theme);
-  }, [theme]);
+
+    localStorage.setItem(STORAGE_KEY, theme);
+    localStorage.setItem(LEGACY_STORAGE_KEY, theme);
+  }, [theme, resolvedTheme]);
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
+    <ThemeContext.Provider value={{ theme, resolvedTheme, setTheme }}>
       {children}
     </ThemeContext.Provider>
   );

@@ -20,8 +20,14 @@ import {
   CalendarDays,
 } from 'lucide-react';import LeatherBoard from '../components/dashboard/LeatherBoard';
 import VintagePaper from '../components/dashboard/VintagePaper';
+import ThemeToggle from '../components/ThemeToggle';
 import API from '../services/api';
-import { getVapidPublicKey, subscribeToPush, unsubscribeFromPush, updateNotificationPreferences } from '../services/notificationApi';
+import {
+  getVapidPublicKey,
+  subscribeToPush,
+  unsubscribeFromPush,
+  updateNotificationPreferences,
+} from '../services/notificationApi';
 import { loadUser } from '../store/slices/authSlice';
 import { validateAvatarFile } from '../utils/fileValidation';
 import { BADGE_LIST, BADGE_ICONS } from '../config/badges';
@@ -43,7 +49,7 @@ const Settings = () => {
   const navigate = useNavigate();
   const { user } = useSelector((state) => state.auth);
 
-const [leaderboardVisible, setLeaderboardVisible] = useState(
+  const [leaderboardVisible, setLeaderboardVisible] = useState(
     typeof user?.leaderboardVisible === 'boolean' ? user.leaderboardVisible : true
   );
   const [hideActivityFromSquad, setHideActivityFromSquad] = useState(
@@ -55,7 +61,8 @@ const [leaderboardVisible, setLeaderboardVisible] = useState(
   const [savingActivityPrivacy, setSavingActivityPrivacy] = useState(false);
   const [savingCalendarSync, setSavingCalendarSync] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);  const [error, setError] = useState(null);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState(null);
 
   // Avatar Upload States
   const [file, setFile] = useState(null);
@@ -104,7 +111,9 @@ const [leaderboardVisible, setLeaderboardVisible] = useState(
       setPreviewUrl(null);
       await dispatch(loadUser());
     } catch (err) {
-      setUploadError(err.response?.data?.error || err.response?.data?.message || 'Failed to save avatar photo.');
+      setUploadError(
+        err.response?.data?.error || err.response?.data?.message || 'Failed to save avatar photo.'
+      );
     } finally {
       setUploading(false);
     }
@@ -124,7 +133,9 @@ const [leaderboardVisible, setLeaderboardVisible] = useState(
       setPreviewUrl(null);
       await dispatch(loadUser());
     } catch (err) {
-      setUploadError(err.response?.data?.error || err.response?.data?.message || 'Failed to remove avatar photo.');
+      setUploadError(
+        err.response?.data?.error || err.response?.data?.message || 'Failed to remove avatar photo.'
+      );
     } finally {
       setUploading(false);
     }
@@ -146,7 +157,7 @@ const [leaderboardVisible, setLeaderboardVisible] = useState(
     } finally {
       setSaving(false);
     }
-}, [leaderboardVisible, dispatch]);
+  }, [leaderboardVisible, dispatch]);
 
   const handleActivityPrivacyToggle = useCallback(async () => {
     const next = !hideActivityFromSquad;
@@ -275,7 +286,6 @@ const [leaderboardVisible, setLeaderboardVisible] = useState(
             Back to Dashboard
           </button>
         </div>
-
         {/* --- USER AVATAR PROFILE --- */}
         <VintagePaper className="border-t-4 border-t-amber-700">
           <div className="flex items-center gap-3 mb-4">
@@ -374,7 +384,27 @@ const [leaderboardVisible, setLeaderboardVisible] = useState(
             </div>
           </div>
         </VintagePaper>
+        {/* --- APPEARANCE / THEME --- */}
+        <VintagePaper className="border-t-4 border-t-amber-700">
+          <div className="flex items-center gap-3 mb-4">
+            <Palette className="w-7 h-7 text-amber-700" />
+            <h2 className="text-2xl font-bold font-playfair text-neutral-800 dark:text-neutral-100">
+              Appearance
+            </h2>
+          </div>
 
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <p className="text-sm text-neutral-600 dark:text-neutral-300">
+                Choose between Light, Dark, High Contrast, or System Default.
+              </p>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                High Contrast mode guarantees a minimum 7:1 contrast ratio (WCAG 2.1 AA).
+              </p>
+            </div>
+            <ThemeToggle />
+          </div>
+        </VintagePaper>
         {/* --- BADGE GALLERY --- */}
         <VintagePaper className="border-t-4 border-t-amber-700">
           <div className="flex items-center gap-3 mb-3">
@@ -393,19 +423,23 @@ const [leaderboardVisible, setLeaderboardVisible] = useState(
               const Icon = BADGE_ICONS[badgeConfig.icon] || Award;
               const earnedRecord = user?.achievements?.find((a) => a.badgeId === badgeConfig.id);
               const isEarned = !!earnedRecord;
-              
+
               return (
-                <div 
+                <div
                   key={badgeConfig.id}
                   className={`p-4 border rounded-sm flex flex-col items-center text-center transition-all ${
-                    isEarned 
+                    isEarned
                       ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700/50 shadow-sm'
                       : 'bg-neutral-50 dark:bg-neutral-800/40 border-neutral-200 dark:border-neutral-700 opacity-60 grayscale'
                   }`}
                 >
-                  <div className={`p-3 rounded-full mb-3 ${
-                    isEarned ? 'bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200' : 'bg-neutral-200 dark:bg-neutral-700 text-neutral-500'
-                  }`}>
+                  <div
+                    className={`p-3 rounded-full mb-3 ${
+                      isEarned
+                        ? 'bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200'
+                        : 'bg-neutral-200 dark:bg-neutral-700 text-neutral-500'
+                    }`}
+                  >
                     <Icon className="w-8 h-8" />
                   </div>
                   <h3 className="font-playfair font-bold text-sm text-neutral-800 dark:text-neutral-200 mb-1">
@@ -416,7 +450,10 @@ const [leaderboardVisible, setLeaderboardVisible] = useState(
                   </p>
                   {isEarned && (
                     <span className="text-[10px] font-semibold tracking-wider uppercase text-amber-700 dark:text-amber-400">
-                      Earned {new Date(earnedRecord.earnedAt || earnedRecord.createdAt).toLocaleDateString()}
+                      Earned{' '}
+                      {new Date(
+                        earnedRecord.earnedAt || earnedRecord.createdAt
+                      ).toLocaleDateString()}
                     </span>
                   )}
                 </div>
@@ -424,7 +461,6 @@ const [leaderboardVisible, setLeaderboardVisible] = useState(
             })}
           </div>
         </VintagePaper>
-
         {/* --- LEADERBOARD PRIVACY --- */}
         <VintagePaper className="border-t-4 border-t-amber-700">
           <div className="flex items-center gap-3 mb-3">
@@ -491,8 +527,7 @@ const [leaderboardVisible, setLeaderboardVisible] = useState(
               {error}
             </p>
           )}
-</VintagePaper>
-
+        </VintagePaper>
         {/* --- STUDY SQUAD ACTIVITY PRIVACY --- */}
         <VintagePaper className="border-t-4 border-t-amber-700">
           <div className="flex items-center gap-3 mb-3">
@@ -522,7 +557,7 @@ const [leaderboardVisible, setLeaderboardVisible] = useState(
                 <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-0.5">
                   {hideActivityFromSquad
                     ? 'Your quiz, streak and badge milestones will not appear in any squad activity feed.'
-                    : 'Your quiz, streak and badge milestones will appear in your squads\' activity feeds.'}
+                    : "Your quiz, streak and badge milestones will appear in your squads' activity feeds."}
                 </p>
               </div>
             </div>
@@ -544,8 +579,8 @@ const [leaderboardVisible, setLeaderboardVisible] = useState(
             </button>
           </div>
         </VintagePaper>
-
-        {/* --- PUSH NOTIFICATIONS --- */}        <VintagePaper className="border-t-4 border-t-amber-700">
+        {/* --- PUSH NOTIFICATIONS --- */}{' '}
+        <VintagePaper className="border-t-4 border-t-amber-700">
           <div className="flex items-center gap-3 mb-3">
             <Bell className="w-7 h-7 text-amber-700" />
             <h2 className="text-2xl font-bold font-playfair text-neutral-800 dark:text-neutral-100">
@@ -554,7 +589,8 @@ const [leaderboardVisible, setLeaderboardVisible] = useState(
           </div>
 
           <p className="text-neutral-600 dark:text-neutral-300 mb-6 leading-relaxed">
-            Enable web push notifications to get daily reminders for your study goals. Set your preferred time below.
+            Enable web push notifications to get daily reminders for your study goals. Set your
+            preferred time below.
           </p>
 
           <div className="flex flex-col gap-6">
@@ -564,7 +600,11 @@ const [leaderboardVisible, setLeaderboardVisible] = useState(
                   Push Notifications
                 </p>
                 <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-0.5">
-                  {pushStatus === 'denied' ? 'Notifications are blocked by your browser.' : (pushSubscribed ? 'Notifications are enabled.' : 'You are not subscribed to notifications.')}
+                  {pushStatus === 'denied'
+                    ? 'Notifications are blocked by your browser.'
+                    : pushSubscribed
+                      ? 'Notifications are enabled.'
+                      : 'You are not subscribed to notifications.'}
                 </p>
               </div>
 
