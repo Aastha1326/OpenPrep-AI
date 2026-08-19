@@ -7,8 +7,16 @@ const PYQ = require('../models/PYQ');
 const Subject = require('../models/Subject');
 const Topic = require('../models/Topic');
 const ActivityLog = require('../models/ActivityLog');
+let uploadFileToFirebase = null;
+try {
+  const firebaseService = require('../services/firebaseStorageService');
+  uploadFileToFirebase = firebaseService.uploadFileToFirebase;
+} catch (e) {
+  // Graceful fallback if firebase storage service is omitted or missing
+}
 const geminiService = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
+const { checkAndAwardBadges } = require('../services/achievementService');
 const { clusterByCosineSimilarity } = require('../utils/vectorUtils');
 
 // Cosine similarity cutoff above which two questions are treated as duplicates
@@ -140,6 +148,13 @@ exports.uploadAndAnalyzePYQ = async (req, res, next) => {
       user: req.user.id,
       activityType: 'pyq_upload',
       description: `Uploaded and analyzed Previous Year Question Paper: ${pyq.title}`,
+    });
+
+    // Issue #1053: Check for PYQ Analyst badge
+    const totalAnalyzed = await PYQ.count({ where: { user: req.user.id } });
+    await checkAndAwardBadges(req.user.id, {
+      type: 'PYQ_ANALYZED',
+      payload: { totalAnalyzed }
     });
 
     res.status(201).json({
@@ -519,6 +534,76 @@ exports.getPYQAnalysis = async (req, res, next) => {
   }
 };
 
+// @desc    Stream PYQ Analysis via Server-Sent Events (SSE)
+// @route   GET /api/pyqs/:id/analyze-stream
+// @access  Private
+exports.analyzePYQStream = async (req, res, next) => {
+  try {
+    const pyq = await PYQ.findOne({
+      where: { id: req.params.id, user: req.user.id },
+    });
+    if (!pyq) {
+      return res.status(404).json({ success: false, error: 'Question paper not found' });
+    }
+
+    // Set Server-Sent Events (SSE) headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    if (typeof res.flushHeaders === 'function') {
+      res.flushHeaders();
+    }
+
+    // Initial connection ACK
+    res.write(`data: ${JSON.stringify({ status: 'connected', message: 'SSE stream established' })}\n\n`);
+
+    let extractedText = '';
+    try {
+      if (pyq.fileUrl) {
+        const absolutePath = path.resolve(path.join(__dirname, '..', pyq.fileUrl));
+        if (fs.existsSync(absolutePath)) {
+          const dataBuffer = await fs.promises.readFile(absolutePath);
+          const pdfData = await pdfParse(dataBuffer);
+          extractedText = pdfData.text;
+        }
+      }
+    } catch (parseError) {
+      console.error('PDF parsing error during SSE stream:', parseError);
+    }
+
+    const subject = await Subject.findByPk(pyq.subject);
+    const subjectName = subject ? subject.name : 'the subject';
+
+    const analysis = await geminiService.analyzePYQStream(
+      extractedText || `${subjectName} - Year ${pyq.year}`,
+      subjectName,
+      (chunkText) => {
+        res.write(`data: ${JSON.stringify({ chunk: chunkText })}\n\n`);
+      }
+    );
+
+    if (analysis) {
+      pyq.analysisResults = analysis;
+      pyq.analyzed = true;
+      await pyq.save();
+    }
+
+    res.write(`data: ${JSON.stringify({ status: 'completed', analysis })}\n\n`);
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (error) {
+    console.error('Error during PYQ SSE analysis streaming:', error);
+    if (!res.headersSent) {
+      next(error);
+    } else {
+      res.write(`data: ${JSON.stringify({ error: error.message || 'Stream processing failed' })}\n\n`);
+      res.write('data: [DONE]\n\n');
+      res.end();
+    }
+  }
+};
+
 // @desc    Delete PYQ
 // @route   DELETE /api/pyqs/:id
 // @access  Private
@@ -850,6 +935,83 @@ exports.exportPYQAnalysisPDF = async (req, res, next) => {
 
     doc.end();
   } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get PYQ metadata (aggregated statistics)
+// @route   GET /api/pyqs/metadata
+// @access  Private
+exports.getPYQMetadata = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+
+    // Get aggregated PYQ statistics
+    const totalPYQs = await PYQ.count({ where: { user: userId } });
+    
+    const analyzedCount = await PYQ.count({ 
+      where: { user: userId, analyzed: true } 
+    });
+
+    // Get unique subjects
+    const subjects = await PYQ.findAll({
+      where: { user: userId },
+      attributes: [[sequelize.fn('DISTINCT', sequelize.col('subject')), 'subject']],
+      raw: true,
+    });
+    const uniqueSubjects = subjects.length;
+
+    // Get year range
+    const yearStats = await PYQ.findOne({
+      where: { user: userId },
+      attributes: [
+        [sequelize.fn('MIN', sequelize.col('year')), 'minYear'],
+        [sequelize.fn('MAX', sequelize.col('year')), 'maxYear'],
+      ],
+      raw: true,
+    });
+
+    // Get difficulty distribution
+    const difficultyStats = await PYQ.findAll({
+      where: { user: userId },
+      attributes: [
+        'difficulty',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+      ],
+      group: ['difficulty'],
+      raw: true,
+    });
+
+    const difficultyDistribution = {
+      Easy: 0,
+      Medium: 0,
+      Hard: 0,
+    };
+
+    difficultyStats.forEach((stat) => {
+      if (stat.difficulty && difficultyDistribution.hasOwnProperty(stat.difficulty)) {
+        difficultyDistribution[stat.difficulty] = parseInt(stat.count, 10);
+      }
+    });
+
+    const metadata = {
+      totalPYQs,
+      analyzedCount,
+      uniqueSubjects,
+      yearRange: {
+        min: yearStats?.minYear || null,
+        max: yearStats?.maxYear || null,
+      },
+      difficultyDistribution,
+      lastUpdated: new Date().toISOString(),
+    };
+
+    res.status(200).json({
+      success: true,
+      data: metadata,
+    });
+  } catch (error) {
+    console.error('[pyqController.getPYQMetadata] Error:', error);
     next(error);
   }
 };

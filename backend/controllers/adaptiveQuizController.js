@@ -1,5 +1,6 @@
 const { GoogleGenAI } = require('@google/genai');
 const Quiz = require('../models/Quiz');
+const prompts = require('../config/prompts');
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -17,20 +18,7 @@ exports.getNextAdaptiveQuestion = async (req, res, next) => {
       else if (streakType === 'incorrect' && currentDifficulty === 'Medium') nextDifficulty = 'Easy';
     }
 
-    const prompt = `
-      Generate a single high-quality Multiple Choice Question (MCQ) of difficulty level "${nextDifficulty}" for an active quiz session.
-      Avoid duplicating these previously asked question IDs: ${JSON.stringify(answeredQuestionIds || [])}.
-      
-      Return the output strictly as a JSON object matching this schema:
-      {
-        "id": "unique_question_id",
-        "question": "Question text here?",
-        "difficulty": "${nextDifficulty}",
-        "options": ["Option A", "Option B", "Option C", "Option D"],
-        "correctAnswer": 0,
-        "explanation": "Detailed explanation."
-      }
-    `;
+    const prompt = prompts.adaptiveQuiz.getNextAdaptiveQuestion(nextDifficulty, answeredQuestionIds);
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',

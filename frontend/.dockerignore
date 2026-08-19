@@ -1,0 +1,44 @@
+# ── Dependencies ──
+node_modules/
+
+# ── Secrets & Environment ──
+.env
+.env.local
+.env.production
+
+# ── Version Control ──
+.git/
+.gitignore
+
+# ── Editor / IDE ──
+.vscode/
+.idea/
+
+# ── OS Artifacts ──
+.DS_Store
+Thumbs.db
+
+# ── Logs ──
+*.log
+npm-debug.log*
+
+# ── Production Builds ──
+dist/
+dist-ssr/
+build/
+
+# ── Tests & Coverage ──
+coverage/
+*.test.jsx
+*.test.js
+*.spec.js
+e2e/
+
+# ── Documentation ──
+*.md
+docs/
+
+# ── Temp files ──
+*.swp
+*.swo
+*~

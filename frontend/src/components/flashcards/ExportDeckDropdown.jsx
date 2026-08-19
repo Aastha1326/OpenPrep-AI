@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Download, FileJson, FileText, Database, ChevronDown, Globe, Upload } from 'lucide-react';
+import { Download, FileJson, FileText, Database, ChevronDown, Globe, Upload, Headphones } from 'lucide-react';
 import API from '../../services/api';
 import ExportModal from '../common/ExportModal';
 import { buildFlashcardDocument, buildFlashcardChapters, exportHTMLToPDF, exportToEPUB } from '../../utils/exportDocs';
+import AudioPodcastPlayerModal from './AudioPodcastPlayerModal';
 
 const ExportDeckDropdown = ({ subjectId = null, onImported = null }) => {
   const [isImporting, setIsImporting] = useState(false);
@@ -15,6 +16,41 @@ const ExportDeckDropdown = ({ subjectId = null, onImported = null }) => {
   const [deckTitle, setDeckTitle] = useState('Flashcard Deck');
   const [deckCount, setDeckCount] = useState(0);
   const dropdownRef = useRef(null);
+
+  const [isPodcastPlayerOpen, setIsPodcastPlayerOpen] = useState(false);
+  const [podcastEpisode, setPodcastEpisode] = useState(null);
+  const [isGeneratingPodcast, setIsGeneratingPodcast] = useState(false);
+  const [podcastCards, setPodcastCards] = useState([]);
+
+  const handleListenPodcast = async () => {
+    const resolvedSubjectId = subjectId && typeof subjectId === 'object' ? subjectId.id : subjectId;
+    if (!resolvedSubjectId) {
+      alert('Please select a subject deck to listen to.');
+      return;
+    }
+
+    setIsOpen(false);
+    setIsGeneratingPodcast(true);
+
+    try {
+      // Fetch cards for local captions
+      const { cards, title } = await fetchDeckCards();
+      setPodcastCards(cards);
+      setDeckTitle(title);
+
+      // Trigger generation endpoint
+      const res = await API.post(`/podcast/decks/${resolvedSubjectId}/generate-podcast`);
+      if (res.data?.success) {
+        setPodcastEpisode(res.data.data);
+        setIsPodcastPlayerOpen(true);
+      }
+    } catch (err) {
+      console.error('Failed to generate study podcast:', err);
+      alert(err?.response?.data?.error || 'Failed to generate revision podcast.');
+    } finally {
+      setIsGeneratingPodcast(false);
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -262,6 +298,22 @@ const ExportDeckDropdown = ({ subjectId = null, onImported = null }) => {
           )}
 
           {subjectId && (
+            <div className="py-1 border-b border-gray-100 dark:border-slate-700">
+              <div className="px-4 py-1.5 text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">
+                Audio Revision
+              </div>
+              <button
+                onClick={handleListenPodcast}
+                disabled={isGeneratingPodcast}
+                className="group flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-slate-700 disabled:opacity-50"
+              >
+                <Headphones className="mr-3 h-4 w-4 text-indigo-500 group-hover:text-indigo-600" />
+                {isGeneratingPodcast ? 'Stitching Audio...' : 'Listen as Podcast'}
+              </button>
+            </div>
+          )}
+
+          {subjectId && (
             <div className="py-1">
               <div className="px-4 py-1.5 text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">
                 Collaboration
@@ -286,6 +338,14 @@ const ExportDeckDropdown = ({ subjectId = null, onImported = null }) => {
         title={`Export ${deckTitle}`}
         itemCount={deckCount}
         onExport={handleFormattedExport}
+      />
+
+      <AudioPodcastPlayerModal
+        isOpen={isPodcastPlayerOpen}
+        onClose={() => setIsPodcastPlayerOpen(false)}
+        episodeData={podcastEpisode}
+        subjectName={deckTitle}
+        flashcards={podcastCards}
       />
     </div>
   );

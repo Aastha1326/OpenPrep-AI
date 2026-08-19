@@ -19,8 +19,8 @@ import { useTheme } from '../context/ThemeContext';
 const Landing = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useSelector((state) => state.auth);
-  const { theme } = useTheme();
-  const isDark = theme === 'dark' || theme === 'oled';
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark' || resolvedTheme === 'high-contrast';
 
   // Fade-in animation variants
   const containerVariants = {
@@ -100,24 +100,30 @@ const Landing = () => {
   return (
     <div className="min-h-screen font-inter bg-[#FFFBE9] dark:bg-[#000000] text-[#000000] dark:text-[#E1DCC9] transition-colors duration-300">
       {/* ── HEADER / NAVIGATION ── */}
-      <header className="sticky top-0 z-50 glass-panel border-b border-[#CEAB93]/50 dark:border-[#412D15] px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="bg-[#AD8B73] dark:bg-[#1F150C] p-2.5 rounded-xl shadow-md border border-[#CEAB93]/40 dark:border-[#412D15] flex items-center justify-center">
-            <BookOpen className="h-6 w-6 text-[#FFFBE9] dark:text-[#E1DCC9]" />
+      <header className="sticky top-0 z-50 glass-panel border-b border-[#CEAB93]/50 dark:border-[#412D15] px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="bg-[#AD8B73] dark:bg-[#1F150C] p-2 sm:p-2.5 rounded-xl shadow-md border border-[#CEAB93]/40 dark:border-[#412D15] flex items-center justify-center">
+            <BookOpen className="h-5 w-5 sm:h-6 sm:w-6 text-[#FFFBE9] dark:text-[#E1DCC9]" />
           </div>
           <div>
-            <h1 className="font-playfair text-xl font-bold tracking-tight flex items-center gap-1.5" style={{ color: isDark ? '#E1DCC9' : '#000000' }}>
+            <h1
+              className="font-playfair text-lg sm:text-xl font-bold tracking-tight flex items-center gap-1.5"
+              style={{ color: isDark ? '#E1DCC9' : '#000000' }}
+            >
               OpenPrep{' '}
-              <span className="text-sm px-2 py-0.5 bg-[#AD8B73]/20 text-[#000000] dark:bg-[#412D15] dark:text-[#E1DCC9] rounded-md font-mono border border-[#CEAB93]/50 dark:border-[#412D15]" style={{ color: isDark ? '#E1DCC9' : '#000000' }}>
+              <span
+                className="text-xs sm:text-sm px-1.5 sm:px-2 py-0.5 bg-[#AD8B73]/20 text-[#000000] dark:bg-[#412D15] dark:text-[#E1DCC9] rounded-md font-mono border border-[#CEAB93]/50 dark:border-[#412D15]"
+                style={{ color: isDark ? '#E1DCC9' : '#000000' }}
+              >
                 AI
               </span>
             </h1>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           {/* Toggles */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             <SoundToggle />
             <ThemeToggle />
           </div>
@@ -126,22 +132,22 @@ const Landing = () => {
           {isAuthenticated ? (
             <Link
               to="/dashboard"
-              className="px-5 py-2.5 rounded-lg btn-primary-theme font-semibold shadow-md transition-all duration-200 text-sm hover:shadow-lg hover:-translate-y-0.5 flex items-center gap-2"
+              className="px-3.5 sm:px-5 py-2.5 rounded-lg btn-primary-theme font-semibold shadow-md transition-all duration-200 text-xs sm:text-sm hover:shadow-lg hover:-translate-y-0.5 flex items-center gap-1.5 min-h-[44px]"
             >
-              Go to Dashboard <ChevronRight className="h-4 w-4" />
+              Dashboard <ChevronRight className="h-4 w-4" />
             </Link>
           ) : (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <Link
                 to="/login"
-                className="hidden sm:inline-block px-4 py-2 text-sm font-bold transition"
+                className="px-2.5 sm:px-4 py-2 text-xs sm:text-sm font-bold transition min-h-[44px] inline-flex items-center justify-center"
                 style={{ color: isDark ? '#E1DCC9' : '#000000' }}
               >
                 Sign In
               </Link>
               <Link
                 to="/register"
-                className="px-5 py-2.5 rounded-lg btn-primary-theme font-semibold shadow-md transition-all duration-200 text-sm hover:shadow-lg hover:-translate-y-0.5"
+                className="px-3.5 sm:px-5 py-2.5 rounded-lg btn-primary-theme font-semibold shadow-md transition-all duration-200 text-xs sm:text-sm hover:shadow-lg hover:-translate-y-0.5 min-h-[44px] inline-flex items-center justify-center"
               >
                 Get Started
               </Link>
@@ -167,7 +173,8 @@ const Landing = () => {
             className="mb-6 px-4 py-1.5 rounded-full bg-[#E3CAA5] dark:bg-[#1F150C] border border-[#CEAB93] dark:border-[#412D15] text-sm font-bold flex items-center gap-2 shadow-sm"
             style={{ color: isDark ? '#E1DCC9' : '#000000' }}
           >
-            <Sparkles className="h-4 w-4" style={{ color: isDark ? '#E1DCC9' : '#000000' }} /> Exam Preparation Reimagined with AI
+            <Sparkles className="h-4 w-4" style={{ color: isDark ? '#E1DCC9' : '#000000' }} /> Exam
+            Preparation Reimagined with AI
           </motion.div>
 
           <motion.h2
@@ -179,7 +186,12 @@ const Landing = () => {
           >
             Study Smarter. Analyze PYQs.
             <br />
-            <span className="underline decoration-[#CEAB93] underline-offset-8" style={{ color: isDark ? '#E1DCC9' : '#000000' }}>Master Your Exam Planner.</span>
+            <span
+              className="underline decoration-[#CEAB93] underline-offset-8"
+              style={{ color: isDark ? '#E1DCC9' : '#000000' }}
+            >
+              Master Your Exam Planner.
+            </span>
           </motion.h2>
 
           <motion.p
@@ -312,8 +324,12 @@ const Landing = () => {
                           🔥
                         </div>
                         <div>
-                          <h6 className="text-sm font-bold text-[#1F150C] dark:text-[#E1DCC9]">14 Day Streak</h6>
-                          <p className="text-[10px] text-[#412D15] dark:text-[#C4BA9D]">120 XP earned today</p>
+                          <h6 className="text-sm font-bold text-[#1F150C] dark:text-[#E1DCC9]">
+                            14 Day Streak
+                          </h6>
+                          <p className="text-[10px] text-[#412D15] dark:text-[#C4BA9D]">
+                            120 XP earned today
+                          </p>
                         </div>
                       </div>
                       <Check className="h-5 w-5 text-[#AD8B73] dark:text-[#E1DCC9]" />

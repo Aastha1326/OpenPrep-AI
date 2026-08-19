@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
+  Video,
   PlaySquare as Youtube,
   Sparkles,
   Loader,
@@ -9,10 +10,11 @@ import {
   CheckSquare,
   Square,
 } from 'lucide-react';
-import { X, Video, Sparkles, Loader, AlertCircle, CheckSquare, Square } from 'lucide-react';
 import API from '../../services/api';
+import useFocusTrap from '../../hooks/useFocusTrap';
 
 const GenerateFlashcardsFromYouTubeModal = ({ onClose, onImported }) => {
+  const containerRef = useFocusTrap(true, onClose);
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [subjects, setSubjects] = useState([]);
   const [subjectId, setSubjectId] = useState('');
@@ -88,16 +90,20 @@ const GenerateFlashcardsFromYouTubeModal = ({ onClose, onImported }) => {
         className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
       >
         <motion.div
+          ref={containerRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="generate-youtube-modal-title"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
           className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto p-6"
         >
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-slate-100">
+            <h3 id="generate-youtube-modal-title" className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-slate-100">
               <Video className="w-5 h-5 text-red-600" /> Generate Flashcards from YouTube
             </h3>
-            <button onClick={onClose} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
+            <button onClick={onClose} aria-label="Close modal" className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
               <X className="w-5 h-5" />
             </button>
           </div>

@@ -12,7 +12,7 @@ async function run() {
 
     // 2. Initialize schema from Sequelize models
     console.log('Syncing database models to set up base schema...');
-    await sequelize.sync({ force: true });
+    await sequelize.sync({ force: process.argv.includes('--force') });
     console.log('Base schema synchronized successfully.');
 
     // 3. Find and run migrations in scripts/migrations
@@ -22,8 +22,9 @@ async function run() {
       process.exit(0);
     }
 
-    const files = fs.readdirSync(migrationsDir)
-      .filter(file => file.endsWith('.sql'))
+    const files = fs
+      .readdirSync(migrationsDir)
+      .filter((file) => file.endsWith('.sql'))
       .sort();
 
     console.log(`Found ${files.length} migration file(s).`);
@@ -36,7 +37,7 @@ async function run() {
       // Execute the SQL file.
       const cleanSql = sql
         .split('\n')
-        .filter(line => !line.trim().startsWith('--'))
+        .filter((line) => !line.trim().startsWith('--'))
         .join('\n')
         .trim();
 
@@ -44,8 +45,8 @@ async function run() {
         // Split statements by semicolon to execute individually
         const statements = cleanSql
           .split(';')
-          .map(stmt => stmt.trim())
-          .filter(stmt => stmt.length > 0);
+          .map((stmt) => stmt.trim())
+          .filter((stmt) => stmt.length > 0);
 
         for (const statement of statements) {
           console.log(`Executing statement:\n${statement}`);

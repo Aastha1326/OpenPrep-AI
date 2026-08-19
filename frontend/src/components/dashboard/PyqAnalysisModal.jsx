@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Upload, AlertCircle, FileText, RefreshCw, CheckCircle } from 'lucide-react';
+import { X, Upload, AlertCircle, FileText, RefreshCw, CheckCircle, Sparkles, Zap } from 'lucide-react';
 import API from '../../services/api';
 
 const PyqAnalysisModal = ({ isOpen, onClose, onAnalysisComplete }) => {
@@ -10,6 +10,8 @@ const PyqAnalysisModal = ({ isOpen, onClose, onAnalysisComplete }) => {
   const [subjectId, setSubjectId] = useState('');
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingContent, setStreamingContent] = useState('');
   const [error, setError] = useState(null);
   const [isTimeout, setIsTimeout] = useState(false);
   const [successData, setSuccessData] = useState(null);
@@ -33,6 +35,8 @@ const PyqAnalysisModal = ({ isOpen, onClose, onAnalysisComplete }) => {
       setError(null);
       setIsTimeout(false);
       setSuccessData(null);
+      setStreamingContent('');
+      setIsStreaming(false);
     }
   }, [isOpen]);
 
@@ -45,7 +49,6 @@ const PyqAnalysisModal = ({ isOpen, onClose, onAnalysisComplete }) => {
       return;
     }
 
-    // 10MB client-side size check
     if (selectedFile.size > 10 * 1024 * 1024) {
       setError('File size exceeds 10MB limit. Please upload a smaller PDF paper.');
       return;
@@ -56,6 +59,80 @@ const PyqAnalysisModal = ({ isOpen, onClose, onAnalysisComplete }) => {
     setFile(selectedFile);
     if (!title) {
       setTitle(selectedFile.name.replace(/\.[^/.]+$/, ''));
+    }
+  };
+
+  const startSSEStream = async (pyqId) => {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    try {
+      setIsStreaming(true);
+      setStreamingContent('');
+
+      const response = await fetch(`/api/pyqs/${pyqId}/analyze-stream`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok || !response.body) {
+        throw new Error('SSE stream connection failed');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+      let finalAnalysisData = null;
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed === 'data: [DONE]') {
+            break;
+          }
+          if (trimmed.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(trimmed.slice(6));
+              if (data.chunk) {
+                setStreamingContent((prev) => prev + data.chunk);
+              }
+              if (data.status === 'completed' && data.analysis) {
+                finalAnalysisData = data.analysis;
+              }
+            } catch (e) {
+              // Ignore partial JSON parse errors
+            }
+          }
+        }
+      }
+
+      const result = finalAnalysisData || { _streamedText: streamingContent };
+      setSuccessData(result);
+      if (onAnalysisComplete) {
+        onAnalysisComplete(result);
+      }
+    } catch (streamErr) {
+      console.warn('SSE Streaming failed, falling back to standard request:', streamErr);
+      try {
+        const res = await API.post(`/pyqs/${pyqId}/analyze`);
+        const fallbackData = res.data?.data?.analysisResults || res.data?.data;
+        setSuccessData(fallbackData);
+        if (onAnalysisComplete) {
+          onAnalysisComplete(fallbackData);
+        }
+      } catch (fallbackErr) {
+        console.error('Fallback PYQ analysis error:', fallbackErr);
+        setError('Failed to analyze PYQ paper.');
+      }
+    } finally {
+      setIsStreaming(false);
+      setLoading(false);
     }
   };
 
@@ -74,6 +151,7 @@ const PyqAnalysisModal = ({ isOpen, onClose, onAnalysisComplete }) => {
     setLoading(true);
     setError(null);
     setIsTimeout(false);
+    setStreamingContent('');
 
     try {
       const formData = new FormData();
@@ -89,9 +167,14 @@ const PyqAnalysisModal = ({ isOpen, onClose, onAnalysisComplete }) => {
         timeout: 45000,
       });
 
-      setSuccessData(res.data?.data);
-      if (onAnalysisComplete) {
-        onAnalysisComplete(res.data?.data);
+      const createdPyq = res.data?.data;
+      if (createdPyq?.id) {
+        // Stream analysis via SSE for instant responsiveness (< 2s first token)
+        await startSSEStream(createdPyq.id);
+      } else {
+        setSuccessData(createdPyq);
+        if (onAnalysisComplete) onAnalysisComplete(createdPyq);
+        setLoading(false);
       }
     } catch (err) {
       console.error('PYQ upload error:', err);
@@ -107,7 +190,6 @@ const PyqAnalysisModal = ({ isOpen, onClose, onAnalysisComplete }) => {
       } else {
         setError(err.response?.data?.error || 'Failed to analyze PYQ paper. Please check file format and try again.');
       }
-    } finally {
       setLoading(false);
     }
   };
@@ -126,8 +208,8 @@ const PyqAnalysisModal = ({ isOpen, onClose, onAnalysisComplete }) => {
             <div className="flex items-center justify-between p-6 border-b border-neutral-300 dark:border-neutral-800">
               <div className="flex items-center gap-2">
                 <FileText className="w-6 h-6 text-yellow-700 dark:text-yellow-500" />
-                <h2 className="text-2xl font-playfair font-bold text-neutral-800 dark:text-neutral-100">
-                  Analyze PYQ Paper
+                <h2 className="text-2xl font-playfair font-bold text-neutral-800 dark:text-neutral-100 flex items-center gap-2">
+                  Analyze PYQ Paper {isStreaming && <Zap className="w-5 h-5 text-amber-500 animate-pulse" />}
                 </h2>
               </div>
               <button
@@ -165,6 +247,22 @@ const PyqAnalysisModal = ({ isOpen, onClose, onAnalysisComplete }) => {
                 </div>
               )}
 
+              {/* Streaming Real-Time Progress View */}
+              {isStreaming && (
+                <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
+                    <span className="flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-amber-500 animate-spin" /> Real-Time SSE Token Stream
+                    </span>
+                    <span className="font-mono text-[10px] bg-amber-500/20 px-2 py-0.5 rounded">Streaming Live...</span>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto p-3 bg-neutral-900 text-slate-200 font-mono text-xs rounded border border-neutral-800 whitespace-pre-wrap leading-relaxed">
+                    {streamingContent || 'Connecting to Gemini AI SSE stream...'}
+                    <span className="inline-block w-2 h-4 bg-amber-400 ml-1 animate-pulse" />
+                  </div>
+                </div>
+              )}
+
               {successData ? (
                 <div className="p-6 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded text-center space-y-3">
                   <CheckCircle className="w-12 h-12 text-green-600 dark:text-green-400 mx-auto" />
@@ -175,7 +273,7 @@ const PyqAnalysisModal = ({ isOpen, onClose, onAnalysisComplete }) => {
                     Important topics, repeated questions, and exam trend weightages have been added to your dashboard.
                   </p>
                 </div>
-              ) : (
+              ) : !isStreaming && (
                 <form onSubmit={handleAnalyze} className="space-y-4">
                   <div>
                     <label className="block text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
@@ -277,12 +375,12 @@ const PyqAnalysisModal = ({ isOpen, onClose, onAnalysisComplete }) => {
                   {loading ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin" />
-                      Analyzing with AI...
+                      {isStreaming ? 'Streaming AI Analysis...' : 'Analyzing with AI...'}
                     </>
                   ) : (
                     <>
-                      <Upload className="w-4 h-4" />
-                      Analyze PYQ
+                      <Zap className="w-4 h-4 text-amber-300" />
+                      Stream PYQ Analysis
                     </>
                   )}
                 </button>

@@ -4,6 +4,7 @@ import { Lightbulb, AlertCircle, RefreshCw, BookOpen, Volume2, VolumeX } from 'l
 
 import { useNavigate } from 'react-router-dom';
 import ExportDeckDropdown from '../flashcards/ExportDeckDropdown';
+import MathRenderer from '../common/MathRenderer';
 
 const Shimmer = ({ className = '' }) => (
   <div className={`animate-pulse bg-neutral-300/60 rounded ${className}`} />
@@ -203,7 +204,7 @@ const FlashcardWidget = ({ flashcard = null, loading = false, error = null, tota
           </button>
           
           <div className="absolute bottom-4 right-4 z-10" onClick={(e) => e.stopPropagation()}>
-            <ExportDeckDropdown />
+            <ExportDeckDropdown subjectId={flashcard?.subject?.id || flashcard?.subject} />
           </div>
 
           {/* Audio Reader Controls */}
@@ -233,7 +234,7 @@ const FlashcardWidget = ({ flashcard = null, loading = false, error = null, tota
           </div>
 
           <h3 className="text-xl font-bold font-inter text-neutral-800 dark:text-neutral-100 text-center leading-snug">
-            {flashcard.front}
+            <MathRenderer text={flashcard.front} />
           </h3>
           <p className="absolute bottom-2 text-xs text-neutral-400 italic">Click to flip</p>
         </div>
@@ -282,7 +283,7 @@ const FlashcardWidget = ({ flashcard = null, loading = false, error = null, tota
             </div>
           </div>
           <p className="text-sm text-neutral-800 dark:text-neutral-200 font-inter leading-relaxed my-2">
-            {flashcard.back}
+            <MathRenderer text={flashcard.back} />
           </p>
           <div className="w-full grid grid-cols-4 gap-1 mt-1">
             <button

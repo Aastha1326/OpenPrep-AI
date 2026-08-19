@@ -1,0 +1,66 @@
+name: Dependency Declaration Check
+
+# A package that is imported but never declared only fails on a clean install,
+# which is exactly what a contributor's machine never does. This job does.
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  undeclared-imports:
+    name: Undeclared Imports
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+
+      # The checker only reads manifests and source, so no install is needed
+      # before it runs — which keeps the failure fast and unambiguous.
+      - name: Check for undeclared imports
+        run: node scripts/check-undeclared-deps.js
+
+      - name: Test the checker
+        run: node --test scripts/check-undeclared-deps.test.js
+
+  clean-install:
+    name: Clean Install Resolves
+    runs-on: ubuntu-latest
+    needs: [undeclared-imports]
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+
+      - name: Install Backend Dependencies
+        run: npm ci --no-audit --no-fund
+        working-directory: backend
+
+      # require.resolve rather than require: config/redis.js opens a connection
+      # on import and archiveOldLogs.js pulls in the Sequelize pool, so actually
+      # executing these modules would hang the job. Resolution is the claim this
+      # workflow makes — that a clean install can find every declared package.
+      - name: Resolve backend packages
+        run: node -e "for (const m of ['yjs','redis','@aws-sdk/client-s3']) { require.resolve(m); console.log('resolved:', m); }"
+        working-directory: backend
+
+      - name: Install Frontend Dependencies
+        run: npm ci --no-audit --no-fund
+        working-directory: frontend
+
+      - name: Resolve frontend packages
+        run: node -e "for (const m of ['yjs','mermaid','react-window','react-confetti','@tiptap/react','@tiptap/starter-kit','@tiptap/extension-highlight']) { require.resolve(m); console.log('resolved:', m); }"
+        working-directory: frontend

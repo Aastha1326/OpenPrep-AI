@@ -317,7 +317,22 @@ const AiAssistant = () => {
                 }`}
               >
                 <div className="prose prose-sm prose-invert max-w-none text-sm leading-relaxed">
-                  <ReactMarkdown>{msg.text}</ReactMarkdown>
+                  <ReactMarkdown
+                    components={{
+                      a: ({ href, children }) => (
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-amber-400 hover:text-amber-300 underline"
+                        >
+                          {children}
+                        </a>
+                      )
+                    }}
+                  >
+                    {msg.text}
+                  </ReactMarkdown>
                 </div>
               </div>
               {msg.role === 'user' && (

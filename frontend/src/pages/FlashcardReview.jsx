@@ -11,12 +11,15 @@ import {
   AlertCircle,
   Settings,
   FileAudio,
-  Video,
-} from 'lucide-react';import API from '../services/api';
+  Keyboard,
+} from 'lucide-react';
+import MathRenderer from '../components/common/MathRenderer';
+import API from '../services/api';
 import useVoiceControl from '../hooks/useVoiceControl';
 import VoiceModeToggle from '../components/VoiceModeToggle';
 import AudioWaveform from '../components/AudioWaveform';
 import GenerateFlashcardsFromAudioModal from '../components/dashboard/GenerateFlashcardsFromAudioModal';
+import KeyboardShortcutsModal from '../components/flashcards/KeyboardShortcutsModal';
 const STORAGE_KEY = 'flashcardReviewSession';
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -63,6 +66,35 @@ const clearSession = () => {
 const FlashcardReview = () => {
   const navigate = useNavigate();
 
+  const [showVideoModal, setShowVideoModal] = useState(false);
+  const [videoUrl, setVideoUrl] = useState('');
+  const [videoStart, setVideoStart] = useState(0);
+
+  const handleOpenVideo = (url, start) => {
+    setVideoUrl(url);
+    setVideoStart(start);
+    setShowVideoModal(true);
+  };
+
+  const getYouTubeId = (url) => {
+    if (!url) return '';
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : '';
+  };
+
+  const formatSeconds = (totalSeconds) => {
+    if (!totalSeconds) return '0:00';
+    const hrs = Math.floor(totalSeconds / 3600);
+    const mins = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+    
+    if (hrs > 0) {
+      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const [userSettings, setUserSettings] = useState({
     sm2EasyFactorModifier: 1.0,
     sm2IntervalModifier: 1.0,
@@ -71,6 +103,7 @@ const FlashcardReview = () => {
   });
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isKeyboardHelpOpen, setIsKeyboardHelpOpen] = useState(false);
   const [isAudioGeneratorOpen, setIsAudioGeneratorOpen] = useState(false);
   const [modalSettings, setModalSettings] = useState(userSettings);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
@@ -155,6 +188,10 @@ const FlashcardReview = () => {
     hard: 0, // quality < 3
   });
 
+  // Track individual failed cards for remediation quiz generation
+  const [failedCards, setFailedCards] = useState(() => savedSession?.failedCards || []);
+  const failedCardsRef = useRef(failedCards);
+
   const [speechRate, setSpeechRate] = useState(1);
 const [speechLanguage, setSpeechLanguage] = useState('en-US');
 const [voiceAnswer, setVoiceAnswer] = useState('');
@@ -234,11 +271,20 @@ const [isVoiceAnswerListening, setIsVoiceAnswerListening] = useState(false);
         mastered: sessionStatsRef.current.mastered + (quality >= 4 ? 1 : 0),
         hard: sessionStatsRef.current.hard + (quality < 3 ? 1 : 0),
       };
+
+      // Track failed cards for remediation quiz
+      if (quality < 3 && currentCard) {
+        const failedEntry = { id: currentCard.id, front: currentCard.front, back: currentCard.back };
+        const nextFailed = [...failedCardsRef.current, failedEntry];
+        failedCardsRef.current = nextFailed;
+        setFailedCards(nextFailed);
+      }
+
       sessionStatsRef.current = nextStats;
       setSessionStats(nextStats);
       setCurrentIndex(nextIndex);
       setIsFlipped(false);
-      persistSession({ cards, currentIndex: nextIndex, sessionStats: nextStats });
+      persistSession({ cards, currentIndex: nextIndex, sessionStats: nextStats, failedCards: failedCardsRef.current });
     } catch (err) {
       if (!isMountedRef.current) return;
       console.error("Failed to update flashcard", err);
@@ -387,25 +433,85 @@ useEffect(() => {
     }
   };
 
-  // Keyboard support
+  // Comprehensive Keyboard Navigation Support
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Space or Enter to flip
-      if (!isFlipped && (e.key === ' ' || e.key === 'Enter')) {
+      // Input guard: ignore shortcuts if typing inside text inputs or editable areas
+      const activeEl = document.activeElement;
+      const isInputActive =
+        activeEl &&
+        (['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl.tagName) || activeEl.isContentEditable);
+      if (isInputActive) return;
+
+      // Question mark (?) to toggle keyboard shortcuts modal
+      if (e.key === '?' || (e.shiftKey && e.key === '/')) {
         e.preventDefault();
-        setIsFlipped(true);
+        setIsKeyboardHelpOpen((prev) => !prev);
+        return;
       }
-      // If flipped, 0-5 keys for rating
-      if (isFlipped) {
-        if (['0', '1', '2', '3', '4', '5'].includes(e.key)) {
-          e.preventDefault();
-          handleReview(parseInt(e.key, 10));
+
+      // Escape to close open modals or exit review session
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (isKeyboardHelpOpen) {
+          setIsKeyboardHelpOpen(false);
+        } else if (isSettingsOpen) {
+          setIsSettingsOpen(false);
+        } else if (isAudioGeneratorOpen) {
+          setIsAudioGeneratorOpen(false);
+        } else {
+          handleExit();
         }
+        return;
+      }
+
+      // Space or Enter to flip card front/back
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        handleCardFlip();
+        return;
+      }
+
+      // ArrowRight or 'n' / 'N' to skip to Next Card
+      if (e.key === 'ArrowRight' || e.key === 'n' || e.key === 'N') {
+        e.preventDefault();
+        if (currentIndex < cards.length - 1) {
+          setCurrentIndex((prev) => prev + 1);
+          setIsFlipped(false);
+        }
+        return;
+      }
+
+      // ArrowLeft or 'p' / 'P' to go back to Previous Card
+      if (e.key === 'ArrowLeft' || e.key === 'p' || e.key === 'P') {
+        e.preventDefault();
+        if (currentIndex > 0) {
+          setCurrentIndex((prev) => prev - 1);
+          setIsFlipped(false);
+        }
+        return;
+      }
+
+      // 0-5 keys for rating (only when card is flipped)
+      if (isFlipped && ['0', '1', '2', '3', '4', '5'].includes(e.key)) {
+        e.preventDefault();
+        handleReview(parseInt(e.key, 10));
       }
     };
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFlipped, handleReview]);
+  }, [
+    isFlipped,
+    isKeyboardHelpOpen,
+    isSettingsOpen,
+    isAudioGeneratorOpen,
+    currentIndex,
+    cards.length,
+    handleCardFlip,
+    handleReview,
+    handleExit,
+  ]);
 
   // Persist the latest checkpoint when the tab is closed or refreshed.
   useEffect(() => {
@@ -505,6 +611,16 @@ useEffect(() => {
             </div>
           )}
 
+          {/* Remediation quiz banner — shown when ≥30% cards failed and we have a deckId */}
+          {!noCardsDue && cards[0]?.subject && (
+            <RemediationQuizModal
+              deckId={cards[0].subject}
+              failedCards={failedCards}
+              totalReviewed={sessionStats.reviewed}
+              onDismiss={() => {}}
+            />
+          )}
+
           <div className="flex gap-4">
             <button 
               onClick={handleExit}
@@ -562,6 +678,15 @@ useEffect(() => {
 />          <div className="text-sm font-semibold text-neutral-500 dark:text-neutral-400 border-l border-neutral-300 dark:border-slate-700 pl-3">
             {currentIndex + 1} <span className="text-neutral-300 dark:text-neutral-600">/</span> {cards.length}
           </div>
+          <button
+            onClick={() => setIsKeyboardHelpOpen(true)}
+            aria-keyshortcuts="?"
+            aria-label="Keyboard Shortcuts Guide (?)"
+            className="p-1.5 rounded-full hover:bg-neutral-200 dark:hover:bg-slate-800 text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-100 transition-colors"
+            title="Keyboard Shortcuts Guide (?)"
+          >
+            <Keyboard className="w-5 h-5" />
+          </button>
           <button
             onClick={() => setIsSettingsOpen(true)}
             className="p-1.5 rounded-full hover:bg-neutral-200 dark:hover:bg-slate-800 text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-100 transition-colors"
@@ -649,7 +774,7 @@ useEffect(() => {
         <AnimatePresence mode="wait">
           <motion.div
             key={currentCard.id}
-            className="w-full max-w-2xl h-80 relative preserve-3d cursor-pointer group"
+            className="w-full max-w-2xl min-h-[22rem] sm:h-80 relative preserve-3d cursor-pointer group"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0, rotateY: isFlipped ? 180 : 0 }}
             exit={{ opacity: 0, x: -100, transition: { duration: 0.2 } }}
@@ -667,7 +792,7 @@ useEffect(() => {
           >
             {/* Front */}
             <div
-              className={`absolute inset-0 bg-white dark:bg-slate-800 shadow-xl border border-neutral-200 dark:border-slate-700 rounded-2xl p-8 flex flex-col justify-center items-center backface-hidden ${isFlipped ? 'pointer-events-none' : ''}`}
+              className={`absolute inset-0 bg-white dark:bg-slate-800 shadow-xl border border-neutral-200 dark:border-slate-700 rounded-2xl p-4 sm:p-8 flex flex-col justify-center items-center backface-hidden ${isFlipped ? 'pointer-events-none' : ''}`}
               style={{
                 backfaceVisibility: 'hidden',
                 WebkitBackfaceVisibility: 'hidden',
@@ -704,18 +829,32 @@ useEffect(() => {
               </div>
 
               <h3 className="text-2xl md:text-3xl font-bold font-inter text-neutral-800 dark:text-neutral-100 text-center leading-snug">
-                {currentCard.front}
+                <MathRenderer text={currentCard.front} />
               </h3>
               
               <div className="absolute bottom-6 flex items-center text-sm font-medium text-neutral-400 opacity-70 group-hover:opacity-100 transition-opacity">
                 <RotateCw className="w-4 h-4 mr-2" />
                 Click or press Space to reveal answer
               </div>
+
+              {currentCard.sourceUrl && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenVideo(currentCard.sourceUrl, currentCard.timestampSeconds);
+                  }}
+                  className="absolute bottom-4 left-6 flex items-center gap-1 px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shadow-md transition z-30 cursor-pointer"
+                >
+                  <Play className="w-3 h-3 fill-white" />
+                  Video Reference ({formatSeconds(currentCard.timestampSeconds)})
+                </button>
+              )}
             </div>
 
             {/* Back */}
             <div
-              className={`absolute inset-0 bg-primary-50 dark:bg-primary-900/10 shadow-xl border border-primary-200 dark:border-primary-800/50 rounded-2xl p-8 flex flex-col items-center overflow-y-auto backface-hidden ${!isFlipped ? 'pointer-events-none' : ''}`}
+              className={`absolute inset-0 bg-primary-50 dark:bg-primary-900/10 shadow-xl border border-primary-200 dark:border-primary-800/50 rounded-2xl p-4 sm:p-8 flex flex-col items-center overflow-y-auto backface-hidden ${!isFlipped ? 'pointer-events-none' : ''}`}
               style={{
                 backfaceVisibility: 'hidden',
                 WebkitBackfaceVisibility: 'hidden',
@@ -756,7 +895,7 @@ useEffect(() => {
 
               <div className="flex-1 w-full flex flex-col items-center justify-center">
                 <p className="text-xl md:text-2xl text-neutral-800 dark:text-neutral-200 font-inter leading-relaxed text-center">
-                  {currentCard.back}
+                  <MathRenderer text={currentCard.back} />
                 </p>
                 {currentCard.sourceUrl && currentCard.timestampSeconds !== undefined && currentCard.timestampSeconds !== null && (
                   <a 
@@ -770,6 +909,20 @@ useEffect(() => {
                   </a>
                 )}
               </div>
+
+              {currentCard.sourceUrl && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenVideo(currentCard.sourceUrl, currentCard.timestampSeconds);
+                  }}
+                  className="absolute bottom-4 left-6 flex items-center gap-1 px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shadow-md transition z-30 cursor-pointer"
+                >
+                  <Play className="w-3 h-3 fill-white" />
+                  Video Reference ({formatSeconds(currentCard.timestampSeconds)})
+                </button>
+              )}
             </div>
           </motion.div>
         </AnimatePresence>
@@ -805,13 +958,17 @@ useEffect(() => {
             ].map(btn => (
               <button
                 key={btn.val}
-                aria-label={btn.label}
+                aria-label={`${btn.label} (Key ${btn.val})`}
+                aria-keyshortcuts={`${btn.val}`}
                 disabled={submitting}
                 onClick={() => handleReview(btn.val)}
                 className={`py-3 px-2 rounded-xl border flex flex-col items-center justify-center transition-all hover:scale-105 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed ${btn.color}`}
               >
-                <span className="font-bold text-lg mb-1">{btn.val}</span>
+                <span className="font-bold text-lg mb-0.5">{btn.val}</span>
                 <span className="text-[10px] uppercase tracking-wider font-semibold opacity-80">{btn.label}</span>
+                <span className="mt-1 px-1.5 py-0.5 text-[9px] font-mono rounded bg-black/10 dark:bg-white/10 opacity-70">
+                  [{btn.val}]
+                </span>
               </button>
             ))}
           </div>
@@ -970,6 +1127,39 @@ useEffect(() => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Video Modal */}
+      {showVideoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 max-w-2xl w-full flex flex-col gap-4 relative">
+            <button
+              type="button"
+              onClick={() => setShowVideoModal(false)}
+              className="absolute -top-3 -right-3 p-1.5 rounded-full bg-neutral-850 border border-neutral-700 text-stone-400 hover:text-white cursor-pointer z-50"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-black shadow-lg">
+              <iframe
+                title="Flashcard Video Reference"
+                src={`https://www.youtube.com/embed/${getYouTubeId(videoUrl)}?start=${videoStart}&autoplay=1`}
+                className="absolute inset-0 w-full h-full"
+                allowFullScreen
+                allow="autoplay"
+              />
+            </div>
+            <div className="text-center text-xs font-semibold text-stone-400">
+              Playing reference from timestamp {formatSeconds(videoStart)}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Shortcuts Guide Modal */}
+      <KeyboardShortcutsModal
+        isOpen={isKeyboardHelpOpen}
+        onClose={() => setIsKeyboardHelpOpen(false)}
+      />
     </div>
   );
 };

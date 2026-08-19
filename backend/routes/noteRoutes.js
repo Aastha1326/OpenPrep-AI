@@ -10,10 +10,14 @@ const {
   uploadOcrNote,
   exportNotes,
   importNotes,
+  shareCollaboration,
+  getNote,
 } = require('../controllers/noteController');
+const { transcribeAndSummarize } = require('../controllers/audioNoteController');
 const { protect } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const { uploadMarkdown } = require('../middleware/upload');
+const audioNoteUpload = require('../middleware/audioNoteUpload');
 const { validateUploadNote, validateImportNotes } = require('../middleware/validators');
 const cacheMiddleware = require('../middleware/cache');
 const clearCache = require('../middleware/clearCache');
@@ -228,10 +232,17 @@ router.post(
 router.post(
   '/voice',
   protect,
-  upload.single('file'),
+  audioNoteUpload.single('file'),
   validateUploadNote,
   clearCache('notes:*'),
   uploadVoiceNote
+);
+
+router.post(
+  '/transcribe-and-summarize',
+  protect,
+  audioNoteUpload.single('file'),
+  transcribeAndSummarize
 );
 
 /**
@@ -486,7 +497,11 @@ router.post('/:id/summarize', protect, summarizeNote);
  *       200:
  *         description: Note updated successfully
  */
+router.get('/:id', protect, getNote);
+
 router.put('/:id', protect, clearCache('notes:*'), updateNote);
+
+router.post('/:id/share', protect, clearCache('notes:*'), shareCollaboration);
 
 router.delete('/:id', protect, clearCache('notes:*'), deleteNote);
 
