@@ -500,9 +500,9 @@ async function seed() {
     console.log('\n=========================================');
     console.log('Database seeding completed successfully!');
     console.log('=========================================');
-    console.log('Demo Login Credentials:');
-    console.log('  - Student:     student@openprep.ai     / Password123');
-    console.log('  - Admin:       admin@openprep.ai       / Password123');
+    console.log('Demo Login Credentials (DEVELOPMENT ONLY):');
+    console.log('  - Student:     demo@openprep.ai     / password123');
+    console.log('  - Admin:       admin@openprep.ai     / Password123');
     console.log('  - Contributor: contributor@openprep.ai / Password123');
     console.log('=========================================\n');
 
