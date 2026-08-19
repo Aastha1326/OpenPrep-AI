@@ -163,6 +163,11 @@ const schema = z.object({
   VAPID_SUBJECT: z.string().optional(),
 
   AWS_REGION: z.string().optional(),
+  AWS_ACCESS_KEY_ID: z.string().optional(),
+  AWS_SECRET_ACCESS_KEY: z.string().optional(),
+  AWS_S3_BUCKET: z.string().optional(),
+  AWS_S3_PUBLIC_BASE_URL: z.string().optional(),
+  STORAGE_PROVIDER: z.enum(['local', 's3']).default('local'),
 
   // ── Caching ──────────────────────────────────────────────────────────────
   CACHE_TTL: intFromString(3600, { min: 0 }),
@@ -212,6 +217,17 @@ const productionRules = [
     message: 'is required in production (or set CLIENT_ORIGIN / CORS_ORIGIN)',
     hint: 'Without it, CORS falls back to the localhost development origin.',
   },
+  {
+    key: 'STORAGE_PROVIDER',
+    check: (config) => {
+      if (config.STORAGE_PROVIDER === 's3') {
+        return Boolean(config.AWS_S3_BUCKET && config.AWS_ACCESS_KEY_ID && config.AWS_SECRET_ACCESS_KEY && config.AWS_REGION);
+      }
+      return true;
+    },
+    message: 'when set to s3, requires AWS_S3_BUCKET, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION',
+    hint: 'Configure AWS credentials or set STORAGE_PROVIDER=local for development',
+  },
 ];
 
 /** Optional integrations, reported at boot as enabled/disabled — never their values. */
@@ -222,6 +238,7 @@ const INTEGRATIONS = {
   googleOAuth: (config) => Boolean(config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET),
   githubOAuth: (config) => Boolean(config.GITHUB_CLIENT_ID && config.GITHUB_CLIENT_SECRET),
   webPush: (config) => Boolean(config.VAPID_PUBLIC_KEY && config.VAPID_PRIVATE_KEY),
+  storage: (config) => config.STORAGE_PROVIDER || 'local',
 };
 
 const summariseIntegrations = (config) => {
