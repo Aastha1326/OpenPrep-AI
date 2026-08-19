@@ -568,11 +568,16 @@ exports.getMe = async (req, res, next) => {
  */
 exports.updateSettings = async (req, res, next) => {
   try {
-    const { leaderboardVisible, hideActivityFromSquad } = req.body;
+    const { leaderboardVisible, hideActivityFromSquad, syncGoogleCalendar } = req.body;
 
-    req.user.leaderboardVisible = leaderboardVisible;
+    if (typeof leaderboardVisible === 'boolean') {
+      req.user.leaderboardVisible = leaderboardVisible;
+    }
     if (typeof hideActivityFromSquad === 'boolean') {
       req.user.hideActivityFromSquad = hideActivityFromSquad;
+    }
+    if (typeof syncGoogleCalendar === 'boolean') {
+      req.user.syncGoogleCalendar = syncGoogleCalendar;
     }
     await req.user.save();
 
@@ -592,6 +597,7 @@ exports.updateSettings = async (req, res, next) => {
         isEmailVerified: req.user.isEmailVerified,
         leaderboardVisible: req.user.leaderboardVisible,
         hideActivityFromSquad: req.user.hideActivityFromSquad,
+        syncGoogleCalendar: req.user.syncGoogleCalendar,
       },
     });
   } catch (error) {

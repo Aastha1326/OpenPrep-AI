@@ -14,6 +14,15 @@ const { toDateOnlyString, toLocalDateString } = require('../utils/dateUtils');
 const { generateMilestones } = require('../services/milestoneGeneratorService');
 const calendarService = require('../services/calendarService');
 const schedulePredictorService = require('../services/schedulePredictorService');
+
+const triggerBackgroundCalendarSync = (plan, user) => {
+  if (user && user.syncGoogleCalendar && user.googleCalendarRefreshToken) {
+    calendarService.syncToGoogleCalendar(plan, user).catch((err) => {
+      console.error('[Calendar Sync] Background calendar sync failed:', err.message);
+    });
+  }
+};
+
 // @desc    Generate AI Study Plan
 // @route   POST /api/study-plans/generate-ai
 // @access  Private
@@ -121,6 +130,8 @@ exports.generateAIPlan = async (req, res, next) => {
     });
 
     await cacheService.del(`study_plan:active:${req.user.id}`);
+
+    triggerBackgroundCalendarSync(studyPlan, req.user);
 
     res.status(201).json({
       success: true,
@@ -310,6 +321,8 @@ exports.toggleTaskCompletion = async (req, res, next) => {
 
     await cacheService.del(`study_plan:active:${req.user.id}`);
 
+    triggerBackgroundCalendarSync(plan, req.user);
+
     res.status(200).json({ success: true, data: plan, progression });
   } catch (error) {
     next(error);
@@ -367,6 +380,8 @@ exports.moveTaskDate = async (req, res, next) => {
     await plan.save();
 
     await cacheService.del(`study_plan:active:${req.user.id}`);
+
+    triggerBackgroundCalendarSync(plan, req.user);
 
     res.status(200).json({ success: true, data: plan });
   } catch (error) {
@@ -643,6 +658,8 @@ exports.rescheduleAdaptivePlan = async (req, res, next) => {
 
     await cacheService.del(`study_plan:active:${req.user.id}`);
 
+    triggerBackgroundCalendarSync(result, req.user);
+
     res.status(200).json({ success: true, data: result, message: 'Adaptive study plan rescheduled successfully' });
   } catch (error) {
     next(error);
@@ -769,6 +786,8 @@ exports.rebalanceStudyPlan = async (req, res, next) => {
     }
 
     await cacheService.del(`study_plan:active:${req.user.id}`);
+
+    triggerBackgroundCalendarSync(plan, req.user);
 
     res.status(200).json({ success: true, data: plan, forecast, rebalanced, reason, message });
   } catch (error) {

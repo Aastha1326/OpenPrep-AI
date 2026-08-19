@@ -14,9 +14,10 @@ import {
   Trash,
   AlertCircle,
   CheckCircle,
-Bell,
+  Bell,
   Award,
   Users,
+  CalendarDays,
 } from 'lucide-react';import LeatherBoard from '../components/dashboard/LeatherBoard';
 import VintagePaper from '../components/dashboard/VintagePaper';
 import API from '../services/api';
@@ -48,7 +49,11 @@ const [leaderboardVisible, setLeaderboardVisible] = useState(
   const [hideActivityFromSquad, setHideActivityFromSquad] = useState(
     typeof user?.hideActivityFromSquad === 'boolean' ? user.hideActivityFromSquad : false
   );
+  const [syncGoogleCalendar, setSyncGoogleCalendar] = useState(
+    typeof user?.syncGoogleCalendar === 'boolean' ? user.syncGoogleCalendar : false
+  );
   const [savingActivityPrivacy, setSavingActivityPrivacy] = useState(false);
+  const [savingCalendarSync, setSavingCalendarSync] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);  const [error, setError] = useState(null);
 
@@ -156,6 +161,20 @@ const [leaderboardVisible, setLeaderboardVisible] = useState(
       setSavingActivityPrivacy(false);
     }
   }, [hideActivityFromSquad, dispatch]);
+
+  const handleCalendarSyncToggle = useCallback(async () => {
+    const next = !syncGoogleCalendar;
+    setSavingCalendarSync(true);
+    try {
+      await API.patch('/auth/settings', { syncGoogleCalendar: next });
+      setSyncGoogleCalendar(next);
+      await dispatch(loadUser());
+    } catch (err) {
+      console.error('Failed to update background calendar sync preference:', err);
+    } finally {
+      setSavingCalendarSync(false);
+    }
+  }, [syncGoogleCalendar, dispatch]);
 
   const [reminderTime, setReminderTime] = useState(user?.dailyReminderTime || '09:00');  const [pushStatus, setPushStatus] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'default');
   const [pushSubscribed, setPushSubscribed] = useState(!!user?.pushSubscription);
@@ -596,6 +615,49 @@ const [leaderboardVisible, setLeaderboardVisible] = useState(
                   {saving ? 'Saving...' : 'Save Time'}
                 </button>
               </div>
+            </div>
+          </div>
+        </VintagePaper>
+
+        {/* --- GOOGLE CALENDAR SYNC --- */}
+        <VintagePaper className="border-t-4 border-t-amber-700">
+          <div className="flex items-center gap-3 mb-3">
+            <CalendarDays className="w-7 h-7 text-amber-700" />
+            <h2 className="text-2xl font-bold font-playfair text-neutral-800 dark:text-neutral-100">
+              Google Calendar Sync
+            </h2>
+          </div>
+
+          <p className="text-neutral-600 dark:text-neutral-300 mb-6 leading-relaxed">
+            Automatically synchronize study plans and task updates to your Google Calendar in the background.
+          </p>
+
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-neutral-100/60 dark:bg-neutral-800/60 border border-neutral-300 dark:border-neutral-600 rounded-sm">
+              <div>
+                <p className="font-playfair font-bold text-lg text-neutral-800 dark:text-neutral-100">
+                  Background Calendar Sync
+                </p>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-0.5">
+                  {syncGoogleCalendar ? 'Automatic background syncing is enabled.' : 'Background syncing is disabled.'}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                role="switch"
+                aria-checked={syncGoogleCalendar}
+                aria-label="Toggle background Google Calendar sync"
+                onClick={handleCalendarSyncToggle}
+                disabled={savingCalendarSync}
+                className="relative inline-flex items-center h-8 w-14 rounded-full bg-neutral-300 dark:bg-neutral-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 disabled:opacity-50 shrink-0"
+              >
+                <span
+                  className={`inline-block w-6 h-6 rounded-full bg-white shadow transform transition-transform ${
+                    syncGoogleCalendar ? 'translate-x-7' : 'translate-x-1'
+                  }`}
+                />
+              </button>
             </div>
           </div>
         </VintagePaper>
