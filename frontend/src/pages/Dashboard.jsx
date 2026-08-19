@@ -83,7 +83,7 @@ import StreakWidget from '../components/gamification/StreakWidget';
 import BadgeCard from '../components/gamification/BadgeCard';
 
 // Lazy-loaded heavy modal components for bundle size reduction
-const CreateNoteModal = lazy(() => import('../components/dashboard/CreateNoteModal'));
+const RichTextEditor = lazy(() => import('../components/dashboard/RichTextEditor'));
 const StudyPlanModal = lazy(() => import('../components/dashboard/StudyPlanModal'));
 const PyqAnalysisModal = lazy(() => import('../components/dashboard/PyqAnalysisModal'));
 const CompositeBundleModal = lazy(() => import('../components/dashboard/CompositeBundleModal'));
@@ -1239,13 +1239,13 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             </p>
           </VintagePaper>
         </div>
-{/* --- CREATE NOTE MODAL --- */}
-      <Suspense fallback={null}>
-        <CreateNoteModal
-          isOpen={isNoteModalOpen}
-          onClose={() => setIsNoteModalOpen(false)}
-          onNoteCreated={() => setIsNoteModalOpen(false)}
-        />
+  {/* --- RICH TEXT EDITOR (AI MVP) --- */}
+        <Suspense fallback={null}>
+          <AnimatePresence>
+            {isNoteModalOpen && (
+              <RichTextEditor onClose={() => setIsNoteModalOpen(false)} />
+            )}
+          </AnimatePresence>
 
       {/* --- YOUTUBE FLASHCARD DECK MODAL --- */}
       {isYoutubeFlashcardModalOpen && (
