@@ -24,6 +24,10 @@ const BattleSession = require('./BattleSession');
 const BattleParticipant = require('./BattleParticipant');
 const PYQAnalysis = require('./PYQAnalysis');
 const PYQQuestion = require('./PYQQuestion');
+const StudySquad = require('./StudySquad');
+const SquadMember = require('./SquadMember');
+const SquadChallenge = require('./SquadChallenge');
+
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -147,6 +151,16 @@ PYQAnalysis.belongsTo(Subject, { foreignKey: 'subjectId', as: 'subjectRef' });
 PYQAnalysis.hasMany(PYQQuestion, { foreignKey: 'pyqAnalysisId', onDelete: 'CASCADE' });
 PYQQuestion.belongsTo(PYQAnalysis, { foreignKey: 'pyqAnalysisId', as: 'analysisRef' });
 
+// StudySquad Associations
+StudySquad.belongsTo(User, { foreignKey: 'ownerId', as: 'owner' });
+StudySquad.hasMany(SquadMember, { foreignKey: 'squadId', onDelete: 'CASCADE' });
+StudySquad.hasMany(SquadChallenge, { foreignKey: 'squadId', onDelete: 'CASCADE' });
+
+SquadMember.belongsTo(StudySquad, { foreignKey: 'squadId' });
+SquadMember.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+SquadChallenge.belongsTo(StudySquad, { foreignKey: 'squadId' });
+
 module.exports = {  sequelize,  User,
   Exam,
   Subject,
@@ -170,4 +184,7 @@ UsageQuota,
   BattleParticipant,
   PYQAnalysis,
   PYQQuestion,
+  StudySquad,
+  SquadMember,
+  SquadChallenge,
 };

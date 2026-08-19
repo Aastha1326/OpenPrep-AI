@@ -30,6 +30,8 @@ const AiAssistant = lazy(() => import('./pages/AiAssistant'));
 const OAuthCallback = lazy(() => import('./pages/OAuthCallback'));
 const PYQAnalytics = lazy(() => import('./pages/PYQAnalytics'));
 const QuizSession = lazy(() => import('./pages/QuizSession'));
+const SquadsPage = lazy(() => import('./pages/SquadsPage'));
+const StudySquadDashboard = lazy(() => import('./pages/StudySquadDashboard'));
 
 function App() {
   const dispatch = useDispatch();
@@ -157,6 +159,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <StudyGroupChat />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/squads"
+            element={
+              <ProtectedRoute>
+                <SquadsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/squads/:id"
+            element={
+              <ProtectedRoute>
+                <StudySquadDashboard />
               </ProtectedRoute>
             }
           />
