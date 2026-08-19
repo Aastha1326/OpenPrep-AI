@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Lightbulb, RotateCw, Play, X } from 'lucide-react';
 import MathRenderer from './common/MathRenderer';
+import AudioReader from './AudioReader';
 
 const FlashcardCard = ({ flashcard, style }) => {
   const [isFlipped, setIsFlipped] = useState(false);
@@ -69,6 +70,9 @@ const FlashcardCard = ({ flashcard, style }) => {
               <span className="flex items-center gap-1">
                 <Lightbulb className="w-3.5 h-3.5 text-yellow-500" /> Question
               </span>
+              <div onClick={(e) => e.stopPropagation()}>
+                <AudioReader text={flashcard?.front} />
+              </div>
             </div>
             <div className="text-center font-bold text-sm text-neutral-800 dark:text-neutral-100 overflow-y-auto max-h-[70%]">
               {flashcard?.front ? (
@@ -106,8 +110,11 @@ const FlashcardCard = ({ flashcard, style }) => {
               transform: 'rotateY(180deg)',
             }}
           >
-            <div className="w-full text-left text-[10px] font-bold text-yellow-700 dark:text-yellow-400 uppercase tracking-widest">
-              Answer
+            <div className="w-full flex justify-between items-center text-[10px] font-bold text-yellow-700 dark:text-yellow-400 uppercase tracking-widest font-mono">
+              <span>Answer</span>
+              <div onClick={(e) => e.stopPropagation()}>
+                <AudioReader text={flashcard?.back} />
+              </div>
             </div>
             <div className="text-center text-xs text-neutral-800 dark:text-neutral-200 overflow-y-auto max-h-[70%] bg-transparent">
               {flashcard?.back ? (

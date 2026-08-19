@@ -27,7 +27,7 @@ const setSystemDark = (value) => {
 };
 
 const Probe = () => {
-  const { theme, resolvedTheme, setTheme } = useTheme();
+  const { theme, resolvedTheme, setTheme, toggleTheme } = useTheme();
   return (
     <div>
       <span data-testid="theme">{theme}</span>
@@ -36,6 +36,7 @@ const Probe = () => {
       <button onClick={() => setTheme('dark')}>Set dark</button>
       <button onClick={() => setTheme('high-contrast')}>Set high-contrast</button>
       <button onClick={() => setTheme('system')}>Set system</button>
+      <button onClick={toggleTheme}>Toggle theme</button>
     </div>
   );
 };
@@ -51,7 +52,16 @@ describe('ThemeContext', () => {
   beforeEach(() => {
     mediaListeners.length = 0;
     systemDark = false;
-    localStorage.clear();
+    let store = {};
+    Object.defineProperty(window, 'localStorage', {
+      writable: true,
+      value: {
+        getItem: vi.fn((key) => store[key] || null),
+        setItem: vi.fn((key, val) => { store[key] = String(val); }),
+        removeItem: vi.fn((key) => { delete store[key]; }),
+        clear: vi.fn(() => { store = {}; }),
+      },
+    });
     document.documentElement.className = '';
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
@@ -128,5 +138,23 @@ describe('ThemeContext', () => {
     expect(screen.getByTestId('theme')).toHaveTextContent('dark');
     expect(screen.getByTestId('resolved')).toHaveTextContent('dark');
     expect(document.documentElement.classList.contains('dark')).toBe(true);
+  });
+
+  it('toggles theme back and forth with toggleTheme helper', async () => {
+    const user = userEvent.setup();
+    renderProbe();
+
+    // Starts light by default
+    expect(screen.getByTestId('resolved')).toHaveTextContent('light');
+
+    // Toggle to dark
+    await user.click(screen.getByText('Toggle theme'));
+    expect(screen.getByTestId('resolved')).toHaveTextContent('dark');
+    expect(document.documentElement.classList.contains('dark')).toBe(true);
+
+    // Toggle back to light
+    await user.click(screen.getByText('Toggle theme'));
+    expect(screen.getByTestId('resolved')).toHaveTextContent('light');
+    expect(document.documentElement.classList.contains('dark')).toBe(false);
   });
 });
