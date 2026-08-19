@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 let speakeasy = null;
 let QRCode = null;
 try {
@@ -66,6 +67,8 @@ const clearRefreshTokenCookie = (res) => {
 
 const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
+const PASSWORD_RESET_OTP_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const PASSWORD_RESET_OTP_RESEND_COOLDOWN_MS = 60 * 1000; // 60 seconds
 
 const getClientBaseUrl = () =>
   process.env.CLIENT_URL || process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -128,6 +131,31 @@ const sendPasswordResetEmail = async (user) => {
   });
 
   return rawToken;
+};
+
+/**
+ * Generate a 6-digit OTP for `user`, persist only its bcrypt hash, and email
+ * the raw code. The OTP is single-use and expires after 15 minutes; the hash
+ * is cleared after successful verification or reset.
+ */
+const sendPasswordResetOtp = async (user) => {
+  const otp = String(crypto.randomInt(100000, 1000000)); // 6-digit code
+  const hashedOtp = await bcrypt.hash(otp, 10);
+  const expiresAt = new Date(Date.now() + PASSWORD_RESET_OTP_TTL_MS);
+
+  user.resetPasswordOtpHash = hashedOtp;
+  user.resetPasswordOtpExpires = expiresAt;
+  user.resetPasswordAttempts = 0;
+  await user.save();
+
+  await sendEmail({
+    to: user.email,
+    subject: 'Your OpenPrep AI password reset code',
+    text: `Hi ${user.name || 'there'},\n\nYour password reset code is:\n\n${otp}\n\nThis code expires in 15 minutes. If you didn't request a reset, no action is needed.`,
+    html: `<p>Hi ${user.name || 'there'},</p><p>Your password reset code is:</p><p><strong style="font-size:24px;letter-spacing:4px">${otp}</strong></p><p>This code expires in 15 minutes. If you didn't request a reset, no action is needed.</p>`,
+  });
+
+  return otp;
 };
 
 /**
@@ -603,7 +631,7 @@ exports.updateSettings = async (req, res, next) => {
  * @swagger
  * /api/auth/forgot-password:
  *   post:
- *     summary: Request a password reset link via email
+ *     summary: Request a 6-digit password reset code via email
  *     tags: [Authentication]
  *     requestBody:
  *       required: true
@@ -620,7 +648,7 @@ exports.updateSettings = async (req, res, next) => {
  *                 example: "jane@example.com"
  *     responses:
  *       200:
- *         description: Password reset request accepted
+ *         description: Password reset code request accepted
  *         content:
  *           application/json:
  *             schema:
@@ -631,7 +659,9 @@ exports.updateSettings = async (req, res, next) => {
  *                   example: true
  *                 message:
  *                   type: string
- *                   example: "If the email exists, a reset link has been sent"
+ *                   example: "If the email exists, a reset code has been sent"
+ *       429:
+ *         description: Resend cooldown active - wait 60 seconds
  */
 exports.forgotPassword = async (req, res, next) => {
   try {
@@ -640,19 +670,36 @@ exports.forgotPassword = async (req, res, next) => {
 
     // Always return the same response to prevent email enumeration
     if (user) {
-      await sendPasswordResetEmail(user, req);
+      // Enforce a 60-second cooldown between resend requests
+      if (user.resetPasswordOtpExpires) {
+        const otpIssuedAt = new Date(
+          user.resetPasswordOtpExpires.getTime() - PASSWORD_RESET_OTP_TTL_MS
+        );
+        if (
+          user.resetPasswordOtpHash &&
+          Date.now() - otpIssuedAt.getTime() < PASSWORD_RESET_OTP_RESEND_COOLDOWN_MS
+        ) {
+          return res.status(429).json({
+            success: false,
+            error: 'Please wait 60 seconds before requesting a new code.',
+          });
+        }
+      }
+
+      await sendPasswordResetOtp(user);
     }
 
     res.status(200).json({
       success: true,
-      message: 'If the email exists, a reset link has been sent',
+      message: 'If the email exists, a reset code has been sent',
     });
   } catch (error) {
-    // If email sending failed, clear the token from DB
+    // If email sending failed, clear the OTP from DB
     const user = await User.findOne({ where: { email: req.body.email } });
     if (user) {
-      user.resetPasswordToken = null;
-      user.resetPasswordExpire = null;
+      user.resetPasswordOtpHash = null;
+      user.resetPasswordOtpExpires = null;
+      user.resetPasswordAttempts = 0;
       await user.save();
     }
     next(error);

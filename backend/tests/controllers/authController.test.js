@@ -483,7 +483,7 @@ describe('Auth Controller - Integration Tests', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.message).toContain('reset link');
+      expect(res.body.message).toContain('reset code');
     });
 
     it('should return 200 even when email does not exist', async () => {
@@ -493,7 +493,7 @@ describe('Auth Controller - Integration Tests', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.message).toBe('If the email exists, a reset link has been sent');
+      expect(res.body.message).toBe('If the email exists, a reset code has been sent');
     });
 
     it('should return same response for existing and non-existing emails', async () => {
@@ -510,7 +510,7 @@ describe('Auth Controller - Integration Tests', () => {
       expect(resExisting.status).toBe(resMissing.status);
       expect(resExisting.body.success).toBe(resMissing.body.success);
       expect(resExisting.body.message).toBe(resMissing.body.message);
-      expect(resExisting.body.message).toBe('If the email exists, a reset link has been sent');
+      expect(resExisting.body.message).toBe('If the email exists, a reset code has been sent');
     });
 
     it('should enforce rate limits of 3 requests per 15 minutes', async () => {
