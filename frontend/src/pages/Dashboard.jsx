@@ -38,6 +38,7 @@ import {
 import API from '../services/api';
 import { toDateOnlyString } from '../utils/dateUtils';
 import SkillTree from '../components/dashboard/SkillTree';
+import ModelViewer from '../components/dashboard/ModelViewer';
 import {
   LineChart,
   Line,
@@ -345,6 +346,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [sessionStartTime] = useState(Date.now());
   const [isExporting, setIsExporting] = useState(false);
   const [isSkillTreeOpen, setIsSkillTreeOpen] = useState(false);
+  const [isModelViewerOpen, setIsModelViewerOpen] = useState(false);
   const [showLevelUpModal, setShowLevelUpModal] = useState(false);
   const [levelUpLevel, setLevelUpLevel] = useState(null);
   const [prevLevel, setPrevLevel] = useState(null);
@@ -506,12 +508,13 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           delay={0.1}
           onClick={() => setIsQuizSetupOpen(true)}
         />
-        <GoldTabButton
-          icon={FileText}
-          label="PYQ Intelligence"
-          delay={0.2}
-          onClick={() => navigate('/pyqs')}
-        />
+          <GoldTabButton
+            icon={FileText}
+            label="PYQ Intelligence"
+            delay={0.2}
+            onClick={() => setIsPyqModalOpen(true)}
+          />
+          <GoldTabButton icon={Box} label="3D Anatomy" delay={0.25} onClick={() => setIsModelViewerOpen(true)} />
         <GoldTabButton
           icon={Calendar}
           label="Study Plan"
@@ -1351,6 +1354,13 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
       <AnimatePresence>
         {isSkillTreeOpen && (
           <SkillTree onClose={() => setIsSkillTreeOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* --- MODEL VIEWER (3D MVP) --- */}
+      <AnimatePresence>
+        {isModelViewerOpen && (
+          <ModelViewer onClose={() => setIsModelViewerOpen(false)} />
         )}
       </AnimatePresence>
 
