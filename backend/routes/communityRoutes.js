@@ -5,6 +5,7 @@ const {
   upvoteFeedback,
   getPublicRoadmap,
   rateCommunityDeck,
+  getCommunityDeckReviews,
 } = require('../controllers/communityController');
 const { getCommunityDecks, cloneCommunityDeck } = require('../controllers/flashcardController');
 const { protect } = require('../middleware/auth');
@@ -224,5 +225,6 @@ router.get('/roadmap', protect, cacheMiddleware('community:roadmap', 900), getPu
 router.get('/decks', protect, getCommunityDecks);
 router.post('/decks/:subjectId/fork', protect, cloneCommunityDeck);
 router.post('/decks/:id/rate', protect, rateCommunityDeck);
+router.get('/decks/:id/reviews', protect, getCommunityDeckReviews);
 
 module.exports = router;
