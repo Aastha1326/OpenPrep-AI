@@ -18,6 +18,8 @@ import {
   Award,
   Users,
   CalendarDays,
+  Volume2,
+  Palette,
 } from 'lucide-react';import LeatherBoard from '../components/dashboard/LeatherBoard';
 import VintagePaper from '../components/dashboard/VintagePaper';
 import ThemeToggle from '../components/ThemeToggle';
@@ -63,6 +65,16 @@ const Settings = () => {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
+
+  const [ttsSpeed, setTtsSpeed] = useState(() => {
+    const savedSpeed = localStorage.getItem('openprep_tts_speed');
+    return savedSpeed ? parseFloat(savedSpeed) : 1;
+  });
+
+  const handleTtsSpeedChange = (speed) => {
+    setTtsSpeed(speed);
+    localStorage.setItem('openprep_tts_speed', String(speed));
+  };
 
   // Avatar Upload States
   const [file, setFile] = useState(null);
@@ -403,6 +415,42 @@ const Settings = () => {
               </p>
             </div>
             <ThemeToggle />
+          </div>
+        </VintagePaper>
+        {/* --- ACCESSIBILITY & TEXT-TO-SPEECH --- */}
+        <VintagePaper className="border-t-4 border-t-amber-700">
+          <div className="flex items-center gap-3 mb-4">
+            <Volume2 className="w-7 h-7 text-amber-700" />
+            <h2 className="text-2xl font-bold font-playfair text-neutral-800 dark:text-neutral-100">
+              Accessibility & Text-to-Speech
+            </h2>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <p className="text-sm text-neutral-600 dark:text-neutral-300 font-semibold">
+                Default Voice Reading Speed
+              </p>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                Select your preferred playback rate (0.5x, 1x, 1.25x, 1.5x) when listening to study notes and flashcards.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {[0.5, 1, 1.25, 1.5].map((speed) => (
+                <button
+                  key={speed}
+                  type="button"
+                  onClick={() => handleTtsSpeedChange(speed)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                    ttsSpeed === speed
+                      ? 'bg-amber-700 text-white shadow-md'
+                      : 'bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-300 dark:hover:bg-neutral-600'
+                  }`}
+                >
+                  {speed}x
+                </button>
+              ))}
+            </div>
           </div>
         </VintagePaper>
         {/* --- BADGE GALLERY --- */}

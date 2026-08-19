@@ -5,6 +5,8 @@ import { FaArrowLeft, FaExclamationTriangle } from 'react-icons/fa';
 import { Loader2 } from 'lucide-react';
 import API from '../services/api';
 import CollaborativeEditor from '../components/notes/CollaborativeEditor';
+import { buildSingleNoteDocument, exportHTMLToPDF } from '../utils/exportDocs';
+import AudioReader from '../components/AudioReader';
 
 export default function CollaborativeNoteView() {
   const { noteId } = useParams();
@@ -74,9 +76,12 @@ export default function CollaborativeNoteView() {
           <div className="space-y-6">
             {/* Title Bar */}
             <div className="space-y-1">
-              <h1 className="text-2xl font-black font-playfair tracking-tight text-white">
-                📝 {note.title}
-              </h1>
+              <div className="flex items-center justify-between gap-4">
+                <h1 className="text-2xl font-black font-playfair tracking-tight text-white flex items-center gap-2">
+                  📝 {note.title}
+                </h1>
+                <AudioReader text={note.content || note.title} />
+              </div>
               <p className="text-stone-400 text-xs">
                 Real-time conflict resolution powered by CRDT algorithms.
               </p>
