@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Lightbulb, RotateCw, Play, X } from 'lucide-react';
+import MathRenderer from './common/MathRenderer';
 
 const FlashcardCard = ({ flashcard, style }) => {
   const [isFlipped, setIsFlipped] = useState(false);
@@ -70,7 +71,11 @@ const FlashcardCard = ({ flashcard, style }) => {
               </span>
             </div>
             <div className="text-center font-bold text-sm text-neutral-800 dark:text-neutral-100 overflow-y-auto max-h-[70%]">
-              {flashcard?.front || 'Empty Front'}
+              {flashcard?.front ? (
+                <MathRenderer text={flashcard.front} />
+              ) : (
+                'Empty Front'
+              )}
             </div>
             <div className="w-full flex justify-between items-center text-[10px] text-neutral-400">
               <span className="flex items-center gap-1">
@@ -105,7 +110,11 @@ const FlashcardCard = ({ flashcard, style }) => {
               Answer
             </div>
             <div className="text-center text-xs text-neutral-800 dark:text-neutral-200 overflow-y-auto max-h-[70%] bg-transparent">
-              {flashcard?.back || 'Empty Back'}
+              {flashcard?.back ? (
+                <MathRenderer text={flashcard.back} />
+              ) : (
+                'Empty Back'
+              )}
             </div>
             <div className="w-full flex justify-between items-center text-[10px] text-neutral-400">
               <span className="flex items-center gap-1">

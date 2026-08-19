@@ -13,6 +13,7 @@ import {
   FileAudio,
   Keyboard,
 } from 'lucide-react';
+import MathRenderer from '../components/common/MathRenderer';
 import API from '../services/api';
 import useVoiceControl from '../hooks/useVoiceControl';
 import VoiceModeToggle from '../components/VoiceModeToggle';
@@ -828,7 +829,7 @@ useEffect(() => {
               </div>
 
               <h3 className="text-2xl md:text-3xl font-bold font-inter text-neutral-800 dark:text-neutral-100 text-center leading-snug">
-                {currentCard.front}
+                <MathRenderer text={currentCard.front} />
               </h3>
               
               <div className="absolute bottom-6 flex items-center text-sm font-medium text-neutral-400 opacity-70 group-hover:opacity-100 transition-opacity">
@@ -894,7 +895,7 @@ useEffect(() => {
 
               <div className="flex-1 w-full flex items-center justify-center">
                 <p className="text-xl md:text-2xl text-neutral-800 dark:text-neutral-200 font-inter leading-relaxed text-center">
-                  {currentCard.back}
+                  <MathRenderer text={currentCard.back} />
                 </p>
               </div>
 
