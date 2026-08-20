@@ -21,6 +21,7 @@ import VoiceModeToggle from '../components/VoiceModeToggle';
 import AudioWaveform from '../components/AudioWaveform';
 import GenerateFlashcardsFromAudioModal from '../components/dashboard/GenerateFlashcardsFromAudioModal';
 import KeyboardShortcutsModal from '../components/flashcards/KeyboardShortcutsModal';
+import PomodoroTimer from '../components/dashboard/PomodoroTimer';
 const STORAGE_KEY = 'flashcardReviewSession';
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -664,6 +665,11 @@ useEffect(() => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-6 px-4 flex flex-col items-center">
+      {/* Pomodoro Timer Toggle */}
+      <div className="fixed bottom-4 right-4 z-50 transform scale-50 origin-bottom-right hover:scale-75 transition-transform duration-300">
+        <PomodoroTimer />
+      </div>
+
       {/* Header */}
       <div className="w-full max-w-3xl flex justify-between items-center mb-8">
         <button 
