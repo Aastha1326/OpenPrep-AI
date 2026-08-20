@@ -1,4 +1,22 @@
-const Sentry = require('@sentry/node');
+let Sentry;
+try {
+  Sentry = require('@sentry/node');
+} catch (e) {
+  Sentry = {
+    init: () => {},
+    captureException: () => {},
+    setUser: () => {},
+    withScope: (callback) => {
+      const mockScope = {
+        setUser: () => {},
+        setTag: () => {},
+        setExtra: () => {},
+      };
+      callback(mockScope);
+    },
+    setupExpressErrorHandler: () => {},
+  };
+}
 
 const isSentryReady = process.env.NODE_ENV !== 'test' && !!process.env.SENTRY_DSN;
 
@@ -64,3 +82,4 @@ module.exports = {
   Sentry,
   isSentryReady,
 };
+

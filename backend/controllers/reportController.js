@@ -3,6 +3,7 @@ const { Op } = require('sequelize');
 const QuizAttempt = require('../models/QuizAttempt');
 const StudyPlan = require('../models/StudyPlan');
 const Progress = require('../models/Progress');
+const certificateService = require('../services/certificateService');
 
 exports.generateStudySummary = async (req, res, next) => {
   try {
@@ -71,48 +72,24 @@ exports.generateStudySummary = async (req, res, next) => {
 
 exports.generateCertificate = async (req, res, next) => {
   try {
-    const { planId } = req.query;
+    const { planId, template } = req.query;
+    
     if (!planId) {
       return res.status(400).json({ success: false, error: 'planId is required' });
     }
 
-    const plan = await StudyPlan.findOne({ where: { id: planId, user: req.user.id } });
-    
-    if (!plan) {
-      return res.status(404).json({ success: false, error: 'Study plan not found' });
-    }
-
-    let isComplete = plan.status === 'completed';
-    if (!isComplete && plan.dailyGoals && plan.dailyGoals.length > 0) {
-      const totalGoals = plan.dailyGoals.length;
-      const completedGoals = plan.dailyGoals.filter(g => g.completed).length;
-      if (totalGoals === completedGoals) {
-        isComplete = true;
-      }
-    }
-
-    if (!isComplete) {
-       return res.status(403).json({ success: false, error: 'Cannot generate certificate for an incomplete study plan.' });
-    }
+    // Use the certificate service for enhanced generation
+    const templateName = template || 'default';
+    const { certificateData, pdfBuffer } = await certificateService.generateCertificate(
+      planId, 
+      req.user.id, 
+      templateName
+    );
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=Certificate_${planId}.pdf`);
-
-    const doc = new PDFDocument({ layout: 'landscape', size: 'A4' });
-    doc.pipe(res);
-
-    doc.rect(0, 0, doc.page.width, doc.page.height).fill('#fff');
-    doc.fillColor('#000');
+    res.setHeader('Content-Disposition', `attachment; filename=Certificate_${certificateData.certificateNumber}.pdf`);
     
-    doc.fontSize(40).text('Certificate of Achievement', { align: 'center', margin: 50 });
-    doc.moveDown();
-    doc.fontSize(20).text(`This certifies that ${req.user.name || 'Student'}`, { align: 'center' });
-    doc.moveDown();
-    doc.fontSize(20).text(`has successfully completed the study plan`, { align: 'center' });
-    doc.moveDown();
-    doc.fontSize(16).text(`Date: ${new Date().toLocaleDateString()}`, { align: 'center' });
-
-    doc.end();
+    res.send(pdfBuffer);
   } catch (error) {
     next(error);
   }

@@ -493,6 +493,63 @@ const handleExportIcs = async () => {
     setIsSyncingCalendar(false);
   }
 };
+
+const handleGoogleCalendarSync = async () => {
+  if (!activePlan?.id) return;
+  setIsSyncingCalendar(true);
+  try {
+    const response = await API.post('/calendar/google-sync', { planId: activePlan.id });
+    if (response.data?.authUrl) {
+      // Direct Google OAuth login flow in a popup
+      const width = 600;
+      const height = 600;
+      const left = window.screen.width / 2 - width / 2;
+      const top = window.screen.height / 2 - height / 2;
+      
+      const popup = window.open(
+        response.data.authUrl,
+        'google_calendar_oauth',
+        `width=${width},height=${height},top=${top},left=${left}`
+      );
+      
+      // Listen for oauth messages from callback page
+      const handleOAuthMessage = (event) => {
+        if (event.data === 'google_calendar_sync_success') {
+          setRescheduleMessage({
+            type: 'success',
+            text: 'Successfully linked and synced with Google Calendar!',
+          });
+          setTimeout(() => setRescheduleMessage(null), 4000);
+          window.removeEventListener('message', handleOAuthMessage);
+        } else if (event.data === 'google_calendar_sync_error') {
+          setRescheduleMessage({
+            type: 'error',
+            text: 'Failed to sync with Google Calendar.',
+          });
+          setTimeout(() => setRescheduleMessage(null), 4000);
+          window.removeEventListener('message', handleOAuthMessage);
+        }
+      };
+      
+      window.addEventListener('message', handleOAuthMessage);
+    } else {
+      setRescheduleMessage({
+        type: 'success',
+        text: response.data.message || 'Successfully synced with Google Calendar.',
+      });
+      setTimeout(() => setRescheduleMessage(null), 4000);
+    }
+  } catch (err) {
+    console.error('Google calendar sync failed:', err);
+    setRescheduleMessage({
+      type: 'error',
+      text: err.response?.data?.error || 'Failed to sync with Google Calendar.',
+    });
+    setTimeout(() => setRescheduleMessage(null), 4000);
+  } finally {
+    setIsSyncingCalendar(false);
+  }
+};
   const handleReschedule = async () => {
     if (!activePlan?.id) return;
 
@@ -655,10 +712,11 @@ const handleExportIcs = async () => {
                 {!showForm && activePlan && (
                   <>
                     <CalendarExportDropdown 
-                      activePlanId={activePlan.id}
+                      activePlan={activePlan}
                       isSyncingCalendar={isSyncingCalendar}
                       setIsSyncingCalendar={setIsSyncingCalendar}
                       onExportIcs={handleExportIcs}
+                      onGoogleCalendar={handleGoogleCalendarSync}
                     />
                     {/* Issue #1056: Export study plan as server-rendered PDF */}
                     <button

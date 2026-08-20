@@ -1,5 +1,5 @@
 const logger = require('../utils/logger');
-const { Sentry, isSentryReady } = require('../config/sentry');
+const sentryConfig = require('../config/sentry');
 
 /**
  * Attach the correlation ID to an error payload so a user can quote it in a
@@ -60,25 +60,47 @@ const errorHandler = (err, req, res, next) => {
   }
 
   // Multer file size limit error
-if (err.name === 'MulterError') {
-  if (err.code === 'LIMIT_FILE_SIZE') {
-    const isAudioUpload = req.path.includes('/flashcards/from-audio');
+  if (err.name === 'MulterError') {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      const isAudioUpload = req.path.includes('/voice') || req.path.includes('/transcribe-and-summarize') || req.path.includes('/flashcards/from-audio');
+      const isAvatarUpload = req.path.includes('/avatar');
+      const { loadEnv } = require('../config/env');
+      const config = loadEnv();
+      const maxAudioSize = config?.MAX_AUDIO_UPLOAD_SIZE_MB || 25;
 
-    return res.status(400).json(
-      withRequestId(req, {
-        success: false,
-        error: isAudioUpload
-          ? 'Audio file too large. Maximum allowed size is 25MB.'
-          : 'File too large. Maximum allowed size is 15MB.',
-      })
-    );
-  }    error = new Error(err.message);
+      return res.status(413).json(
+        withRequestId(req, {
+          success: false,
+          error: isAvatarUpload
+            ? 'File is too large. Maximum size is 2MB.'
+            : isAudioUpload
+            ? `Audio file too large. Maximum allowed size is ${maxAudioSize}MB.`
+            : 'File too large. Maximum allowed size is 15MB.',
+          message: isAvatarUpload
+            ? 'File is too large. Maximum size is 2MB.'
+            : isAudioUpload
+            ? `Audio file too large. Maximum allowed size is ${maxAudioSize}MB.`
+            : 'File too large. Maximum allowed size is 15MB.',
+        })
+      );
+    }
+    error = new Error(err.message);
     error.statusCode = 400;
   }
 
   // Custom file type validation error
   if (err.name === 'FileValidationError') {
     error.statusCode = 400;
+  }
+
+  // Custom file size limit error for audio uploads
+  if (err.name === 'FileSizeLimitError') {
+    return res.status(413).json(
+      withRequestId(req, {
+        success: false,
+        error: err.message,
+      })
+    );
   }
 
   // JWT Errors
@@ -109,11 +131,18 @@ if (err.name === 'MulterError') {
 
   const statusCode = error.statusCode || 500;
 
-  if (isSentryReady && statusCode >= 500) {
-    if (req.user) {
-      Sentry.setUser({ id: req.user.id, email: req.user.email });
-    }
-    Sentry.captureException(err);
+  if (sentryConfig.isSentryReady && statusCode >= 500) {
+    sentryConfig.Sentry.withScope((scope) => {
+      if (req.user) {
+        scope.setUser({ id: req.user.id, email: req.user.email });
+      }
+      if (req) {
+        scope.setTag('method', req.method);
+        scope.setTag('url', req.originalUrl || req.url);
+        scope.setExtra('requestId', req.id);
+      }
+      sentryConfig.Sentry.captureException(err);
+    });
   }
 
   const responseMessage = statusCode === 500 ? 'Internal Server Error' : (error.message || 'Server Error');
@@ -129,3 +158,4 @@ if (err.name === 'MulterError') {
 
 module.exports = errorHandler;
 module.exports.withRequestId = withRequestId;
+

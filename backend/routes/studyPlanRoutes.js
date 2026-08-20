@@ -100,6 +100,7 @@ const router = express.Router();
 
 router.post('/generate-ai', protect, aiLimiter, checkAiQuota, validateGenerateAIPlan, generateAIPlan);
 router.get('/:id/export-ics', protect, exportStudyPlanIcs);
+router.get('/:id/ics', protect, exportStudyPlanIcs);
 router.get('/:id/export-pdf', protect, exportStudyPlanPdf);
 
 /**
