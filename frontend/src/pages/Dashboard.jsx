@@ -61,6 +61,7 @@ import {
 import LeatherBoard from '../components/dashboard/LeatherBoard';
 import VintagePaper from '../components/dashboard/VintagePaper';
 import GoldTabButton from '../components/dashboard/GoldTabButton';
+import CustomFolders from '../components/dashboard/CustomFolders';
 import PomodoroTimer from '../components/dashboard/PomodoroTimer';
 import FlashcardWidget from '../components/dashboard/FlashcardWidget';
 import BadgeGrid from '../components/dashboard/BadgeGrid';
@@ -1042,9 +1043,11 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
 
         <div className="my-6">
           <FocusEfficiencyWidget />
-        </div>
-        <div className="my-6">
-          <ActivityHeatmap />
+          {/* Folders & Activity */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <CustomFolders />
+            <ActivityHeatmap data={chartData} />
+          </div>
         </div>
 
 
