@@ -297,11 +297,13 @@ npm run dev           # runs backend + frontend concurrently
 
 3. **Frontend** — open `http://localhost:5173` in your browser. Register a new account, or log in with a seeded demo account:
 
-   | Role        | Email                     | Password      |
-   | ----------- | ------------------------- | ------------- |
-   | Student     | `student@openprep.ai`     | `Password123` |
-   | Admin       | `admin@openprep.ai`       | `Password123` |
+   | Role        | Email                  | Password      |
+   | ----------- | ---------------------- | ------------- |
+   | Student     | `demo@openprep.ai`     | `password123` |
+   | Admin       | `admin@openprep.ai`    | `Password123` |
    | Contributor | `contributor@openprep.ai` | `Password123` |
+
+   > ⚠️ These demo credentials are **development-only** and must never be used in production.
 
 ---
 
@@ -312,8 +314,7 @@ If you prefer to run the entire stack containerized, use the configured `docker-
 ### Steps
 
 1. Navigate to the project root directory containing `docker-compose.yml`.
-2. Ensure you have created the backend environment configuration in `backend/.env`.
-3. Spin up the container services:
+2. Spin up the container services:
    ```bash
    docker-compose up --build
    ```
@@ -321,7 +322,10 @@ If you prefer to run the entire stack containerized, use the configured `docker-
    docker-compose up --build
    ```
 
-This downloads the necessary images, boots an isolated PostgreSQL database container, and builds the frontend and backend service instances.
+This downloads the necessary images, boots PostgreSQL and Redis database containers, and builds the frontend and backend service instances.
+
+> [!NOTE]
+> Database migrations and seeding are automated on first boot! The database will be pre-populated with a default student user: **`demo@openprep.ai`** (password: **`password123`**) along with sample exams, subjects, notes, and flashcard decks. Live hot-reloading is fully supported via mounted volumes for both frontend and backend development.
 
 ### Port Mappings
 
@@ -332,15 +336,96 @@ This downloads the necessary images, boots an isolated PostgreSQL database conta
 | **PostgreSQL**              | `localhost:5432`                                                                |
 | **Redis**                   | `localhost:6379`                                                                |
 
-To shut down all running containers:
+### Overriding Development Credentials
+
+The `docker-compose.yml` file uses development-only defaults for PostgreSQL and the backend JWT secret. To override them (e.g., different local ports or credentials), create a `.env` file in the repository root using the variables below — compose reads it automatically:
+
+```env
+# DEVELOPMENT ONLY — never use these defaults in production
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=openprep
+JWT_SECRET=dev_jwt_secret_openprep_12345
+```
+
+For example, to use a different PostgreSQL password:
 
 ```bash
-docker-compose down
+echo "POSTGRES_PASSWORD=my_local_dev_password" >> .env
+docker-compose up --build
 ```
+
+To completely reset the local development environment, including the database volume:
+
+```bash
+docker-compose down -v
+```
+
+### 🪟 Windows Setup via WSL2 (Recommended)
+
+For Windows users, it is highly recommended to run Docker inside **Windows Subsystem for Linux (WSL2)** to avoid file permission issues, line ending conflicts, and performance bottlenecks.
+
+1. **Install WSL2 and Ubuntu**:
+   Ensure WSL2 is enabled and install Ubuntu from the Microsoft Store:
+   ```bash
+   wsl --install
+   ```
+2. **Enable WSL2 Integration in Docker Desktop**:
+   Open Docker Desktop settings, navigate to **General**, check **Use the WSL 2 based engine**, then go to **Resources > WSL Integration** and enable it for your installed distro (e.g., Ubuntu).
+3. **Important: Git Line Endings (`CRLF` vs `LF`)**:
+   Windows uses `CRLF` for line endings, while Linux uses `LF`. When Docker mounts files from Windows, shell scripts (`.sh`) will fail to run inside containers if they contain `CRLF` line endings.
+   
+   To prevent this, configure Git to preserve `LF` line endings **before cloning the repository**:
+   ```bash
+   git config --global core.autocrlf input
+   ```
+   If you have already cloned the repository, you can re-normalize line endings by running:
+   ```bash
+   git add --renormalize .
+   ```
 
 ---
 
+
 ## 🧯 Common Troubleshooting
+
+This section covers common problems that may occur while installing, configuring, or running OpenPrep AI locally.
+
+### Issue: Backend dependency installation fails
+
+If `npm install` fails inside the `backend` directory:
+
+1. Check Node.js and npm:
+   ```bash
+   node --version
+   npm --version
+   ```
+
+2. Make sure you are running the command from the `backend` directory:
+   ```bash
+   cd backend
+   ```
+
+### Issue: Frontend dependency installation fails
+
+If `npm install` fails inside the `frontend` directory:
+
+1. Check the required Node.js and npm versions:
+   ```bash
+   node --version
+   npm --version
+   ```
+
+### Issue: Missing environment variables
+
+If the backend exits during startup or reports a missing configuration value:
+
+1. Make sure `backend/.env` exists.
+2. Create it from the provided template:
+   ```powershell
+   cd backend
+   Copy-Item .env.example .env
+   ```
 
 ### Issue: `SequelizeConnectionError: connect ECONNREFUSED`
 
@@ -349,27 +434,28 @@ The backend cannot reach PostgreSQL.
 1. **Ensure PostgreSQL is running**:
    - **Windows (PowerShell, as Administrator):**
      ```powershell
-     Get-Service postgresql*          # find the service name
-     Start-Service postgresql-x64-18 # or the name from above
+     Get-Service postgresql*
+     Start-Service postgresql-x64-18
      ```
    - **Linux/macOS:**
      ```bash
      sudo systemctl status postgresql
      sudo systemctl start postgresql
      ```
+
 2. **Check the connection string** — verify `DATABASE_URL` in `backend/.env` matches your PostgreSQL user, password, host, and port.
+
 3. **Verify the database exists**:
    ```bash
    psql -U postgres -c "SELECT 1 FROM pg_database WHERE datname='openprep'"
    ```
-   If it returns no rows, create it (see [Create the Database](#create-the-database)).
 
 ### Issue: `password authentication failed for user "postgres"`
 
 The password in `DATABASE_URL` does not match your local PostgreSQL password.
 
-- Update `DATABASE_URL` in `backend/.env` to use the correct password, or reset your local password.
-- If you used Docker, the password is `postgres` (matching `POSTGRES_PASSWORD`).
+- Update `DATABASE_URL` in `backend/.env` to use the correct password.
+- If you used Docker, the password is `postgres`.
 
 ### Issue: `database "openprep" does not exist`
 
@@ -393,7 +479,39 @@ The backend did not find a valid `GEMINI_API_KEY`.
    ```
 3. Restart the backend to load the new environment variable.
 
+### Issue: Docker shell script execution failures on Windows (`\r: command not found`)
+
+This occurs because Git on Windows converted Unix line endings (`LF`) to Windows line endings (`CRLF`) during checkout, which breaks script execution inside Linux containers.
+
+**Solution:**
+Configure Git to check out line endings as-is:
+```bash
+git config --global core.autocrlf input
+```
+Then, force Git to re-normalize the line endings in your working tree:
+```bash
+git add --renormalize .
+git checkout-index --force --all
+```
+
+### Issue: Common Volume Mounting Issues in Docker Desktop for Windows
+
+If your changes are not hot-reloading inside the container, or if the container fails with permission errors when creating files/directories:
+
+1. **WSL2 File System access**:
+   Always clone your repository inside the WSL2 Linux file system (e.g. `/home/username/OpenPrep-AI/`) instead of the mounted Windows drive (`/mnt/c/Users/...`). Accessing mounted host drives (`/mnt/c`) is much slower and prone to file watcher/reload issues.
+2. **File Sharing Permissions**:
+   If using the Windows file system, make sure the directory is shared with Docker Desktop:
+   - Go to Docker Desktop **Settings > Resources > File sharing**.
+   - Add your workspace path (e.g., `C:\Users\username\OneDrive\Desktop\openSource`) to the list of allowed directories.
+3. **Restart Docker Service**:
+   If container volumes fail to mount after a Windows update or system wake from sleep, restart Docker Desktop or run:
+   ```powershell
+   Restart-Service *docker*
+   ```
+
 ---
+
 
 ## 🧪 Running Tests
 

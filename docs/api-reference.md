@@ -901,6 +901,104 @@ This document catalogs the REST API endpoints available in the **OpenPrep AI** b
   "error": "Not authorized, no token"
 }
 ```
+
+---
+
+## 👥 Community Flashcard Decks Endpoints
+
+### 1. Get Community Decks Catalog
+
+- **Method**: `GET`
+- **Path**: `/community/decks`
+- **Headers**: `Authorization: Bearer <token>`
+- **Query Parameters**:
+  - `search` (optional): search term matching deck title, description, or tags.
+  - `subjectId` (optional): filter by a specific deck ID.
+  - `rating` (optional): minimum star rating (e.g. `3` or `4`).
+  - `sort` (optional): sorting criteria (`popular`, `rating`, `newest`).
+- **Success Response (200 OK)**:
+
+```json
+{
+  "success": true,
+  "count": 1,
+  "total": 1,
+  "page": 1,
+  "limit": 12,
+  "totalPages": 1,
+  "data": [
+    {
+      "id": "uuid-deck-123",
+      "name": "Organic Chemistry Fundamentals",
+      "description": "Essential mechanisms and reactions.",
+      "isPublic": true,
+      "clonedFromId": null,
+      "cloneCount": 14,
+      "rating": 4.8,
+      "ratingsCount": 5,
+      "tags": ["chemistry", "organic"],
+      "cardCount": 42,
+      "ownerName": "Alice Smith",
+      "examName": "MCAT Prep"
+    }
+  ]
+}
+```
+
+### 2. Fork Community Deck
+
+- **Method**: `POST`
+- **Path**: `/community/decks/:subjectId/fork`
+- **Headers**: `Authorization: Bearer <token>`
+- **Description**: Clones the specified public community deck and all its flashcards into the authenticated user's library.
+- **Success Response (200 OK)**:
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "cloned-deck-uuid",
+    "name": "Organic Chemistry Fundamentals",
+    "exam": "user-exam-uuid",
+    "user": "authenticated-user-uuid",
+    "clonedFromId": "uuid-deck-123"
+  }
+}
+```
+
+### 3. Rate Community Deck
+
+- **Method**: `POST`
+- **Path**: `/community/decks/:id/rate`
+- **Headers**: `Authorization: Bearer <token>`
+- **Request Body**:
+
+```json
+{
+  "stars": 5,
+  "comment": "Incredible high quality cards!"
+}
+```
+
+- **Success Response (200 OK)**:
+
+```json
+{
+  "success": true,
+  "data": {
+    "rating": {
+      "id": "rating-uuid",
+      "deckId": "uuid-deck-123",
+      "userId": "authenticated-user-uuid",
+      "stars": 5,
+      "comment": "Incredible high quality cards!"
+    },
+    "deckRating": 4.8,
+    "deckRatingsCount": 5
+  }
+}
+```
+
 ## ⚠️ Error Responses
 
 The API uses standard HTTP status codes to indicate whether a request was successful or failed. Error responses follow a consistent JSON structure whenever possible.
@@ -942,43 +1040,40 @@ Returned when authentication is required but the request does not contain a vali
 ```
 
 **Common Causes:**
-
-- Access token is missing.
+- Authorization header is missing.
 - Access token is invalid or expired.
-- Authentication credentials are not provided.
+- Refresh token rotation failure.
 
 **Client Handling:**
-Prompt the user to authenticate again and retry the request with a valid access token.
+Redirect the user to the login page to acquire a new access token.
 
 ---
 
 ### 403 Forbidden
 
-Returned when the user is authenticated but does not have permission to perform the requested action.
+Returned when the authenticated user does not have permission to access the requested resource.
 
 **Example Response:**
 
 ```json
 {
   "success": false,
-  "error": "Forbidden"
+  "error": "Access denied"
 }
 ```
 
 **Common Causes:**
-
-- The authenticated user does not have the required role or permissions.
-- The requested resource is restricted to authorized users.
-- The user does not own the requested resource.
+- User does not have the required role (e.g., student trying to access admin endpoints).
+- User trying to access / modify another user's data.
 
 **Client Handling:**
-Display an appropriate permission error and do not retry the request unless the user's permissions or authentication context changes.
+Display an access denied page or generic error message.
 
 ---
 
 ### 404 Not Found
 
-Returned when the requested resource or endpoint cannot be found.
+Returned when the requested resource does not exist.
 
 **Example Response:**
 
@@ -988,65 +1083,20 @@ Returned when the requested resource or endpoint cannot be found.
   "error": "Resource not found"
 }
 ```
-**Common Causes:**
 
-- Requested resource does not exist.
-- The provided resource ID is invalid or does not belong to an existing record.
-- The requested API endpoint or route is incorrect.
-- The resource may have been deleted or is no longer available.
+**Common Causes:**
+- Invalid resource ID.
+- Resource deleted by another user.
+- Route or path is incorrect.
 
 **Client Handling:**
+Display a 404 page or clear error message and redirect to the dashboard.
 
-Verify that the requested resource or endpoint exists before retrying the request.
-
-### 405 Method Not Allowed
-
-Returned when the requested endpoint exists, but the HTTP method used is not supported by that endpoint.
-
-**Example Response:**
-
-```json
-{
-  "success": false,
-  "error": "Method not allowed"
-}
-```
-**Common Causes:**
-
-- The wrong HTTP method was used for an existing endpoint.
-- A GET request was sent to an endpoint that only supports POST.
-- A POST request was sent to an endpoint that only supports GET.
-- The client is using an outdated API method.
-
-**Client Handling:**
-
-Verify the endpoint documentation and use the HTTP method supported by the route. Do not retry the same request with the same HTTP method.
-
-### 429 Too Many Requests
-
-Returned when the client exceeds the configured API rate limit.
-
-**Example Response:**
-
-```json
-{
-  "success": false,
-  "error": "Too many requests"
-}
-```
-**Common Causes:**
-
-- The client has exceeded the configured API rate limit.
-- Too many requests were sent within a short period.
-- The same endpoint was called repeatedly without respecting the rate-limit window.
-
-**Client Handling:**
-
-Wait before retrying the request and respect any rate-limit or retry-after information provided by the server.
+---
 
 ### 500 Internal Server Error
 
-Returned when the server encounters an unexpected error while processing the request.
+Returned when the server encounters an unexpected error.
 
 **Example Response:**
 

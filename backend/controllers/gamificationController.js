@@ -1,24 +1,4 @@
-const { User, UserBadge } = require('../models');
-
-// Helper to get badge titles
-function getBadgeTitle(code) {
-  const titles = {
-    seven_day_streak: '7-Day Streak 🔥',
-    night_owl: 'Night Owl 🦉',
-    quiz_master: 'Quiz Master 🎓',
-  };
-  return titles[code] || 'Achievement Unlocked';
-}
-
-// Helper to get badge descriptions
-function getBadgeDescription(code) {
-  const descriptions = {
-    seven_day_streak: 'Studied consistently for 7 consecutive days.',
-    night_owl: 'Completed a study task between 11 PM and 4 AM.',
-    quiz_master: 'Successfully finished 10 quiz attempts.',
-  };
-  return descriptions[code] || 'Earned a study achievement badge.';
-}
+const { User, UserBadge, Badge } = require('../models');
 
 exports.getSummary = async (req, res, next) => {
   try {
@@ -29,6 +9,14 @@ exports.getSummary = async (req, res, next) => {
 
     const badges = await UserBadge.findAll({
       where: { userId: user.id },
+      include: [
+        {
+          model: Badge,
+          as: 'badge',
+          where: { isActive: true },
+          required: false,
+        },
+      ],
       order: [['unlockedAt', 'DESC']],
     });
 
@@ -47,8 +35,9 @@ exports.getSummary = async (req, res, next) => {
           id: b.id,
           badgeCode: b.badgeCode,
           unlockedAt: b.unlockedAt,
-          title: getBadgeTitle(b.badgeCode),
-          description: getBadgeDescription(b.badgeCode),
+          title: b.badge?.name || 'Achievement Unlocked',
+          description: b.badge?.description || 'Earned a study achievement badge.',
+          svgIcon: b.badge?.svgIcon || null,
         })),
       },
     });

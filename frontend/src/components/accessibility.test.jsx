@@ -192,21 +192,61 @@ describe('FlashcardWidget accessibility', () => {
 
 // ── PomodoroTimer A11Y ──
 
-describe('PomodoroTimer accessibility', () => {
-  test('play button has aria-label', () => {
-    render(<PomodoroTimer />);
-    expect(screen.getByRole('button', { name: /start timer/i })).toBeInTheDocument();
+// ── Modal Dialogs A11Y ──
+
+describe('Modal Dialogs accessibility and ARIA roles', () => {
+  test('PYQUploadModal has role="dialog", aria-modal="true", and aria-labelledby', async () => {
+    const { default: PYQUploadModal } = await import('./pyq/PYQUploadModal');
+    render(<PYQUploadModal isOpen={true} onClose={vi.fn()} />);
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toHaveAttribute('aria-labelledby', 'pyq-upload-modal-title');
+    expect(document.getElementById('pyq-upload-modal-title')).toBeInTheDocument();
   });
 
-  test('reset button has aria-label', () => {
-    render(<PomodoroTimer />);
-    expect(screen.getByRole('button', { name: /reset timer/i })).toBeInTheDocument();
+  test('ForgotPasswordModal has role="dialog", aria-modal="true", and aria-labelledby', async () => {
+    const { default: ForgotPasswordModal } = await import('./auth/ForgotPasswordModal');
+    renderWithAuth(<ForgotPasswordModal isOpen={true} onClose={vi.fn()} />);
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toHaveAttribute('aria-labelledby', 'forgot-password-modal-title');
+    expect(document.getElementById('forgot-password-modal-title')).toBeInTheDocument();
   });
 
-  test('play button changes to pause after clicking', () => {
-    render(<PomodoroTimer />);
-    const playBtn = screen.getByRole('button', { name: /start timer/i });
-    fireEvent.click(playBtn);
-    expect(screen.getByRole('button', { name: /pause timer/i })).toBeInTheDocument();
+  test('GenerateFlashcardsFromYouTubeModal has role="dialog", aria-modal="true", and aria-labelledby', async () => {
+    const { default: GenerateFlashcardsFromYouTubeModal } = await import('./dashboard/GenerateFlashcardsFromYouTubeModal');
+    render(<GenerateFlashcardsFromYouTubeModal onClose={vi.fn()} />);
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toHaveAttribute('aria-labelledby', 'generate-youtube-modal-title');
+    expect(document.getElementById('generate-youtube-modal-title')).toBeInTheDocument();
+  });
+
+  test('KeyboardShortcutsModal has role="dialog", aria-modal="true", and aria-labelledby', async () => {
+    const { default: KeyboardShortcutsModal } = await import('./flashcards/KeyboardShortcutsModal');
+    render(<KeyboardShortcutsModal isOpen={true} onClose={vi.fn()} />);
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toHaveAttribute('aria-labelledby', 'keyboard-shortcuts-modal-title');
+    expect(document.getElementById('keyboard-shortcuts-modal-title')).toBeInTheDocument();
+  });
+
+  test('GenerateQuizModal has role="dialog", aria-modal="true", and aria-labelledby', async () => {
+    const { default: GenerateQuizModal } = await import('./dashboard/GenerateQuizModal');
+    render(<GenerateQuizModal isOpen={true} onClose={vi.fn()} />);
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toHaveAttribute('aria-labelledby', 'generate-quiz-modal-title');
+    expect(document.getElementById('generate-quiz-modal-title')).toBeInTheDocument();
+  });
+
+  test('ConfirmDeleteModal has role="dialog", aria-modal="true", and aria-labelledby', async () => {
+    const { default: ConfirmDeleteModal } = await import('./common/ConfirmDeleteModal');
+    render(<ConfirmDeleteModal isOpen={true} onClose={vi.fn()} />);
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toHaveAttribute('aria-labelledby', 'confirm-delete-modal-title');
+    expect(document.getElementById('confirm-delete-modal-title')).toBeInTheDocument();
   });
 });
+

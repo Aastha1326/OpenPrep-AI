@@ -1,4 +1,4 @@
-import { useEffect, lazy, Suspense } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { loadUser, checkTokenFreshness, setAiQuotaExceededUntil, setAiQuotaErrorMsg } from './store/slices/authSlice';
@@ -10,6 +10,10 @@ import MobileNavDrawer from './components/MobileNavDrawer';
 import PageSkeleton from './components/PageSkeleton';
 import SessionTimeoutModal from './components/SessionTimeoutModal';
 import QuotaExceededModal from './components/dashboard/QuotaExceededModal';
+import CommandPalette from './components/search/CommandPalette';
+import OfflineBanner from './components/common/OfflineBanner';
+import PwaInstallPrompt from './components/common/PwaInstallPrompt';
+import OfflineIndicator from './components/common/OfflineIndicator';
 import './App.css';
 
 const Landing = lazy(() => import('./pages/Landing'));
@@ -24,19 +28,36 @@ const NotFound = lazy(() => import('./pages/NotFound'));
 const FlashcardReview = lazy(() => import('./pages/FlashcardReview'));
 const PyqDashboard = lazy(() => import('./pages/PyqDashboard'));
 const Settings = lazy(() => import('./pages/Settings'));
+const Flashcards = lazy(() => import('./pages/Flashcards'));
+const CommunityDecks = lazy(() => import('./pages/CommunityDecks'));
+const PublicShare = lazy(() => import('./pages/PublicShare'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const StudyGroupChat = lazy(() => import('./pages/StudyGroupChat'));
 const AiAssistant = lazy(() => import('./pages/AiAssistant'));
 const OAuthCallback = lazy(() => import('./pages/OAuthCallback'));
 const PYQAnalytics = lazy(() => import('./pages/PYQAnalytics'));
 const QuizSession = lazy(() => import('./pages/QuizSession'));
+const MindMapViewer = lazy(() => import('./pages/MindMapViewer'));
+const StudyPlanner = lazy(() => import('./pages/StudyPlanner'));
+const VivaSimulator = lazy(() => import('./pages/VivaSimulator'));
+const CollaborativeNoteView = lazy(() => import('./pages/CollaborativeNoteView'));
 const SquadsPage = lazy(() => import('./pages/SquadsPage'));
-const StudySquadDashboard = lazy(() => import('./pages/StudySquadDashboard'));
-const CollabNote = lazy(() => import('./pages/CollabNote'));
 
 function App() {
   const dispatch = useDispatch();
   const { sessionExpired, aiQuotaExceededUntil } = useSelector((state) => state.auth);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     if (localStorage.getItem('token')) {
@@ -109,15 +130,20 @@ function App() {
           <span>AI features are temporarily locked due to rate limit/quota limits.</span>
         </div>
       )}
+      <OfflineBanner />
+      <PwaInstallPrompt />
+      <OfflineIndicator />
       <CustomCursor />
       <ScrollToTop />
       <MobileNavDrawer />
       <QuotaExceededModal />
+      <CommandPalette isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
       <Suspense fallback={<PageSkeleton />}>
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/share/:token" element={<PublicShare />} />
           <Route path="/oauth-callback" element={<OAuthCallback />} />
           <Route path="/verify-email/:token" element={<VerifyEmail />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -136,6 +162,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <FlashcardReview />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/flashcards"
+            element={
+              <ProtectedRoute>
+                <Flashcards />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/community/decks"
+            element={
+              <ProtectedRoute>
+                <CommunityDecks />
               </ProtectedRoute>
             }
           />
@@ -215,6 +257,33 @@ function App() {
           />
 
           <Route
+            path="/study-planner"
+            element={
+              <ProtectedRoute>
+                <StudyPlanner />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/viva-simulator"
+            element={
+              <ProtectedRoute>
+                <VivaSimulator />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/notes/collaborative/:noteId"
+            element={
+              <ProtectedRoute>
+                <CollaborativeNoteView />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/quiz/:id"
             element={
               <ProtectedRoute>
@@ -224,10 +293,28 @@ function App() {
           />
 
           <Route
+            path="/mind-map"
+            element={
+              <ProtectedRoute>
+                <MindMapViewer />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/settings"
             element={
               <ProtectedRoute>
                 <Settings />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/squads"
+            element={
+              <ProtectedRoute>
+                <SquadsPage />
               </ProtectedRoute>
             }
           />

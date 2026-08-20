@@ -14,8 +14,8 @@ import {
   FaDownload,
   FaCompass,
   FaTrophy,
-  FaSparkles,
 } from 'react-icons/fa';
+import { Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const PYQAnalytics = () => {
@@ -190,7 +190,7 @@ const PYQAnalytics = () => {
               onClick={() => setIsCustomQuizOpen(true)}
               className="bg-neutral-800 hover:bg-neutral-750 text-stone-250 border border-neutral-700 font-bold py-3 px-5 rounded-xl transition-all shadow-md text-xs flex items-center gap-2"
             >
-              <FaSparkles className="text-indigo-400" /> Custom Test
+              <Sparkles className="text-indigo-400" /> Custom Test
             </button>
           </div>
         </div>
@@ -318,7 +318,7 @@ const PYQAnalytics = () => {
                   >
                     <div>
                       <p className="text-xs font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-1.5 justify-center sm:justify-start">
-                        <FaSparkles /> Practice Chapter
+                        <Sparkles /> Practice Chapter
                       </p>
                       <h4 className="text-sm font-bold text-stone-100 mt-1">"{clickedChapter}"</h4>
                       <p className="text-stone-400 text-xs mt-0.5">Select a practice method below to start revision.</p>
