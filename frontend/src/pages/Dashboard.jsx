@@ -569,6 +569,12 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           delay={0.5}
           onClick={() => navigate('/ai-assistant')}
         />
+        <GoldTabButton
+          icon={Network}
+          label="Topic Mind Map"
+          delay={0.52}
+          onClick={() => navigate('/mind-map')}
+        />
         <button
           onClick={() => {
             setIsNoteModalOpen(true);
