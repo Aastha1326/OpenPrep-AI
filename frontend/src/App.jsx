@@ -14,6 +14,7 @@ import CommandPalette from './components/search/CommandPalette';
 import OfflineBanner from './components/common/OfflineBanner';
 import PwaInstallPrompt from './components/common/PwaInstallPrompt';
 import OfflineIndicator from './components/common/OfflineIndicator';
+import Walkthrough from './components/tutorial/Walkthrough';
 import './App.css';
 
 const Landing = lazy(() => import('./pages/Landing'));
@@ -29,6 +30,7 @@ const FlashcardReview = lazy(() => import('./pages/FlashcardReview'));
 const PyqDashboard = lazy(() => import('./pages/PyqDashboard'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Flashcards = lazy(() => import('./pages/Flashcards'));
+const CommunityDecks = lazy(() => import('./pages/CommunityDecks'));
 const PublicShare = lazy(() => import('./pages/PublicShare'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const StudyGroupChat = lazy(() => import('./pages/StudyGroupChat'));
@@ -136,6 +138,7 @@ function App() {
       <ScrollToTop />
       <MobileNavDrawer />
       <QuotaExceededModal />
+      <Walkthrough />
       <CommandPalette isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
       <Suspense fallback={<PageSkeleton />}>
         <Routes>
@@ -173,6 +176,14 @@ function App() {
             }
           />
           <Route
+            path="/community/decks"
+            element={
+              <ProtectedRoute>
+                <CommunityDecks />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/battle"
             element={
               <ProtectedRoute>
@@ -193,6 +204,30 @@ function App() {
             element={
               <ProtectedRoute>
                 <StudyGroupChat />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/squads"
+            element={
+              <ProtectedRoute>
+                <SquadsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/squads/:id"
+            element={
+              <ProtectedRoute>
+                <StudySquadDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/collab-note/:id"
+            element={
+              <ProtectedRoute>
+                <CollabNote />
               </ProtectedRoute>
             }
           />
@@ -293,6 +328,7 @@ function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
+      <MobileBottomNav />
     </>
   );
 }

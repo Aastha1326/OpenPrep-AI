@@ -16,3 +16,6 @@ CREATE TABLE IF NOT EXISTS "DeckRatings" (
 
 CREATE INDEX IF NOT EXISTS deck_rating_deck_idx ON "DeckRatings" ("deckId");
 CREATE INDEX IF NOT EXISTS deck_rating_user_idx ON "DeckRatings" ("userId");
+
+CREATE INDEX IF NOT EXISTS subject_is_public_rating_idx ON "Subjects" ("isPublic", "rating");
+CREATE INDEX IF NOT EXISTS subject_is_public_clone_count_idx ON "Subjects" ("isPublic", "cloneCount");

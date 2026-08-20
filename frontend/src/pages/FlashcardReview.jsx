@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useDrag } from '@use-gesture/react';
 import {
   Brain,
   ArrowLeft,
@@ -13,14 +14,14 @@ import {
   FileAudio,
   Keyboard,
 } from 'lucide-react';
+import MathRenderer from '../components/common/MathRenderer';
 import API from '../services/api';
 import useVoiceControl from '../hooks/useVoiceControl';
 import VoiceModeToggle from '../components/VoiceModeToggle';
 import AudioWaveform from '../components/AudioWaveform';
 import GenerateFlashcardsFromAudioModal from '../components/dashboard/GenerateFlashcardsFromAudioModal';
 import KeyboardShortcutsModal from '../components/flashcards/KeyboardShortcutsModal';
-import offlineSyncService from '../services/offlineSyncService';
-import { db } from '../services/db';
+import PomodoroTimer from '../components/dashboard/PomodoroTimer';
 const STORAGE_KEY = 'flashcardReviewSession';
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -669,8 +670,28 @@ useEffect(() => {
   // --- Active Review Queue Screen ---
   const progressPercent = Math.round((currentIndex / cards.length) * 100);
 
+  const bind = useDrag(({ down, movement: [mx], cancel }) => {
+    if (down && Math.abs(mx) > 120) {
+      cancel();
+      if (mx < 0) {
+        // Swipe Left
+        if (!isFlipped) handleCardFlip();
+        else handleReview(1); // Mark as Wrong
+      } else {
+        // Swipe Right
+        if (!isFlipped) handleCardFlip();
+        else handleReview(5); // Mark as Easy
+      }
+    }
+  });
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-6 px-4 flex flex-col items-center">
+      {/* Pomodoro Timer Toggle */}
+      <div className="fixed bottom-4 right-4 z-50 transform scale-50 origin-bottom-right hover:scale-75 transition-transform duration-300">
+        <PomodoroTimer />
+      </div>
+
       {/* Header */}
       <div className="w-full max-w-3xl flex justify-between items-center mb-8">
         <button 
@@ -796,6 +817,7 @@ useEffect(() => {
       <div className="w-full max-w-3xl flex-1 flex flex-col items-center justify-start perspective-1000 mb-20 select-none touch-action-manipulation">
         <AnimatePresence mode="wait">
           <motion.div
+            {...bind()}
             key={currentCard.id}
             className="w-full max-w-2xl min-h-[22rem] sm:h-80 relative preserve-3d cursor-pointer group"
             initial={{ opacity: 0, y: 20 }}
@@ -852,7 +874,7 @@ useEffect(() => {
               </div>
 
               <h3 className="text-2xl md:text-3xl font-bold font-inter text-neutral-800 dark:text-neutral-100 text-center leading-snug">
-                {currentCard.front}
+                <MathRenderer text={currentCard.front} />
               </h3>
               
               <div className="absolute bottom-6 flex items-center text-sm font-medium text-neutral-400 opacity-70 group-hover:opacity-100 transition-opacity">
@@ -916,10 +938,21 @@ useEffect(() => {
                 </div>
               </div>
 
-              <div className="flex-1 w-full flex items-center justify-center">
+              <div className="flex-1 w-full flex flex-col items-center justify-center">
                 <p className="text-xl md:text-2xl text-neutral-800 dark:text-neutral-200 font-inter leading-relaxed text-center">
-                  {currentCard.back}
+                  <MathRenderer text={currentCard.back} />
                 </p>
+                {currentCard.sourceUrl && currentCard.timestampSeconds !== undefined && currentCard.timestampSeconds !== null && (
+                  <a 
+                    href={`${currentCard.sourceUrl}&t=${currentCard.timestampSeconds}s`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-6 flex items-center gap-2 px-4 py-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-full text-sm font-medium hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                  >
+                    <Video className="w-4 h-4" />
+                    Jump to Video ({Math.floor(currentCard.timestampSeconds / 60)}:{(currentCard.timestampSeconds % 60).toString().padStart(2, '0')})
+                  </a>
+                )}
               </div>
 
               {currentCard.sourceUrl && (
@@ -990,10 +1023,135 @@ useEffect(() => {
         </div>
       </div>
 
-      {/* Settings Modal */}
+      {/* Settings Modal (Mobile & Desktop) */}
+      <MobileBottomSheet
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        title="SM-2 Algorithm Settings"
+      >
+        <div className="flex flex-col gap-4 py-2">
+          {/* Easy Factor Modifier */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-neutral-600 dark:text-neutral-300 uppercase tracking-wider">
+              Easiness Factor Adjuster (Multiplier)
+            </label>
+            <input
+              type="number"
+              step="0.05"
+              min="0.1"
+              max="5.0"
+              value={modalSettings.sm2EasyFactorModifier}
+              onChange={(e) => setModalSettings({
+                ...modalSettings,
+                sm2EasyFactorModifier: parseFloat(e.target.value) || 1.0
+              })}
+              className="w-full px-3 py-2 text-sm bg-neutral-50 dark:bg-slate-900 border border-neutral-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-primary-500 text-neutral-800 dark:text-neutral-100 transition-colors"
+            />
+            <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
+              Controls how aggressively the easiness factor increases or decreases based on quality scores.
+            </span>
+          </div>
+
+          {/* Interval Modifier */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-neutral-600 dark:text-neutral-300 uppercase tracking-wider">
+              Interval Scale Factor (Multiplier)
+            </label>
+            <input
+              type="number"
+              step="0.05"
+              min="0.1"
+              max="10.0"
+              value={modalSettings.sm2IntervalModifier}
+              onChange={(e) => setModalSettings({
+                ...modalSettings,
+                sm2IntervalModifier: parseFloat(e.target.value) || 1.0
+              })}
+              className="w-full px-3 py-2 text-sm bg-neutral-50 dark:bg-slate-900 border border-neutral-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-primary-500 text-neutral-800 dark:text-neutral-100 transition-colors"
+            />
+            <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
+              Adjusts review intervals for third+ reviews. Larger values stretch review intervals further.
+            </span>
+          </div>
+
+          {/* Step 1 Review Interval */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-neutral-600 dark:text-neutral-300 uppercase tracking-wider">
+              Step 1 Review Interval (Days)
+            </label>
+            <input
+              type="number"
+              step="1"
+              min="1"
+              max="365"
+              value={modalSettings.sm2Step1Interval}
+              onChange={(e) => setModalSettings({
+                ...modalSettings,
+                sm2Step1Interval: parseInt(e.target.value, 10) || 1
+              })}
+              className="w-full px-3 py-2 text-sm bg-neutral-50 dark:bg-slate-900 border border-neutral-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-primary-500 text-neutral-800 dark:text-neutral-100 transition-colors"
+            />
+            <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
+              The interval in days for the very first correct review.
+            </span>
+          </div>
+
+          {/* Step 2 Review Interval */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-neutral-600 dark:text-neutral-300 uppercase tracking-wider">
+              Step 2 Review Interval (Days)
+            </label>
+            <input
+              type="number"
+              step="1"
+              min="1"
+              max="365"
+              value={modalSettings.sm2Step2Interval}
+              onChange={(e) => setModalSettings({
+                ...modalSettings,
+                sm2Step2Interval: parseInt(e.target.value, 10) || 6
+              })}
+              className="w-full px-3 py-2 text-sm bg-neutral-50 dark:bg-slate-900 border border-neutral-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-primary-500 text-neutral-800 dark:text-neutral-100 transition-colors"
+            />
+            <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
+              The interval in days for the second correct review.
+            </span>
+          </div>
+        </div>
+
+        <div className="flex justify-between items-center pt-3 border-t border-neutral-100 dark:border-slate-700/60 mt-2">
+          <button
+            type="button"
+            disabled={isSavingSettings}
+            onClick={handleResetSettings}
+            className="px-4 py-2 text-xs font-bold text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-all"
+          >
+            Reset Defaults
+          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={isSavingSettings}
+              onClick={() => setIsSettingsOpen(false)}
+              className="px-4 py-2 text-xs font-bold text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-slate-700 rounded-lg transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={isSavingSettings}
+              onClick={handleSaveSettings}
+              className="px-4 py-2 text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-lg shadow-md transition-all flex items-center gap-1.5"
+            >
+              {isSavingSettings ? 'Saving...' : 'Save Settings'}
+            </button>
+          </div>
+        </div>
+      </MobileBottomSheet>
+
       <AnimatePresence>
         {isSettingsOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="hidden md:flex fixed inset-0 z-50 items-center justify-center p-4">
             {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
