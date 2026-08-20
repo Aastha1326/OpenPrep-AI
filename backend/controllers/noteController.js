@@ -173,7 +173,18 @@ exports.importNotes = async (req, res, next) => {
  */
 exports.uploadNote = async (req, res, next) => {
   try {
-    const { title, content, subjectId, topicId, isPublic, category, tags } = req.body;
+    const {
+      title,
+      content,
+      subjectId,
+      topicId,
+      isPublic,
+      category,
+      tags,
+      isOcrExtracted,
+      ocrConfidence,
+      originalImageUrl,
+    } = req.body;
 
     const subject = await Subject.findByPk(subjectId);
     if (!subject) {
@@ -200,6 +211,9 @@ exports.uploadNote = async (req, res, next) => {
       category: category || 'Lecture Notes',
       tags: typeof tags === 'string' ? tags.split(',').map(t => t.trim()).filter(Boolean) : (Array.isArray(tags) ? tags : []),
       user: req.user.id,
+      isOcrExtracted: isOcrExtracted === 'true' || isOcrExtracted === true,
+      ocrConfidence: ocrConfidence ? parseFloat(ocrConfidence) : null,
+      originalImageUrl: originalImageUrl || null,
     });
 
     // Log activity
