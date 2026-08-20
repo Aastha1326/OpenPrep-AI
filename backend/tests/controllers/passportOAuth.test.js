@@ -23,7 +23,7 @@ describe('Passport OAuth 2.0 Strategy Callbacks', () => {
       const mockProfile = {
         id: 'google-999',
         displayName: 'Google Linker',
-        emails: [{ value: 'linker@example.com' }],
+        emails: [{ value: 'linker@example.com', verified: true }],
         photos: [{ value: 'http://avatar.com/google.png' }],
       };
 
@@ -55,7 +55,7 @@ describe('Passport OAuth 2.0 Strategy Callbacks', () => {
       const mockProfile = {
         id: 'google-777',
         displayName: 'New Google User',
-        emails: [{ value: 'newgoogle@example.com' }],
+        emails: [{ value: 'newgoogle@example.com', verified: true }],
         photos: [{ value: 'http://avatar.com/newgoogle.png' }],
       };
 
@@ -103,7 +103,7 @@ describe('Passport OAuth 2.0 Strategy Callbacks', () => {
       const mockProfile = {
         id: 'github-123',
         username: 'gitlink',
-        emails: [{ value: 'gitlink@example.com' }],
+        emails: [{ value: 'gitlink@example.com', primary: true, verified: true }],
         photos: [{ value: 'http://avatar.com/git.png' }],
       };
 
