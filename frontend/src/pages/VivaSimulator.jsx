@@ -1,156 +1,123 @@
-import React, { useState, useEffect } from 'react';
+/**
+ * @fileoverview Main page for the Oral Viva Simulator.
+ * Manages conversation state, integrates the recorder, and displays AI feedback.
+ */
+import React, { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import API from '../services/api';
-import VivaSimulatorCanvas from '../components/viva/VivaSimulatorCanvas';
+import VivaRecorder from '../components/Viva/VivaRecorder';
 import VivaScorecardModal from '../components/viva/VivaScorecardModal';
-import { FaGraduationCap, FaAngleRight, FaExclamationCircle } from 'react-icons/fa';
+import { FaGraduationCap, FaExclamationCircle } from 'react-icons/fa';
 import { Loader2 } from 'lucide-react';
 
 export default function VivaSimulator() {
-  const [subjects, setSubjects] = useState([]);
-  const [selectedSubjectId, setSelectedSubjectId] = useState('');
-  const [sessionId, setSessionId] = useState(null);
-  const [turns, setTurns] = useState([]);
-  const [nextQuestion, setNextQuestion] = useState('');
+  const location = useLocation();
+
+  // Initialize state from location state or defaults
+  const [topic, setTopic] = useState(location.state?.topic || '');
+  const [sessionId, setSessionId] = useState(location.state?.sessionId || null);
+  const [currentQuestion, setCurrentQuestion] = useState(location.state?.currentQuestion || '');
+  const [conversationHistory, setConversationHistory] = useState(location.state?.conversationHistory || []);
   const [scorecard, setScorecard] = useState(null);
   const [isScorecardOpen, setIsScorecardOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [loadingSubjects, setLoadingSubjects] = useState(true);
+
+  const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState('');
+  const [showTopicInput, setShowTopicInput] = useState(!location.state?.topic);
 
-  const fetchSubjects = async () => {
-    try {
-      const res = await API.get('/subjects');
-      if (res.data?.success) {
-        setSubjects(res.data.data || []);
-        if (res.data.data.length > 0) {
-          setSelectedSubjectId(res.data.data[0].id);
-        }
-      }
-    } catch (err) {
-      console.error(err);
-      setError('Failed to load subjects list.');
-    } finally {
-      setLoadingSubjects(false);
-    }
-  };
+  const handleStartSession = async (e) => {
+    e.preventDefault();
+    if (!topic.trim()) return;
 
-  const handleStartViva = async () => {
-    if (!selectedSubjectId) return;
-    setLoading(true);
+    setIsProcessing(true);
     setError('');
     setScorecard(null);
+
     try {
-      const res = await API.post('/viva/start', { subjectId: selectedSubjectId });
-      if (res.data?.success) {
-        setSessionId(res.data.data.sessionId);
-        setTurns(res.data.data.turns || []);
-        setNextQuestion(res.data.data.nextQuestion || '');
+      const response = await API.post('/viva/start', { topic: topic.trim() });
+      if (response.data.success) {
+        setSessionId(response.data.data.sessionId);
+        setCurrentQuestion(response.data.data.currentQuestion);
+        setConversationHistory(response.data.data.conversationHistory || []);
+        setShowTopicInput(false);
+      } else {
+        setError(response.data.message || 'Failed to start session.');
       }
     } catch (err) {
-      console.error(err);
-      setError(err?.response?.data?.error || 'Failed to start viva session.');
+      console.error('Start session error:', err);
+      setError(err?.response?.data?.message || 'Network error. Please check your connection and try again.');
     } finally {
-      setLoading(false);
+      setIsProcessing(false);
     }
   };
 
-  const handleRespond = async (studentAnswer) => {
-    setLoading(true);
+  const handleRecordingComplete = async (audioBlob) => {
+    // In production, upload audioBlob to a transcription service (e.g., Whisper) first.
+    // For this implementation, we simulate the STT output to satisfy the API contract.
+    const mockTranscribedText = "This is a simulated transcribed answer from the audio blob. In production, this would be the actual STT output.";
+
+    setIsProcessing(true);
     setError('');
 
-    // Optimistically update turns to display student response immediately
-    const tempTurns = [...turns, { speaker: 'student', text: studentAnswer }];
-    setTurns(tempTurns);
-
     try {
-      // 1. Submit response
-      const res = await API.post('/viva/respond', {
+      const response = await API.post('/viva/evaluate', {
         sessionId,
-        studentAnswer,
+        topic,
+        currentQuestion,
+        userAnswer: mockTranscribedText,
+        conversationHistory,
       });
 
-      if (res.data?.success) {
-        // Count student answers
-        const studentTurnsCount = tempTurns.filter((t) => t.speaker === 'student').length;
-
-        // Auto evaluate after 5 turns (exchanges) to match acceptance criteria
-        if (studentTurnsCount >= 5) {
-          await handleEvaluate();
-        } else {
-          setTurns(res.data.data.turns || []);
-          setNextQuestion(res.data.data.nextQuestion || '');
-        }
+      if (response.data.success) {
+        setConversationHistory(response.data.data.conversationHistory);
+        setCurrentQuestion(response.data.data.nextQuestion);
+      } else {
+        setError(response.data.message || 'Failed to evaluate answer.');
       }
     } catch (err) {
-      console.error(err);
-      setError(err?.response?.data?.error || 'Failed to submit response.');
+      console.error('Evaluation error:', err);
+      setError(err?.response?.data?.message || 'Failed to evaluate. The AI service might be busy.');
     } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleEvaluate = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const res = await API.post('/viva/evaluate', { sessionId });
-      if (res.data?.success) {
-        setScorecard(res.data.data);
-        setIsScorecardOpen(true);
-      }
-    } catch (err) {
-      console.error(err);
-      setError(err?.response?.data?.error || 'Failed to generate performance scorecard.');
-    } finally {
-      setLoading(false);
+      setIsProcessing(false);
     }
   };
 
   const handleRestart = () => {
+    setTopic('');
     setSessionId(null);
-    setTurns([]);
-    setNextQuestion('');
+    setCurrentQuestion('');
+    setConversationHistory([]);
     setScorecard(null);
     setIsScorecardOpen(false);
+    setShowTopicInput(true);
+    setError('');
   };
 
-  useEffect(() => {
-    fetchSubjects();
-  }, []);
-
-  const studentTurnsCount = turns.filter((t) => t.speaker === 'student').length;
-
   return (
-    <div className="min-h-screen bg-stone-950 text-stone-100 font-inter py-8 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-stone-950 text-stone-100 font-inter py-8 px-4 sm:px-6 lg:px-8 transition-colors duration-200">
       <div className="max-w-4xl mx-auto space-y-8">
-        
-        {/* Title bar */}
+
+        {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-neutral-800 pb-6 gap-4">
           <div>
             <h1 className="text-3xl font-black font-playfair tracking-tight text-white flex items-center gap-2">
-              <FaGraduationCap className="text-indigo-400" /> AI Practice Viva Simulator
+              <FaGraduationCap className="text-indigo-400" /> AI Oral Viva Simulator
             </h1>
             <p className="text-stone-400 text-xs mt-1">
-              Practice real-time technical viva questions under exam pressure.
+              Practice your spoken answers and get instant, constructive feedback.
             </p>
           </div>
-          {sessionId && (
-            <div className="flex items-center gap-3">
-              <div className="text-right">
-                <span className="text-[9px] font-bold text-stone-500 uppercase tracking-widest block">Progress</span>
-                <span className="text-xs font-bold text-stone-300">Turn {studentTurnsCount} / 5</span>
-              </div>
-              <button
-                onClick={handleEvaluate}
-                disabled={loading || studentTurnsCount < 2}
-                className="px-4 py-2 bg-neutral-850 hover:bg-neutral-800 disabled:opacity-50 text-stone-300 border border-neutral-750 rounded-xl text-xs font-bold transition cursor-pointer"
-              >
-                Finish Early
-              </button>
-            </div>
+          {sessionId && !showTopicInput && (
+            <button
+              onClick={handleRestart}
+              className="px-4 py-2 bg-neutral-850 hover:bg-neutral-800 text-stone-300 border border-neutral-750 rounded-xl text-xs font-bold transition cursor-pointer"
+            >
+              End & Restart
+            </button>
           )}
         </div>
 
+        {/* Error Display */}
         {error && (
           <div className="flex items-center gap-2 p-3 rounded-xl border border-rose-500/30 bg-rose-500/10 text-xs text-rose-400 font-semibold">
             <FaExclamationCircle className="shrink-0" />
@@ -158,80 +125,109 @@ export default function VivaSimulator() {
           </div>
         )}
 
-        {loadingSubjects ? (
-          <div className="flex flex-col items-center justify-center py-16">
-            <Loader2 className="w-8 h-8 animate-spin text-indigo-500 mb-2" />
-            <p className="text-xs text-stone-400 font-semibold">Loading subjects...</p>
-          </div>
-        ) : !sessionId ? (
-          /* Session Start / Selector Setup */
+        {/* Topic Input Phase */}
+        {showTopicInput ? (
           <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-8 shadow-2xl max-w-xl mx-auto space-y-6">
-            <div className="space-y-2">
-              <h2 className="text-stone-100 font-extrabold font-playfair text-xl">Oral Examination Simulator</h2>
-              <p className="text-stone-400 text-xs leading-relaxed">
-                Choose a subject to configure your oral technical viva session. The examiner persona will ask complex technical follow-up questions to test your accuracy and clarity.
+            <form onSubmit={handleStartSession} className="space-y-6">
+              <div className="space-y-2">
+                <h2 className="text-stone-100 font-extrabold font-playfair text-xl">Configure Your Session</h2>
+                <p className="text-stone-400 text-xs leading-relaxed">
+                  Enter a specific topic to generate targeted oral examination questions.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="topic" className="text-[10px] font-black text-stone-500 uppercase tracking-widest block">
+                  Practice Topic
+                </label>
+                <input
+                  type="text"
+                  id="topic"
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  placeholder="e.g., Data Structures, World War II, React Hooks"
+                  className="w-full bg-stone-950 border border-neutral-850 focus:border-indigo-500 rounded-xl px-4 py-3 text-sm text-stone-300 outline-none transition"
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isProcessing || !topic.trim()}
+                className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 disabled:opacity-50 text-white rounded-2xl text-xs font-bold transition shadow-lg hover:shadow-indigo-500/10 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Generating Question...</span>
+                  </>
+                ) : (
+                  <span>Start Viva Session</span>
+                )}
+              </button>
+            </form>
+          </div>
+        ) : (
+          /* Active Viva Phase */
+          <div className="space-y-6">
+
+            {/* Current Question Card */}
+            <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-3xl p-6 sm:p-8">
+              <h2 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-3">
+                Current Question
+              </h2>
+              <p className="text-xl sm:text-2xl font-medium text-white leading-relaxed font-playfair">
+                {currentQuestion}
               </p>
             </div>
 
-            {subjects.length === 0 ? (
-              <div className="p-4 rounded-xl border border-neutral-850 bg-stone-950/20 text-center text-xs text-stone-500">
-                Please create subjects in the Dashboard before simulating a practice interview.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <label htmlFor="subject-select" className="text-[10px] font-black text-stone-500 uppercase tracking-widest block">Select Subject</label>
-                  <select
-                    id="subject-select"
-                    value={selectedSubjectId}
-                    onChange={(e) => setSelectedSubjectId(e.target.value)}
-                    className="w-full bg-stone-950 border border-neutral-850 focus:border-indigo-500 rounded-xl px-4 py-2.5 text-xs text-stone-300 outline-none transition cursor-pointer"
-                  >
-                    {subjects.map((sub) => (
-                      <option key={sub.id} value={sub.id}>
-                        {sub.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+            {/* Recorder Component */}
+            <VivaRecorder
+              onRecordingComplete={handleRecordingComplete}
+              isProcessing={isProcessing}
+            />
 
-                <button
-                  onClick={handleStartViva}
-                  disabled={loading}
-                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-bold transition shadow-lg hover:shadow-indigo-500/10 flex items-center justify-center gap-1 cursor-pointer"
-                >
-                  {loading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <>
-                      <span>Enter Examination Room</span>
-                      <FaAngleRight />
-                    </>
-                  )}
-                </button>
+            {/* Conversation History */}
+            {conversationHistory.length > 0 && (
+              <div className="space-y-4 pt-4">
+                <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest border-b border-neutral-800 pb-2">
+                  Session History
+                </h3>
+                {conversationHistory.map((turn, index) => (
+                  <div key={index} className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 space-y-4">
+                    <div>
+                      <span className="text-[10px] font-black text-stone-500 uppercase tracking-widest">Q{index + 1}</span>
+                      <p className="text-stone-200 mt-1 text-sm">{turn.question}</p>
+                    </div>
+
+                    <div className="pl-4 border-l-2 border-neutral-800">
+                      <span className="text-[10px] font-black text-stone-500 uppercase tracking-widest">Your Answer</span>
+                      <p className="text-stone-400 mt-1 text-sm italic">"{turn.answer}"</p>
+                    </div>
+
+                    <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">AI Feedback</span>
+                        <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 text-[10px] font-bold rounded-full border border-emerald-500/30">
+                          Score: {turn.score}/10
+                        </span>
+                      </div>
+                      <p className="text-xs text-emerald-100/80 leading-relaxed">{turn.feedback}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
-        ) : (
-          /* Active Simulator Arena */
-          <div className="space-y-6">
-            <VivaSimulatorCanvas
-              turns={turns}
-              nextQuestion={nextQuestion}
-              onRespond={handleRespond}
-              loading={loading}
-            />
-          </div>
         )}
 
-        {/* Evaluation Scorecard Modal */}
+        {/* Evaluation Scorecard Modal (Retained for future end-session evaluation) */}
         <VivaScorecardModal
           isOpen={isScorecardOpen}
           onClose={() => setIsScorecardOpen(false)}
           scorecard={scorecard}
           onRestart={handleRestart}
         />
-
       </div>
     </div>
   );
