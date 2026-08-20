@@ -12,7 +12,7 @@ import {
   FaRegBookmark,
   FaSpinner,
 } from 'react-icons/fa';
-import API from '../services/api';
+import API, { evaluateSubjectiveAnswer } from '../services/api';
 import MathRenderer from '../components/common/MathRenderer';
 import { exportAsCSV, exportAsJSON } from '../utils/exportUtils';
 import useVoiceControl from '../hooks/useVoiceControl';
@@ -23,6 +23,47 @@ import LevelUpModal from '../components/gamification/LevelUpModal';
 import RevisionSheetModal from '../components/dashboard/RevisionSheetModal';
 import RemediationPlanModal from '../components/dashboard/RemediationPlanModal';
 import QuestionExplanation from '../components/dashboard/QuestionExplanation';
+import SubjectiveQuestionView from '../components/quiz/SubjectiveQuestionView';
+import confetti from 'canvas-confetti';
+
+export const getScoreMotivationalMessage = (score) => {
+  const numScore = Number(score) || 0;
+  if (numScore >= 90) return "Outstanding! 🏆 You've mastered this topic!";
+  if (numScore >= 70) return "Great work! 🎯 Keep sharpening those edges.";
+  return "Keep pushing! 💪 Review the weak topics below.";
+};
+
+export function useCountUp(targetValue, durationMs = 1500, start = false) {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    if (!start || targetValue === undefined || targetValue === null) {
+      setCount(0);
+      return;
+    }
+    const end = Number(targetValue) || 0;
+    let startTimestamp = null;
+    let animationFrameId;
+
+    const step = (timestamp) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / durationMs, 1);
+      const easeOut = 1 - Math.pow(1 - progress, 3);
+      setCount(Math.round(easeOut * end));
+      if (progress < 1) {
+        animationFrameId = requestAnimationFrame(step);
+      }
+    };
+
+    animationFrameId = requestAnimationFrame(step);
+
+    return () => {
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    };
+  }, [targetValue, durationMs, start]);
+
+  return count;
+}
 
 const REVIEW_FILTERS = [
   { key: 'all', label: 'All Questions' },
@@ -47,13 +88,18 @@ const resolveUserAnswerIndex = (question, rawAnswer) => {
 };
 
 const buildQuizResultRows = (quiz, answers) =>
-  quiz.questions.map((q, idx) => ({
-    questionNumber: idx + 1,
-    question: q.questionText,
-    yourAnswer: answers[q._id] ?? '',
-    correctAnswer: q.correctAnswer,
-    isCorrect: answers[q._id] === q.correctAnswer ? 'Yes' : 'No',
-  }));
+  quiz.questions.map((q, idx) => {
+    const isCorrect = Array.isArray(q.correctAnswer)
+      ? q.correctAnswer.includes(answers[q._id])
+      : answers[q._id] === q.correctAnswer;
+    return {
+      questionNumber: idx + 1,
+      question: q.questionText,
+      yourAnswer: answers[q._id] ?? '',
+      correctAnswer: q.correctAnswer,
+      isCorrect: isCorrect ? 'Yes' : 'No',
+    };
+  });
 
 const QuizSession = () => {
   const { id } = useParams();
@@ -79,6 +125,9 @@ const QuizSession = () => {
   const [timeLeft, setTimeLeft] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+
+  const [savedSessionBanner, setSavedSessionBanner] = useState(null);
+  const startedAtRef = useRef(Date.now());
 
   const submittingRef = useRef(false);
   // Unique idempotency key for this session's submission — reused across retries
@@ -187,6 +236,89 @@ const fetchQuiz = useCallback(async () => {
   useEffect(() => {
     fetchQuiz();
   }, [id, fetchQuiz]);
+
+  // Check localStorage for saved session on quiz load
+  useEffect(() => {
+    if (!id || !quiz) return;
+    const storageKey = `quiz_progress_${id}`;
+    try {
+      const savedStr = localStorage.getItem(storageKey);
+      if (savedStr) {
+        const parsed = JSON.parse(savedStr);
+        const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+        if (parsed && parsed.startedAt && Date.now() - parsed.startedAt < TWO_HOURS_MS) {
+          setSavedSessionBanner(parsed);
+        } else {
+          // Expired (older than 2 hours) -> automatically discard
+          localStorage.removeItem(storageKey);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to parse saved quiz progress:', e);
+    }
+  }, [id, quiz]);
+
+  // Auto-save quiz progress to localStorage (debounced by 500ms)
+  useEffect(() => {
+    if (!id || !quiz || submitted) return;
+    if (Object.keys(answers).length === 0 && currentQuestionIndex === 0) return;
+
+    const timer = setTimeout(() => {
+      try {
+        const storageKey = `quiz_progress_${id}`;
+        const dataToSave = {
+          quizId: id,
+          answers,
+          currentQuestionIndex,
+          startedAt: startedAtRef.current || Date.now(),
+        };
+        localStorage.setItem(storageKey, JSON.stringify(dataToSave));
+      } catch (e) {
+        console.error('Failed to save quiz progress to localStorage:', e);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [id, quiz, answers, currentQuestionIndex, submitted]);
+
+  useEffect(() => {
+    if (submitted && result?.score !== undefined && result.score >= 70) {
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+      });
+    }
+  }, [submitted, result?.score]);
+
+  const handleResumeQuiz = () => {
+    if (savedSessionBanner) {
+      if (savedSessionBanner.answers) {
+        setAnswers(savedSessionBanner.answers);
+      }
+      if (savedSessionBanner.startedAt) {
+        startedAtRef.current = savedSessionBanner.startedAt;
+      }
+      let targetIndex = savedSessionBanner.currentQuestionIndex ?? 0;
+      if (quiz && quiz.questions) {
+        const restoredAnswers = savedSessionBanner.answers || {};
+        const firstUnanswered = quiz.questions.findIndex((q) => !restoredAnswers[q._id || q.id]);
+        if (firstUnanswered !== -1) {
+          targetIndex = firstUnanswered;
+        }
+      }
+      setCurrentQuestionIndex(targetIndex);
+    }
+    setSavedSessionBanner(null);
+  };
+
+  const handleDiscardSavedQuiz = () => {
+    if (id) {
+      localStorage.removeItem(`quiz_progress_${id}`);
+    }
+    setSavedSessionBanner(null);
+  };
+
   const timeElapsed = timeLeft === 0 && !submitted;
 
 const handleOptionSelect = useCallback((questionId, option) => {
@@ -301,6 +433,9 @@ const submitQuiz = useCallback(async () => {
 
       setResult(res.data.data);
       setSubmitted(true);
+      if (id) {
+        localStorage.removeItem(`quiz_progress_${id}`);
+      }
     } catch (err) {
       console.error(err);
       setSubmitError('Failed to submit quiz attempt. Check your connection and retry.');
@@ -463,7 +598,10 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
 
   const reviewCounts = { all: quiz.questions.length, correct: 0, incorrect: 0, bookmarked: 0 };
   quiz.questions.forEach((q) => {
-    if (answers[q._id] === q.correctAnswer) reviewCounts.correct += 1;
+    const isCorrect = Array.isArray(q.correctAnswer)
+      ? q.correctAnswer.includes(answers[q._id])
+      : answers[q._id] === q.correctAnswer;
+    if (isCorrect) reviewCounts.correct += 1;
     else reviewCounts.incorrect += 1;
     if (bookmarkedIds.has(q._id)) reviewCounts.bookmarked += 1;
   });
@@ -471,14 +609,19 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
   const filteredQuestions = quiz.questions
     .map((q, idx) => ({ q, idx }))
     .filter(({ q }) => {
-      const isCorrect = answers[q._id] === q.correctAnswer;
+      const isCorrect = Array.isArray(q.correctAnswer)
+        ? q.correctAnswer.includes(answers[q._id])
+        : answers[q._id] === q.correctAnswer;
       if (reviewFilter === 'incorrect') return !isCorrect;
       if (reviewFilter === 'correct') return isCorrect;
       if (reviewFilter === 'bookmarked') return bookmarkedIds.has(q._id);
       return true;
     });
+
+  const animatedScore = useCountUp(result?.score ?? 0, 1500, submitted);
+  const motivationalMessage = getScoreMotivationalMessage(result?.score ?? 0);
   return (
-    <div className="min-h-screen bg-slate-900 text-white py-10 px-4 md:px-20">
+    <div className="min-h-screen bg-slate-900 text-white py-6 sm:py-10 px-3 sm:px-6 md:px-20">
       {timeElapsed && !submitted && (
         <div
           role="alert"
@@ -507,12 +650,45 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
           )}
         </div>
       )}
+
+      {savedSessionBanner && !submitted && (
+        <div
+          role="alert"
+          aria-label="Resume quiz banner"
+          className="max-w-3xl mx-auto mb-6 bg-amber-500/20 border border-amber-500/40 text-amber-200 p-4 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg backdrop-blur-sm"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-2xl" aria-hidden="true">⏳</span>
+            <div>
+              <h4 className="font-bold text-white text-base">Resume quiz?</h4>
+              <p className="text-xs text-amber-200/80">
+                You have saved progress for this quiz from {new Date(savedSessionBanner.startedAt).toLocaleTimeString()}.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={handleResumeQuiz}
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold text-sm rounded-lg transition-colors shadow"
+            >
+              Resume
+            </button>
+            <button
+              onClick={handleDiscardSavedQuiz}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-sm rounded-lg transition-colors"
+            >
+              Start Fresh
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-3xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8 border-b border-slate-700 pb-4">
-          <h1 className="text-2xl font-bold text-slate-100">{quiz.title}</h1>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8 border-b border-slate-700 pb-4">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-100">{quiz.title}</h1>
           {!submitted && (
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <AudioWaveform status={status} />
               <VoiceModeToggle
                 isSupported={isSupported}
@@ -525,35 +701,62 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
               <span
                 role="timer"
                 aria-label={`Time remaining: ${formatTime(timeLeft)}`}
-                className={`text-sm font-semibold px-3 py-1 rounded-full font-mono ${
+                className={`text-xs sm:text-sm font-semibold px-3 py-1 rounded-full font-mono ${
                   lowTime ? 'bg-red-500/20 text-red-400' : 'bg-slate-800 text-indigo-300'
                 }`}
               >
                 {formatTime(timeLeft)}
               </span>
-              <span className="text-sm font-medium bg-slate-800 px-3 py-1 rounded-full text-indigo-300">
+              <span className="text-xs sm:text-sm font-medium bg-slate-800 px-3 py-1 rounded-full text-indigo-300">
                 Question {currentQuestionIndex + 1} of {quiz.questions.length}
               </span>
             </div>
           )}
         </div>
-
         {/* Quiz Content */}
         {!submitted ? (
-          <div className="bg-slate-800 rounded-xl p-6 md:p-8 shadow-xl border border-slate-700">
-            <h2 className="text-xl font-semibold mb-6 leading-relaxed break-words whitespace-pre-wrap">
+          <>
+          {currentQuestion.questionType === 'SUBJECTIVE' || (!currentQuestion.options && currentQuestion.idealAnswer) ? (
+            <SubjectiveQuestionView
+              question={currentQuestion}
+              questionIndex={currentQuestionIndex}
+              totalQuestions={quiz.questions.length}
+              existingAnswer={typeof answers[currentQuestion._id || currentQuestion.id] === 'object' ? answers[currentQuestion._id || currentQuestion.id]?.userAnswerText || '' : (answers[currentQuestion._id || currentQuestion.id] || '')}
+              existingEvaluation={typeof answers[currentQuestion._id || currentQuestion.id] === 'object' ? answers[currentQuestion._id || currentQuestion.id]?.evaluation || null : null}
+              onEvaluateAnswer={async (qId, userAnswerText) => {
+                const response = await evaluateSubjectiveAnswer({
+                  questionId: qId,
+                  quizId: quiz.id,
+                  userAnswerText,
+                });
+                const evalData = response.data.data;
+                setAnswers((prev) => ({
+                  ...prev,
+                  [qId]: {
+                    questionId: qId,
+                    questionType: 'SUBJECTIVE',
+                    userAnswerText,
+                    evaluation: evalData,
+                  },
+                }));
+                return evalData;
+              }}
+            />
+          ) : (
+          <div className="bg-slate-800 rounded-xl p-4 sm:p-6 md:p-8 shadow-xl border border-slate-700">
+            <h2 className="text-lg sm:text-xl font-semibold mb-6 leading-relaxed break-words whitespace-pre-wrap">
               <MathRenderer text={currentQuestion.questionText} />
             </h2>
 
             <div className="space-y-3 mb-8">
-              {currentQuestion.options.map((option, index) => {
+              {(currentQuestion.options || []).map((option, index) => {
                 const isSelected = answers[currentQuestion._id] === option;
                 return (
                   <button
                     key={index}
                     onClick={() => handleOptionSelect(currentQuestion._id, option)}
                     disabled={submitted || timeElapsed || submitting}
-                    className={`w-full text-left p-4 rounded-lg border transition-all duration-200 flex items-center disabled:opacity-60 disabled:cursor-not-allowed ${
+                    className={`w-full min-w-0 text-left p-3.5 sm:p-4 rounded-lg border transition-all duration-200 flex items-center min-h-[44px] break-words disabled:opacity-60 disabled:cursor-not-allowed ${
                       isSelected
                         ? 'bg-indigo-600/20 border-indigo-500 text-indigo-100'
                         : 'bg-slate-700/50 border-slate-600 hover:border-indigo-400 hover:bg-slate-700 text-slate-200'
@@ -571,46 +774,46 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
                 );
               })}
             </div>
-
-            {/* Navigation */}
-            <div className="flex justify-between items-center mt-8">
-              <button
-                onClick={handlePrevious}
-                disabled={currentQuestionIndex === 0 || timeElapsed}
-                className="flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
-              >
-                <FaArrowLeft className="mr-2" /> Previous
-              </button>
-
-              {isLastQuestion ? (
-                <button
-                  onClick={() => submitQuiz()}
-                  disabled={
-                    submitting || timeElapsed || Object.keys(answers).length < quiz.questions.length
-                  }
-                  className="flex items-center px-6 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold shadow-lg shadow-emerald-500/20 transition-all"
-                >
-                  {submitting ? (
-                    <>
-                      <FaSpinner className="ml-2 animate-spin" /> Submitting...
-                    </>
-                  ) : (
-                    <>
-                      Submit Quiz <FaCheckCircle className="ml-2" />
-                    </>
-                  )}
-                </button>
-              ) : (
-                <button
-                  onClick={handleNext}
-                  disabled={timeElapsed}
-                  className="flex items-center px-6 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-medium transition-colors"
-                >
-                  Next <FaArrowRight className="ml-2" />
-                </button>
-              )}
-            </div>
           </div>
+          )}
+
+          {/* Global Quiz Question Navigation Bar */}
+          <div className="flex justify-between items-center mt-6">
+            <button
+              onClick={handlePrevious}
+              disabled={currentQuestionIndex === 0 || timeElapsed}
+              className="flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors text-slate-200"
+            >
+              <FaArrowLeft className="mr-2" /> Previous
+            </button>
+
+            {isLastQuestion ? (
+              <button
+                onClick={() => submitQuiz()}
+                disabled={submitting || timeElapsed}
+                className="flex items-center px-6 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold shadow-lg shadow-emerald-500/20 transition-all text-white"
+              >
+                {submitting ? (
+                  <>
+                    <FaSpinner className="ml-2 animate-spin" /> Submitting...
+                  </>
+                ) : (
+                  <>
+                    Submit Quiz <FaCheckCircle className="ml-2" />
+                  </>
+                )}
+              </button>
+            ) : (
+              <button
+                onClick={handleNext}
+                disabled={timeElapsed}
+                className="flex items-center px-6 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-medium transition-colors text-white"
+              >
+                Next <FaArrowRight className="ml-2" />
+              </button>
+            )}
+          </div>
+          </>
         ) : (
           /* Results View */
           <div
@@ -624,10 +827,14 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
               <h2 className="text-3xl font-bold text-white mb-2">Quiz Completed!</h2>
               <p className="text-slate-400 text-lg">
                 You scored{' '}
-                <span className="text-emerald-400 font-bold text-2xl">{result?.score}</span> out of{' '}
-                {quiz.questions.length}
+                <span className="text-emerald-400 font-bold text-3xl font-mono" data-testid="animated-score">
+                  {animatedScore}%
+                </span>
               </p>
-              <div className="flex items-center justify-center gap-3 mt-4">
+              <p className="mt-3 text-lg font-semibold text-emerald-300 animate-fade-in" data-testid="motivational-message">
+                {motivationalMessage}
+              </p>
+              <div className="flex items-center justify-center gap-3 mt-6">
                 <button
                   onClick={handleExportResultsCSV}
                   className="px-4 py-2 text-sm bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition-colors"
@@ -684,7 +891,9 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
 
               {filteredQuestions.map(({ q, idx }) => {
                 const userAnswer = answers[q._id];
-                const isCorrect = userAnswer === q.correctAnswer;
+                const isCorrect = Array.isArray(q.correctAnswer)
+                  ? q.correctAnswer.includes(userAnswer)
+                  : userAnswer === q.correctAnswer;
                 const isBookmarked = bookmarkedIds.has(q._id);
 
                 return (
@@ -706,7 +915,11 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
                         let btnClass =
                           'w-full text-left p-3 rounded-md border text-sm flex items-center justify-between ';
 
-                        if (opt === q.correctAnswer) {
+                        const isOptCorrect = Array.isArray(q.correctAnswer)
+                          ? (q.correctAnswer.includes(opt) || q.correctAnswer.includes(oIdx))
+                          : (opt === q.correctAnswer || oIdx === q.correctAnswer);
+
+                        if (isOptCorrect) {
                           btnClass += 'bg-emerald-500/20 border-emerald-500 text-emerald-100';
                         } else if (opt === userAnswer && !isCorrect) {
                           btnClass += 'bg-red-500/20 border-red-500 text-red-100';
@@ -719,7 +932,7 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
                             <span>
                               <MathRenderer text={opt} />
                             </span>
-                            {opt === q.correctAnswer && (
+                            {isOptCorrect && (
                               <FaCheckCircle className="text-emerald-400" />
                             )}
                             {opt === userAnswer && !isCorrect && (

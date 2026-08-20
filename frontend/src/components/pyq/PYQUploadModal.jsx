@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import API from '../../services/api';
 import { FaTimes, FaCloudUploadAlt, FaFilePdf, FaCheckCircle, FaExclamationCircle } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
+import useFocusTrap from '../../hooks/useFocusTrap';
 
 const PYQUploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
+  const containerRef = useFocusTrap(isOpen, onClose);
   const [subjects, setSubjects] = useState([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [examName, setExamName] = useState('');
@@ -112,21 +114,26 @@ const PYQUploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-4 overflow-y-auto">
         <motion.div
-          className="bg-neutral-900 border border-neutral-800 rounded-2xl w-full max-w-lg shadow-2xl p-6 relative overflow-hidden text-left"
+          ref={containerRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pyq-upload-modal-title"
+          className="bg-neutral-900 border border-neutral-800 rounded-2xl w-[calc(100vw-2rem)] max-w-lg shadow-2xl p-4 sm:p-6 relative overflow-y-auto max-h-[90vh] text-left"
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
         >
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 text-stone-500 hover:text-stone-300 transition-colors"
+            aria-label="Close modal"
+            className="absolute top-3 right-3 text-stone-500 hover:text-stone-300 transition-colors p-2 min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer z-10"
           >
             <FaTimes className="text-lg" />
           </button>
 
-          <h2 className="text-xl font-bold font-playfair text-stone-100 mb-2">Analyze PYQ Batch</h2>
+          <h2 id="pyq-upload-modal-title" className="text-xl font-bold font-playfair text-stone-100 mb-2">Analyze PYQ Batch</h2>
           <p className="text-stone-400 text-xs mb-6">Upload up to 10 past exam papers to extract chapter trends and concepts.</p>
 
           <form onSubmit={handleUploadSubmit} className="space-y-4">

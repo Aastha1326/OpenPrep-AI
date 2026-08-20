@@ -30,4 +30,10 @@ describe('Server Startup Integrity', () => {
       expect(occurrences).toBe(1);
     }
   });
+
+  it('should include the SPA production catch-all routing configurations', () => {
+    const source = fs.readFileSync(serverJsPath, 'utf8');
+    expect(source).toContain("app.use(express.static(path.join(__dirname, '../frontend/dist')));");
+    expect(source).toContain("res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));");
+  });
 });

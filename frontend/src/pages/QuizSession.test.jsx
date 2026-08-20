@@ -366,5 +366,135 @@ describe('QuizSession', () => {
     expect(submitCalls()).toHaveLength(2);
     expect(submitCalls()[1][1].submissionId).toBe(payload.submissionId);
   });
+
+  describe('localStorage mid-quiz progress persistence', () => {
+    beforeEach(() => {
+      localStorage.clear();
+    });
+
+    test('persists selected answers to localStorage within 500ms debounce', async () => {
+      API.get.mockResolvedValue({ data: { data: sampleQuiz } });
+      renderQuiz();
+
+      expect(await screen.findByText('What is 2+2?')).toBeInTheDocument();
+      fireEvent.click(screen.getByText('4'));
+
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+
+      const saved = JSON.parse(localStorage.getItem('quiz_progress_q1'));
+      expect(saved).not.toBeNull();
+      expect(saved.quizId).toBe('q1');
+      expect(saved.answers['qq1']).toBe('4');
+    });
+
+    test('renders Resume Quiz banner when valid saved progress within 2 hours exists', async () => {
+      const validSavedState = {
+        quizId: 'q1',
+        answers: { qq1: '4' },
+        currentQuestionIndex: 0,
+        startedAt: Date.now() - 30 * 60 * 1000,
+      };
+      localStorage.setItem('quiz_progress_q1', JSON.stringify(validSavedState));
+
+      API.get.mockResolvedValue({ data: { data: sampleQuiz } });
+      renderQuiz();
+
+      expect(await screen.findByText('Resume quiz?')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Resume' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Start Fresh' })).toBeInTheDocument();
+    });
+
+    test('restores answers and jumps to last unanswered question when Resume is clicked', async () => {
+      const validSavedState = {
+        quizId: 'q1',
+        answers: { qq1: '4' },
+        currentQuestionIndex: 0,
+        startedAt: Date.now() - 30 * 60 * 1000,
+      };
+      localStorage.setItem('quiz_progress_q1', JSON.stringify(validSavedState));
+
+      API.get.mockResolvedValue({ data: { data: sampleQuiz } });
+      renderQuiz();
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Resume' }));
+
+      expect(await screen.findByText('What is 2*3?')).toBeInTheDocument();
+      expect(screen.queryByText('Resume quiz?')).not.toBeInTheDocument();
+    });
+
+    test('discards saved state older than 2 hours automatically on mount', async () => {
+      const expiredSavedState = {
+        quizId: 'q1',
+        answers: { qq1: '4' },
+        currentQuestionIndex: 0,
+        startedAt: Date.now() - 3 * 60 * 60 * 1000,
+      };
+      localStorage.setItem('quiz_progress_q1', JSON.stringify(expiredSavedState));
+
+      API.get.mockResolvedValue({ data: { data: sampleQuiz } });
+      renderQuiz();
+
+      await screen.findByText('What is 2+2?');
+      expect(screen.queryByText('Resume quiz?')).not.toBeInTheDocument();
+      expect(localStorage.getItem('quiz_progress_q1')).toBeNull();
+    });
+
+    test('clears localStorage upon successful quiz submission', async () => {
+      API.get.mockResolvedValue({ data: { data: sampleQuiz } });
+      API.post.mockResolvedValue({ data: { data: { score: 100 } } });
+
+      const savedState = {
+        quizId: 'q1',
+        answers: { qq1: '4', qq2: '6' },
+        currentQuestionIndex: 1,
+        startedAt: Date.now(),
+      };
+      localStorage.setItem('quiz_progress_q1', JSON.stringify(savedState));
+
+      renderQuiz();
+
+      fireEvent.click(await screen.findByText('What is 2+2?'));
+      fireEvent.click(screen.getByRole('button', { name: /Submit Quiz/i }));
+
+      await waitFor(() => {
+        expect(localStorage.getItem('quiz_progress_q1')).toBeNull();
+      });
+    });
+  });
+
+  describe('Score Tier Motivational Messages & Confetti', () => {
+    test('returns correct motivational message for score >= 90%', () => {
+      const { getScoreMotivationalMessage } = require('./QuizSession');
+      expect(getScoreMotivationalMessage(95)).toBe("Outstanding! 🏆 You've mastered this topic!");
+      expect(getScoreMotivationalMessage(90)).toBe("Outstanding! 🏆 You've mastered this topic!");
+    });
+
+    test('returns correct motivational message for score between 70% and 89%', () => {
+      const { getScoreMotivationalMessage } = require('./QuizSession');
+      expect(getScoreMotivationalMessage(85)).toBe("Great work! 🎯 Keep sharpening those edges.");
+      expect(getScoreMotivationalMessage(70)).toBe("Great work! 🎯 Keep sharpening those edges.");
+    });
+
+    test('returns correct motivational message for score < 70%', () => {
+      const { getScoreMotivationalMessage } = require('./QuizSession');
+      expect(getScoreMotivationalMessage(65)).toBe("Keep pushing! 💪 Review the weak topics below.");
+      expect(getScoreMotivationalMessage(0)).toBe("Keep pushing! 💪 Review the weak topics below.");
+    });
+
+    test('renders score tier motivational message on results screen', async () => {
+      API.get.mockResolvedValue({ data: { data: sampleQuiz } });
+      API.post.mockResolvedValue({ data: { data: { score: 95 } } });
+
+      renderQuiz();
+
+      fireEvent.click(await screen.findByText('What is 2+2?'));
+      fireEvent.click(screen.getByRole('button', { name: /Submit Quiz/i }));
+
+      expect(await screen.findByText(/Outstanding! 🏆 You've mastered this topic!/i)).toBeInTheDocument();
+    });
+  });
 });
+
 

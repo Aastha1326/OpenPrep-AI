@@ -31,6 +31,21 @@ const Quiz = sequelize.define(
       type: DataTypes.ENUM('AI_Generated', 'Manual'),
       defaultValue: 'AI_Generated',
     },
+    sourceType: {
+      type: DataTypes.STRING(20),
+      defaultValue: 'AI_Generated',
+      allowNull: false,
+      validate: {
+        isIn: {
+          args: [['AI_Generated', 'REMEDIATION']],
+          msg: 'sourceType must be AI_Generated or REMEDIATION',
+        },
+      },
+    },
+    linkedDeckId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
     language: {
       type: DataTypes.STRING,
       allowNull: true,

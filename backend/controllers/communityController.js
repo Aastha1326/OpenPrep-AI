@@ -1,6 +1,8 @@
 const { Op, Sequelize } = require('sequelize');
 const Feedback = require('../models/Feedback');
 const User = require('../models/User');
+const Subject = require('../models/Subject');
+const DeckRating = require('../models/DeckRating');
 
 // @desc    Submit Bug Report or Feature Request
 // @route   POST /api/community/feedback
@@ -149,6 +151,104 @@ exports.getPublicRoadmap = async (req, res, next) => {
         milestones,
         communityFeatures: feedbackRoadmap,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Submit a star rating and comment for a public community deck
+// @route   POST /api/community/decks/:id/rate
+// @access  Private
+exports.rateCommunityDeck = async (req, res, next) => {
+  try {
+    const { id } = req.params; // deckId (Subject id)
+    const { stars, comment } = req.body;
+
+    if (stars === undefined || stars < 1 || stars > 5) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'Provide a star rating between 1 and 5' });
+    }
+
+    const deck = await Subject.findByPk(id);
+    if (!deck || !deck.isPublic) {
+      return res.status(404).json({ success: false, error: 'Public community deck not found' });
+    }
+
+    if (deck.user === req.user.id) {
+      return res.status(400).json({ success: false, error: 'You cannot rate your own deck' });
+    }
+
+    // Check if user has already rated this deck, if so update it
+    let ratingRecord = await DeckRating.findOne({
+      where: { deckId: id, userId: req.user.id },
+    });
+
+    if (ratingRecord) {
+      ratingRecord.stars = stars;
+      ratingRecord.comment = comment !== undefined ? comment : ratingRecord.comment;
+      await ratingRecord.save();
+    } else {
+      ratingRecord = await DeckRating.create({
+        deckId: id,
+        userId: req.user.id,
+        stars,
+        comment,
+      });
+    }
+
+    // Recalculate average rating and ratings count dynamically
+    const ratings = await DeckRating.findAll({ where: { deckId: id } });
+    const count = ratings.length;
+    const sum = ratings.reduce((acc, r) => acc + r.stars, 0);
+    const avg = count > 0 ? parseFloat((sum / count).toFixed(2)) : 0.0;
+
+    deck.rating = avg;
+    deck.ratingsCount = count;
+    await deck.save();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        rating: ratingRecord,
+        deckRating: avg,
+        deckRatingsCount: count,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get reviews and comments for a community deck
+// @route   GET /api/community/decks/:id/reviews
+// @access  Private
+exports.getCommunityDeckReviews = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const deck = await Subject.findByPk(id);
+    if (!deck || !deck.isPublic) {
+      return res.status(404).json({ success: false, error: 'Public community deck not found' });
+    }
+
+    const reviews = await DeckRating.findAll({
+      where: { deckId: id },
+      include: [
+        {
+          model: User,
+          as: 'userRef',
+          attributes: ['id', 'name'],
+        },
+      ],
+      order: [['createdAt', 'DESC']],
+    });
+
+    res.status(200).json({
+      success: true,
+      count: reviews.length,
+      data: reviews,
     });
   } catch (error) {
     next(error);

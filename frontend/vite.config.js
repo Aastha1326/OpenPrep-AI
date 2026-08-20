@@ -16,23 +16,51 @@ export default defineConfig({
       manifest: {
         name: 'OpenPrep AI',
         short_name: 'OpenPrep',
-        description: 'AI-Powered study platform',
-        theme_color: '#ffffff',
+        description: 'AI-Powered study platform for offline flashcard review and exam preparation',
+        theme_color: '#4f46e5',
+        background_color: '#0f0f11',
+        display: 'standalone',
+        start_url: '/',
+        scope: '/',
         icons: [
           {
             src: '/vite.svg',
             sizes: '192x192',
-            type: 'image/svg+xml'
+            type: 'image/svg+xml',
           },
           {
             src: '/vite.svg',
             sizes: '512x512',
-            type: 'image/svg+xml'
-          }
-        ]
-      }
-    })
+            type: 'image/svg+xml',
+            purpose: 'any maskable',
+          },
+        ],
+      },
+    }),
   ],
+  build: {
+    chunkSizeWarningLimit: 1500,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('recharts')) {
+              return 'vendor-charts';
+            }
+            if (id.includes('react-quill') || id.includes('react-markdown') || id.includes('@tiptap')) {
+              return 'vendor-editor';
+            }
+            if (id.includes('lucide-react')) {
+              return 'vendor-icons';
+            }
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom') || id.includes('@reduxjs/toolkit') || id.includes('react-redux')) {
+              return 'vendor-core';
+            }
+          }
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {

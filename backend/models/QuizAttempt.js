@@ -65,4 +65,24 @@ const QuizAttempt = sequelize.define(
   }
 );
 
+const cacheManager = require('../utils/cacheManager');
+
+QuizAttempt.afterSave(async (attempt, options) => {
+  try {
+    const pattern = `user_${attempt.user}:*`;
+    await cacheManager.invalidate(pattern);
+  } catch (err) {
+    console.error('Error invalidating cache after QuizAttempt save:', err);
+  }
+});
+
+QuizAttempt.afterDestroy(async (attempt, options) => {
+  try {
+    const pattern = `user_${attempt.user}:*`;
+    await cacheManager.invalidate(pattern);
+  } catch (err) {
+    console.error('Error invalidating cache after QuizAttempt destroy:', err);
+  }
+});
+
 module.exports = QuizAttempt;

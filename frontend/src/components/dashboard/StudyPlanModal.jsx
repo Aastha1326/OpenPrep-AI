@@ -18,7 +18,6 @@ import {
   List,
   Gauge,
   Sparkles,
-} from 'lucide-react';
   Loader,
 } from 'lucide-react';
 import CalendarExportDropdown from '../CalendarExportDropdown';
@@ -26,6 +25,8 @@ import html2pdf from 'html2pdf.js';
 import API from '../../services/api';
 import { toLocalDateString, formatDateOnly } from '../../utils/dateUtils';
 import StudyPlanGanttView from './StudyPlanGanttView';
+import StudyPlanCalendarView from './StudyPlanCalendarView';
+import { downloadCertificate } from '../../services/reportService';
 
 const MILESTONE_TYPE_LABELS = {
   weekly_checkpoint: 'Weekly Checkpoint',
@@ -272,12 +273,14 @@ const StudyPlanModal = ({
 
   const contentRef = useRef(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingServerPdf, setIsExportingServerPdf] = useState(false);
+  const [exportPdfError, setExportPdfError] = useState(null);
   const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
 const [isRescheduling, setIsRescheduling] = useState(false);
   const [isRebalancing, setIsRebalancing] = useState(false);  const [rescheduleMessage, setRescheduleMessage] = useState(null);
   const [showWeakOnly, setShowWeakOnly] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [showTimeline, setShowTimeline] = useState(false);
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'timeline' | 'calendar'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [prefillConsumed, setPrefillConsumed] = useState(false);
@@ -392,36 +395,161 @@ const totalWeakCount = useMemo(() => {
     }
   };
 
-  const handleExportIcs = async () => {
+  // Issue #1056: Server-side study plan PDF export
+  const handleExportServerPdf = async () => {
     if (!activePlan?.id) return;
-    setIsSyncingCalendar(true);
-
+    setIsExportingServerPdf(true);
+    setExportPdfError(null);
     try {
-      const response = await API.get(`/study-plans/${activePlan.id}/export-ics`, {
+      const response = await API.get(`/study-plans/${activePlan.id}/export-pdf`, {
         responseType: 'blob',
       });
-
-      const blob = new Blob([response.data], { type: 'text/calendar;charset=utf-8' });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `study-plan-${activePlan.id}.ics`);
+      const dateStr = new Date().toISOString().split('T')[0];
+      link.setAttribute('download', `openprep-studyplan-${dateStr}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.parentNode.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('iCal export failed:', err);
-      setRescheduleMessage({
-        type: 'error',
-        text: err.response?.data?.error || 'Failed to export calendar .ics file',
-      });
-      setTimeout(() => setRescheduleMessage(null), 4000);
+      console.error('Server PDF export failed:', err);
+      setExportPdfError('Failed to export PDF. Please try again.');
+      setTimeout(() => setExportPdfError(null), 5000);
     } finally {
-      setIsSyncingCalendar(false);
+      setIsExportingServerPdf(false);
     }
   };
 
+
+const handleExportIcs = async () => {
+  if (!activePlan?.id) {
+    return;
+  }
+
+  setIsSyncingCalendar(true);
+
+  try {
+    const timeZone =
+      Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    const response = await API.get(
+      `/study-plans/${activePlan.id}/export-ics`,
+      {
+        responseType: 'blob',
+        headers: {
+          'x-timezone': timeZone,
+        },
+      }
+    );
+
+    const blob = new Blob(
+      [response.data],
+      {
+        type: 'text/calendar;charset=utf-8',
+      }
+    );
+
+    const url =
+      window.URL.createObjectURL(blob);
+
+    const link =
+      document.createElement('a');
+
+    link.href = url;
+
+    link.setAttribute(
+      'download',
+      `study-plan-${activePlan.id}.ics`
+    );
+
+    document.body.appendChild(link);
+
+    link.click();
+
+    link.parentNode.removeChild(link);
+
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error(
+      'iCal export failed:',
+      err
+    );
+
+    setRescheduleMessage({
+      type: 'error',
+      text:
+        err.response?.data?.error ||
+        'Failed to export calendar .ics file',
+    });
+
+    setTimeout(
+      () => setRescheduleMessage(null),
+      4000
+    );
+  } finally {
+    setIsSyncingCalendar(false);
+  }
+};
+
+const handleGoogleCalendarSync = async () => {
+  if (!activePlan?.id) return;
+  setIsSyncingCalendar(true);
+  try {
+    const response = await API.post('/calendar/google-sync', { planId: activePlan.id });
+    if (response.data?.authUrl) {
+      // Direct Google OAuth login flow in a popup
+      const width = 600;
+      const height = 600;
+      const left = window.screen.width / 2 - width / 2;
+      const top = window.screen.height / 2 - height / 2;
+      
+      const popup = window.open(
+        response.data.authUrl,
+        'google_calendar_oauth',
+        `width=${width},height=${height},top=${top},left=${left}`
+      );
+      
+      // Listen for oauth messages from callback page
+      const handleOAuthMessage = (event) => {
+        if (event.data === 'google_calendar_sync_success') {
+          setRescheduleMessage({
+            type: 'success',
+            text: 'Successfully linked and synced with Google Calendar!',
+          });
+          setTimeout(() => setRescheduleMessage(null), 4000);
+          window.removeEventListener('message', handleOAuthMessage);
+        } else if (event.data === 'google_calendar_sync_error') {
+          setRescheduleMessage({
+            type: 'error',
+            text: 'Failed to sync with Google Calendar.',
+          });
+          setTimeout(() => setRescheduleMessage(null), 4000);
+          window.removeEventListener('message', handleOAuthMessage);
+        }
+      };
+      
+      window.addEventListener('message', handleOAuthMessage);
+    } else {
+      setRescheduleMessage({
+        type: 'success',
+        text: response.data.message || 'Successfully synced with Google Calendar.',
+      });
+      setTimeout(() => setRescheduleMessage(null), 4000);
+    }
+  } catch (err) {
+    console.error('Google calendar sync failed:', err);
+    setRescheduleMessage({
+      type: 'error',
+      text: err.response?.data?.error || 'Failed to sync with Google Calendar.',
+    });
+    setTimeout(() => setRescheduleMessage(null), 4000);
+  } finally {
+    setIsSyncingCalendar(false);
+  }
+};
   const handleReschedule = async () => {
     if (!activePlan?.id) return;
 
@@ -584,11 +712,30 @@ const totalWeakCount = useMemo(() => {
                 {!showForm && activePlan && (
                   <>
                     <CalendarExportDropdown 
-                      activePlanId={activePlan.id}
+                      activePlan={activePlan}
                       isSyncingCalendar={isSyncingCalendar}
                       setIsSyncingCalendar={setIsSyncingCalendar}
                       onExportIcs={handleExportIcs}
+                      onGoogleCalendar={handleGoogleCalendarSync}
                     />
+                    {/* Issue #1056: Export study plan as server-rendered PDF */}
+                    <button
+                      onClick={handleExportServerPdf}
+                      disabled={isExportingServerPdf}
+                      aria-label="Export study plan as PDF"
+                      className="flex items-center space-x-2 bg-gradient-to-r from-emerald-700 to-emerald-900 text-white px-4 py-2 rounded-sm hover:from-emerald-600 hover:to-emerald-800 transition-colors disabled:opacity-50 cursor-pointer"
+                      title="Download a printable PDF of your study plan"
+                    >
+                      {isExportingServerPdf
+                        ? <Loader className="w-4 h-4 animate-spin" />
+                        : <Download className="w-4 h-4" />}
+                      <span className="font-semibold">
+                        {isExportingServerPdf ? 'Exporting...' : 'Export PDF'}
+                      </span>
+                    </button>
+                    {exportPdfError && (
+                      <span className="text-xs text-red-600 font-semibold">{exportPdfError}</span>
+                    )}
                     <button
                       onClick={handleReschedule}
                       disabled={isRescheduling}
@@ -632,21 +779,41 @@ const totalWeakCount = useMemo(() => {
                       <Filter className="w-4 h-4" />
                       {showWeakOnly ? 'Showing Weak Only' : 'Filter Weak Topics'}
                     </button>
-                    <button
-                      onClick={() => setShowTimeline((v) => !v)}
-                      className={`flex items-center gap-1.5 px-3 py-2 rounded-sm text-sm font-semibold transition-colors cursor-pointer border ${
-                        showTimeline
-                          ? 'bg-indigo-700 text-white border-indigo-800'
-                          : 'bg-white/70 text-[#8B4513] border-[#8B4513]/30 hover:bg-white'
-                      }`}
-                    >
-                      {showTimeline ? (
-                        <List className="w-4 h-4" />
-                      ) : (
-                        <GanttChartSquare className="w-4 h-4" />
-                      )}
-                      {showTimeline ? 'List View' : 'Timeline View'}
-                    </button>{' '}
+                    <div className="flex bg-[#ebd5b3]/40 border border-[#8B4513]/25 rounded p-0.5">
+                      <button
+                        onClick={() => setViewMode('list')}
+                        className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-bold transition-colors cursor-pointer ${
+                          viewMode === 'list'
+                            ? 'bg-[#8B4513] text-white'
+                            : 'text-[#8B4513] hover:bg-white/50'
+                        }`}
+                      >
+                        <List className="w-3.5 h-3.5" />
+                        List
+                      </button>
+                      <button
+                        onClick={() => setViewMode('timeline')}
+                        className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-bold transition-colors cursor-pointer ${
+                          viewMode === 'timeline'
+                            ? 'bg-[#8B4513] text-white'
+                            : 'text-[#8B4513] hover:bg-white/50'
+                        }`}
+                      >
+                        <GanttChartSquare className="w-3.5 h-3.5" />
+                        Timeline
+                      </button>
+                      <button
+                        onClick={() => setViewMode('calendar')}
+                        className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-bold transition-colors cursor-pointer ${
+                          viewMode === 'calendar'
+                            ? 'bg-[#8B4513] text-white'
+                            : 'text-[#8B4513] hover:bg-white/50'
+                        }`}
+                      >
+                        <CalendarDays className="w-3.5 h-3.5" />
+                        Calendar
+                      </button>
+                    </div>{' '}
                     <button
                       onClick={handleExportPDF}
                       disabled={isExporting}
@@ -657,6 +824,28 @@ const totalWeakCount = useMemo(() => {
                         {isExporting ? 'Exporting...' : 'Export to PDF'}
                       </span>
                     </button>
+                    {activePlan?.status === 'completed' || (completionForecast && completionForecast.progress === 100) ? (
+                      <button
+                        onClick={async () => {
+                          setIsExporting(true);
+                          try {
+                            await downloadCertificate(activePlan.id);
+                          } catch (err) {
+                            console.error(err);
+                          } finally {
+                            setIsExporting(false);
+                          }
+                        }}
+                        disabled={isExporting}
+                        className="flex items-center space-x-2 bg-gradient-to-r from-indigo-700 to-indigo-900 text-white px-4 py-2 rounded-sm hover:from-indigo-600 hover:to-indigo-800 transition-colors disabled:opacity-50 cursor-pointer"
+                        title="Download Certificate of Achievement"
+                      >
+                        <Download className="w-5 h-5" />
+                        <span className="font-semibold">
+                          Certificate
+                        </span>
+                      </button>
+                    ) : null}
                   </>
                 )}
                 <button
@@ -726,9 +915,13 @@ const totalWeakCount = useMemo(() => {
                   prefillExamName={syllabusPrefill?.examName}
                   isAiDisabled={isAiDisabled}
                 />
-              ) : showTimeline ? (
+              ) : viewMode === 'timeline' ? (
                 <div className="bg-white/80 p-6 rounded-sm shadow-sm border border-[#8B4513]/10">
                   <StudyPlanGanttView activePlan={activePlan} onPlanUpdate={onPlanUpdate} />
+                </div>
+              ) : viewMode === 'calendar' ? (
+                <div className="bg-white/80 p-6 rounded-sm shadow-sm border border-[#8B4513]/10">
+                  <StudyPlanCalendarView activePlan={activePlan} onPlanUpdate={onPlanUpdate} />
                 </div>
               ) : (
                 <div

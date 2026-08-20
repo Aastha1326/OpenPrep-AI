@@ -1,152 +1,285 @@
 # 🤝 Contributing to OpenPrep AI
 
-Thank you for your interest in contributing to OpenPrep AI! We want to make contributing to this project as easy and transparent as possible, whether it's:
-
-- Reporting a bug
-- Discussing the current state of the code
-- Submitting a fix
-- Proposing new features
-- Improving documentation
-
-This document guides you through the contribution process.
+Thank you for your interest in contributing to OpenPrep AI! We welcome contributions from developers of all skill levels. Whether you are fixing a bug, adding a new feature, improving documentation, or writing tests, this guide will walk you step-by-step through our contribution workflow.
 
 ---
 
-## 🚦 Good First Issue Workflow
+## 📋 Table of Contents
 
-If you are new to the repository, look for issues labeled `good first issue` or `help wanted`.
-
-1. Browse our [GitHub Issues](https://github.com/yourusername/openprep-ai/issues).
-2. Comment on the issue to request assignment. A maintainer will assign it to you if it's not already claimed.
-3. Once assigned, you can start working on the fix. Do not submit a PR without an open, assigned issue.
+- [1. Development Setup](#1-development-setup)
+- [2. Branch Naming Convention](#2-branch-naming-convention)
+- [3. Commit Message Format](#3-commit-message-format)
+- [4. PR Checklist](#4-pr-checklist)
+- [5. Code Review Process](#5-code-review-process)
+- [Getting Help](#getting-help)
 
 ---
 
-## 🔱 Fork and Pull Request Workflow
+## 1. Development Setup
 
-We use the standard Fork and Pull Request model:
+Follow these step-by-step instructions to get your local development environment up and running.
 
-```bash
-Fork Repository ➔ Clone Locally ➔ Create Branch ➔ Make Changes ➔ Commit ➔ Push ➔ Open PR
-```
+### Step 1: Prerequisites
 
-### Step 1: Fork and Clone
+Ensure you have the following installed on your local machine:
 
-1. Click **Fork** in the top-right corner of the OpenPrep AI GitHub repository.
+- **Node.js**: Version 20.x or higher (`node -v`)
+- **npm**: Version 10.x or higher (`npm -v`)
+- **PostgreSQL**: Version 14.x or higher running locally or accessible via URI
+- **Git**: Installed and configured (`git --version`)
+
+### Step 2: Fork and Clone the Repository
+
+1. Click the **Fork** button in the top right corner of the [OpenPrep AI Repository](https://github.com/nishit546/OpenPrep-AI) to create your own copy.
 2. Clone your fork to your local machine:
    ```bash
-   git clone https://github.com/yourusername/OpenPrep-AI.git
+   git clone https://github.com/<YOUR_GITHUB_USERNAME>/OpenPrep-AI.git
    cd OpenPrep-AI
    ```
-3. Add the upstream repository:
+3. Add the main repository as an `upstream` remote:
    ```bash
-   git remote add upstream https://github.com/original-owner/OpenPrep-AI.git
+   git remote add upstream https://github.com/nishit546/OpenPrep-AI.git
+   git fetch upstream
    ```
 
-### Step 2: Create a Branch
+### Step 3: Environment Configuration
 
-Always create a descriptive branch for your work. Keep your branch synced with the upstream `main` branch.
+Copy `.env.example` to `.env` in both `/backend` and `/frontend` directories and fill in the required values:
+
+1. **Backend Environment Setup**:
+
+   ```bash
+   cp backend/.env.example backend/.env
+   ```
+
+   Open `backend/.env` and update the required values (e.g., PostgreSQL credentials `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET`, etc.).
+
+2. **Frontend Environment Setup**:
+   ```bash
+   cp frontend/.env.example frontend/.env
+   ```
+   Open `frontend/.env` and configure your API URL (e.g., `VITE_API_BASE_URL=http://localhost:5000/api`).
+
+### Step 4: Install Dependencies
+
+Run `npm install` in both `/backend` and `/frontend` directories:
 
 ```bash
+# Install root dependencies
+npm install
+
+# Install backend dependencies
+cd backend
+npm install
+cd ..
+
+# Install frontend dependencies
+cd frontend
+npm install
+cd ..
+```
+
+_Tip: You can also run `npm run install:all` from the root directory to install dependencies for all packages at once._
+
+### Step 5: Database Setup & Migrations
+
+Make sure your PostgreSQL server is running and the target database exists, then execute the database migrations:
+
+```bash
+cd backend
+# Run database migrations
+npm run db:migrate:test
+
+# Seed initial data (optional)
+npm run seed
+cd ..
+```
+
+### Step 6: Start Development Servers
+
+Start the backend and frontend dev servers to verify your setup:
+
+- **Run both servers concurrently (from root)**:
+
+  ```bash
+  npm run dev
+  ```
+
+- **Run individually**:
+  - **Backend API Server** (runs on `http://localhost:5000`):
+    ```bash
+    cd backend
+    npm run dev
+    ```
+  - **Frontend Client** (runs on `http://localhost:5173`):
+    ```bash
+    cd frontend
+    npm run dev
+    ```
+
+---
+
+## 2. Branch Naming Convention
+
+To keep our repository organized, please create a new branch from `main` for every task using the following naming structure:
+
+| Branch Pattern                 | Category / Purpose                       | Example                            |
+| :----------------------------- | :--------------------------------------- | :--------------------------------- |
+| `feat/short-description`       | New features                             | `feat/google-oauth-login`          |
+| `fix/issue-number-description` | Bug fixes                                | `fix/104-quiz-score-calculation`   |
+| `docs/section-name`            | Documentation changes                    | `docs/contributing-workflow`       |
+| `test/scope-description`       | Tests only                               | `test/auth-controller-unit`        |
+| `refactor/component-name`      | Code refactoring without behavior change | `refactor/user-service-middleware` |
+
+### Branch Checkout Steps:
+
+```bash
+# Keep local main updated
 git checkout main
 git pull upstream main
-git checkout -b feature/your-feature-name
-# Or bugfix/your-bug-name
+
+# Create and switch to your branch
+git checkout -b feat/your-feature-name
 ```
 
-For more information, see our [Branching Strategy](./docs/branching-strategy.md).
+---
 
-### Step 3: Local Setup
+## 3. Commit Message Format
 
-OpenPrep AI consists of a React frontend and Node.js backend. Follow the [Setup Guide](./docs/setup-guide.md) for full instructions on launching the local stack.
+We follow the **Conventional Commits** specification (`type(scope): description`). Commit messages should be imperative, concise, and clearly describe the change.
 
-1. Install backend dependencies:
-   ```bash
-   cd backend
-   npm install
-   ```
-2. Install frontend dependencies:
-   ```bash
-   cd ../frontend
-   npm install
-   ```
-3. Set up environment variables as described in the Setup Guide.
+### Format:
 
-### Step 4: Commit Messages
-
-We enforce standard commit message conventions based on [Conventional Commits](https://www.conventionalcommits.org/):
-
-Format: `<type>(<scope>): <description>`
-
-- `feat`: A new feature (e.g., `feat(auth): add google oauth login`)
-- `fix`: A bug fix (e.g., `fix(quiz): repair scoring algorithm`)
-- `docs`: Documentation changes (e.g., `docs(setup): update docker guide`)
-- `style`: Code style changes (formatting, missing semi-colons, no functional change)
-- `refactor`: Code changes that neither fix a bug nor add a feature
-- `test`: Adding missing tests or correcting existing tests
-- `chore`: Maintenance tasks (dependencies update, CI config)
-
-Example:
-
-```bash
-feat(quiz): add timer component to quiz interface
+```text
+type(scope): description
 ```
 
-#### Pull Request Titles
-
-Pull request titles must also follow the Conventional Commits format:
-
-`<type>(<scope>): <description>`
-
-Examples:
-
-- `feat(auth): add google oauth login`
-- `fix(quiz): repair scoring algorithm`
-- `docs(setup): update docker guide`
-- `chore(ci): update GitHub Actions workflow`
-
-Pull request titles are automatically validated by GitHub Actions. Invalid titles will cause the PR validation check to fail.
-
-Common commit types include:
+### Types:
 
 - `feat`: A new feature
 - `fix`: A bug fix
-- `docs`: Documentation changes
-- `style`: Code style changes
-- `refactor`: Code restructuring without changing behavior
-- `test`: Adding or modifying tests
-- `chore`: Maintenance tasks
-- `ci`: Changes to CI/CD configuration
+- `docs`: Documentation updates
+- `test`: Adding or updating tests
+- `refactor`: Code restructures that don't fix bugs or add features
+- `style`: Code style fixes (formatting, missing semicolons, etc.)
+- `chore`: Maintenance tasks or dependency updates
+- `ci`: Changes to CI configuration or scripts
 
-### Step 5: Open a Pull Request
+### Examples:
 
-1. Push your branch to your fork:
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-2. Navigate to the original OpenPrep AI repository on GitHub. You will see a prompt to open a Pull Request.
-3. Complete the PR template.
-4. Reference the issue you are fixing (e.g., `Closes #123`).
-5. Wait for review. Maintainers will review your PR and suggest changes or merge it.
+```bash
+git commit -m "feat(auth): add google oauth login strategy"
+git commit -m "fix(quiz): resolve scoring error when timer expires"
+git commit -m "docs(contributing): update step-by-step setup guide"
+git commit -m "test(backend): add vitest coverage for user controller"
+```
 
 ---
 
-## 🐛 Issue Reporting Guidelines
+## 4. PR Checklist
 
-When reporting a bug, please ensure you check existing issues first. If it's a new issue, include:
+Before opening or requesting review on a Pull Request, verify that all items on this checklist are checked:
 
-- A clear summary title.
-- Preconditions and environment (OS, Browser, Node.js version, PostgreSQL version).
-- Steps to reproduce the issue.
-- Expected vs. actual behavior.
-- Screenshots, logs, or error stack traces if applicable.
+- [ ] **Tests written and passing**
+  - Unit and integration tests cover new functionality or bug fixes.
+  - Backend tests pass (`cd backend && npm run test`).
+  - Frontend tests pass (`cd frontend && npm run test`).
+- [ ] **No `console.log` statements left in production code**
+  - Cleaned up debug statements, commented code, and extraneous logs.
+- [ ] **ESLint passes with zero errors**
+  - Ran `npm run lint` across `/backend` and `/frontend` with zero errors.
+- [ ] **Screenshot attached for UI changes**
+  - Added screenshots or GIFs to the PR description demonstrating frontend UI modifications.
+- [ ] **Up to date with `main`**
+  - Merged or rebased against `upstream/main` without merge conflicts.
+
+## Writing Backend Tests
+
+### Which runner owns your file
+
+Three configs split the backend suite by path. Picking the wrong globals means a
+file fails to load, which reports as a failed _file_ rather than failed
+assertions — easy to scroll past in a long run.
+
+| Path                                | Runner | Config                  | Globals                                   |
+| ----------------------------------- | ------ | ----------------------- | ----------------------------------------- |
+| `tests/**/*.unit.test.js`           | Vitest | `vitest.config.unit.js` | `vi`, `describe`, `it`/`test`, `expect`   |
+| `tests/**/*.test.js` (not `.unit.`) | Vitest | `vitest.config.js`      | same                                      |
+| `tests/integration/**/*.test.js`    | Jest   | `jest.config.js`        | `jest`, `describe`, `it`/`test`, `expect` |
+
+Use `vi.*` everywhere except `tests/integration/`. A `jest.*` call outside that
+directory throws `ReferenceError: jest is not defined` before a single
+assertion runs.
+
+### Module mocking does not intercept `require`
+
+`vi.mock` and `vi.doMock` **do not** replace a module that production code
+reaches through CommonJS `require`. The backend is CJS, so a service's internal
+`require('../models')` resolves to the real Sequelize models no matter what the
+test declared — the suite then hits a live database instead of a double.
+
+This affects `vi.mock` with a factory, bare automocks, and `vi.doMock` with a
+dynamic `import` alike. Only a module the **test file itself** imports with
+ESM `import` is intercepted.
+
+Until the backend moves to ESM, pass collaborators in rather than mocking them:
+
+```js
+// sockets/crdtHandler.js — real dependency by default, overridable in tests
+module.exports = (io, deps = {}) => {
+  const noteModel = deps.noteModel || Note;
+  // ...
+};
+```
+
+```js
+// tests/sockets/crdtHandler.unit.test.js
+const Note = { findByPk: vi.fn(), update: vi.fn().mockResolvedValue([1]) };
+crdtHandler(fakeIo, { noteModel: Note });
+```
+
+If a unit test needs a database to pass, it is an integration test — put it
+under `tests/integration/` so it runs against the Postgres service in CI.
 
 ---
 
-## 📜 Code Review Guidelines
+## 5. Code Review Process
 
-All Pull Requests require:
+Here is what happens after you submit a Pull Request:
 
-1. Approval from at least one core maintainer.
-2. Passing all CI tests (linting, tests, build).
-3. Compliance with our [Coding Standards](./docs/coding-standards.md).
+### 🕒 Timeline Expectations
+
+- **Initial Review**: Maintainers review new PRs within **24–48 hours** on business days.
+- **Priority Handling**: Critical bug fixes and security patches are reviewed promptly.
+
+### 💬 Responding to Feedback
+
+- **Collaborative Spirit**: Reviews are intended to maintain code quality and share knowledge.
+- **Addressing Comments**: Make the requested updates directly on your feature branch and push them:
+  ```bash
+  git add .
+  git commit -m "fix(auth): update token verification logic per review"
+  git push origin feat/your-feature-name
+  ```
+- **Re-requesting Review**: Click the re-review button on GitHub once all review comments are addressed.
+
+### ✅ What Approval Means
+
+- **Maintainer Approval**: At least one core maintainer has reviewed and approved your changes.
+- **Green CI Checks**: Automated checks (linting, tests, build checks) pass successfully.
+- **Merge**: A maintainer will squash and merge your PR into `main`. Congratulations on your contribution! 🎉
+
+---
+
+## 👥 Community
+
+Please read our [Code of Conduct](./CODE_OF_CONDUCT.md) before contributing to maintain a respectful and maintaining community.
+
+## ❓ Getting Help
+
+If you encounter any issues or have questions:
+
+- Open an issue on [GitHub Issues](https://github.com/nishit546/OpenPrep-AI/issues).
+- Ask for feedback on your draft Pull Request.
+
+Thank you for contributing to OpenPrep AI! 🚀

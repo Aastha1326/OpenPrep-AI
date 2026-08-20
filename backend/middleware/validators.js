@@ -77,8 +77,13 @@ const validateResetPassword = [
 ];
 
 const validateRefreshToken = [
-  body('refreshToken').notEmpty().withMessage('Refresh token is required'),
-  handleValidationErrors,
+  (req, res, next) => {
+    const rawToken = req.cookies?.refreshToken || req.body?.refreshToken;
+    if (!rawToken) {
+      return res.status(400).json({ success: false, error: 'Refresh token is required' });
+    }
+    next();
+  }
 ];
 
 const validateResendVerification = [
@@ -95,9 +100,12 @@ const validateUpdateSettings = [
     .optional()
     .isBoolean()
     .withMessage('receiveWeeklyDigest must be a boolean'),
+  body('hideActivityFromSquad')
+    .optional()
+    .isBoolean()
+    .withMessage('hideActivityFromSquad must be a boolean'),
   handleValidationErrors,
 ];
-
 const validateVerifyOtp = [
   body('email').trim().isEmail().withMessage('Please provide a valid email').normalizeEmail(),
   body('otp').trim().isLength({ min: 6, max: 6 }).withMessage('OTP must be exactly 6 digits').isNumeric().withMessage('OTP must be numeric'),
@@ -138,7 +146,34 @@ const validateCreateSubject = [
 ];
 
 const validateCreateTopic = [
-  body('name').trim().notEmpty().withMessage('Please provide a topic name'),
+  body('name')
+    .trim()
+    .notEmpty()
+    .withMessage('Please provide a topic name')
+    .isLength({ max: 100 })
+    .withMessage('Topic name must not exceed 100 characters')
+    .matches(/^[a-zA-Z0-9\s\-_.,()&'/]+$/)
+    .withMessage('Topic name contains invalid characters')
+    .custom((value) => {
+      const forbiddenPhrases = [
+        'ignore previous instructions',
+        'ignore instructions',
+        'ignore the instructions',
+        'system prompt',
+        'bypass instructions',
+        'you are now',
+        'act as',
+        'ignore above',
+        'ignore below'
+      ];
+      const normalized = value.toLowerCase();
+      for (const phrase of forbiddenPhrases) {
+        if (normalized.includes(phrase)) {
+          throw new Error('Invalid topic name format or suspected prompt injection');
+        }
+      }
+      return true;
+    }),
   body('subjectId').isUUID(4).withMessage('Valid subject ID is required'),
   handleValidationErrors,
 ];
@@ -152,7 +187,35 @@ const validateUpdateTopic = [
     .optional()
     .isFloat({ min: 0 })
     .withMessage('Weightage must be a non-negative number'),
-  body('name').optional().trim().notEmpty().withMessage('Name cannot be empty'),
+  body('name')
+    .optional()
+    .trim()
+    .notEmpty()
+    .withMessage('Name cannot be empty')
+    .isLength({ max: 100 })
+    .withMessage('Topic name must not exceed 100 characters')
+    .matches(/^[a-zA-Z0-9\s\-_.,()&'/]+$/)
+    .withMessage('Topic name contains invalid characters')
+    .custom((value) => {
+      const forbiddenPhrases = [
+        'ignore previous instructions',
+        'ignore instructions',
+        'ignore the instructions',
+        'system prompt',
+        'bypass instructions',
+        'you are now',
+        'act as',
+        'ignore above',
+        'ignore below'
+      ];
+      const normalized = value.toLowerCase();
+      for (const phrase of forbiddenPhrases) {
+        if (normalized.includes(phrase)) {
+          throw new Error('Invalid topic name format or suspected prompt injection');
+        }
+      }
+      return true;
+    }),
   handleValidationErrors,
 ];
 
@@ -201,6 +264,10 @@ const validateReviewFlashcard = [
   body('quality')
     .isFloat({ min: 0, max: 5 })
     .withMessage('Quality must be a number between 0 and 5'),
+  body('confidence')
+    .optional()
+    .isIn(['very_unsure', 'unsure', 'confident', 'very_confident'])
+    .withMessage('Confidence must be one of: very_unsure, unsure, confident, very_confident'),
   handleValidationErrors,
 ];
 
@@ -268,6 +335,26 @@ const validateGenerateRemediationPlan = [
   handleValidationErrors,
 ];
 
+const validateEvaluateSubjective = [
+  body('questionId').optional().isUUID().withMessage('questionId must be a valid UUID'),
+  body('userAnswerText').isString().withMessage('userAnswerText must be a string'),
+  handleValidationErrors,
+];
+
+const validateGenerateRemediationQuiz = [
+  body('deckId').isUUID(4).withMessage('Valid deck (subject) ID is required'),
+  body('failedCardIds')
+    .isArray({ min: 2 })
+    .withMessage('failedCardIds must be an array with at least 2 card IDs'),
+  body('failedCardIds.*').isUUID(4).withMessage('Each failedCardId must be a valid UUID'),
+  body('count')
+    .optional()
+    .isInt({ min: 5, max: 10 })
+    .withMessage('count must be between 5 and 10'),
+  handleValidationErrors,
+];
+
+
 const validateSubmitQuizAttempt = [
   body('answers').isArray({ min: 1 }).withMessage('Answers must be a non-empty array'),
   body('answers.*.questionId')
@@ -288,6 +375,14 @@ const validateSubmitQuizAttempt = [
 // ---------------------------------------------------------------------------
 // AI routes
 // ---------------------------------------------------------------------------
+const validateGenerateMindMap = [
+  body('noteId').optional().isUUID().withMessage('noteId must be a valid UUID'),
+  body('subjectId').optional().isUUID().withMessage('subjectId must be a valid UUID'),
+  body('topicId').optional().isUUID().withMessage('topicId must be a valid UUID'),
+  body('textContext').optional().isString().withMessage('textContext must be a string'),
+  handleValidationErrors,
+];
+
 const validateExplainQuestion = [
   body('question')
     .trim()
@@ -518,8 +613,11 @@ validateGenerateAIFlashcards,
   validateExportFlashcards,
   validateImportFlashcards, // Quiz
   validateGenerateAIQuiz,
+  validateExplainQuestion,
+  validateEvaluateSubjective,
   validateGenerateRevisionSheet,
   validateGenerateRemediationPlan,
+  validateGenerateRemediationQuiz,
   validateSubmitQuizAttempt,
   validateToggleQuizBookmark,
 // Note
@@ -535,6 +633,7 @@ validateGenerateAIFlashcards,
   validateUpdateTopicProgress,
   validateFocusSession, // Community
   validateSubmitFeedback,
+  validateGenerateMindMap,
   validateResendVerification,
   validateVerifyOtp,
   validateResetPasswordOtp,

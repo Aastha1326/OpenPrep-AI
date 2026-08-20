@@ -8,7 +8,7 @@ describe('validateAvatarFile', () => {
     expect(result.error).toBe('No file selected');
   });
 
-  it('should pass for valid MIME types under 5MB', () => {
+  it('should pass for valid MIME types under 2MB', () => {
     const validMimes = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
 
     validMimes.forEach((mime) => {
@@ -26,15 +26,15 @@ describe('validateAvatarFile', () => {
     expect(result.error).toContain('Invalid file format');
   });
 
-  it('should fail if file size exceeds 5MB limit', () => {
+  it('should fail if file size exceeds 2MB limit', () => {
     const hugeFile = {
       name: 'avatar.png',
       type: 'image/png',
-      size: 6 * 1024 * 1024, // 6MB
+      size: 3 * 1024 * 1024, // 3MB
     };
 
     const result = validateAvatarFile(hugeFile);
     expect(result.isValid).toBe(false);
-    expect(result.error).toContain('File size too large');
+    expect(result.error).toBe('File is too large. Maximum size is 2MB.');
   });
 });

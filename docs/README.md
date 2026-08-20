@@ -11,8 +11,9 @@ Welcome to the OpenPrep AI docs. Start here to find the right guide.
 - [System Architecture](./architecture.md)
 - [Backend Architecture](./backend-architecture.md)
 - [Frontend Architecture](./frontend-architecture.md)
+- [Database Architecture & Model Relationships](./DATABASE.md)
+- [Database Schema Overview](./database-schema.md)
 - [Socket.IO Events Reference](./socket-events.md)
-- [Database Schema](./database-schema.md)
 - [Authentication Flow](./authentication-flow.md)
 
 ## API
@@ -21,6 +22,7 @@ Welcome to the OpenPrep AI docs. Start here to find the right guide.
 ## Contributing
 - [Contribution Guide](./contribution-guide.md)
 - [Coding Standards](./coding-standards.md)
+- [Frontend Component Guidelines](./FRONTEND_GUIDELINES.md)
 - [Branching Strategy](./branching-strategy.md)
 
 ## Project
