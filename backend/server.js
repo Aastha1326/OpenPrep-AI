@@ -252,6 +252,7 @@ app.use('/api/academic', academicRoutes);
 app.use('/api/pyqs', pyqRoutes);
 app.use('/api/pyq', pyqRoutes);
 app.use('/api/community', communityRoutes);
+app.use('/api/squads', squadRoutes);
 app.use('/api/study', fatigueRoutes);
 app.use('/api/documents', pdfAnnotationRoutes);
 app.use('/api/sync', syncRoutes);
