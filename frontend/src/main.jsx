@@ -11,6 +11,7 @@ import './index.css'
 import './i18n';
 import App from './App.jsx'
 import { GoogleOAuthProvider } from '@react-oauth/google';
+import { unregisterLegacyServiceWorker } from './utils/pushNotifications';
 
 if (import.meta.env.MODE !== 'test' && import.meta.env.VITE_SENTRY_DSN) {
   Sentry.init({
@@ -43,12 +44,15 @@ window.addEventListener('unhandledrejection', (event) => {
   }
 });
 
-// Register Service Worker for PWA
+// The PWA service worker is registered by vite-plugin-pwa (injectRegister
+// defaults to 'auto'). Registering a second one here — as this file used to,
+// against a hand-written /service-worker.js — put two workers at scope `/`,
+// both calling skipWaiting() and clientsClaim(), racing each other for control
+// on every load. All that is left to do is evict the retired worker from
+// browsers that still have it.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js').catch((err) => {
-      console.log('ServiceWorker registration failed: ', err);
-    });
+    unregisterLegacyServiceWorker();
   });
 }
 

@@ -9,6 +9,13 @@ export default defineConfig({
       registerType: 'autoUpdate',
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        // push-sw.js is pulled in by importScripts below, and registerSW.js is
+        // the registration shim — neither is an app asset worth precaching.
+        globIgnores: ['push-sw.js', 'registerSW.js'],
+        // Web Push lives in its own file so it survives the build. Without
+        // this the generated worker replaces public/sw.js and the push and
+        // notificationclick handlers never reach production.
+        importScripts: ['/push-sw.js'],
         cleanupOutdatedCaches: true,
         skipWaiting: true,
         clientsClaim: true,

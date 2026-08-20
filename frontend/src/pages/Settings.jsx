@@ -34,17 +34,10 @@ import { loadUser } from '../store/slices/authSlice';
 import { validateAvatarFile } from '../utils/fileValidation';
 import { BADGE_LIST, BADGE_ICONS } from '../config/badges';
 import LazyImage from '../components/common/LazyImage';
-
-const urlBase64ToUint8Array = (base64String) => {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
-};
+import {
+  subscribeToPushNotifications,
+  unsubscribeFromPushNotifications,
+} from '../utils/pushNotifications';
 
 const Settings = () => {
   const dispatch = useDispatch();
@@ -210,14 +203,11 @@ const Settings = () => {
       setPushStatus(permission);
 
       if (permission === 'granted') {
-        const registration = await navigator.serviceWorker.register('/service-worker.js');
+        // Subscribes against the worker vite-plugin-pwa already registered.
+        // This used to register /service-worker.js and subscribe to that — a
+        // worker with no push listener, so nothing was ever displayed.
         const vapidPublicKey = await getVapidPublicKey();
-        const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
-
-        const subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: convertedVapidKey,
-        });
+        const subscription = await subscribeToPushNotifications(vapidPublicKey);
 
         await subscribeToPush(subscription);
         setPushSubscribed(true);
@@ -234,11 +224,7 @@ const Settings = () => {
   const handleDisablePush = async () => {
     try {
       setPushLoading(true);
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
-      if (subscription) {
-        await subscription.unsubscribe();
-      }
+      await unsubscribeFromPushNotifications();
       await unsubscribeFromPush();
       setPushSubscribed(false);
       dispatch(loadUser());
@@ -257,7 +243,7 @@ const Settings = () => {
       await updateNotificationPreferences(reminderTime);
       setSaved(true);
       dispatch(loadUser());
-    } catch (err) {
+    } catch {
       setError('Failed to update reminder time.');
     } finally {
       setSaving(false);
