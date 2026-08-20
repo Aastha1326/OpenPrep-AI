@@ -14,6 +14,7 @@ import CommandPalette from './components/search/CommandPalette';
 import OfflineBanner from './components/common/OfflineBanner';
 import PwaInstallPrompt from './components/common/PwaInstallPrompt';
 import OfflineIndicator from './components/common/OfflineIndicator';
+import Walkthrough from './components/tutorial/Walkthrough';
 import './App.css';
 
 const Landing = lazy(() => import('./pages/Landing'));
@@ -137,6 +138,7 @@ function App() {
       <ScrollToTop />
       <MobileNavDrawer />
       <QuotaExceededModal />
+      <Walkthrough />
       <CommandPalette isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
       <Suspense fallback={<PageSkeleton />}>
         <Routes>
