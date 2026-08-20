@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const BattleSession = require('../models/BattleSession');
 const BattleParticipant = require('../models/BattleParticipant');
+const Quiz = require('../models/Quiz');
 const roomManager = require('../utils/roomManager');
 const { awardXP } = require('../services/gamificationService');
 
@@ -171,15 +172,39 @@ module.exports = (io) => {
   io.on('connection', (socket) => {
     console.log(`Battle socket connection established: ${socket.id} (user: ${socket.user.name})`);
 
-    socket.on('join-room', (payload, callback) => {
+    socket.on('join-room', async (payload, callback) => {
       const roomCode = (payload?.roomId || '').trim().toUpperCase();
       if (!roomCode) {
         return callback && callback({ success: false, message: 'Room code is required.' });
       }
 
-      const room = roomManager.getRoom(roomCode);
+      let room = roomManager.getRoom(roomCode);
       if (!room) {
-        return callback && callback({ success: false, message: 'Lobby room not found.' });
+        try {
+          const dbSession = await BattleSession.findOne({
+            where: { roomCode },
+            include: [{ model: Quiz, as: 'quizRef' }]
+          });
+
+          if (!dbSession || dbSession.status === 'finished') {
+            return callback && callback({ success: false, message: 'Lobby room not found.' });
+          }
+
+          room = roomManager.createRoom(roomCode, dbSession.hostUserId, {
+            roomName: dbSession.roomName,
+            password: dbSession.password,
+            questionCount: dbSession.questionCount,
+            timePerQuestion: dbSession.timePerQuestion,
+            quiz: dbSession.quizRef,
+          });
+
+          if (!room) {
+            return callback && callback({ success: false, message: 'Failed to initialize lobby room.' });
+          }
+        } catch (err) {
+          console.error('Error loading battle session from database:', err);
+          return callback && callback({ success: false, message: 'Database error loading room.' });
+        }
       }
 
       if (room.status !== 'waiting') {
