@@ -31,6 +31,7 @@ const {
 
 const models = require('../../models');
 const cacheService = require('../../services/cacheService');
+const xpRateLimiter = require('../../services/xpRateLimiter');
 
 vi.mock('../../services/notificationService', () => ({
   createNotification: vi.fn().mockResolvedValue({}),
@@ -212,12 +213,21 @@ describe('Gamification Service Unit Tests', () => {
       };
       userSpy.mockResolvedValue(mockUser);
 
-      // Mock cache returning 500 XP already earned in the current hour
-      cacheGetSpy.mockResolvedValueOnce('500');
+      // The user has already spent the hourly allowance, so the limiter grants
+      // nothing. The cap lives in xpRateLimiter now — it used to be a cache
+      // key read inline here.
+      vi.spyOn(xpRateLimiter, 'consume').mockResolvedValue({
+        granted: 0,
+        usage: xpRateLimiter.HOURLY_XP_CAP,
+        remaining: 0,
+        capped: true,
+        degraded: false,
+      });
 
       const result = await awardXP('user-123', 100, 'task_complete');
       expect(result.xp).toBe(100); // XP unchanged
       expect(result.message).toBe('Hourly XP limit reached');
+      expect(mockUser.save).not.toHaveBeenCalled();
     });
   });
 
