@@ -225,9 +225,16 @@ async function updateStreak(userId, timezoneOffsetMinutes = 0) {
     // Graceful fallback if achievement service DB query is unavailable
   }
 
-  // Issue #764: Post a "Streak hit" milestone to the user's study squad feeds
+  // Issue #764: Post a "Streak hit" milestone to the user's study squad feeds.
+  // logSquadActivity reports failures instead of throwing, so a feed outage
+  // cannot roll back a streak the user has already earned.
   if (user.currentStreak >= 7 && user.currentStreak % 7 === 0) {
-    await logSquadActivity(userId, 'streak_hit', `hit a ${user.currentStreak}-day study streak 🔥`);
+    await logSquadActivity(
+      userId,
+      'streak_hit',
+      `hit a ${user.currentStreak}-day study streak 🔥`,
+      { streakDays: user.currentStreak }
+    );
   }
 
   return {

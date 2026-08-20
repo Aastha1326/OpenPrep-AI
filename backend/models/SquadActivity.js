@@ -26,6 +26,12 @@ const SquadActivity = sequelize.define('SquadActivity', {
   reactionCounts: {
     type: DataTypes.JSONB,
     defaultValue: {}
+  },
+  // Structured detail for the feed UI (quiz id, score, badge code, ...). The
+  // service has always passed this through; it had no column to land in.
+  metadata: {
+    type: DataTypes.JSONB,
+    defaultValue: {}
   }
 }, {
   timestamps: true,

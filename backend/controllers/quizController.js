@@ -523,9 +523,17 @@ exports.submitQuizAttempt = async (req, res, next) => {
       description: `Completed practice quiz: "${quiz.title}" with score ${score}%`,
     });
 
-    // Issue #764: Post a "Quiz completed" milestone to the user's study squad feeds
+    // Issue #764: Post a "Quiz completed" milestone to the user's study squad feeds.
+    // The service reports failures rather than throwing — a squad feed post must
+    // not take down a submission whose attempt has already been committed, and
+    // must not skip the XP/streak/badge work that follows it.
     const { logSquadActivity } = require('../services/squadActivityService');
-    await logSquadActivity(req.user.id, 'quiz_completed', `completed "${quiz.title}" scoring ${score}%`);
+    await logSquadActivity(
+      req.user.id,
+      'quiz_completed',
+      `completed "${quiz.title}" scoring ${score}%`,
+      { quizId: quiz.id, attemptId: attempt.id, score }
+    );
 
     // Award XP and check gamification badges/streaks
     const gamificationService = require('../services/gamificationService');    const progression = await gamificationService.awardXP(req.user.id, 100, 'quiz_complete');

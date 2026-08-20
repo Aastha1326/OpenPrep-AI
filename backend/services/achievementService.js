@@ -114,7 +114,12 @@ async function checkAndAwardBadges(userId, event) {
       }
 
       // Issue #764: Post a "Badge unlocked" milestone to the user's study squad feeds
-      await logSquadActivity(userId, 'badge_unlocked', `unlocked the "${badgeConfig.name}" badge 🏆`);
+      await logSquadActivity(
+        userId,
+        'badge_unlocked',
+        `unlocked the "${badgeConfig.name}" badge 🏆`,
+        { badgeId }
+      );
     } catch (error) {      if (error.name !== 'SequelizeUniqueConstraintError') {
         console.error('Error awarding badge:', error);
       }
