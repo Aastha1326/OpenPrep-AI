@@ -4,6 +4,10 @@ const QuizAttempt = require('../models/QuizAttempt');
 const StudyPlan = require('../models/StudyPlan');
 const Progress = require('../models/Progress');
 
+/**
+ * Generate PDF Study Performance Summary Report
+ * @route GET /api/reports/study-summary
+ */
 exports.generateStudySummary = async (req, res, next) => {
   try {
     const range = req.query.range || '30d'; // 7d, 30d, all
