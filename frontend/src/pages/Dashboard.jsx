@@ -34,6 +34,7 @@ import {
   Brain,
   Bot,
   Users,
+  Network,
 } from 'lucide-react';
 import API from '../services/api';
 import { toDateOnlyString } from '../utils/dateUtils';
@@ -553,6 +554,12 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           label="AI Study Assistant"
           delay={0.5}
           onClick={() => navigate('/ai-assistant')}
+        />
+        <GoldTabButton
+          icon={Network}
+          label="Topic Mind Map"
+          delay={0.52}
+          onClick={() => navigate('/mind-map')}
         />
         <button
           onClick={() => {
