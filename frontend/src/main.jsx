@@ -43,7 +43,14 @@ window.addEventListener('unhandledrejection', (event) => {
   }
 });
 
-
+// Register Service Worker for PWA
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js').catch((err) => {
+      console.log('ServiceWorker registration failed: ', err);
+    });
+  });
+}
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '179369126060-lq7unpt173rt6aog2nt93s6m895d6b2i.apps.googleusercontent.com';
 
