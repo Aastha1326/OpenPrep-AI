@@ -269,7 +269,7 @@ router.get('/weakness-analysis', protect, aiLimiter, getWeaknessAnalysis);
  *               $ref: '#/components/schemas/Error'
  */
 
-router.post('/reschedule-adaptive', protect, rescheduleAdaptivePlan);
+router.post('/reschedule-adaptive', protect, aiLimiter, checkAiQuota, rescheduleAdaptivePlan);
 
 /**
  * @swagger
@@ -442,6 +442,6 @@ router.post('/:id/reschedule', protect, aiLimiter, checkAiQuota, rescheduleOverd
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/rebalance', protect, rebalanceStudyPlan);
+router.post('/rebalance', protect, aiLimiter, checkAiQuota, rebalanceStudyPlan);
 
 module.exports = router;

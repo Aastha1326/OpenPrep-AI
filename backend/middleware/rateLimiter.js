@@ -1,7 +1,7 @@
 const rateLimit = require('express-rate-limit');
 
-// Skip rate limiting in test environment
-const shouldSkip = () => process.env.NODE_ENV === 'test';
+// Skip rate limiting in test environment unless explicitly testing rate limits
+const shouldSkip = (req) => process.env.NODE_ENV === 'test' && !req?.headers?.['x-test-rate-limit'];
 
 /**
  * AI Endpoint Rate Limiter

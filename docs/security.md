@@ -96,7 +96,7 @@ This document outlines the security architecture, data validation flows, and pol
 * `.txt` files have no magic bytes; they are accepted only when no known binary signature is detected.
 
 ### 11. AI Quota Controls & API Rate Limiting
-* **AI Route Rate Limits**: Restricted to a maximum of 10 requests per 15-minute window. Enforced at the route level via express-rate-limit and token bucket (Redis/in-memory).
+* **AI Route Rate Limits**: Restricted to a maximum of 10 requests per 15-minute window. Enforced at the route level via express-rate-limit and token bucket (Redis/in-memory). All AI routes are protected, including `/api/ai/*`, `/api/quizzes/generate-ai`, `/api/quizzes/evaluate-subjective`, `/api/quizzes/generate-from-pdf`, `/api/quizzes/generate-remediation`, `/api/quizzes/generate-revision-sheet`, `/api/quizzes/generate-remediation-plan`, `/api/quizzes/adaptive/next-question`, `/api/quizzes/questions/:questionId/explanation`, `/api/notes/:id/summarize`, `/api/notes/transcribe-and-summarize`, `/api/study-plans/generate-ai`, `/api/study-plans/:id/reschedule`, `/api/study-plans/reschedule-adaptive`, and `/api/study-plans/rebalance`.
 * **Identifier Identification**: The rate-limiting keys are bound directly to the user's account ID when logged in, with a fallback to the client IP address.
 * **Daily Quota Enforcement**: Daily AI generation counts are persisted inside the `Users` table (`dailyAiUsageCount`, `lastAiUsageReset`).
 * **Tiered Allocations**: Enforced daily limits automatically based on user roles:
