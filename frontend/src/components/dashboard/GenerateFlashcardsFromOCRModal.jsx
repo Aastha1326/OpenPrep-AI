@@ -11,6 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import API from '../../services/api';
+import MathMarkdownEditor from '../common/MathMarkdownEditor';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ACCEPTED_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'application/pdf']);
@@ -390,23 +391,20 @@ const GenerateFlashcardsFromOCRModal = ({ onClose, onImported }) => {
                     </button>
 
                     <div className="flex-1 space-y-2">
-                      <input
+                      <MathMarkdownEditor
                         value={card.front}
-                        onChange={(event) =>
-                          updateCard(index, 'front', event.target.value)
-                        }
-                        className="w-full rounded border border-slate-200 dark:border-slate-600 bg-transparent px-2 py-1.5 text-sm font-medium"
-                        aria-label={`Flashcard ${index + 1} front`}
+                        onChange={(next) => updateCard(index, 'front', next)}
+                        ariaLabel={`Flashcard ${index + 1} front`}
+                        rows={1}
+                        className="text-sm font-medium"
                       />
 
-                      <textarea
+                      <MathMarkdownEditor
                         value={card.back}
-                        onChange={(event) =>
-                          updateCard(index, 'back', event.target.value)
-                        }
+                        onChange={(next) => updateCard(index, 'back', next)}
+                        ariaLabel={`Flashcard ${index + 1} back`}
                         rows={2}
-                        className="w-full rounded border border-slate-200 dark:border-slate-600 bg-transparent px-2 py-1.5 text-sm text-slate-600 dark:text-slate-300"
-                        aria-label={`Flashcard ${index + 1} back`}
+                        className="text-sm text-slate-600 dark:text-slate-300"
                       />
                     </div>
                   </div>

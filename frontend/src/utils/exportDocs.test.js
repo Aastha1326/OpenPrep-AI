@@ -5,6 +5,7 @@ import {
   textToHTMLForEPUB,
   buildFlashcardDocument,
   buildFlashcardChapters,
+  buildSingleNoteDocument,
   buildNotesDocument,
   buildNotesChapters,
   buildEPUBZip,
@@ -157,6 +158,42 @@ describe('buildFlashcardChapters', () => {
     const chapters = buildFlashcardChapters({ cards, includeAnswerKey: true });
     expect(chapters).toHaveLength(2);
     expect(chapters[1].title).toBe('Answer Key');
+  });
+});
+
+describe('buildSingleNoteDocument', () => {
+  it('renders a single study note with title, subject, and formatted markdown', () => {
+    const note = {
+      title: 'Quantum Mechanics Overview',
+      subject: { name: 'Physics' },
+      content: '# Introduction\n\nWave equation: $$i\\hbar\\frac{\\partial}{\\partial t}\\Psi = \\hat{H}\\Psi$$',
+      tags: ['Quantum', 'Exam2026'],
+    };
+    const html = buildSingleNoteDocument({ note });
+    expect(html).toContain('Quantum Mechanics Overview');
+    expect(html).toContain('Physics');
+    expect(html).toContain('Introduction');
+    expect(html).toContain('math-block');
+    expect(html).toContain('Tags: Quantum, Exam2026');
+  });
+
+  it('includes AI summary, key concepts badges, and exam tips when available', () => {
+    const note = {
+      title: 'Cellular Respiration',
+      subject: 'Biology',
+      content: 'ATP production process.',
+    };
+    const summary = {
+      summary: 'Main process of generating ATP via glycolysis and Krebs cycle.',
+      keyConcepts: ['Glycolysis', 'ATP', 'Krebs Cycle'],
+      examTips: ['Remember the net yield is 32-38 ATP per glucose.'],
+    };
+
+    const html = buildSingleNoteDocument({ note, summary });
+    expect(html).toContain('AI Revision Summary');
+    expect(html).toContain('Main process of generating ATP');
+    expect(html).toContain('Glycolysis');
+    expect(html).toContain('Remember the net yield');
   });
 });
 

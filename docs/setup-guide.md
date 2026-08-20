@@ -297,11 +297,13 @@ npm run dev           # runs backend + frontend concurrently
 
 3. **Frontend** — open `http://localhost:5173` in your browser. Register a new account, or log in with a seeded demo account:
 
-   | Role        | Email                     | Password      |
-   | ----------- | ------------------------- | ------------- |
-   | Student     | `student@openprep.ai`     | `Password123` |
-   | Admin       | `admin@openprep.ai`       | `Password123` |
+   | Role        | Email                  | Password      |
+   | ----------- | ---------------------- | ------------- |
+   | Student     | `demo@openprep.ai`     | `password123` |
+   | Admin       | `admin@openprep.ai`    | `Password123` |
    | Contributor | `contributor@openprep.ai` | `Password123` |
+
+   > ⚠️ These demo credentials are **development-only** and must never be used in production.
 
 ---
 
@@ -312,8 +314,7 @@ If you prefer to run the entire stack containerized, use the configured `docker-
 ### Steps
 
 1. Navigate to the project root directory containing `docker-compose.yml`.
-2. Ensure you have created the backend environment configuration in `backend/.env`.
-3. Spin up the container services:
+2. Spin up the container services:
    ```bash
    docker-compose up --build
    ```
@@ -335,10 +336,29 @@ This downloads the necessary images, boots PostgreSQL and Redis database contain
 | **PostgreSQL**              | `localhost:5432`                                                                |
 | **Redis**                   | `localhost:6379`                                                                |
 
-To shut down all running containers:
+### Overriding Development Credentials
+
+The `docker-compose.yml` file uses development-only defaults for PostgreSQL and the backend JWT secret. To override them (e.g., different local ports or credentials), create a `.env` file in the repository root using the variables below — compose reads it automatically:
+
+```env
+# DEVELOPMENT ONLY — never use these defaults in production
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=openprep
+JWT_SECRET=dev_jwt_secret_openprep_12345
+```
+
+For example, to use a different PostgreSQL password:
 
 ```bash
-docker-compose down
+echo "POSTGRES_PASSWORD=my_local_dev_password" >> .env
+docker-compose up --build
+```
+
+To completely reset the local development environment, including the database volume:
+
+```bash
+docker-compose down -v
 ```
 
 ### 🪟 Windows Setup via WSL2 (Recommended)

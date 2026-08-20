@@ -261,4 +261,18 @@ router.get(
   }
 );
 
+const calendarSyncService = require('../services/calendarSyncService');
+
+// Mock route for syncing timetable to Google Calendar
+router.post('/sync', async (req, res) => {
+  try {
+    const { events } = req.body;
+    // In a real app, userId comes from req.user (auth middleware)
+    const result = await calendarSyncService.syncTimetable('mock_user', events || []);
+    res.status(200).json(result);
+  } catch (err) {
+    res.status(500).json({ message: 'Sync failed' });
+  }
+});
+
 module.exports = router;

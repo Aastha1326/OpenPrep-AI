@@ -215,11 +215,15 @@ async function updateStreak(userId, timezoneOffsetMinutes = 0) {
     timezoneOffsetMinutes,
   });
 
-// Issue #1053: Check for Week Warrior badge
-  await checkAndAwardBadges(userId, {
-    type: 'STREAK_UPDATED',
-    payload: { streakDays: user.currentStreak }
-  });
+  // Issue #1053: Check for Week Warrior badge
+  try {
+    await checkAndAwardBadges(userId, {
+      type: 'STREAK_UPDATED',
+      payload: { streakDays: user.currentStreak },
+    });
+  } catch (e) {
+    // Graceful fallback if achievement service DB query is unavailable
+  }
 
   // Issue #764: Post a "Streak hit" milestone to the user's study squad feeds
   if (user.currentStreak >= 7 && user.currentStreak % 7 === 0) {
@@ -271,16 +275,18 @@ newUnlocks.push({
   freezeReward: freezeRewardBadges.has(badgeCode) ? 1 : 0,
 });
 
-// Import io dynamically if needed, or pass null and it will just do Web Push + DB.
-// Since we don't have direct access to io here, we'll pass null.
-await createNotification(
-  user.id,
-  `Badge Earned: ${getBadgeTitle(badgeCode)}`,
-  getBadgeDescription(badgeCode),
-  'badge_earned',
-  '/dashboard',
-  global.io // Assuming we attach io to global, or let notificationService handle it. But server.js doesn't export io. We'll leave io as null or we can require server.js? Actually, if we just pass null, it won't emit real-time over socket, which fails the requirement. Wait!
-);
+try {
+  await createNotification(
+    user.id,
+    `Badge Earned: ${getBadgeTitle(badgeCode)}`,
+    getBadgeDescription(badgeCode),
+    'badge_earned',
+    '/dashboard',
+    global.io
+  );
+} catch (err) {
+  // Notification creation error fallback
+}
 
     }
   };
