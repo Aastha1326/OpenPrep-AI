@@ -83,6 +83,7 @@ import BadgesList from '../components/BadgesList';
 import LevelProgressBar from '../components/gamification/LevelProgressBar';
 import StreakWidget from '../components/gamification/StreakWidget';
 import BadgeCard from '../components/gamification/BadgeCard';
+import GlobalSearchBar from '../components/common/GlobalSearchBar';
 
 // Lazy-loaded heavy modal components for bundle size reduction
 const RichTextEditor = lazy(() => import('../components/dashboard/RichTextEditor'));
@@ -626,6 +627,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             transition={{ duration: 0.5, delay: 0.3 }}
             className="flex flex-wrap md:flex-nowrap items-center gap-3 sm:gap-4 mt-2 md:mt-0 max-w-full"
           >
+            <GlobalSearchBar />
             <div className="relative group z-50">
               <button className="bg-neutral-800 text-gold-foil border border-yellow-700/50 hover:bg-neutral-700 px-4 py-2.5 rounded-sm shadow-[0_4px_15px_rgba(0,0,0,0.5)] flex items-center gap-2 font-playfair font-bold text-sm tracking-wide min-h-[44px]">
                 <Download className="w-4 h-4" /> {t('export_analytics')}
