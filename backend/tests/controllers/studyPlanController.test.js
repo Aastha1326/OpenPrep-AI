@@ -275,4 +275,53 @@ describe('Study Plan Controller - Toggle Task Completion', () => {
       expect(updatedTask.completed).toBe(true);
     });
   });
+
+  describe('Active Study Plan Caching (GET /api/study-plans/active)', () => {
+    it('should query the database on cache miss, hit cache on subsequent request, and invalidate on task toggle', async () => {
+      // Setup: ensure we have an active plan in DB
+      const { plan, taskId } = await createPlanWithTask({ initialCompleted: false });
+
+      const findOneSpy = vi.spyOn(StudyPlan, 'findOne');
+
+      // 1. First fetch: should be cache miss -> queries DB
+      const res1 = await request(app)
+        .get('/api/study-plans/active')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res1.status).toBe(200);
+      expect(res1.body.success).toBe(true);
+      expect(res1.body.data.id).toBe(plan.id);
+      expect(findOneSpy).toHaveBeenCalledTimes(1);
+
+      // 2. Second fetch: should be cache hit -> does NOT query DB
+      const res2 = await request(app)
+        .get('/api/study-plans/active')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res2.status).toBe(200);
+      expect(res2.body.success).toBe(true);
+      expect(res2.body.data.id).toBe(plan.id);
+      // Spy count remains 1!
+      expect(findOneSpy).toHaveBeenCalledTimes(1);
+
+      // 3. Invalidate cache: update task status
+      const toggleRes = await request(app)
+        .put(`/api/study-plans/${plan.id}/tasks/${taskId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ completed: true, studyTimeMinutes: 30 });
+
+      expect(toggleRes.status).toBe(200);
+
+      // 4. Third fetch: should be cache miss again -> queries DB
+      const res3 = await request(app)
+        .get('/api/study-plans/active')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res3.status).toBe(200);
+      expect(res3.body.success).toBe(true);
+      expect(findOneSpy).toHaveBeenCalledTimes(2);
+
+      findOneSpy.mockRestore();
+    });
+  });
 });

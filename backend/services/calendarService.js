@@ -1,9 +1,11 @@
 const { google } = require('googleapis');
+const icalGenerator = require('ical-generator');
+const ical = typeof icalGenerator === 'function' ? icalGenerator : (icalGenerator.ical || icalGenerator.default || icalGenerator);
 const { encryptToken, decryptToken } = require('../utils/encryption');
 const User = require('../models/User');
 
 const CALENDAR_NAME = 'OpenPrep AI';
-
+const DEFAULT_START_HOUR = 9;
 /**
  * Initializes the Google OAuth2 client with environment variables
  */
@@ -15,7 +17,114 @@ function getOAuthClient() {
   );
   return oAuth2Client;
 }
+/**
+ * Converts a local date/time in the user's IANA timezone into a UTC Date.
+ * This keeps calendar events aligned with the user's local timezone,
+ * including daylight-saving changes in supported timezones.
+ */
+function zonedDateTimeToUtc(dateString, hour, minute, timeZone) {
+  const [year, month, day] = dateString.split('-').map(Number);
 
+  const utcGuess = new Date(
+    Date.UTC(year, month - 1, day, hour, minute, 0)
+  );
+
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(utcGuess);
+
+  const values = {};
+  parts.forEach(({ type, value }) => {
+    values[type] = value;
+  });
+
+  const timezoneEquivalentUtc = Date.UTC(
+    Number(values.year),
+    Number(values.month) - 1,
+    Number(values.day),
+    Number(values.hour),
+    Number(values.minute),
+    Number(values.second)
+  );
+
+  const offset = timezoneEquivalentUtc - utcGuess.getTime();
+
+  return new Date(utcGuess.getTime() - offset);
+}
+
+/**
+ * Generates a valid RFC 5545 iCalendar file for a study plan.
+ */
+function generateStudyPlanIcs(plan, timeZone = 'UTC') {
+  const examName = plan.examRef?.name || 'Exam Study Plan';
+
+  const calendar = ical({
+    name: `${examName} - Study Plan`,
+    prodId: '//OpenPrep-AI//Study Plan Calendar//EN',
+  });
+
+  calendar.method('PUBLISH');
+
+  if (!Array.isArray(plan.dailyGoals)) {
+    return calendar.toString();
+  }
+
+  for (const day of plan.dailyGoals) {
+    if (!day.date || !Array.isArray(day.tasks)) continue;
+
+    let currentMinutes = DEFAULT_START_HOUR * 60;
+
+    for (const task of day.tasks) {
+      const durationMinutes = Math.max(
+        1,
+        Number(task.duration) || 60
+      );
+
+      const startHour = Math.floor(currentMinutes / 60);
+      const startMinute = currentMinutes % 60;
+
+      const start = zonedDateTimeToUtc(
+        day.date,
+        startHour,
+        startMinute,
+        timeZone
+      );
+
+      const end = new Date(
+        start.getTime() + durationMinutes * 60 * 1000
+      );
+
+      calendar.createEvent({
+        id: `${task._id || task.id || `${plan.id}-${day.date}-${currentMinutes}`}@openprep.ai`,
+        start,
+        end,
+        summary: `Study: ${task.title}`,
+        description:
+          `Study Plan: ${examName}\n` +
+          `Topic: ${task.title}\n` +
+          `Duration: ${durationMinutes} minutes`,
+        alarms: [
+          {
+            type: 'display',
+            trigger: 900,
+            description: `Reminder: ${task.title} starts in 15 minutes`,
+          },
+        ],
+      });
+
+      currentMinutes += durationMinutes;
+    }
+  }
+
+  return calendar.toString();
+}
 /**
  * Syncs the given study plan to Google Calendar.
  * @param {Object} plan - The study plan object
@@ -146,4 +255,5 @@ module.exports = {
   getOAuthClient,
   syncToGoogleCalendar,
   linkGoogleCalendar,
+  generateStudyPlanIcs,
 };

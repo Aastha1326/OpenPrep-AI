@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Award, RefreshCw, ChevronDown, ChevronRight, GraduationCap } from 'lucide-react';
-import API from '../../services/api';
+import { Award, RefreshCw, ChevronDown, ChevronRight, GraduationCap, Target } from 'lucide-react';import API from '../../services/api';
 import VintagePaper from './VintagePaper';
-
+import SubjectGoalModal from './SubjectGoalModal';
 // ── Mastery tier configuration ──
 // Colors follow the issue spec: Red < 50% | Yellow 50-79% | Green 80%+
 const TIER_CONFIG = {
@@ -99,60 +98,139 @@ const ChapterRow = ({ chapter }) => {
     </div>
   );
 };
+const ScoreGapBar = ({ actualScore, targetPercentage }) => {
+  if (targetPercentage === null || targetPercentage === undefined) {
+    return (
+      <div className="mt-3">
+        <div className="flex items-center justify-between text-[10px] text-neutral-500">
+          <span>Target not set</span>
+        </div>
+      </div>
+    );
+  }
 
+  const actual = Math.max(0, Math.min(100, actualScore || 0));
+  const target = Math.max(0, Math.min(100, targetPercentage));
+  const gap = Math.max(0, target - actual);
+
+  return (
+    <div className="mt-3">
+      <div className="mb-1 flex items-center justify-between text-[10px] font-semibold">
+        <span className="text-neutral-500">Actual vs Target</span>
+        <span className={gap === 0 ? 'text-green-700' : 'text-red-700'}>
+          {gap === 0 ? 'Goal reached' : `${gap}% gap`}
+        </span>
+      </div>
+
+      <div className="relative h-2 overflow-hidden rounded-full bg-neutral-200">
+        <div
+          className="absolute inset-y-0 left-0 rounded-full bg-amber-700 transition-all"
+          style={{ width: `${actual}%` }}
+        />
+        <div
+          className="absolute top-0 h-2 w-0.5 bg-neutral-900"
+          style={{ left: `${target}%` }}
+          title={`Target: ${target}%`}
+        />
+      </div>
+
+      <div className="mt-1 flex justify-between text-[10px] text-neutral-500">
+        <span>Actual: {actual}%</span>
+        <span>Target: {target}%</span>
+      </div>
+    </div>
+  );
+};
 // ── Subject Card ──
-const SubjectCard = ({ subject }) => {
+const SubjectCard = ({ subject, onGoalSaved }) => {
   const [expanded, setExpanded] = useState(false);
+  const [showGoalModal, setShowGoalModal] = useState(false);
   const config = TIER_CONFIG[subject.tier] || TIER_CONFIG.Beginner;
   const hasChapters = subject.chapters && subject.chapters.length > 0;
 
   return (
-    <div className="p-4 bg-white/60 border border-neutral-200 rounded-sm shadow-sm">
-      <div className="flex items-center gap-4">
-        <ProgressRing percentage={subject.masteryPercentage} color={config.ring} />
-        <div className="flex-1 min-w-0">
-          <h4 className="font-bold text-neutral-900 font-playfair truncate">{subject.name}</h4>
-          <div className="mt-1">
-            <TierBadge tier={subject.tier} />
+    <>
+      <div className="p-4 bg-white/60 border border-neutral-200 rounded-sm shadow-sm">
+        <div className="flex items-center gap-4">
+          <ProgressRing percentage={subject.masteryPercentage} color={config.ring} />
+
+          <div className="flex-1 min-w-0">
+            <h4 className="font-bold text-neutral-900 font-playfair truncate">
+              {subject.name}
+            </h4>
+
+            <div className="mt-1">
+              <TierBadge tier={subject.tier} />
+            </div>
+
+            {hasChapters && (
+              <p className="text-xs text-neutral-500 mt-1">
+                {subject.chapters.length} chapter{subject.chapters.length !== 1 ? 's' : ''}
+              </p>
+            )}
           </div>
-          {hasChapters && (
-            <p className="text-xs text-neutral-500 mt-1">
-              {subject.chapters.length} chapter{subject.chapters.length !== 1 ? 's' : ''}
-            </p>
-          )}
+
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => setShowGoalModal(true)}
+              className="p-1.5 rounded-full text-amber-700 hover:bg-amber-50 transition-colors"
+              aria-label={`Set target score for ${subject.name}`}
+              title="Set target score"
+            >
+              <Target className="w-4 h-4" />
+            </button>
+
+            {hasChapters && (
+              <button
+                onClick={() => setExpanded((v) => !v)}
+                className="p-1.5 rounded-full text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 transition-colors"
+                aria-label={expanded ? `Collapse ${subject.name} chapters` : `Expand ${subject.name} chapters`}
+              >
+                {expanded ? (
+                  <ChevronDown className="w-5 h-5" />
+                ) : (
+                  <ChevronRight className="w-5 h-5" />
+                )}
+              </button>
+            )}
+          </div>
         </div>
-        {hasChapters && (
-          <button
-            onClick={() => setExpanded((v) => !v)}
-            className="p-1.5 rounded-full text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 transition-colors"
-            aria-label={expanded ? `Collapse ${subject.name} chapters` : `Expand ${subject.name} chapters`}
-          >
-            {expanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
-          </button>
-        )}
+
+        <ScoreGapBar
+          actualScore={subject.actualScore}
+          targetPercentage={subject.targetPercentage}
+        />
+
+        <AnimatePresence initial={false}>
+          {expanded && hasChapters && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              className="overflow-hidden"
+            >
+              <div className="mt-3 pt-1">
+                {subject.chapters.map((chapter) => (
+                  <ChapterRow key={chapter.id || chapter.name} chapter={chapter} />
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      <AnimatePresence initial={false}>
-        {expanded && hasChapters && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.25 }}
-            className="overflow-hidden"
-          >
-            <div className="mt-3 pt-1">
-              {subject.chapters.map((chapter) => (
-                <ChapterRow key={chapter.id || chapter.name} chapter={chapter} />
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+      {showGoalModal && (
+        <SubjectGoalModal
+          subject={subject}
+          currentTarget={subject.targetPercentage}
+          onClose={() => setShowGoalModal(false)}
+          onSaved={(target) => onGoalSaved(subject.id, target)}
+        />
+      )}
+    </>
   );
 };
-
 // ── Main Widget ──
 const SubjectMasteryWidget = () => {
   const [loading, setLoading] = useState(true);
@@ -175,28 +253,33 @@ const SubjectMasteryWidget = () => {
     }
   };
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await API.get('/progress/mastery');
-        if (!cancelled && res.data?.data) {
-          setData(res.data.data);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.error('Failed to fetch mastery levels:', err);
-          setError('Could not load subject mastery levels');
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+useEffect(() => {
+  let cancelled = false;
 
+  const loadMastery = async () => {
+    try {
+      const res = await API.get('/progress/mastery');
+      if (!cancelled && res.data?.data) {
+        setData(res.data.data);
+      }
+    } catch (err) {
+      if (!cancelled) {
+        console.error('Failed to fetch mastery levels:', err);
+        setError('Could not load subject mastery levels');
+      }
+    } finally {
+      if (!cancelled) setLoading(false);
+    }
+  };
+
+  loadMastery();
+  window.addEventListener('focus', loadMastery);
+
+  return () => {
+    cancelled = true;
+    window.removeEventListener('focus', loadMastery);
+  };
+}, []);
   const overallConfig = TIER_CONFIG[data?.overallTier] || TIER_CONFIG.Beginner;
 
   return (
@@ -252,10 +335,26 @@ const SubjectMasteryWidget = () => {
 
           {/* Subject cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {data.subjects.map((subject) => (
-              <SubjectCard key={subject.id || subject.name} subject={subject} />
-            ))}
-          </div>
+{data.subjects.map((subject) => (
+  <SubjectCard
+    key={subject.id || subject.name}
+    subject={subject}
+    onGoalSaved={(subjectId, target) => {
+      setData((current) => ({
+        ...current,
+        subjects: current.subjects.map((item) =>
+          item.id === subjectId
+            ? {
+                ...item,
+                targetPercentage: target,
+                performanceGap: Math.max(0, target - (item.actualScore || 0)),
+              }
+            : item
+        ),
+      }));
+    }}
+  />
+))}          </div>
         </>
       )}
     </VintagePaper>

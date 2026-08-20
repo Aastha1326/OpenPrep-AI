@@ -1,147 +1,106 @@
-const crypto = require('crypto');
-const { StudySquad, SquadMember, SquadChallenge, User } = require('../models');
+const squadService = require('../services/squadService');
+const { StudySquad, SquadMember, User, SquadChallenge, SquadAchievement, SquadChallengeContribution } = require('../models');
 
-// @desc    Create a new Study Squad
-// @route   POST /api/squads
-// @access  Private
-exports.createSquad = async (req, res, next) => {
+async function createSquad(req, res, next) {
   try {
-    const { name, description, isPublic } = req.body;
-    
-    const joinCode = crypto.randomBytes(3).toString('hex').toUpperCase();
-
-    const squad = await StudySquad.create({
-      name,
-      description,
-      joinCode,
-      ownerId: req.user.id,
-      isPublic: isPublic !== false,
-    });
-
-    // Add creator as admin member
-    await SquadMember.create({
-      squadId: squad.id,
-      userId: req.user.id,
-      role: 'admin',
-    });
-
-    res.status(201).json({ success: true, data: squad });
-  } catch (error) {
-    if (error.name === 'SequelizeUniqueConstraintError') {
-      return res.status(400).json({ success: false, error: 'Squad name already exists' });
+    const { name } = req.body;
+    if (!name) {
+      return res.status(400).json({ error: 'Squad name is required' });
     }
-    next(error);
+    const squad = await squadService.createSquad(req.user.id, name);
+    res.status(201).json(squad);
+  } catch (err) {
+    next(err);
   }
-};
+}
 
-// @desc    Get user's squads
-// @route   GET /api/squads
-// @access  Private
-exports.getSquads = async (req, res, next) => {
+async function joinSquad(req, res, next) {
   try {
-    const memberships = await SquadMember.findAll({
-      where: { userId: req.user.id },
-      include: [{ model: StudySquad }]
-    });
-    
-    const squads = memberships.map(m => m.StudySquad);
-    res.status(200).json({ success: true, data: squads });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Join a squad by join code
-// @route   POST /api/squads/join
-// @access  Private
-exports.joinSquad = async (req, res, next) => {
-  try {
-    const { joinCode } = req.body;
-
-    const squad = await StudySquad.findOne({ where: { joinCode: joinCode.toUpperCase() } });
-    if (!squad) {
-      return res.status(404).json({ success: false, error: 'Invalid join code or squad not found' });
+    const { inviteCode } = req.body;
+    if (!inviteCode) {
+      return res.status(400).json({ error: 'Invite code is required' });
     }
-
-    const existingMember = await SquadMember.findOne({
-      where: { squadId: squad.id, userId: req.user.id }
-    });
-
-    if (existingMember) {
-      return res.status(400).json({ success: false, error: 'You are already in this squad' });
+    const squad = await squadService.joinSquad(req.user.id, inviteCode);
+    res.status(200).json(squad);
+  } catch (err) {
+    if (err.message === 'Invalid invite code' || err.message === 'User is already a member of this squad') {
+      return res.status(400).json({ error: err.message });
     }
-
-    await SquadMember.create({
-      squadId: squad.id,
-      userId: req.user.id,
-      role: 'member'
-    });
-
-    res.status(200).json({ success: true, data: squad });
-  } catch (error) {
-    next(error);
+    next(err);
   }
-};
+}
 
-// @desc    Get squad details and leaderboard
-// @route   GET /api/squads/:id
-// @access  Private
-exports.getSquadDetails = async (req, res, next) => {
+async function leaveSquad(req, res, next) {
   try {
     const { id } = req.params;
+    await squadService.leaveSquad(req.user.id, id);
+    res.status(200).json({ message: 'Left squad successfully' });
+  } catch (err) {
+    if (err.message === 'Not a member of this squad') {
+      return res.status(400).json({ error: err.message });
+    }
+    next(err);
+  }
+}
 
-    // Verify user is in squad
-    const membership = await SquadMember.findOne({
-      where: { squadId: id, userId: req.user.id }
-    });
-
-    if (!membership) {
-      return res.status(403).json({ success: false, error: 'You do not have access to this squad' });
+async function getSquadDashboard(req, res, next) {
+  try {
+    const { id } = req.params;
+    
+    // Check membership
+    const member = await SquadMember.findOne({ where: { squadId: id, userId: req.user.id } });
+    if (!member) {
+      return res.status(403).json({ error: 'Not authorized to view this squad' });
     }
 
     const squad = await StudySquad.findByPk(id, {
       include: [
         {
           model: SquadMember,
-          include: [{ model: User, as: 'user', attributes: ['id', 'name', 'email', 'avatar'] }]
+          as: 'SquadMembers',
+          include: [{ model: User, as: 'userRef', attributes: ['id', 'name', 'avatar'] }]
         },
-        { model: SquadChallenge }
+        {
+          model: SquadChallenge,
+          as: 'SquadChallenges',
+          where: { status: 'active' },
+          required: false,
+          include: [{ model: SquadChallengeContribution, as: 'SquadChallengeContributions' }]
+        },
+        {
+          model: SquadAchievement,
+          as: 'SquadAchievements'
+        }
       ]
     });
 
-    res.status(200).json({ success: true, data: squad });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Create a squad challenge
-// @route   POST /api/squads/:id/challenges
-// @access  Private (Admin only)
-exports.createChallenge = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { title, description, targetGoal, deadline, rewardPoints } = req.body;
-
-    const membership = await SquadMember.findOne({
-      where: { squadId: id, userId: req.user.id, role: 'admin' }
-    });
-
-    if (!membership) {
-      return res.status(403).json({ success: false, error: 'Only squad admins can create challenges' });
+    if (!squad) {
+      return res.status(404).json({ error: 'Squad not found' });
     }
 
-    const challenge = await SquadChallenge.create({
-      squadId: id,
-      title,
-      description,
-      targetGoal,
-      deadline,
-      rewardPoints: rewardPoints || 100
-    });
-
-    res.status(201).json({ success: true, data: challenge });
-  } catch (error) {
-    next(error);
+    res.status(200).json({ squad, currentUserRole: member.role });
+  } catch (err) {
+    next(err);
   }
+}
+
+async function getMySquads(req, res, next) {
+  try {
+    const memberships = await SquadMember.findAll({
+      where: { userId: req.user.id },
+      include: [{ model: StudySquad, as: 'squadRef' }]
+    });
+    const squads = memberships.map(m => m.squadRef);
+    res.status(200).json(squads);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = {
+  createSquad,
+  joinSquad,
+  leaveSquad,
+  getSquadDashboard,
+  getMySquads
 };

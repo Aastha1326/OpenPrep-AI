@@ -1,24 +1,23 @@
 const express = require('express');
 const router = express.Router();
-const {
-  createSquad,
-  getSquads,
-  joinSquad,
-  getSquadDetails,
-  createChallenge,
-} = require('../controllers/squadController');
+const squadController = require('../controllers/squadController');
+const challengeController = require('../controllers/challengeController');
+const squadActivityController = require('../controllers/squadActivityController');
+// `middleware/auth` exports { protect, authorize, requireAdmin } — passing the
+// whole module object to router.use() registers a non-function and throws.
 const { protect } = require('../middleware/auth');
+router.use(protect);
 
-router.route('/')
-  .post(protect, createSquad)
-  .get(protect, getSquads);
+router.get('/', squadController.getMySquads);
+router.post('/create', squadController.createSquad);
+router.post('/join', squadController.joinSquad);
+router.post('/:id/leave', squadController.leaveSquad);
+router.get('/:id/dashboard', squadController.getSquadDashboard);
 
-router.post('/join', protect, joinSquad);
+router.post('/:squadId/challenges', challengeController.createChallenge);
+router.put('/:squadId/challenges/:challengeId', challengeController.updateChallenge);
 
-router.route('/:id')
-  .get(protect, getSquadDetails);
-
-router.route('/:id/challenges')
-  .post(protect, createChallenge);
+router.get('/:squadId/activity', squadActivityController.getFeed);
+router.post('/:squadId/activity/:activityId/react', squadActivityController.react);
 
 module.exports = router;

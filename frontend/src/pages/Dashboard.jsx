@@ -1,9 +1,12 @@
 import Skeleton from '../components/dashboard/Skeleton';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import LanguageSelector from '../components/LanguageSelector';
 import { motion, AnimatePresence } from 'framer-motion';
 import SecuritySettings from '../components/SecuritySettings';
+import NotificationBell from '../components/notifications/NotificationBell';
 import {
   Flame,
   Play,
@@ -30,9 +33,16 @@ import {
   Video,
   Brain,
   Bot,
-} from 'lucide-react';import API from '../services/api';
+  Users,
+  Swords,
+} from 'lucide-react';
+import API from '../services/api';
 import { toDateOnlyString } from '../utils/dateUtils';
 import SkillTree from '../components/dashboard/SkillTree';
+import ModelViewer from '../components/dashboard/ModelViewer';
+import StudyTimetable from '../components/dashboard/StudyTimetable';
+import FocusRoom from '../components/dashboard/FocusRoom';
+import QuizBattleArena from '../components/dashboard/QuizBattleArena';
 import {
   LineChart,
   Line,
@@ -57,30 +67,35 @@ import BadgeGrid from '../components/dashboard/BadgeGrid';
 import PinnedTasks from '../components/dashboard/PinnedTasks';
 import FatigueMonitor from '../components/dashboard/FatigueMonitor';
 import UploadMaterial from '../components/dashboard/UploadMaterial';
-import CreateNoteModal from '../components/dashboard/CreateNoteModal';
-import StudyPlanModal from '../components/dashboard/StudyPlanModal';
-import PyqAnalysisModal from '../components/dashboard/PyqAnalysisModal';
 import WeaknessDashboardWidget from '../components/dashboard/WeaknessDashboardWidget';
 import SubjectMasteryWidget from '../components/dashboard/SubjectMasteryWidget';
 import FocusEfficiencyWidget from '../components/dashboard/FocusEfficiencyWidget';
+import StudyReportPDF from '../components/reports/StudyReportPDF';
 import ActivityHeatmap from '../components/dashboard/ActivityHeatmap';
 import LeaderboardWidget from '../components/dashboard/LeaderboardWidget';
 import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
+import ExamCountdownCard from '../components/dashboard/ExamCountdownCard';
 import TargetExamOverviewWidget from '../components/dashboard/TargetExamOverviewWidget';
-import CompositeBundleModal from '../components/dashboard/CompositeBundleModal';
-import SyllabusImportModal from '../components/dashboard/SyllabusImportModal';
 import NotesWidget from '../components/dashboard/NotesWidget';
 import ThemeToggle from '../components/ThemeToggle';
+import ReadinessWidget from '../components/dashboard/ReadinessWidget';
 import BadgesList from '../components/BadgesList';
-import SM2SettingsModal from '../components/dashboard/SM2SettingsModal';
 import LevelProgressBar from '../components/gamification/LevelProgressBar';
 import StreakWidget from '../components/gamification/StreakWidget';
 import BadgeCard from '../components/gamification/BadgeCard';
-import BadgeUnlockModal from '../components/gamification/BadgeUnlockModal';
-import LevelUpModal from '../components/gamification/LevelUpModal';
-import CommunityDecksModal from '../components/dashboard/CommunityDecksModal';
-import QuizSetupModal from '../components/dashboard/QuizSetupModal';
-import GenerateFlashcardsFromYouTubeModal from '../components/dashboard/GenerateFlashcardsFromYouTubeModal';
+
+// Lazy-loaded heavy modal components for bundle size reduction
+const RichTextEditor = lazy(() => import('../components/dashboard/RichTextEditor'));
+const StudyPlanModal = lazy(() => import('../components/dashboard/StudyPlanModal'));
+const PyqAnalysisModal = lazy(() => import('../components/dashboard/PyqAnalysisModal'));
+const CompositeBundleModal = lazy(() => import('../components/dashboard/CompositeBundleModal'));
+const SyllabusImportModal = lazy(() => import('../components/dashboard/SyllabusImportModal'));
+const SM2SettingsModal = lazy(() => import('../components/dashboard/SM2SettingsModal'));
+const BadgeUnlockModal = lazy(() => import('../components/gamification/BadgeUnlockModal'));
+const LevelUpModal = lazy(() => import('../components/gamification/LevelUpModal'));
+const CommunityDecksModal = lazy(() => import('../components/dashboard/CommunityDecksModal'));
+const QuizSetupModal = lazy(() => import('../components/dashboard/QuizSetupModal'));
+const GenerateFlashcardsFromYouTubeModal = lazy(() => import('../components/dashboard/GenerateFlashcardsFromYouTubeModal'));
 import {
   fetchDashboardStats,
   fetchSubjectBreakdown,
@@ -191,8 +206,20 @@ const EmptyState = ({ icon: Icon = Lightbulb, message = 'No data yet' }) => (
 );
 
 
+const formatStudyTime = (hoursVal) => {
+  if (hoursVal === undefined || hoursVal === null || Number.isNaN(hoursVal) || hoursVal <= 0) {
+    return '0h 0m';
+  }
+  const totalMins = Math.round(hoursVal * 60);
+  if (totalMins <= 0 || Number.isNaN(totalMins)) return '0h 0m';
+  const hrs = Math.floor(totalMins / 60);
+  const mins = totalMins % 60;
+  return `${hrs}h ${mins}m`;
+};
+
 // ── Main Component ──
 const Dashboard = () => {
+  const { t } = useTranslation();
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
@@ -201,8 +228,7 @@ const Dashboard = () => {
   const [gamificationData, setGamificationData] = useState(null);
   const [loadingGamification, setLoadingGamification] = useState(false);
   const [activeBadgeUnlock, setActiveBadgeUnlock] = useState(null);
-  const [isFreezing, setIsFreezing] = useState(false);
-
+// Streak freezes are automatically consumed by the backend.
   const fetchGamification = useCallback(async () => {
     try {
       setLoadingGamification(true);
@@ -238,20 +264,20 @@ const Dashboard = () => {
     errorFlashcards,
   } = useSelector((state) => state.dashboard);
 
-  useEffect(() => {
-    const fetchAll = () => {
-      dispatch(fetchDashboardStats());
-      dispatch(fetchSubjectBreakdown());
-      dispatch(fetchActivePlan());
-      dispatch(fetchDueFlashcards());
-      fetchGamification();
-    };
+  const fetchAll = useCallback(() => {
+    dispatch(fetchDashboardStats());
+    dispatch(fetchSubjectBreakdown());
+    dispatch(fetchActivePlan());
+    dispatch(fetchDueFlashcards());
+    fetchGamification();
+  }, [dispatch, fetchGamification]);
 
+  useEffect(() => {
     fetchAll();
 
     window.addEventListener('focus', fetchAll);
     return () => window.removeEventListener('focus', fetchAll);
-  }, [dispatch]);
+  }, [fetchAll]);
 
   const handleRetry = (thunk) => () => dispatch(thunk());
 
@@ -324,6 +350,10 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [sessionStartTime] = useState(Date.now());
   const [isExporting, setIsExporting] = useState(false);
   const [isSkillTreeOpen, setIsSkillTreeOpen] = useState(false);
+  const [isModelViewerOpen, setIsModelViewerOpen] = useState(false);
+  const [isTimetableOpen, setIsTimetableOpen] = useState(false);
+  const [isFocusRoomOpen, setIsFocusRoomOpen] = useState(false);
+  const [isBattleOpen, setIsBattleOpen] = useState(false);
   const [showLevelUpModal, setShowLevelUpModal] = useState(false);
   const [levelUpLevel, setLevelUpLevel] = useState(null);
   const [prevLevel, setPrevLevel] = useState(null);
@@ -347,27 +377,8 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
     }
   }, [user?.level, prevLevel]);
 
-  const handleUseStreakFreeze = async () => {
-    try {
-      setIsFreezing(true);
-      const timezoneOffset = new Date().getTimezoneOffset();
-      const res = await API.post('/gamification/streak-freeze/use', {}, {
-        headers: { 'x-timezone-offset': String(timezoneOffset) }
-      });
-      if (res.data.success) {
-        alert('Streak Freeze Shield activated successfully!');
-        fetchGamification();
-        dispatch(loadUser());
-        dispatch(fetchDashboardStats());
-      }
-    } catch (err) {
-      console.error(err);
-      alert(err.response?.data?.error || 'Failed to activate Streak Freeze shield.');
-    } finally {
-      setIsFreezing(false);
-    }
-  };
-
+// Streak freezes are consumed automatically by the backend
+// when exactly one study day is missed.
   const handleGoToStudyPlanFromImport = (prefill) => {
     if (prefill) setSyllabusPrefill(prefill);
     // Refresh dashboard caches so the new exam appears immediately in select
@@ -497,19 +508,23 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   return (
     <LeatherBoard>
       {/* --- QUICK ACTIONS TABS --- */}
-      <div className="absolute -left-4 top-24 flex-col gap-4 z-30 hidden md:flex">
-        <GoldTabButton
+        <div className="absolute -left-4 top-24 flex-col gap-4 z-30 hidden md:flex">
+          <GoldTabButton icon={Swords} label="Battle Arena" delay={0.05} onClick={() => setIsBattleOpen(true)} />
+          <GoldTabButton
           icon={Play}
           label="Start Quiz"
           delay={0.1}
           onClick={() => setIsQuizSetupOpen(true)}
         />
-        <GoldTabButton
-          icon={FileText}
-          label="PYQ Intelligence"
-          delay={0.2}
-          onClick={() => navigate('/pyqs')}
-        />
+          <GoldTabButton
+            icon={FileText}
+            label="PYQ Intelligence"
+            delay={0.2}
+            onClick={() => setIsPyqModalOpen(true)}
+          />
+          <GoldTabButton icon={Box} label="3D Anatomy" delay={0.25} onClick={() => setIsModelViewerOpen(true)} />
+          <GoldTabButton icon={Calendar} label="Timetable DnD" delay={0.3} onClick={() => setIsTimetableOpen(true)} />
+          <GoldTabButton icon={Headphones} label="Lofi Room" delay={0.45} onClick={() => setIsFocusRoomOpen(true)} />
         <GoldTabButton
           icon={Calendar}
           label="Study Plan"
@@ -533,6 +548,12 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           label="Study Room"
           delay={0.45}
           onClick={() => navigate('/study-group')}
+        />
+        <GoldTabButton
+          icon={Users}
+          label="Study Squads"
+          delay={0.46}
+          onClick={() => navigate('/squads')}
         />
         <GoldTabButton
           icon={Globe}
@@ -566,58 +587,60 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
-            className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10"
-        >
-          <div>
-            <h1 className="text-3xl font-playfair font-bold text-stone-800 dark:text-stone-100 mb-2">
-              Welcome back, <span className="text-amber-600 dark:text-amber-500">{user?.name?.split(' ')[0] || 'Scholar'}</span>
-            </h1>
-            <p className="text-amber-100/70 text-lg italic font-playfair">
-              &ldquo;The roots of education are bitter, but the fruit is sweet.&rdquo; – Aristotle
-            </p>
+            className="flex flex-col gap-4 relative z-10"
+          >
+            <div>
+              <h1 className="text-3xl font-playfair font-bold text-stone-800 dark:text-stone-100 mb-2">
+                Welcome back, <span className="text-amber-600 dark:text-amber-500">{user?.name?.split(' ')[0] || 'Scholar'}</span>
+              </h1>
+              <p className="text-amber-100/70 text-lg italic font-playfair">
+                &ldquo;The roots of education are bitter, but the fruit is sweet.&rdquo; – Aristotle
+              </p>
 
-            {/* --- XP PROGRESS BAR --- */}
-            <div className="mt-4 max-w-md">
-              <LevelProgressBar
-                xp={gamificationData?.xp || user?.xp || 0}
-                level={gamificationData?.level || user?.level || 1}
-                nextLevelXP={gamificationData?.nextLevelXP || 100}
-              />
+              {/* --- XP PROGRESS BAR --- */}
+              <div className="mt-4 max-w-md">
+                <LevelProgressBar
+                  xp={gamificationData?.xp || user?.xp || 0}
+                  level={gamificationData?.level || user?.level || 1}
+                  nextLevelXP={gamificationData?.nextLevelXP || 100}
+                />
+              </div>
+
+              {/* --- EXAM COUNTDOWN CARD --- */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.4 }}
+                className="mt-5 max-w-3xl"
+              >
+                <ExamCountdownCard
+                  stats={stats?.examCountdown}
+                  onRefresh={fetchAll}
+                />
+              </motion.div>
             </div>
-
-            {/* --- EXAM COUNTDOWN WIDGET --- */}
-<motion.div
-  initial={{ opacity: 0, y: 10 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{ duration: 0.5, delay: 0.4 }}
-  className="mt-5"
->
-  <ExamCountdownWidget
-    examDate={activePlan?.exam?.date}
-    examName={activePlan?.exam?.name}
-  />
-</motion.div>
+          </motion.div>
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, delay: 0.3 }}
-            className="flex items-center space-x-6 mt-2 md:mt-0 shrink-0"
+            className="flex flex-wrap md:flex-nowrap items-center gap-3 sm:gap-4 mt-2 md:mt-0 max-w-full"
           >
             <div className="relative group z-50">
-              <button className="bg-neutral-800 text-gold-foil border border-yellow-700/50 hover:bg-neutral-700 px-4 py-2 rounded-sm shadow-[0_4px_15px_rgba(0,0,0,0.5)] flex items-center gap-2 font-playfair font-bold text-sm tracking-wide">
-                <Download className="w-4 h-4" /> Export Analytics
+              <button className="bg-neutral-800 text-gold-foil border border-yellow-700/50 hover:bg-neutral-700 px-4 py-2.5 rounded-sm shadow-[0_4px_15px_rgba(0,0,0,0.5)] flex items-center gap-2 font-playfair font-bold text-sm tracking-wide min-h-[44px]">
+                <Download className="w-4 h-4" /> {t('export_analytics')}
               </button>
               <div className="absolute right-0 top-full mt-2 w-40 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
                 <button
                   onClick={() => handleExportReport('csv')}
-                  className="w-full text-left block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200"
+                  className="w-full text-left block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 min-h-[44px]"
                 >
                   CSV
                 </button>
 
                 <button
                   onClick={() => handleExportReport('pdf')}
-                  className="w-full text-left block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200"
+                  className="w-full text-left block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 min-h-[44px]"
                 >
                   PDF
                 </button>
@@ -629,57 +652,69 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             <ThemeToggle className="mr-2" />
             <button
               onClick={() => setIsSettingsModalOpen(true)}
-              className="bg-neutral-800 text-yellow-500 border border-yellow-700/50 hover:bg-neutral-700 p-2.5 rounded-sm shadow-[0_4px_10px_rgba(0,0,0,0.4)] flex items-center justify-center relative group"
+              className="bg-neutral-800 text-yellow-500 border border-yellow-700/50 hover:bg-neutral-700 p-2.5 rounded-sm shadow-[0_4px_10px_rgba(0,0,0,0.4)] flex items-center justify-center relative group min-h-[44px] min-w-[44px]"
               aria-label="Settings"
             >
               <Settings className="w-5 h-5 transition-transform duration-300 group-hover:rotate-45" />
               <div className="absolute top-full mt-2 px-2 py-1 bg-neutral-800 text-yellow-500 text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
-                SM-2 Settings
+                {t('sm2_settings')}
               </div>
             </button>
 
             <button
               onClick={() => setIsSkillTreeOpen(true)}
-              className="bg-neutral-800 text-yellow-500 border border-yellow-700/50 hover:bg-neutral-700 p-2.5 rounded-sm shadow-[0_4px_10px_rgba(0,0,0,0.4)] flex items-center justify-center relative group"
+              className="bg-neutral-800 text-yellow-500 border border-yellow-700/50 hover:bg-neutral-700 p-2.5 rounded-sm shadow-[0_4px_10px_rgba(0,0,0,0.4)] flex items-center justify-center relative group min-h-[44px] min-w-[44px]"
               aria-label="Skill Tree"
             >
               <Brain className="w-5 h-5 transition-transform duration-300 group-hover:scale-110" />
               <div className="absolute top-full mt-2 px-2 py-1 bg-neutral-800 text-yellow-500 text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
-                Skill Tree
+                {t('skill_tree')}
               </div>
             </button>
 
             {/* --- STREAK WIDGET --- */}
-            <div className="w-80">
-              <StreakWidget
-                currentStreak={gamificationData?.currentStreak ?? user?.currentStreak ?? 0}
-                longestStreak={gamificationData?.longestStreak ?? user?.longestStreak ?? 0}
-                streakFreezesAvailable={gamificationData?.streakFreezesAvailable ?? user?.streakFreezesAvailable ?? 0}
-                onUseStreakFreeze={handleUseStreakFreeze}
-                isFreezing={isFreezing}
-              />
-            </div>
+            <div className="w-full max-w-xs sm:w-80">
+<StreakWidget
+  currentStreak={
+    gamificationData?.currentStreak ??
+    user?.currentStreak ??
+    0
+  }
+  longestStreak={
+    gamificationData?.longestStreak ??
+    user?.longestStreak ??
+    0
+  }
+  streakFreezesAvailable={
+    gamificationData?.streakFreezesAvailable ??
+    user?.streakFreezesAvailable ??
+    0
+  }
+  badges={gamificationData?.badges || []}
+/>            </div>
 
             <button
               onClick={() => navigate('/settings')}
-              className="bg-neutral-800 text-amber-100/80 px-4 py-3 rounded-sm border border-amber-700/40 shadow-[0_4px_15px_rgba(0,0,0,0.5)] hover:bg-neutral-700 hover:text-yellow-400 transition-all flex items-center gap-2 group"
+              className="bg-neutral-800 text-amber-100/80 px-4 py-3 rounded-sm border border-amber-700/40 shadow-[0_4px_15px_rgba(0,0,0,0.5)] hover:bg-neutral-700 hover:text-yellow-400 transition-all flex items-center gap-2 group min-h-[44px]"
               aria-label="Settings"
             >
               <Settings className="w-5 h-5" />
               <span className="font-playfair font-bold text-sm tracking-wide hidden sm:inline">
-                Settings
+                {t('settings')}
               </span>
             </button>
 
             <button
               onClick={handleLogout}
-              className="bg-stone-800 text-amber-500 px-4 py-2 rounded-lg font-bold hover:bg-stone-700 transition shadow-lg border border-amber-900/30 flex items-center gap-2"
+              className="bg-stone-800 text-amber-500 px-4 py-2.5 rounded-lg font-bold hover:bg-stone-700 transition shadow-lg border border-amber-900/30 flex items-center gap-2 min-h-[44px]"
             >
               <LogOut className="w-5 h-5 group-hover:text-white" />
               <span className="font-playfair font-bold text-sm tracking-wide group-hover:text-white hidden sm:inline">
-                Log out
+                {t('logout')}
               </span>
             </button>
+            <NotificationBell />
+            <LanguageSelector />
             <ThemeToggle />
           </motion.div>
         </div>
@@ -695,7 +730,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           <ErrorBanner message={errorStats} onRetry={handleRetry(fetchDashboardStats)} />
         ) : null}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {loadingStats ? (
             <>
               <StatsCardSkeleton />
@@ -743,10 +778,12 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
                   <Clock className="text-neutral-600 dark:text-neutral-400 w-5 h-5" />
                 </div>
                 <p className="text-4xl font-bold text-neutral-900 dark:text-white font-playfair">
-                  {totalStudyHours.toFixed(1)}h
+                  {formatStudyTime(totalStudyHours)}
                 </p>
                 <p className="text-neutral-600 dark:text-neutral-400 text-sm mt-2 italic border-t border-neutral-300 dark:border-neutral-600 pt-2">
-                  Total study time
+                  {(!recentActivity || recentActivity.length === 0 || totalStudyHours <= 0)
+                    ? 'Start your first study session to track time!'
+                    : 'Total study time'}
                 </p>
               </VintagePaper>
 
@@ -770,8 +807,13 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           )}
         </div>
 
+        {/* --- AI EXAM READINESS SECTION --- */}
+        <div className="space-y-4 pt-6">
+          <ReadinessWidget />
+        </div>
+
         {/* --- ANALYTICS SECTION (WOODEN DESK) --- */}
-        <div className="space-y-4">
+        <div className="space-y-4 pt-6">
           <div className="flex justify-between items-center px-1">
             <h2 className="text-2xl font-bold font-playfair text-amber-100 flex items-center gap-2">
               <TrendingUp className="w-6 h-6 text-yellow-500" /> Performance Analytics
@@ -785,14 +827,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
               >
                 <Download className="w-3.5 h-3.5" /> Export CSV
               </button>
-              <button
-                onClick={() => handleExportReport('pdf')}
-                disabled={isExporting}
-                className="px-3 py-1.5 bg-gradient-to-r from-yellow-700 to-yellow-600 hover:from-yellow-600 hover:to-yellow-500 text-yellow-50 rounded text-xs font-semibold flex items-center gap-1.5 shadow transition-all disabled:opacity-50"
-                title="Export report as PDF"
-              >
-                <Download className="w-3.5 h-3.5" /> Export PDF
-              </button>
+              <StudyReportPDF />
             </div>
           </div>
 
@@ -938,28 +973,38 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
               </div>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {gamificationData?.badges?.length > 0 ? (
+                  gamificationData.badges.slice(0, 4).map((badge) => (
+                    <BadgeCard
+                      key={badge.id}
+                      badgeCode={badge.badgeCode}
+                      title={badge.title}
+                      description={badge.description}
+                      isUnlocked={true}
+                      unlockedAt={badge.unlockedAt}
+                      svgIcon={badge.svgIcon}
+                    />
+                  ))
+                ) : (
+                  <div className="col-span-2 text-center text-stone-500 text-sm py-4">
+                    No badges earned yet. Start studying to unlock achievements!
+                  </div>
+                )}
+                
+                {/* Show example locked badges */}
                 <BadgeCard
-                  badgeCode="seven_day_streak"
-                  title="7-Day Streak 🔥"
-                  description="Studied consistently for 7 consecutive days."
-                  isUnlocked={!!gamificationData?.badges?.some(b => b.badgeCode === 'seven_day_streak')}
-                  unlockedAt={gamificationData?.badges?.find(b => b.badgeCode === 'seven_day_streak')?.unlockedAt}
+                  badgeCode="week_warrior"
+                  title="Week Warrior 🔥"
+                  description="Achieve a 7-day study streak"
+                  isUnlocked={!!gamificationData?.badges?.some(b => b.badgeCode === 'week_warrior')}
+                  unlockedAt={gamificationData?.badges?.find(b => b.badgeCode === 'week_warrior')?.unlockedAt}
                 />
-
                 <BadgeCard
-                  badgeCode="night_owl"
-                  title="Night Owl 🦉"
-                  description="Completed a study task between 11 PM and 4 AM."
-                  isUnlocked={!!gamificationData?.badges?.some(b => b.badgeCode === 'night_owl')}
-                  unlockedAt={gamificationData?.badges?.find(b => b.badgeCode === 'night_owl')?.unlockedAt}
-                />
-
-                <BadgeCard
-                  badgeCode="quiz_master"
-                  title="Quiz Master 🎓"
-                  description="Successfully finished 10 quiz attempts."
-                  isUnlocked={!!gamificationData?.badges?.some(b => b.badgeCode === 'quiz_master')}
-                  unlockedAt={gamificationData?.badges?.find(b => b.badgeCode === 'quiz_master')?.unlockedAt}
+                  badgeCode="card_collector"
+                  title="Card Collector 📚"
+                  description="Create 50 flashcards"
+                  isUnlocked={!!gamificationData?.badges?.some(b => b.badgeCode === 'card_collector')}
+                  unlockedAt={gamificationData?.badges?.find(b => b.badgeCode === 'card_collector')?.unlockedAt}
                 />
               </div>
             </div>
@@ -1198,13 +1243,13 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             </p>
           </VintagePaper>
         </div>
-      </div>
-{/* --- CREATE NOTE MODAL --- */}
-      <CreateNoteModal
-        isOpen={isNoteModalOpen}
-        onClose={() => setIsNoteModalOpen(false)}
-        onNoteCreated={() => setIsNoteModalOpen(false)}
-      />
+  {/* --- RICH TEXT EDITOR (AI MVP) --- */}
+        <Suspense fallback={null}>
+          <AnimatePresence>
+            {isNoteModalOpen && (
+              <RichTextEditor onClose={() => setIsNoteModalOpen(false)} />
+            )}
+          </AnimatePresence>
 
       {/* --- YOUTUBE FLASHCARD DECK MODAL --- */}
       {isYoutubeFlashcardModalOpen && (
@@ -1322,6 +1367,34 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
         )}
       </AnimatePresence>
 
+      {/* --- MODEL VIEWER (3D MVP) --- */}
+      <AnimatePresence>
+        {isModelViewerOpen && (
+          <ModelViewer onClose={() => setIsModelViewerOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* --- TIMETABLE DND MVP --- */}
+      <AnimatePresence>
+        {isTimetableOpen && (
+          <StudyTimetable onClose={() => setIsTimetableOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* --- LOFI FOCUS ROOM MVP --- */}
+      <AnimatePresence>
+        {isFocusRoomOpen && (
+          <FocusRoom onClose={() => setIsFocusRoomOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* --- QUIZ BATTLE ARENA MVP --- */}
+      <AnimatePresence>
+        {isBattleOpen && (
+          <QuizBattleArena onClose={() => setIsBattleOpen(false)} />
+        )}
+      </AnimatePresence>
+
       {/* --- LEVEL UP MODAL --- */}
       <AnimatePresence>
         {showLevelUpModal && (
@@ -1378,12 +1451,14 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
         description={activeBadgeUnlock?.description}
         onClose={() => setActiveBadgeUnlock(null)}
       />
+      </Suspense>
 
       {/* --- SECURITY SETTINGS (2FA) --- */}
       <div className="my-6">
         <SecuritySettings />
       </div>
-    </LeatherBoard>
+    </div>
+  </LeatherBoard>
   );
 };
 

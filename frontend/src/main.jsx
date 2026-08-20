@@ -2,13 +2,30 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { Provider } from 'react-redux'
+import * as Sentry from '@sentry/react'
 import { store } from './store'
 import { ThemeProvider } from './context/ThemeContext'
 import { SyncProvider } from './context/SyncContext'
-import ErrorBoundary from './components/ErrorBoundary'
+import ErrorBoundary from './components/common/ErrorBoundary'
 import './index.css'
 import './i18n';
 import App from './App.jsx'
+import { GoogleOAuthProvider } from '@react-oauth/google';
+
+if (import.meta.env.MODE !== 'test' && import.meta.env.VITE_SENTRY_DSN) {
+  Sentry.init({
+    dsn: import.meta.env.VITE_SENTRY_DSN,
+    environment: import.meta.env.VITE_SENTRY_ENVIRONMENT || import.meta.env.MODE,
+    integrations: [
+      Sentry.browserTracingIntegration(),
+      Sentry.replayIntegration(),
+    ],
+    tracesSampleRate: 0.2, // 20% traces sampling
+    replaysSessionSampleRate: 0.1, // 10% session replays
+    replaysOnErrorSampleRate: 1.0, // 100% replays on error
+  });
+  console.log('✅ Sentry React Monitoring initialized successfully.');
+}
 
 // Catch Vite chunk load errors when a new deployment updates JS assets
 window.addEventListener('unhandledrejection', (event) => {
@@ -26,7 +43,7 @@ window.addEventListener('unhandledrejection', (event) => {
   }
 });
 
-import { GoogleOAuthProvider } from '@react-oauth/google';
+
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '179369126060-lq7unpt173rt6aog2nt93s6m895d6b2i.apps.googleusercontent.com';
 

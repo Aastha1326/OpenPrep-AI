@@ -29,9 +29,10 @@ const User = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
       validate: {
-        len: {
-          args: [8],
-          msg: 'Password must be at least 8 characters long',
+        isValidPassword(value) {
+          if (value && value.length < 8) {
+            throw new Error('Password must be at least 8 characters long');
+          }
         },
       },
     },
@@ -154,7 +155,6 @@ const User = sequelize.define(
       type: DataTypes.INTEGER,
       defaultValue: 6,
     },
-
     leaderboardVisible: {
       type: DataTypes.BOOLEAN,
       defaultValue: true,
@@ -167,11 +167,14 @@ const User = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
-    syncGoogleCalendar: {
+syncGoogleCalendar: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
-    pushSubscription: {
+    hideActivityFromSquad: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },    pushSubscription: {
       type: DataTypes.JSONB,
       allowNull: true,
     },

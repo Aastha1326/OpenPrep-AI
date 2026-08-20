@@ -1,5 +1,5 @@
 const { DataTypes } = require('sequelize');
-const sequelize = require('../config/db');
+const { sequelize } = require('../config/db');
 
 const StudySquad = sequelize.define('StudySquad', {
   id: {
@@ -10,34 +10,25 @@ const StudySquad = sequelize.define('StudySquad', {
   name: {
     type: DataTypes.STRING,
     allowNull: false,
-    unique: true,
-  },
-  description: {
-    type: DataTypes.TEXT,
-  },
-  joinCode: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    unique: true,
-  },
-  ownerId: {
-    type: DataTypes.UUID,
-    allowNull: false,
-    references: {
-      model: 'Users',
-      key: 'id'
+    validate: {
+      notEmpty: true,
     }
   },
-  totalScore: {
-    type: DataTypes.INTEGER,
-    defaultValue: 0,
+  inviteCode: {
+    type: DataTypes.STRING(6),
+    allowNull: false,
+    unique: true,
+    validate: {
+      len: [6, 6]
+    }
   },
-  isPublic: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: true,
+  adminUserId: {
+    type: DataTypes.UUID,
+    allowNull: false
   }
 }, {
   timestamps: true,
+  tableName: 'study_squads'
 });
 
 module.exports = StudySquad;

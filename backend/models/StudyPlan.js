@@ -57,8 +57,37 @@ const StudyPlan = sequelize.define(
         name: 'studyplan_user_exam_created_idx',
         fields: ['user', 'exam', 'createdAt'],
       },
+      {
+        name: 'studyplan_dailygoals_idx',
+        fields: ['dailyGoals'],
+        using: 'GIN',
+      },
     ],
   }
 );
+
+const cacheManager = require('../utils/cacheManager');
+
+StudyPlan.afterSave(async (studyPlan, options) => {
+  try {
+    const pattern = `user_${studyPlan.user}:*`;
+    await cacheManager.invalidate(pattern);
+    const cacheService = require('../services/cacheService');
+    await cacheService.del(`study_plan:active:${studyPlan.user}`);
+  } catch (err) {
+    console.error('Error invalidating cache after StudyPlan save:', err);
+  }
+});
+
+StudyPlan.afterDestroy(async (studyPlan, options) => {
+  try {
+    const pattern = `user_${studyPlan.user}:*`;
+    await cacheManager.invalidate(pattern);
+    const cacheService = require('../services/cacheService');
+    await cacheService.del(`study_plan:active:${studyPlan.user}`);
+  } catch (err) {
+    console.error('Error invalidating cache after StudyPlan destroy:', err);
+  }
+});
 
 module.exports = StudyPlan;

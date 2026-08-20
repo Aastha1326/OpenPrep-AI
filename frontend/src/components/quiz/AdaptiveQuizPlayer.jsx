@@ -37,7 +37,9 @@ export default function AdaptiveQuizPlayer({ quizId }) {
 
   const handleAnswerSubmit = (optionIndex) => {
     setSelectedOption(optionIndex);
-    const isCorrect = optionIndex === currentQuestion.correctAnswer;
+    const isCorrect = Array.isArray(currentQuestion.correctAnswer)
+      ? currentQuestion.correctAnswer.includes(optionIndex)
+      : optionIndex === currentQuestion.correctAnswer;
 
     // Update streak tracking
     let newStreak = streakType === (isCorrect ? 'correct' : 'incorrect') ? streak + 1 : 1;
@@ -116,16 +118,21 @@ export default function AdaptiveQuizPlayer({ quizId }) {
         <div className="space-y-4">
           <h3 className="text-base font-bold font-playfair">{currentQuestion.question}</h3>
           <div className="space-y-2.5">
-            {currentQuestion.options.map((opt, idx) => (
-              <button
-                key={idx}
-                disabled={selectedOption !== null}
-                onClick={() => handleAnswerSubmit(idx)}
-                className={`w-full text-left p-3.5 rounded-xl border text-xs font-medium transition cursor-pointer ${selectedOption === idx ? (idx === currentQuestion.correctAnswer ? 'bg-green-500/20 border-green-500 text-green-700 dark:text-green-300' : 'bg-red-500/20 border-red-500 text-red-700 dark:text-red-300') : 'bg-white dark:bg-[#251D17] border-[#CEAB93]/40 dark:border-[#412D15] hover:border-amber-500'}`}
-              >
-                {opt}
-              </button>
-            ))}
+            {currentQuestion.options.map((opt, idx) => {
+              const isOptionCorrect = Array.isArray(currentQuestion.correctAnswer)
+                ? currentQuestion.correctAnswer.includes(idx)
+                : idx === currentQuestion.correctAnswer;
+              return (
+                <button
+                  key={idx}
+                  disabled={selectedOption !== null}
+                  onClick={() => handleAnswerSubmit(idx)}
+                  className={`w-full text-left p-3.5 rounded-xl border text-xs font-medium transition cursor-pointer ${selectedOption === idx ? (isOptionCorrect ? 'bg-green-500/20 border-green-500 text-green-700 dark:text-green-300' : 'bg-red-500/20 border-red-500 text-red-700 dark:text-red-300') : 'bg-white dark:bg-[#251D17] border-[#CEAB93]/40 dark:border-[#412D15] hover:border-amber-500'}`}
+                >
+                  {opt}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

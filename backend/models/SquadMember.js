@@ -1,5 +1,5 @@
 const { DataTypes } = require('sequelize');
-const sequelize = require('../config/db');
+const { sequelize } = require('../config/db');
 
 const SquadMember = sequelize.define('SquadMember', {
   id: {
@@ -9,34 +9,28 @@ const SquadMember = sequelize.define('SquadMember', {
   },
   squadId: {
     type: DataTypes.UUID,
-    allowNull: false,
-    references: {
-      model: 'StudySquads',
-      key: 'id'
-    }
+    allowNull: false
   },
   userId: {
     type: DataTypes.UUID,
-    allowNull: false,
-    references: {
-      model: 'Users',
-      key: 'id'
-    }
+    allowNull: false
   },
   role: {
     type: DataTypes.ENUM('admin', 'member'),
     defaultValue: 'member',
+    allowNull: false
   },
-  pointsContributed: {
-    type: DataTypes.INTEGER,
-    defaultValue: 0,
+  joinedAt: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW
   }
 }, {
-  timestamps: true,
+  timestamps: false,
+  tableName: 'squad_members',
   indexes: [
     {
       unique: true,
-      fields: ['squadId', 'userId']
+      fields: ['squadId', 'userId'] // Prevent duplicate membership
     }
   ]
 });

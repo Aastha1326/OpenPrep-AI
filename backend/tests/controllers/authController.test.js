@@ -23,7 +23,94 @@ const createVerifiedUser = async (overrides = {}) => {
     ...overrides,
   });
 };
+// =========================================================================
+// POST /api/auth/logout-all
+// =========================================================================
+describe('POST /api/auth/logout-all', () => {
+  it('should revoke refresh tokens from all devices', async () => {
+    const user = await createVerifiedUser({
+      email: 'logout-all@example.com',
+      refreshTokens: [
+        {
+          token: crypto.createHash('sha256').update('device-token-1').digest('hex'),
+          family: 'device-family-1',
+          createdAt: new Date().toISOString(),
+        },
+        {
+          token: crypto.createHash('sha256').update('device-token-2').digest('hex'),
+          family: 'device-family-2',
+          createdAt: new Date().toISOString(),
+        },
+      ],
+      refreshTokenExpire: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
 
+    const accessToken = jwt.sign(
+      { id: user.id, type: 'access' },
+      process.env.JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+
+    const res = await request(app)
+      .post('/api/auth/logout-all')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+
+    const updatedUser = await User.findByPk(user.id);
+
+    expect(updatedUser.refreshTokens).toEqual([]);
+    expect(updatedUser.refreshTokenExpire).toBeNull();
+  });
+
+  it('should reject refresh tokens after logout-all', async () => {
+    const deviceToken1 = 'device-refresh-token-1';
+    const deviceToken2 = 'device-refresh-token-2';
+
+    const user = await createVerifiedUser({
+      email: 'logout-all-refresh@example.com',
+      refreshTokens: [
+        {
+          token: crypto.createHash('sha256').update(deviceToken1).digest('hex'),
+          family: 'device-family-1',
+          createdAt: new Date().toISOString(),
+        },
+        {
+          token: crypto.createHash('sha256').update(deviceToken2).digest('hex'),
+          family: 'device-family-2',
+          createdAt: new Date().toISOString(),
+        },
+      ],
+      refreshTokenExpire: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
+
+    const accessToken = jwt.sign(
+      { id: user.id, type: 'access' },
+      process.env.JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+
+    const logoutResponse = await request(app)
+      .post('/api/auth/logout-all')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(logoutResponse.status).toBe(200);
+
+    const device1Refresh = await request(app)
+      .post('/api/auth/refresh-token')
+      .send({ refreshToken: deviceToken1 });
+
+    const device2Refresh = await request(app)
+      .post('/api/auth/refresh-token')
+      .send({ refreshToken: deviceToken2 });
+
+    expect(device1Refresh.status).toBe(401);
+    expect(device2Refresh.status).toBe(401);
+    expect(device1Refresh.body.error).toBe('Invalid or expired refresh token');
+    expect(device2Refresh.body.error).toBe('Invalid or expired refresh token');
+  });
+});
 describe('Auth Controller - Integration Tests', () => {
   // =========================================================================
   // POST /api/auth/register
@@ -396,7 +483,7 @@ describe('Auth Controller - Integration Tests', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.message).toContain('password reset link');
+      expect(res.body.message).toContain('reset code');
     });
 
     it('should return 200 even when email does not exist', async () => {
@@ -406,6 +493,7 @@ describe('Auth Controller - Integration Tests', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
+      expect(res.body.message).toBe('If the email exists, a reset code has been sent');
     });
 
     it('should return same response for existing and non-existing emails', async () => {
@@ -422,6 +510,31 @@ describe('Auth Controller - Integration Tests', () => {
       expect(resExisting.status).toBe(resMissing.status);
       expect(resExisting.body.success).toBe(resMissing.body.success);
       expect(resExisting.body.message).toBe(resMissing.body.message);
+      expect(resExisting.body.message).toBe('If the email exists, a reset code has been sent');
+    });
+
+    it('should enforce rate limits of 3 requests per 15 minutes', async () => {
+      process.env.ENABLE_RATE_LIMIT_TESTS = 'true';
+      try {
+        // Send 3 requests - all should succeed
+        for (let i = 0; i < 3; i++) {
+          const res = await request(app)
+            .post('/api/auth/forgot-password')
+            .send({ email: 'rate@example.com' });
+          expect(res.status).toBe(200);
+        }
+
+        // 4th request should exceed the limit and return 429
+        const resBlocked = await request(app)
+          .post('/api/auth/forgot-password')
+          .send({ email: 'rate@example.com' });
+
+        expect(resBlocked.status).toBe(429);
+        expect(resBlocked.body.success).toBe(false);
+        expect(resBlocked.body.error).toBe('Too many requests. Please try again after 15 minutes.');
+      } finally {
+        delete process.env.ENABLE_RATE_LIMIT_TESTS;
+      }
     });
   });
 
@@ -516,6 +629,26 @@ describe('Auth Controller - Integration Tests', () => {
       // Refresh token should be different (rotation)
       expect(res.body.refreshToken).not.toBe(oldRefreshToken);
       // Access token is same user/payload — may match if issued same second
+    });
+
+    it('should rotate and issue a new refresh token using /refresh endpoint', async () => {
+      const user = await createVerifiedUser({ email: 'refreshnew@example.com' });
+
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'refreshnew@example.com', password: 'StrongPass1!' });
+
+      const oldRefreshToken = loginRes.body.refreshToken;
+
+      const res = await request(app)
+        .post('/api/auth/refresh')
+        .send({ refreshToken: oldRefreshToken });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.token).toBeDefined();
+      expect(res.body.refreshToken).toBeDefined();
+      expect(res.body.refreshToken).not.toBe(oldRefreshToken);
     });
 
     it('should return 401 with invalid refresh token', async () => {

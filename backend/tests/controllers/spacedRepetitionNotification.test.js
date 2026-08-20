@@ -9,9 +9,9 @@ const Flashcard = require('../../models/Flashcard');
 const { initNotificationCron } = require('../../services/notificationService');
 
 // Mock web-push
-jest.mock('web-push', () => ({
-  setVapidDetails: jest.fn(),
-  sendNotification: jest.fn().mockResolvedValue({}),
+vi.mock('web-push', () => ({
+  setVapidDetails: vi.fn(),
+  sendNotification: vi.fn().mockResolvedValue({}),
 }));
 
 const app = express();
@@ -34,7 +34,7 @@ describe('Automated Spaced Repetition Notification Reminders', () => {
   beforeEach(async () => {
     await User.destroy({ where: {} });
     await Flashcard.destroy({ where: {} });
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     testUser = await User.create({
       name: 'Push Student',

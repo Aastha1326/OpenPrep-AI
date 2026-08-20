@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { UploadCloud, FileImage, AlertCircle, Loader2, X } from 'lucide-react';
-import API from '../../services/api';
+import { UploadCloud, FileImage, FileText, AlertCircle, Loader2, X } from 'lucide-react';
+import API from '../services/api';
 
 const OCRUploadZone = ({ onTextExtracted }) => {
   const [file, setFile] = useState(null);
@@ -9,23 +9,23 @@ const OCRUploadZone = ({ onTextExtracted }) => {
   const [progress, setProgress] = useState(0);
   const fileInputRef = useRef(null);
 
-  const validTypes = ['image/png', 'image/jpeg', 'image/webp'];
+  const validTypes = ['image/png', 'image/jpeg', 'image/webp', 'application/pdf'];
 
   const validateFile = (selectedFile) => {
     if (!selectedFile) return false;
 
     if (selectedFile.type === 'image/gif' || selectedFile.type === 'image/bmp') {
-      setError('GIF and BMP formats are not supported for OCR. Please upload a PNG, JPG, or WebP image.');
+      setError('GIF and BMP formats are not supported for OCR. Please upload a PNG, JPG, WebP image, or PDF.');
       return false;
     }
 
     if (!validTypes.includes(selectedFile.type)) {
-      setError('Please upload a valid image file (PNG, JPG, WebP).');
+      setError('Please upload a valid image file (PNG, JPG, WebP) or PDF.');
       return false;
     }
 
     if (selectedFile.size > 10 * 1024 * 1024) {
-      setError('File size exceeds the 10MB limit. Please upload a smaller image.');
+      setError('File size exceeds the 10MB limit. Please upload a smaller file.');
       return false;
     }
 
@@ -112,7 +112,7 @@ const OCRUploadZone = ({ onTextExtracted }) => {
             type="file"
             ref={fileInputRef}
             onChange={handleFileChange}
-            accept=".png, .jpg, .jpeg, .webp"
+            accept=".png, .jpg, .jpeg, .webp, .pdf"
             className="hidden"
           />
 
@@ -124,7 +124,11 @@ const OCRUploadZone = ({ onTextExtracted }) => {
               >
                 <X className="w-4 h-4 text-neutral-700" />
               </button>
-              <FileImage className="w-12 h-12 text-amber-500 mb-3" />
+              {file.type === 'application/pdf' ? (
+                <FileText className="w-12 h-12 text-amber-500 mb-3" />
+              ) : (
+                <FileImage className="w-12 h-12 text-amber-500 mb-3" />
+              )}
               <p className="text-neutral-700 font-medium">{file.name}</p>
               <p className="text-neutral-500 text-xs mt-1">
                 {(file.size / 1024 / 1024).toFixed(2)} MB
@@ -133,8 +137,8 @@ const OCRUploadZone = ({ onTextExtracted }) => {
           ) : (
             <>
               <UploadCloud className="w-12 h-12 text-amber-600/60 mb-3" />
-              <p className="text-neutral-700 font-medium">Click or Drag & Drop an image here</p>
-              <p className="text-neutral-500 text-xs mt-1">PNG, JPG, WebP up to 10MB</p>
+              <p className="text-neutral-700 font-medium">Click or Drag & Drop an image or PDF here</p>
+              <p className="text-neutral-500 text-xs mt-1">PNG, JPG, WebP, PDF up to 10MB</p>
             </>
           )}
         </div>
@@ -158,7 +162,7 @@ const OCRUploadZone = ({ onTextExtracted }) => {
             onClick={clearFile}
             className="mt-4 px-4 py-2 bg-green-100 text-green-700 rounded hover:bg-green-200 text-sm font-medium transition"
           >
-            Upload Another Image
+            Upload Another File
           </button>
         </div>
       )}

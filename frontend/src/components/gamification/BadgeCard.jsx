@@ -1,6 +1,6 @@
 import { Award, Lock } from 'lucide-react';
 
-const BadgeCard = ({ badgeCode = '', title = '', description = '', isUnlocked = false, unlockedAt = null }) => {
+const BadgeCard = ({ badgeCode = '', title = '', description = '', isUnlocked = false, unlockedAt = null, svgIcon = null }) => {
   return (
     <div
       className={`border rounded-xl p-4 flex gap-3.5 items-center relative overflow-hidden transition-all duration-300 ${
@@ -16,7 +16,18 @@ const BadgeCard = ({ badgeCode = '', title = '', description = '', isUnlocked = 
             : 'bg-neutral-850 border-neutral-800 text-stone-600'
         }`}
       >
-        {isUnlocked ? <Award className="w-8 h-8 fill-current animate-pulse" /> : <Lock className="w-8 h-8" />}
+        {isUnlocked ? (
+          svgIcon ? (
+            <div 
+              className="w-8 h-8 fill-current animate-pulse"
+              dangerouslySetInnerHTML={{ __html: svgIcon }}
+            />
+          ) : (
+            <Award className="w-8 h-8 fill-current animate-pulse" />
+          )
+        ) : (
+          <Lock className="w-8 h-8" />
+        )}
       </div>
 
       <div className="flex-1 min-w-0">

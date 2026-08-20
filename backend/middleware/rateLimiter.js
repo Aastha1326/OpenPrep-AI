@@ -14,7 +14,7 @@ const aiLimiter = rateLimit({
   max: 10,
   skip: shouldSkip,
   keyGenerator: (req) => {
-    return req.user && req.user.id ? String(req.user.id) : (req.ip || req.connection.remoteAddress || '127.0.0.1');
+    return req.user && req.user.id ? String(req.user.id) : String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1');
   },
   handler: (req, res, next, options) => {
     const retryInSeconds = Math.ceil(options.windowMs / 1000);

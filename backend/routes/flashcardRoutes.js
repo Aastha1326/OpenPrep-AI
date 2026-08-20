@@ -2,6 +2,7 @@ const express = require('express');
 const {
   generateAIFlashcards,
   generateFlashcardsFromNote,
+  generateFlashcardsFromText,
   generateFlashcardsFromAudio,
   generateFlashcardsFromYouTube,
   autoTagFlashcard,  
@@ -17,8 +18,10 @@ const {
   cloneCommunityDeck,
   rateCommunityDeck,
   starCommunityDeck,
+  batchSyncOfflineReviews,
 } = require('../controllers/flashcardController');
 const { protect } = require('../middleware/auth');
+const cacheMiddleware = require('../middleware/cacheMiddleware');
 const { aiLimiter } = require('../middleware/rateLimiter');
 const { checkQuota } = require('../middleware/quotaMiddleware');
 const flashcardUpload = require('../middleware/flashcardUpload');
@@ -216,6 +219,101 @@ router.post(
 
 /**
  * @swagger
+ * /api/flashcards/generate-from-text:
+ *   post:
+ *     summary: Generate AI flashcard preview directly from text content
+ *     tags: [Flashcards]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - subjectId
+ *               - text
+ *             properties:
+ *               subjectId:
+ *                 type: string
+ *                 format: uuid
+ *                 example: "123e4567-e89b-12d3-a456-426614174000"
+ *               text:
+ *                 type: string
+ *                 example: "The mitochondria is the powerhouse of the cell."
+ *               count:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 50
+ *                 default: 6
+ *                 example: 6
+ *     responses:
+ *       200:
+ *         description: Flashcards generated successfully (preview mode, not saved)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 count:
+ *                   type: integer
+ *                   example: 6
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       front:
+ *                         type: string
+ *                         example: "What is the mitochondria?"
+ *                       back:
+ *                         type: string
+ *                         example: "The powerhouse of the cell"
+ *       400:
+ *         description: Validation error or empty text content
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Subject not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       429:
+ *         description: Rate limit exceeded
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       503:
+ *         description: AI service unavailable
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.post(
+  '/generate-from-text',
+  protect,
+  aiLimiter,
+  checkQuota,
+  generateFlashcardsFromText
+);
+
+/**
+ * @swagger
  * /api/flashcards/from-youtube:
  *   post:
  *     summary: Extract a YouTube video transcript and preview AI-generated flashcards
@@ -285,7 +383,8 @@ router.post(
 
 /**
  * @swagger
- * /api/flashcards/export: *   get:
+ * /api/flashcards/export:
+ *   get:
  *     summary: Export flashcards as JSON
  *     tags: [Flashcards]
  *     security:
@@ -546,7 +645,7 @@ router.post('/', protect, validateCreateFlashcard, createFlashcard);
  *               $ref: '#/components/schemas/Error'
  */
 
-router.get('/', protect, getFlashcards);
+router.get('/', protect, cacheMiddleware(900), getFlashcards);
 
 /**
  * @swagger
@@ -776,6 +875,7 @@ router.put('/decks/:subjectId/share', protect, shareFlashcardDeck);
 router.post('/decks/:subjectId/clone', protect, cloneCommunityDeck);
 router.post('/decks/:subjectId/rate', protect, rateCommunityDeck);
 router.post('/decks/:subjectId/star', protect, starCommunityDeck);
+router.post('/batch-sync', protect, batchSyncOfflineReviews);
 
 router.delete('/:id', protect, deleteFlashcard);
 

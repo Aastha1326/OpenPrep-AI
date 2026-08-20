@@ -49,8 +49,8 @@ async function seed() {
     console.log('Seeding Users...');
     const student = await User.create({
       name: 'Demo Student',
-      email: 'student@openprep.ai',
-      password: 'Password123',
+      email: 'demo@openprep.ai',
+      password: 'password123',
       role: 'student',
       streakCount: 5,
       studyHours: 15.5,
@@ -72,7 +72,9 @@ async function seed() {
       role: 'contributor',
       isEmailVerified: true,
     });
-    console.log(`Created users: student (${student.id}), admin (${admin.id}), contributor (${contributor.id})`);
+    console.log(
+      `Created users: student (${student.id}), admin (${admin.id}), contributor (${contributor.id})`
+    );
 
     // 2. Create Exams
     console.log('Seeding Exams...');
@@ -128,7 +130,8 @@ async function seed() {
 
     const topicDerivatives = await Topic.create({
       name: 'Derivatives',
-      description: 'Definition of derivative, differentiation rules, chain rule, implicit differentiation',
+      description:
+        'Definition of derivative, differentiation rules, chain rule, implicit differentiation',
       subject: mathSubject.id,
       status: 'Weak',
       weightage: 30,
@@ -193,7 +196,7 @@ async function seed() {
         subject: mathSubject.id,
         topic: topicDerivatives.id,
         front: 'What is the Chain Rule for differentiation?',
-        back: 'd/dx [f(g(x))] = f\'(g(x)) * g\'(x)',
+        back: "d/dx [f(g(x))] = f'(g(x)) * g'(x)",
         interval: 1,
         repetitions: 0,
         efactor: 2.5,
@@ -215,7 +218,7 @@ async function seed() {
         subject: mathSubject.id,
         topic: topicIntegrals.id,
         front: 'State the Fundamental Theorem of Calculus (Part 1).',
-        back: 'If f is continuous on [a, b] and F(x) = integral of f(t)dt from a to x, then F\'(x) = f(x).',
+        back: "If f is continuous on [a, b] and F(x) = integral of f(t)dt from a to x, then F'(x) = f(x).",
         interval: 5,
         repetitions: 3,
         efactor: 2.7,
@@ -228,7 +231,8 @@ async function seed() {
     console.log('Seeding Notes...');
     const noteLimits = await Note.create({
       title: 'Limits & Continuity Summary Cheat Sheet',
-      content: 'Important rules:\n1. Direct substitution first.\n2. If indeterminate form 0/0, factor, rationalize, or use L\'Hopital\'s rule.\n3. Continuous means limit exists and equals f(c).\n4. Intermediate Value Theorem: If f is continuous on [a, b], it takes all values between f(a) and f(b).',
+      content:
+        "Important rules:\n1. Direct substitution first.\n2. If indeterminate form 0/0, factor, rationalize, or use L'Hopital's rule.\n3. Continuous means limit exists and equals f(c).\n4. Intermediate Value Theorem: If f is continuous on [a, b], it takes all values between f(a) and f(b).",
       subject: mathSubject.id,
       topic: topicLimits.id,
       isPublic: true,
@@ -238,7 +242,8 @@ async function seed() {
 
     const noteDerivatives = await Note.create({
       title: 'Common Derivative Shortcuts',
-      content: 'Standard formulas:\n- d/dx [x^n] = n*x^(n-1)\n- d/dx [sin x] = cos x\n- d/dx [cos x] = -sin x\n- d/dx [tan x] = sec^2 x\n- d/dx [ln x] = 1/x\n- Product rule: u\'v + uv\'\n- Quotient rule: (u\'v - uv\') / v^2',
+      content:
+        "Standard formulas:\n- d/dx [x^n] = n*x^(n-1)\n- d/dx [sin x] = cos x\n- d/dx [cos x] = -sin x\n- d/dx [tan x] = sec^2 x\n- d/dx [ln x] = 1/x\n- Product rule: u'v + uv'\n- Quotient rule: (u'v - uv') / v^2",
       subject: mathSubject.id,
       topic: topicDerivatives.id,
       isPublic: true,
@@ -261,19 +266,22 @@ async function seed() {
           questionText: 'Evaluate the limit of (x^2 - 4)/(x - 2) as x approaches 2.',
           options: ['0', '2', '4', 'Undefined'],
           correctAnswer: 2, // Index 2 ('4')
-          explanation: 'Factor the numerator: (x-2)(x+2)/(x-2) = x+2. As x approaches 2, x+2 approaches 4.',
+          explanation:
+            'Factor the numerator: (x-2)(x+2)/(x-2) = x+2. As x approaches 2, x+2 approaches 4.',
         },
         {
           _id: 'q-limits-2',
-          questionText: 'If a function f(x) is continuous at x = 3, which of the following MUST be true?',
+          questionText:
+            'If a function f(x) is continuous at x = 3, which of the following MUST be true?',
           options: [
-            'f\'(3) exists',
+            "f'(3) exists",
             'f(3) is defined and the limit of f(x) as x approaches 3 equals f(3)',
             'f(x) has a horizontal tangent line at x = 3',
             'f(x) is a polynomial function',
           ],
           correctAnswer: 1, // Index 1
-          explanation: 'By definition, continuity at x=c requires the function to be defined at c, the limit to exist at c, and the limit to equal the function value f(c).',
+          explanation:
+            'By definition, continuity at x=c requires the function to be defined at c, the limit to exist at c, and the limit to equal the function value f(c).',
         },
       ],
     });
@@ -290,7 +298,8 @@ async function seed() {
           questionText: 'Find the derivative of f(x) = sin(x^2).',
           options: ['2x * cos(x^2)', 'cos(x^2)', '2 * sin(x)', '-2x * cos(x^2)'],
           correctAnswer: 0, // Index 0
-          explanation: 'Using the chain rule: d/dx[sin(u)] = cos(u) * du/dx. Here, u = x^2, so du/dx = 2x. Thus, the derivative is cos(x^2) * 2x.',
+          explanation:
+            'Using the chain rule: d/dx[sin(u)] = cos(u) * du/dx. Here, u = x^2, so du/dx = 2x. Thus, the derivative is cos(x^2) * 2x.',
         },
       ],
     });
@@ -318,9 +327,7 @@ async function seed() {
       score: 0,
       totalQuestions: 1,
       timeSpent: 30,
-      answers: [
-        { questionId: 'q-deriv-1', selectedAnswer: 1, isCorrect: false },
-      ],
+      answers: [{ questionId: 'q-deriv-1', selectedAnswer: 1, isCorrect: false }],
       strongTopics: [],
       weakTopics: [topicDerivatives.id],
     });
@@ -346,9 +353,7 @@ async function seed() {
       topic: topicDerivatives.id,
       completionPercentage: 20,
       studyHours: 1.5,
-      quizScores: [
-        { attempt: attemptDerivatives.id, score: 0, date: new Date() },
-      ],
+      quizScores: [{ attempt: attemptDerivatives.id, score: 0, date: new Date() }],
       flashcardsMastered: 0,
     });
 
@@ -405,21 +410,51 @@ async function seed() {
       let tasks = [];
       if (i === 0) {
         tasks = [
-          { title: 'Read Limits & Continuity Cheat Sheet', completed: true, topic: topicLimits.id, duration: 30 },
-          { title: 'Attempt Limits & Continuity Quiz', completed: true, topic: topicLimits.id, duration: 15 },
+          {
+            title: 'Read Limits & Continuity Cheat Sheet',
+            completed: true,
+            topic: topicLimits.id,
+            duration: 30,
+          },
+          {
+            title: 'Attempt Limits & Continuity Quiz',
+            completed: true,
+            topic: topicLimits.id,
+            duration: 15,
+          },
         ];
       } else if (i === 1) {
         tasks = [
-          { title: 'Review derivatives notes', completed: false, topic: topicDerivatives.id, duration: 40 },
-          { title: 'Attempt derivatives quiz', completed: false, topic: topicDerivatives.id, duration: 20 },
+          {
+            title: 'Review derivatives notes',
+            completed: false,
+            topic: topicDerivatives.id,
+            duration: 40,
+          },
+          {
+            title: 'Attempt derivatives quiz',
+            completed: false,
+            topic: topicDerivatives.id,
+            duration: 20,
+          },
         ];
       } else if (i === 2) {
         tasks = [
-          { title: 'Learn derivative chain rule and implicit differentiation', completed: false, topic: topicDerivatives.id, duration: 60 },
+          {
+            title: 'Learn derivative chain rule and implicit differentiation',
+            completed: false,
+            topic: topicDerivatives.id,
+            duration: 60,
+          },
         ];
       } else {
         tasks = [
-          { title: 'Introduction to Integrals & Riemann Sums', completed: false, topic: topicIntegrals.id, duration: 50 },
+          {
+            title: 'Introduction to Integrals & Riemann Sums',
+            completed: false,
+            topic: topicIntegrals.id,
+            duration: 50,
+          },
         ];
       }
 
@@ -443,7 +478,8 @@ async function seed() {
     console.log('Seeding Feedback...');
     await Feedback.create({
       title: 'Dark Mode UI issue on Quiz page',
-      description: 'The background of options becomes light gray, making white text unreadable when dark mode is enabled on screen resolutions below 768px.',
+      description:
+        'The background of options becomes light gray, making white text unreadable when dark mode is enabled on screen resolutions below 768px.',
       type: 'bug',
       status: 'open',
       upvotes: [student.id, contributor.id],
@@ -452,7 +488,8 @@ async function seed() {
 
     await Feedback.create({
       title: 'Export flashcards as Anki deck',
-      description: 'It would be amazing if we could export our spaced repetition flashcards as an .apkg file so that we can study them inside Anki.',
+      description:
+        'It would be amazing if we could export our spaced repetition flashcards as an .apkg file so that we can study them inside Anki.',
       type: 'feature_request',
       status: 'planned',
       upvotes: [contributor.id],
@@ -463,9 +500,9 @@ async function seed() {
     console.log('\n=========================================');
     console.log('Database seeding completed successfully!');
     console.log('=========================================');
-    console.log('Demo Login Credentials:');
-    console.log('  - Student:     student@openprep.ai     / Password123');
-    console.log('  - Admin:       admin@openprep.ai       / Password123');
+    console.log('Demo Login Credentials (DEVELOPMENT ONLY):');
+    console.log('  - Student:     demo@openprep.ai     / password123');
+    console.log('  - Admin:       admin@openprep.ai     / Password123');
     console.log('  - Contributor: contributor@openprep.ai / Password123');
     console.log('=========================================\n');
 

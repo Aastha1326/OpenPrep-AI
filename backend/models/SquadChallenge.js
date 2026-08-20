@@ -1,5 +1,5 @@
 const { DataTypes } = require('sequelize');
-const sequelize = require('../config/db');
+const { sequelize } = require('../config/db');
 
 const SquadChallenge = sequelize.define('SquadChallenge', {
   id: {
@@ -9,40 +9,36 @@ const SquadChallenge = sequelize.define('SquadChallenge', {
   },
   squadId: {
     type: DataTypes.UUID,
+    allowNull: false
+  },
+  targetXp: {
+    type: DataTypes.INTEGER,
     allowNull: false,
-    references: {
-      model: 'StudySquads',
-      key: 'id'
+    validate: {
+      min: 1
     }
   },
-  title: {
-    type: DataTypes.STRING,
-    allowNull: false,
-  },
-  description: {
-    type: DataTypes.TEXT,
-  },
-  targetGoal: {
-    type: DataTypes.INTEGER, // e.g. 500 points, or 100 flashcards
-    allowNull: false,
-  },
-  currentProgress: {
+  currentXp: {
     type: DataTypes.INTEGER,
     defaultValue: 0,
+    allowNull: false
   },
-  deadline: {
+  startDate: {
     type: DataTypes.DATE,
+    allowNull: false
   },
-  isCompleted: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false,
+  endDate: {
+    type: DataTypes.DATE,
+    allowNull: false
   },
-  rewardPoints: {
-    type: DataTypes.INTEGER,
-    defaultValue: 100,
+  status: {
+    type: DataTypes.ENUM('active', 'completed', 'failed'),
+    defaultValue: 'active',
+    allowNull: false
   }
 }, {
   timestamps: true,
+  tableName: 'squad_challenges'
 });
 
 module.exports = SquadChallenge;

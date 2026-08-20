@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   FileText,
   Volume2,
@@ -11,6 +12,8 @@ import {
   Mic,
   Play,
   Pause,
+  Users,
+  Download,
 } from 'lucide-react';
 import API from '../../services/api';
 import VintagePaper from './VintagePaper';
@@ -18,7 +21,8 @@ import AudioReader from '../AudioReader';
 import HighlightedText from '../HighlightedText';
 import GenerateFlashcardsFromNoteModal from './GenerateFlashcardsFromNoteModal';
 import ImportExportNotes from './ImportExportNotes';
-const RecordVoiceNoteModal = lazy(() => import('./RecordVoiceNoteModal'));
+import { buildSingleNoteDocument, exportHTMLToPDF } from '../../utils/exportDocs';
+const VoiceNoteRecorderModal = lazy(() => import('../notes/VoiceNoteRecorderModal'));
 
 const Shimmer = ({ className = '' }) => (
   <div className={`animate-pulse bg-neutral-300/60 rounded ${className}`} />
@@ -103,6 +107,7 @@ const VoiceNotePlayer = ({ fileUrl }) => {
 };
 
 const NotesWidget = ({ limit = 5 }) => {
+  const navigate = useNavigate();
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -110,12 +115,36 @@ const NotesWidget = ({ limit = 5 }) => {
   const [activeSentenceByNote, setActiveSentenceByNote] = useState({});
   const [flashcardNote, setFlashcardNote] = useState(null);
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
+  const [tagFilter, setTagFilter] = useState('');
+  const [exportingNoteId, setExportingNoteId] = useState(null);
+
+  const handleExportNotePDF = useCallback(async (note, summaryData) => {
+    setExportingNoteId(note.id);
+    try {
+      const title = note.title || 'Study Note';
+      const safeFilename =
+        title
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)/g, '') || 'note';
+
+      const html = buildSingleNoteDocument({ note, summary: summaryData, title });
+      await exportHTMLToPDF(html, `openprep-${safeFilename}.pdf`);
+    } catch (err) {
+      console.error('Failed to export note PDF:', err);
+      alert('Failed to export note as PDF.');
+    } finally {
+      setExportingNoteId(null);
+    }
+  }, []);
 
   const loadNotes = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await API.get('/notes', { params: { limit } });
+      const params = { limit };
+      if (tagFilter.trim()) params.tag = tagFilter.trim();
+      const res = await API.get('/notes', { params });
       const items = res?.data?.data;
       setNotes(Array.isArray(items) ? items : []);
     } catch (err) {
@@ -127,7 +156,7 @@ const NotesWidget = ({ limit = 5 }) => {
 
   useEffect(() => {
     loadNotes();
-  }, [loadNotes]);
+  }, [loadNotes, tagFilter]);
 
   const generateSummary = useCallback(async (noteId) => {
     setSummaries((prev) => ({ ...prev, [noteId]: { loading: true, error: null } }));
@@ -174,6 +203,16 @@ const NotesWidget = ({ limit = 5 }) => {
       </h2>      <p className="text-xs text-neutral-500 italic -mt-2 mb-4">
         Generate a revision summary for a note, or record voice notes to summarize automatically.
       </p>
+
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="Filter by tag (e.g. Important)..."
+          value={tagFilter}
+          onChange={(e) => setTagFilter(e.target.value)}
+          className="w-full px-3 py-1.5 text-sm bg-white border border-neutral-300 rounded focus:outline-none focus:ring-1 focus:ring-yellow-600"
+        />
+      </div>
 
       {loading ? (
         <div className="space-y-3">
@@ -226,6 +265,13 @@ const NotesWidget = ({ limit = 5 }) => {
                         {note.subject.name}
                       </p>
                     )}
+                    {note.tags && note.tags.length > 0 && (
+                      <div className="flex gap-1 mt-1 flex-wrap">
+                        {note.tags.map(t => (
+                          <span key={t} className="text-[9px] bg-neutral-200 text-neutral-700 px-1.5 py-0.5 rounded-sm">#{t}</span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
                     {!summary && (
@@ -243,6 +289,27 @@ const NotesWidget = ({ limit = 5 }) => {
                       className="flex items-center gap-1 px-2.5 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-800 text-xs font-bold rounded transition-colors"
                     >
                       <Layers className="w-3.5 h-3.5" /> Generate AI Flashcards
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/notes/collaborative/${note.id}`)}
+                      className="flex items-center gap-1 px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-bold rounded transition-colors"
+                    >
+                      <Users className="w-3.5 h-3.5" /> Collaborate
+                    </button>
+                    <button
+                      type="button"
+                      disabled={exportingNoteId === note.id}
+                      onClick={() => handleExportNotePDF(note, summary)}
+                      className="flex items-center gap-1 px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-bold rounded transition-colors disabled:opacity-60"
+                      title="Download as PDF"
+                    >
+                      {exportingNoteId === note.id ? (
+                        <Loader className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Download className="w-3.5 h-3.5" />
+                      )}
+                      <span>Download PDF</span>
                     </button>
                   </div>
                 </div>
@@ -301,7 +368,7 @@ const NotesWidget = ({ limit = 5 }) => {
                       )}
 
                     {Array.isArray(summary.data.examTips) && summary.data.examTips.length > 0 && (
-                      <ul className="mt-3 space-y-1 list-disc list-inside text-xs text-neutral-600 font-serif">
+                      <ul className="mt-3 space-y-1 list-disc list-outside pl-6 text-xs text-neutral-600 font-serif">
                         {summary.data.examTips.map((tip, idx) => (
                           <li key={idx}>{tip}</li>
                         ))}
@@ -324,7 +391,7 @@ const NotesWidget = ({ limit = 5 }) => {
       )}
 
       <Suspense fallback={null}>
-        <RecordVoiceNoteModal
+        <VoiceNoteRecorderModal
           isOpen={isRecordModalOpen}
           onClose={() => setIsRecordModalOpen(false)}
           onNoteCreated={loadNotes}

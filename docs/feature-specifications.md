@@ -130,10 +130,25 @@ If response quality $q < 3$, repetitions is reset to $0$, and interval $I$ is re
 
 ---
 
-## 📊 Dashboard Analytics
+## 📊 Dashboard Analytics & Exam Readiness Index (ERI)
 
-Provides students with an overview of their learning telemetry:
+Provides students with an overview of their learning telemetry and predicted exam readiness levels:
 * **Streak Tracking**: Logs consecutive active days. If last active date is $> 1$ day, the streak resets to 0.
 * **Hours Studied**: Aggregates time spent on completed study plan tasks.
 * **Completion Rate**: Percentage of overall syllabus topics categorized as "Strong".
 * **Recent Activity Feed**: Chronological list of completed quizzes, uploaded PYQs, and flashcard reviews.
+
+### 1. Exam Readiness Index (ERI) Formula
+Calculates a composite exam preparedness metric (0-100%) for each subject:
+$$\text{ERI} = 0.30 \times \text{Syllabus Coverage} + 0.30 \times \text{Quiz Accuracy} + 0.25 \times \text{Memory Retention} + 0.15 \times \text{Schedule Velocity}$$
+* **Syllabus Coverage**: Average completion percentage across all topics of the subject.
+* **Quiz Accuracy**: Percentage of correct answers across all quiz attempts in the subject.
+* **Memory Retention**: Average memory stability derived from flashcardrepetitions and SM-2 ease factors.
+* **Schedule Velocity**: Percentage of completed study goals inside the active study plan.
+
+### 2. Knowledge Radar Chart
+An interactive Recharts Radar Chart mapping ERI masteries across enrolled subjects. If the student has less than 3 active subjects, the visualization falls back to a horizontal Bar Chart to maintain correct scale rendering.
+
+### 3. Trajectory Score Forecast
+Plots projected readiness progression up to the target exam date based on daily study plan goals, helping students visualize their revision progress.
+

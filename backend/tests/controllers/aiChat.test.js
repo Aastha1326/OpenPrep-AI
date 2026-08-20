@@ -7,11 +7,11 @@ const User = require('../../models/User');
 const geminiService = require('../../services/geminiService');
 
 // Mock geminiService chat method
-jest.mock('../../services/geminiService', () => {
-  const original = jest.requireActual('../../services/geminiService');
+vi.mock('../../services/geminiService', () => {
+  const original = vi.requireActual('../../services/geminiService');
   return {
     ...original,
-    generateChatResponse: jest.fn(),
+    generateChatResponse: vi.fn(),
   };
 });
 
@@ -34,7 +34,7 @@ describe('AI Chat Assistant Endpoint', () => {
 
   beforeEach(async () => {
     await User.destroy({ where: {} });
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     testUser = await User.create({
       name: 'Chat Student',
