@@ -206,6 +206,30 @@ function App() {
             }
           />
           <Route
+            path="/squads"
+            element={
+              <ProtectedRoute>
+                <SquadsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/squads/:id"
+            element={
+              <ProtectedRoute>
+                <StudySquadDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/collab-note/:id"
+            element={
+              <ProtectedRoute>
+                <CollabNote />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/ai-assistant"
             element={
               <ProtectedRoute>
