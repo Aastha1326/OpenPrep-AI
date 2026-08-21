@@ -711,6 +711,39 @@ describe('Auth Controller - Integration Tests', () => {
         .send({ refreshToken: secondToken });
       expect(secondReplay.status).toBe(401);
     });
+
+    it('should prune oldest refresh tokens when count exceeds MAX_ACTIVE_SESSIONS', async () => {
+      const tokens = Array.from({ length: 12 }, (_, i) => ({
+        token: crypto.createHash('sha256').update(`token-${i}`).digest('hex'),
+        family: `family-${i}`,
+        createdAt: new Date(Date.now() - (12 - i) * 60000).toISOString(),
+      }));
+
+      const user = await createVerifiedUser({
+        email: 'prune@example.com',
+        refreshTokens: tokens,
+        refreshTokenExpire: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      });
+
+      const res = await request(app)
+        .post('/api/auth/refresh-token')
+        .send({ refreshToken: 'token-11' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+
+      const updatedUser = await User.findByPk(user.id);
+      expect(updatedUser.refreshTokens.length).toBe(10);
+
+      const containsToken0 = updatedUser.refreshTokens.some(
+        (t) => t.token === crypto.createHash('sha256').update('token-0').digest('hex')
+      );
+      const containsToken1 = updatedUser.refreshTokens.some(
+        (t) => t.token === crypto.createHash('sha256').update('token-1').digest('hex')
+      );
+      expect(containsToken0).toBe(false);
+      expect(containsToken1).toBe(false);
+    });
   });
 
   // =========================================================================
