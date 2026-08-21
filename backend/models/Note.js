@@ -66,6 +66,18 @@ const Note = sequelize.define(
       type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
+    isOcrExtracted: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
+    ocrConfidence: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+    },
+    originalImageUrl: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
   },
   {
     timestamps: true,

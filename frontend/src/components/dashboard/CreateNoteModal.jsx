@@ -21,6 +21,9 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
   const [activeTab, setActiveTab] = useState('write'); // 'write' or 'ocr'
   const [ocrData, setOcrData] = useState(null);
   const [isCorrectionOpen, setIsCorrectionOpen] = useState(false);
+  const [isOcrExtracted, setIsOcrExtracted] = useState(false);
+  const [ocrConfidence, setOcrConfidence] = useState(null);
+  const [originalImageUrl, setOriginalImageUrl] = useState('');
 
   const lastSavedTitle = useRef('');
   const lastSavedContent = useRef('');
@@ -55,6 +58,9 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
       setActiveTab('write');
       setOcrData(null);
       setIsCorrectionOpen(false);
+      setIsOcrExtracted(false);
+      setOcrConfidence(null);
+      setOriginalImageUrl('');
     }
 
     return () => {
@@ -86,6 +92,11 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
           formData.append('content', content);
           formData.append('subjectId', subjectId);
           if (tags.trim()) formData.append('tags', tags);
+          if (isOcrExtracted) {
+            formData.append('isOcrExtracted', 'true');
+            if (ocrConfidence !== null) formData.append('ocrConfidence', ocrConfidence.toString());
+            if (originalImageUrl) formData.append('originalImageUrl', originalImageUrl);
+          }
 
           const response = await API.post('/notes', formData, {
             isBackground: true,
@@ -114,6 +125,9 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
             content,
             subjectId,
             tags: tags ? tags.split(',').map(t => t.trim()) : [],
+            isOcrExtracted,
+            ocrConfidence,
+            originalImageUrl,
           }, {
             isBackground: true,
           });
@@ -138,7 +152,7 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
     return () => {
       if (autosaveTimer.current) clearInterval(autosaveTimer.current);
     };
-  }, [isOpen, title, content, subjectId, noteId]);
+  }, [isOpen, title, content, subjectId, noteId, isOcrExtracted, ocrConfidence, originalImageUrl]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -167,6 +181,9 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
           content,
           subjectId,
           tags: tags ? tags.split(',').map(t => t.trim()) : [],
+          isOcrExtracted,
+          ocrConfidence,
+          originalImageUrl,
         });
       } else {
         const formData = new FormData();
@@ -174,6 +191,11 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
         formData.append('content', content);
         formData.append('subjectId', subjectId);
         if (tags.trim()) formData.append('tags', tags);
+        if (isOcrExtracted) {
+          formData.append('isOcrExtracted', 'true');
+          if (ocrConfidence !== null) formData.append('ocrConfidence', ocrConfidence.toString());
+          if (originalImageUrl) formData.append('originalImageUrl', originalImageUrl);
+        }
 
         response = await API.post('/notes', formData, {
           headers: {
@@ -418,7 +440,10 @@ const CreateNoteModal = ({ isOpen, onClose, onNoteCreated }) => {
         onClose={() => setIsCorrectionOpen(false)}
         ocrData={ocrData}
         onSave={(correctedText) => {
-          setContent((prev) => prev ? `${prev}<br><br>${correctedText.replace(/\\n/g, '<br>')}` : correctedText.replace(/\\n/g, '<br>'));
+          setContent((prev) => prev ? `${prev}<br><br>${correctedText.replace(/\n/g, '<br>')}` : correctedText.replace(/\n/g, '<br>'));
+          setIsOcrExtracted(true);
+          setOcrConfidence(ocrData.confidence);
+          setOriginalImageUrl(ocrData.fileUrl);
           setIsCorrectionOpen(false);
           setActiveTab('write'); // Switch back to editor
         }}

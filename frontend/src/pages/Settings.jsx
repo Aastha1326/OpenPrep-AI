@@ -34,15 +34,27 @@ import { loadUser } from '../store/slices/authSlice';
 import { validateAvatarFile } from '../utils/fileValidation';
 import { BADGE_LIST, BADGE_ICONS } from '../config/badges';
 import LazyImage from '../components/common/LazyImage';
-import {
-  subscribeToPushNotifications,
-  unsubscribeFromPushNotifications,
-} from '../utils/pushNotifications';
+import ThemeCustomizerDrawer from '../components/ThemeCustomizerDrawer';
+import { useTheme } from '../context/ThemeContext';
+import { THEME_PRESETS } from '../themePresets';
+
+const urlBase64ToUint8Array = (base64String) => {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+};
 
 const Settings = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { user } = useSelector((state) => state.auth);
+  const { theme, resolvedTheme, accentColors } = useTheme();
+  const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
 
   const [leaderboardVisible, setLeaderboardVisible] = useState(
     typeof user?.leaderboardVisible === 'boolean' ? user.leaderboardVisible : true
@@ -382,27 +394,62 @@ const Settings = () => {
             </div>
           </div>
         </VintagePaper>
-        {/* --- APPEARANCE / THEME --- */}
+        {/* --- APPEARANCE / THEME CUSTOMIZER --- */}
         <VintagePaper className="border-t-4 border-t-amber-700">
-          <div className="flex items-center gap-3 mb-4">
-            <Palette className="w-7 h-7 text-amber-700" />
-            <h2 className="text-2xl font-bold font-playfair text-neutral-800 dark:text-neutral-100">
-              Appearance
-            </h2>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <Palette className="w-7 h-7 text-amber-700" />
+              <div>
+                <h2 className="text-2xl font-bold font-playfair text-neutral-800 dark:text-neutral-100">
+                  Appearance & Theme Customizer
+                </h2>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                  Current Preset: <span className="font-semibold text-amber-800 dark:text-amber-300">{THEME_PRESETS[theme]?.name || THEME_PRESETS[resolvedTheme]?.name}</span>
+                </p>
+              </div>
+            </div>
+
+            <ThemeToggle showPaletteOption />
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-neutral-100/60 dark:bg-neutral-800/60 border border-neutral-300 dark:border-neutral-600 rounded-lg">
             <div>
-              <p className="text-sm text-neutral-600 dark:text-neutral-300">
-                Choose between Light, Dark, High Contrast, or System Default.
+              <p className="text-sm text-neutral-700 dark:text-neutral-200 font-semibold">
+                Theme Presets & Custom HSL Accent Colors
               </p>
               <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-                High Contrast mode guarantees a minimum 7:1 contrast ratio (WCAG 2.1 AA).
+                Customize presets (Modern Glassmorphism, Midnight AMOLED Dark, Emerald Study, Sunset Warm, Sepia Reading) or fine-tune CSS accent colors.
               </p>
             </div>
-            <ThemeToggle />
+
+            <div className="flex items-center gap-3">
+              {/* Swatch Preview */}
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900">
+                <span
+                  className="w-3.5 h-3.5 rounded-full border border-black/20"
+                  style={{ backgroundColor: accentColors?.primary?.hex || '#ad8b73' }}
+                  title="Primary Accent"
+                />
+                <span
+                  className="w-3.5 h-3.5 rounded-full border border-black/20"
+                  style={{ backgroundColor: accentColors?.secondary?.hex || '#e3caa5' }}
+                  title="Secondary Accent"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsCustomizerOpen(true)}
+                className="px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white rounded-lg text-xs font-semibold shadow transition-all flex items-center gap-2 cursor-pointer shrink-0"
+              >
+                <Palette className="w-4 h-4" /> Open Customizer
+              </button>
+            </div>
           </div>
+
+          <ThemeCustomizerDrawer isOpen={isCustomizerOpen} onClose={() => setIsCustomizerOpen(false)} />
         </VintagePaper>
+
         {/* --- ACCESSIBILITY & TEXT-TO-SPEECH --- */}
         <VintagePaper className="border-t-4 border-t-amber-700">
           <div className="flex items-center gap-3 mb-4">

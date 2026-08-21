@@ -209,12 +209,31 @@ const [isVoiceAnswerListening, setIsVoiceAnswerListening] = useState(false);
   const fetchDueCards = async () => {
     try {
       const res = await API.get('/flashcards?dueOnly=true&limit=100'); // Fetch a batch of due cards
-      setCards(res.data.data || []);
+      const fetchedCards = res.data.data || [];
+      setCards(fetchedCards);
+
+      // Update IndexedDB cache for offline access
+      if (fetchedCards.length > 0) {
+        await db.cachedFlashcards.clear();
+        await db.cachedFlashcards.bulkPut(fetchedCards);
+      }
       setLoading(false);
     } catch (err) {
-      console.error(err);
-      setError('Failed to fetch due flashcards.');
-      setLoading(false);
+      console.warn('Failed to fetch due flashcards from server, checking local IndexedDB cache...', err);
+      try {
+        const cached = await db.cachedFlashcards.toArray();
+        if (cached && cached.length > 0) {
+          setCards(cached);
+          setLoading(false);
+        } else {
+          setError('Failed to fetch due flashcards and no offline cache available.');
+          setLoading(false);
+        }
+      } catch (dbErr) {
+        console.error('Failed to read from IndexedDB cache:', dbErr);
+        setError('Failed to fetch due flashcards.');
+        setLoading(false);
+      }
     }
   };
 
@@ -256,9 +275,12 @@ const [isVoiceAnswerListening, setIsVoiceAnswerListening] = useState(false);
     setSaveError(null);
 
     try {
-      // Persist the rating server-side before advancing, with retry so a
-      // transient network failure doesn't silently lose the card's progress.
-      await putWithRetry(`/flashcards/${currentCard.id}/review`, { quality });
+      // Persist the rating server-side or queue it in IndexedDB for offline use.
+      const syncResult = await offlineSyncService.queueReview(currentCard.id, quality);
+
+      if (syncResult && syncResult.failed > 0 && syncResult.reason && syncResult.reason.startsWith('dropped-')) {
+        setSaveError(`Failed to save: ${syncResult.reason}`);
+      }
 
       // Ignore stale resolutions: never apply an update after the component
       // unmounted or when a different card is now being reviewed. Out-of-order

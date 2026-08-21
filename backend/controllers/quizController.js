@@ -392,7 +392,7 @@ exports.submitQuizAttempt = async (req, res, next) => {
         const isSubjective = q.questionType === 'SUBJECTIVE' || (!q.options && q.idealAnswer);
 
         if (isSubjective) {
-          const evalObj = userAns && userAns.evaluation ? userAns.evaluation : null;
+          const evalObj = userAns ? (userAns.evaluation || (userAns.selectedAnswer && userAns.selectedAnswer.evaluation) || null) : null;
           const earned = evalObj ? (evalObj.score || 0) : 0;
           const maxSc = (evalObj && evalObj.maxScore) ? evalObj.maxScore : (q.maxScore || 10);
           totalEarnedPoints += earned;
@@ -403,7 +403,7 @@ exports.submitQuizAttempt = async (req, res, next) => {
           return {
             questionId: q._id || q.id,
             questionType: 'SUBJECTIVE',
-            userAnswerText: userAns ? (userAns.userAnswerText || userAns.selectedAnswer || '') : '',
+            userAnswerText: userAns ? (userAns.userAnswerText || (userAns.selectedAnswer && userAns.selectedAnswer.userAnswerText) || (typeof userAns.selectedAnswer === 'string' ? userAns.selectedAnswer : '') || '') : '',
             isCorrect,
             evaluation: evalObj,
           };

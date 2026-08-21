@@ -36,6 +36,32 @@ const generateAccessToken = (id) => {
   });
 };
 
+/**
+ * Short-lived token binding a provider identity we have already authenticated.
+ *
+ * Used when a provider gives us no usable email and the user has to supply one.
+ * Signing it means the follow-up request proves it came from a real OAuth
+ * round trip rather than simply naming an identity.
+ */
+const PENDING_OAUTH_TTL = '15m';
+
+const generatePendingOAuthToken = (payload) =>
+  jwt.sign(
+    { ...payload, type: 'oauth_pending' },
+    process.env.JWT_SECRET || 'supersecret_openprep_key',
+    { expiresIn: PENDING_OAUTH_TTL }
+  );
+
+const verifyPendingOAuthToken = (token) => {
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'supersecret_openprep_key');
+    if (decoded.type !== 'oauth_pending' || !decoded.githubId) return null;
+    return decoded;
+  } catch {
+    return null;
+  }
+};
+
 const generateTokenFamily = () => crypto.randomBytes(16).toString('hex');
 
 const generateRefreshToken = async (user, family = null) => {
@@ -1109,8 +1135,18 @@ exports.oauthSuccessCallback = async (req, res, next) => {
 
     if (user.isTemp) {
       const frontendBase = process.env.FRONTEND_URL || 'http://localhost:5173';
+      // The provider id goes back to the browser inside a short-lived signed
+      // token, not as a query parameter. registerOAuthEmail used to accept a
+      // raw githubId from the request body, which let anyone claim any identity
+      // without going through the provider at all.
+      const pendingToken = generatePendingOAuthToken({
+        provider: user.provider || 'github',
+        githubId: user.githubId,
+        name: user.name,
+        avatarUrl: user.avatarUrl,
+      });
       return res.redirect(
-        `${frontendBase.replace(/\/$/, '')}/oauth-callback?prompt_email=true&githubId=${user.githubId}&name=${encodeURIComponent(user.name)}&avatarUrl=${encodeURIComponent(user.avatarUrl || '')}`
+        `${frontendBase.replace(/\/$/, '')}/oauth-callback?prompt_email=true&pendingToken=${encodeURIComponent(pendingToken)}`
       );
     }
 
@@ -1128,30 +1164,48 @@ exports.oauthSuccessCallback = async (req, res, next) => {
 
 exports.registerOAuthEmail = async (req, res, next) => {
   try {
-    const { email, githubId, name, avatarUrl } = req.body;
-    if (!email || !githubId) {
-      return res.status(400).json({ success: false, error: 'Email and GitHub ID are required.' });
+    const { email, pendingToken } = req.body;
+    if (!email || !pendingToken) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'Email and a valid sign-in token are required.' });
     }
+
+    const pending = verifyPendingOAuthToken(pendingToken);
+    if (!pending) {
+      return res
+        .status(401)
+        .json({ success: false, error: 'This sign-in link has expired. Start again.' });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const { githubId, name, avatarUrl } = pending;
 
     let user = await User.findOne({ where: { githubId } });
     if (!user) {
-      user = await User.findOne({ where: { email } });
-      if (user) {
-        user.githubId = githubId;
-        user.authProvider = 'github';
-        user.avatarUrl = avatarUrl || user.avatarUrl;
-        await user.save();
-      } else {
-        user = await User.create({
-          name: name || 'GitHub User',
-          email,
-          githubId,
-          authProvider: 'github',
-          avatarUrl,
-          isEmailVerified: true,
-          password: null,
+      const existingByEmail = await User.findOne({ where: { email: normalizedEmail } });
+      if (existingByEmail) {
+        // The address came from the user, not from GitHub — nothing has
+        // verified that they own it. Attaching the provider id to somebody
+        // else's account on that basis is the takeover this flow used to allow.
+        return res.status(409).json({
+          success: false,
+          error:
+            'An account already uses this email. Sign in with your password and connect GitHub from Settings.',
         });
       }
+
+      user = await User.create({
+        name: name || 'GitHub User',
+        email: normalizedEmail,
+        githubId,
+        authProvider: 'github',
+        avatarUrl,
+        // GitHub did not give us this address, so it is unconfirmed until the
+        // usual verification email is completed.
+        isEmailVerified: false,
+        password: null,
+      });
     }
 
     const accessToken = generateAccessToken(user.id);
