@@ -1,7 +1,7 @@
 const pdfParse = require('pdf-parse');
 const { Syllabus, SyllabusTopic, Note } = require('../models');
 const { analyzeSyllabusGaps } = require('../services/gapDetectorService');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { verifyMagicBytes } = require('../middleware/upload');const { GoogleGenerativeAI } = require('@google/generative-ai');
 const prompts = require('../config/prompts');
 
 // Initialize Gemini API client
@@ -14,8 +14,14 @@ exports.uploadSyllabus = async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'Please upload a PDF syllabus file.' });
     }
 
-    // 1. Parse PDF text
-    let extractedText = '';
+    // Verify the upload is genuinely a PDF (magic bytes), not just named ".pdf"
+    try {
+      await verifyMagicBytes('.pdf', req.file.buffer);
+    } catch (err) {
+      return res.status(400).json({ success: false, error: 'The uploaded file is not a valid PDF.' });
+    }
+
+    // 1. Parse PDF text    let extractedText = '';
     try {
       const parsedPdf = await pdfParse(req.file.buffer);
       extractedText = parsedPdf.text || '';
