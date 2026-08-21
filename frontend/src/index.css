@@ -72,7 +72,42 @@
   h6 {
     font-family: 'Playfair Display', serif;
   }
+
+  /* ── WCAG 2.1 AA Focus-Visible Keyboard Focus Rings ── */
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [role="button"]:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid var(--accent-primary, #ad8b73);
+    outline-offset: 2px;
+  }
+
+  .dark button:focus-visible,
+  .dark a:focus-visible,
+  .dark input:focus-visible,
+  .dark select:focus-visible,
+  .dark textarea:focus-visible,
+  .dark [role="button"]:focus-visible,
+  .dark [tabindex]:focus-visible {
+    outline: 2px solid #f59e0b;
+    outline-offset: 2px;
+  }
+
+  .high-contrast button:focus-visible,
+  .high-contrast a:focus-visible,
+  .high-contrast input:focus-visible,
+  .high-contrast select:focus-visible,
+  .high-contrast textarea:focus-visible,
+  .high-contrast [role="button"]:focus-visible,
+  .high-contrast [tabindex]:focus-visible {
+    outline: 3px solid #ffff00 !important;
+    outline-offset: 3px !important;
+  }
 }
+
 
 .font-playfair {
   font-family: 'Playfair Display', serif;

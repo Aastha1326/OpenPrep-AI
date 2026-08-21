@@ -4,9 +4,10 @@ function CustomCursor() {
   const dotRef = useRef(null);
   const ringRef = useRef(null);
   const [isTouch] = useState(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
       return window.matchMedia('(pointer: coarse)').matches;
     }
+
     return false;
   });
 

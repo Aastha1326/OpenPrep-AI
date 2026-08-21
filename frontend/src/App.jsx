@@ -15,7 +15,10 @@ import OfflineBanner from './components/common/OfflineBanner';
 import PwaInstallPrompt from './components/common/PwaInstallPrompt';
 import OfflineIndicator from './components/common/OfflineIndicator';
 import Walkthrough from './components/tutorial/Walkthrough';
+import MobileBottomNav from './components/common/MobileBottomNav';
 import './App.css';
+
+
 
 const Landing = lazy(() => import('./pages/Landing'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -43,8 +46,11 @@ const StudyPlanner = lazy(() => import('./pages/StudyPlanner'));
 const VivaSimulator = lazy(() => import('./pages/VivaSimulator'));
 const CollaborativeNoteView = lazy(() => import('./pages/CollaborativeNoteView'));
 const SquadsPage = lazy(() => import('./pages/SquadsPage'));
+const StudySquadDashboard = lazy(() => import('./pages/SquadsPage'));
+const CollabNote = lazy(() => import('./pages/CollaborativeNoteView'));
 
 function App() {
+
   const dispatch = useDispatch();
   const { sessionExpired, aiQuotaExceededUntil } = useSelector((state) => state.auth);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -125,6 +131,12 @@ function App() {
 
   return (
     <>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[99999] focus:px-4 focus:py-2 focus:bg-amber-700 focus:text-white focus:rounded-lg focus:shadow-2xl focus:outline-none focus:ring-2 focus:ring-amber-400 font-semibold text-xs"
+      >
+        Skip to main content
+      </a>
       {aiQuotaExceededUntil && (
         <div className="bg-red-900 border-b border-red-700 text-red-50 text-center py-2 text-xs font-semibold select-none flex items-center justify-center gap-2 relative z-[9998]">
           <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-ping" />
@@ -138,9 +150,11 @@ function App() {
       <ScrollToTop />
       <MobileNavDrawer />
       <QuotaExceededModal />
+      <SessionTimeoutModal />
       <Walkthrough />
       <CommandPalette isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
-      <Suspense fallback={<PageSkeleton />}>
+      <main id="main-content" tabIndex="-1" role="main" className="focus:outline-none min-h-screen">
+        <Suspense fallback={<PageSkeleton />}>
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/register" element={<Register />} />
@@ -328,9 +342,11 @@ function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
+      </main>
       <MobileBottomNav />
     </>
   );
+
 }
 
 export default App;
