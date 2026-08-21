@@ -242,6 +242,17 @@ describe('POST /api/flashcards/from-audio', () => {
       expect(res.body.data[0].front).toContain('Photosynthesis');
     });
 
+    it('should handle search with no results correctly', async () => {
+      const res = await request(app)
+        .get('/api/flashcards')
+        .set('Authorization', `Bearer ${authToken}`)
+        .query({ search: 'nonexistentquery123' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.count).toBe(0);
+      expect(res.body.data).toEqual([]);
+    });
+
     it('should filter flashcards by topicId', async () => {
       await Flashcard.create({
         user: testUser.id,
@@ -603,6 +614,18 @@ describe('POST /api/flashcards/from-audio', () => {
       expect(res.body.success).toBe(true);
       expect(res.body.data).toBeInstanceOf(Array);
       expect(res.body.data.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should handle empty search results correctly', async () => {
+      const res = await request(app)
+        .get('/api/flashcards/community')
+        .set('Authorization', `Bearer ${authToken}`)
+        .query({ search: 'nonexistentcommunitydeck123' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.count).toBe(0);
+      expect(res.body.data).toEqual([]);
     });
 
     it("should clone a community deck into user's personal library and increment cloneCount", async () => {
