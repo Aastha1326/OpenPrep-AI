@@ -19,7 +19,9 @@ describe('Exam Readiness Engine Unit & Data Structure Tests', () => {
     it('accurately computes 30% Syllabus, 30% Quiz, 25% Memory, 15% Velocity formula', async () => {
       vi.spyOn(models.Topic, 'findAll').mockResolvedValue([{ id: 't-1' }]);
       vi.spyOn(models.Progress, 'findAll').mockResolvedValue([{ topic: 't-1', completionPercentage: 100 }]);
-      vi.spyOn(models.QuizAttempt, 'findAll').mockResolvedValue([{ score: 10, totalQuestions: 10 }]);
+      // score is the percentage quizController stores, not a count of correct
+      // answers — a perfect ten-question quiz is { score: 100, totalQuestions: 10 }.
+      vi.spyOn(models.QuizAttempt, 'findAll').mockResolvedValue([{ score: 100, totalQuestions: 10 }]);
       vi.spyOn(models.Flashcard, 'findAll').mockResolvedValue([{ efactor: 3.0, repetitions: 5 }]);
       vi.spyOn(models.StudyPlan, 'findOne').mockResolvedValue({
         dailyGoals: [{ completed: true }],
