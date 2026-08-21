@@ -56,6 +56,31 @@ class RedisService {
     }
   }
 
+  /**
+   * Atomically add `amount` to a counter and return the new total.
+   *
+   * INCRBY is the whole point: a get/modify/set round trip lets concurrent
+   * callers all read the same value before any of them writes, which is how a
+   * quota check ends up letting every request through. Returns null when Redis
+   * is unavailable so the caller can fall back deliberately rather than
+   * mistaking a failure for a count of zero.
+   */
+  async incrBy(key, amount, ttlSeconds = 3600) {
+    if (!this.isReady) return null;
+    try {
+      const total = await this.client.incrby(key, amount);
+      // Only set the TTL when the key is new, so a long-lived counter is not
+      // repeatedly pushed out of expiry by later increments.
+      if (total === amount) {
+        await this.client.expire(key, ttlSeconds);
+      }
+      return total;
+    } catch (error) {
+      console.warn('Redis IncrBy Error:', error.message);
+      return null;
+    }
+  }
+
   async del(keyPattern) {
     if (!this.isReady) return;
     try {
