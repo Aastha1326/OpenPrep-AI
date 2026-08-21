@@ -65,11 +65,15 @@ export const reviewFlashcard = createAsyncThunk(
 
 // ── Helper: Initial theme detection ──
 const getInitialTheme = () => {
-  if (typeof localStorage === 'undefined' || typeof localStorage.getItem !== 'function') {
+  try {
+    if (typeof localStorage === 'undefined' || !localStorage || typeof localStorage.getItem !== 'function') {
+      return 'light';
+    }
+    const saved = localStorage.getItem('openprep_theme') || localStorage.getItem('theme');
+    return saved === 'dark' ? 'dark' : 'light';
+  } catch (e) {
     return 'light';
   }
-  const saved = localStorage.getItem('openprep_theme') || localStorage.getItem('theme');
-  return saved === 'dark' ? 'dark' : 'light';
 };
 
 
