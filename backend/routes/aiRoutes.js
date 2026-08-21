@@ -1,11 +1,16 @@
 const express = require('express');
-const { explainQuestion, chatWithAssistant } = require('../controllers/aiController');
+const multer = require('multer');
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+});
+const { explainQuestion, chatWithAssistant, solveImageQuestion } = require('../controllers/aiController');
 const { generateMindMap, getMindMapById, getUserMindMaps } = require('../controllers/mindMapController');
 const { protect } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
 const { checkAiQuota } = require('../middleware/aiQuotaMiddleware');
+const { aiSanitizer } = require('../middleware/aiSanitizer');
 const { validateGenerateMindMap } = require('../middleware/validators');
-
 
 const router = express.Router();
 
@@ -189,5 +194,14 @@ router.post(
 
 router.get('/mind-map', protect, getUserMindMaps);
 router.get('/mind-map/:id', protect, getMindMapById);
+
+router.post(
+  '/solve-image',
+  protect,
+  aiLimiter,
+  checkAiQuota,
+  upload.single('image'),
+  solveImageQuestion
+);
 
 module.exports = router;
