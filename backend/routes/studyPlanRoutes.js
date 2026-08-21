@@ -11,6 +11,8 @@ const {
   exportStudyPlanIcs,
   exportStudyPlanPdf,
   rebalanceStudyPlan,
+  createStudyPlan,
+  getStudyPlan,
 } = require('../controllers/studyPlanController');
 const { protect } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
@@ -30,10 +32,24 @@ const router = express.Router();
  */
 
 /**
+ * @route   POST /api/study-plans
+ * @desc    Generate a new AI-powered study plan (Service-based)
+ * @access  Private
+ */
+router.post('/', protect, createStudyPlan);
+
+/**
+ * @route   GET /api/study-plans
+ * @desc    Retrieve the user's current study plan (Service-based)
+ * @access  Private
+ */
+router.get('/', protect, getStudyPlan);
+
+/**
  * @swagger
  * /api/study-plans/generate-ai:
  *   post:
- *     summary: Generate an AI-powered study plan
+ *     summary: Generate an AI-powered study plan (Legacy/Detailed)
  *     tags: [Study Plans]
  *     security:
  *       - bearerAuth: []
