@@ -12,7 +12,9 @@ const PYQQuestion = require('../models/PYQQuestion');
 const ActivityLog = require('../models/ActivityLog');
 const Progress = require('../models/Progress');
 const QuizTelemetryEvent = require('../models/QuizTelemetryEvent');
-const QuizBookmark = require('../models/QuizBookmark');const geminiService = require('../services/geminiService');
+const QuizBookmark = require('../models/QuizBookmark');
+const geminiService = require('../services/geminiService');
+const cacheService = require('../services/cacheService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
 const { runCalibration } = require('../services/difficultyCalibrator');
 const { calculateTopicProficiency, getDifficultyLevel } = require('../services/proficiencyService');
@@ -90,17 +92,45 @@ exports.generateAIQuiz = async (req, res, next) => {
     const proficiency = await calculateTopicProficiency(req.user.id, subjectId, topicId);
     const difficultyLevel = getDifficultyLevel(proficiency);
 
-    // Call Gemini Service
-    const aiQuiz = await geminiService.generateQuiz(
-      subject.name,
-      topicName,
-      notesText,
-      count || 5,
-      req.query.refresh === 'true',
-      normalizedLanguage,
-      difficultyLevel,
-      questionType
-    );
+    // Build canonical prompt memoization payload & cache key
+    const isRefresh = req.query.refresh === 'true';
+    const cacheKey = cacheService.hashPayload('quiz', {
+      subject: subject.name,
+      topic: topicName,
+      count: count || 5,
+      language: normalizedLanguage,
+      difficulty: difficultyLevel,
+      questionType,
+    });
+
+    let aiQuiz = null;
+    let cacheStatus = 'MISS';
+
+    if (!isRefresh) {
+      const cached = await cacheService.getWithMetadata(cacheKey);
+      if (cached.isHit && cached.data) {
+        aiQuiz = cached.data;
+        cacheStatus = 'HIT';
+      }
+    }
+
+    if (!aiQuiz) {
+      aiQuiz = await geminiService.generateQuiz(
+        subject.name,
+        topicName,
+        notesText,
+        count || 5,
+        isRefresh,
+        normalizedLanguage,
+        difficultyLevel,
+        questionType
+      );
+      if (aiQuiz && !aiQuiz._mock) {
+        await cacheService.set(cacheKey, aiQuiz, cacheService.QUIZ_TTL);
+      }
+    }
+
+    res.setHeader('X-Cache-Status', cacheStatus);
 
     // Assign unique question IDs (similar to Mongoose subdocument ids)
     const questionsWithIds = aiQuiz.questions.map((q) => {
