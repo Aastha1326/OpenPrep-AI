@@ -215,14 +215,11 @@ const Settings = () => {
       setPushStatus(permission);
 
       if (permission === 'granted') {
-        const registration = await navigator.serviceWorker.register('/service-worker.js');
+        // Subscribes against the worker vite-plugin-pwa already registered.
+        // This used to register /service-worker.js and subscribe to that — a
+        // worker with no push listener, so nothing was ever displayed.
         const vapidPublicKey = await getVapidPublicKey();
-        const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
-
-        const subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: convertedVapidKey,
-        });
+        const subscription = await subscribeToPushNotifications(vapidPublicKey);
 
         await subscribeToPush(subscription);
         setPushSubscribed(true);
@@ -239,11 +236,7 @@ const Settings = () => {
   const handleDisablePush = async () => {
     try {
       setPushLoading(true);
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
-      if (subscription) {
-        await subscription.unsubscribe();
-      }
+      await unsubscribeFromPushNotifications();
       await unsubscribeFromPush();
       setPushSubscribed(false);
       dispatch(loadUser());
@@ -262,7 +255,7 @@ const Settings = () => {
       await updateNotificationPreferences(reminderTime);
       setSaved(true);
       dispatch(loadUser());
-    } catch (err) {
+    } catch {
       setError('Failed to update reminder time.');
     } finally {
       setSaving(false);

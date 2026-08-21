@@ -1,5 +1,10 @@
-/* eslint-disable no-restricted-globals */
-// Service Worker for OpenPrep AI Web Push Notifications
+// Web Push handlers for OpenPrep AI.
+//
+// This file is NOT registered directly. vite-plugin-pwa generates the service
+// worker that actually gets registered (dist/sw.js) and pulls this file in via
+// `workbox.importScripts` — see frontend/vite.config.js. It used to live at
+// public/sw.js, where the generated worker overwrote it at build time and the
+// push handlers below silently vanished from the deployed bundle.
 
 self.addEventListener('push', (event) => {
   let data = {
