@@ -1464,7 +1464,7 @@ exports.starCommunityDeck = async (req, res, next) => {
 // @access  Private
 exports.batchSyncOfflineReviews = async (req, res, next) => {
   try {
-    const { reviews } = req.body;
+    const reviews = req.body.reviews || req.body.batch || req.body;
 
     if (!Array.isArray(reviews) || reviews.length === 0) {
       return res.status(400).json({
@@ -1493,9 +1493,11 @@ exports.batchSyncOfflineReviews = async (req, res, next) => {
     // card must compose in order, otherwise the second overwrites the first's
     // SM-2 state instead of building on it.
     for (const review of reviews) {
-      const { cardId, score, reviewedAt } = review || {};
+      const cardId = review.cardId || review.flashcardId;
+      const rawScore = review.score ?? review.quality;
+      const reviewedAt = review.reviewedAt || review.timestamp;
 
-      const quality = Number(score);
+      const quality = Number(rawScore);
       if (!Number.isInteger(quality) || quality < 0 || quality > 5) {
         skipped += 1;
         errors.push({ cardId: cardId || null, error: 'Score must be an integer between 0 and 5' });
