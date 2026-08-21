@@ -40,6 +40,17 @@
   --color-dark-border: #412d15;
   --color-dark-text: #e1dcc9;
   --color-dark-muted: #c4ba9d;
+
+  --accent-primary: #ad8b73;
+  --accent-secondary: #e3caa5;
+  --primary-h: 24;
+  --primary-s: 25%;
+  --primary-l: 57%;
+  --secondary-h: 36;
+  --secondary-s: 62%;
+  --secondary-l: 67%;
+  --color-primary: var(--accent-primary);
+  --color-secondary: var(--accent-secondary);
 }
 
 @layer base {
@@ -62,6 +73,37 @@
   html.high-contrast body {
     background-color: #000000 !important;
     color: #ffffff !important;
+  }
+
+  /* Preset specific body background & text rules */
+  .theme-glassmorphism body,
+  html.theme-glassmorphism body {
+    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%) !important;
+    color: #f8fafc !important;
+  }
+
+  .theme-oled body,
+  html.theme-oled body {
+    background-color: #000000 !important;
+    color: #ffffff !important;
+  }
+
+  .theme-emerald body,
+  html.theme-emerald body {
+    background: linear-gradient(135deg, #022c22 0%, #064e3b 100%) !important;
+    color: #ecfdf5 !important;
+  }
+
+  .theme-sunset body,
+  html.theme-sunset body {
+    background: linear-gradient(135deg, #181825 0%, #2a1b3d 100%) !important;
+    color: #f3e8ee !important;
+  }
+
+  .theme-sepia body,
+  html.theme-sepia body {
+    background-color: #fbf0d9 !important;
+    color: #433422 !important;
   }
 
   h1,
