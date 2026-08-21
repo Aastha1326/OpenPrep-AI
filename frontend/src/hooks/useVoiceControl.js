@@ -70,27 +70,30 @@ recognition.lang = language;
     };
 
     recognition.onresult = (event) => {
-      if (isSpeakingRef.current || isPaused) return; // Prevent collision
-      
-      setStatus('PROCESSING');
       const lastResult = event.results[event.results.length - 1];
       const transcript = lastResult[0].transcript;
       const confidence = lastResult[0].confidence;
+      let command = null;
+      if (confidence > CONFIDENCE_THRESHOLD) {
+        command = parseCommand(transcript);
+      }
+
+      if (isSpeakingRef.current) return;
+      if (isPaused && command !== 'RESUME') return;
+      
+      setStatus('PROCESSING');
       if (confidence > CONFIDENCE_THRESHOLD && onTranscript) {
         onTranscript(transcript.trim(), confidence);
       }
-      if (confidence > CONFIDENCE_THRESHOLD) {
-        const command = parseCommand(transcript);
-        if (command) {
-          if (command === 'PAUSE') {
-            setIsPaused(true);
-            setStatus('IDLE');
-          } else if (command === 'RESUME') {
-            setIsPaused(false);
-            setStatus('LISTENING');
-          } else if (!isPaused && onCommand) {
-            onCommand(command);
-          }
+      if (command) {
+        if (command === 'PAUSE') {
+          setIsPaused(true);
+          setStatus('IDLE');
+        } else if (command === 'RESUME') {
+          setIsPaused(false);
+          setStatus('LISTENING');
+        } else if (!isPaused && onCommand) {
+          onCommand(command);
         }
       }
       
@@ -160,7 +163,7 @@ recognition.lang = language;
       recognition.abort();
       if (synthRef.current) synthRef.current.cancel();
     };
-  }, [isEnabled, isPaused, onCommand, onTranscript, language, status]);
+  }, [isEnabled, isPaused, onCommand, onTranscript, language]);
   const toggleVoiceMode = useCallback(() => {
     if (!isSupported) return;
     
