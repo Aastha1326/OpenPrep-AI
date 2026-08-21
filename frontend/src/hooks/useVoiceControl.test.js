@@ -8,6 +8,7 @@ describe('useVoiceControl', () => {
   let mockOnCommand;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     mockRecognitionInstance = {
       start: vi.fn(),
       abort: vi.fn(),
@@ -16,7 +17,7 @@ describe('useVoiceControl', () => {
       lang: '',
     };
     
-    MockRecognition = vi.fn(() => mockRecognitionInstance);
+    MockRecognition = vi.fn(function() { return mockRecognitionInstance; });
     window.SpeechRecognition = MockRecognition;
 
     mockSynth = {
@@ -24,14 +25,23 @@ describe('useVoiceControl', () => {
       cancel: vi.fn(),
     };
     window.speechSynthesis = mockSynth;
+    window.SpeechSynthesisUtterance = vi.fn(function(text) {
+      this.text = text;
+      this.rate = 1;
+      this.lang = '';
+      this.onend = null;
+      this.onerror = null;
+    });
     
     mockOnCommand = vi.fn();
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     delete window.SpeechRecognition;
     delete window.speechSynthesis;
+    delete window.SpeechSynthesisUtterance;
   });
 
   it('handles unsupported browsers', () => {
@@ -186,7 +196,7 @@ describe('useVoiceControl', () => {
     result.current.toggleVoiceMode();
   });
 
-  const recognition = MockSpeechRecognition.instances[0];
+  const recognition = mockRecognitionInstance;
 
   act(() => {
     recognition.onstart();
@@ -220,7 +230,7 @@ test('reports microphone permission errors without trapping the user in voice mo
     result.current.toggleVoiceMode();
   });
 
-  const recognition = MockSpeechRecognition.instances[0];
+  const recognition = mockRecognitionInstance;
 
   act(() => {
     recognition.onerror({
