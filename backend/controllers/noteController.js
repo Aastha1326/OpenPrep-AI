@@ -38,7 +38,16 @@ const escapeRegex = (string) => {
  */
 exports.exportNotes = async (req, res, next) => {
   try {
-    const format = req.query.format === 'zip' ? 'zip' : 'json';
+    const requestedFormat = req.query.format;
+    if (!requestedFormat || requestedFormat.trim() === '') {
+      return res.status(400).json({ success: false, error: 'Export format is required' });
+    }
+    
+    if (requestedFormat !== 'zip' && requestedFormat !== 'json') {
+      return res.status(400).json({ success: false, error: 'Unsupported export format' });
+    }
+
+    const format = requestedFormat;
 
     const notes = await Note.findAll({
       where: { user: req.user.id },

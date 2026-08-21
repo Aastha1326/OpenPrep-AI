@@ -528,4 +528,57 @@ describe('Note Controller - Integration Tests', () => {
       expect(res.body.error).toContain('exceeds the maximum allowed size');
     });
   });
+
+  // =========================================================================
+  // GET /api/notes/export — Export Notes
+  // =========================================================================
+  describe('GET /api/notes/export', () => {
+    it('should reject when export format is missing with 400', async () => {
+      const res = await request(app)
+        .get('/api/notes/export')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toContain('Export format is required');
+    });
+
+    it('should reject when export format is blank with 400', async () => {
+      const res = await request(app)
+        .get('/api/notes/export?format=   ')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toContain('Export format is required');
+    });
+
+    it('should reject when export format is unsupported with 400', async () => {
+      const res = await request(app)
+        .get('/api/notes/export?format=pdf')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toContain('Unsupported export format');
+    });
+
+    it('should succeed when export format is json', async () => {
+      const res = await request(app)
+        .get('/api/notes/export?format=json')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('application/json');
+    });
+
+    it('should succeed when export format is zip', async () => {
+      const res = await request(app)
+        .get('/api/notes/export?format=zip')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('application/zip');
+    });
+  });
 });
