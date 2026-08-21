@@ -29,8 +29,30 @@ describe('Swagger Documentation Router Integration tests', () => {
     const res = await request(app).get('/api/docs.json');
 
     expect(res.status).toBe(200);
-    expect(res.body.openapi).toBe('3.0.0');
+    expect(res.body.openapi).toBe('3.1.0');
     expect(res.body.info.title).toBe('OpenPrep AI Backend API');
+  });
+
+  test('GET /api/openapi.json returns raw OpenAPI 3.1 JSON specs', async () => {
+    process.env.NODE_ENV = 'development';
+
+    const res = await request(app).get('/api/openapi.json');
+
+    expect(res.status).toBe(200);
+    expect(res.body.openapi).toBe('3.1.0');
+    expect(res.body.info.title).toBe('OpenPrep AI Backend API');
+    expect(res.body.components.securitySchemes.bearerAuth).toBeDefined();
+  });
+
+  test('GET /api/docs returns Scalar HTML with dark theme support', async () => {
+    process.env.NODE_ENV = 'development';
+
+    const res = await request(app).get('/api/docs').redirects(1);
+
+    expect(res.status).toBe(200);
+    expect(res.text || '').toContain('html');
+    // Scalar renders with api-reference marker
+    expect(res.text.toLowerCase()).toMatch(/scalar|api-reference/);
   });
 
   test('GET /api/docs returns 403 Forbidden in production environment when SWAGGER_ENABLED is not true', async () => {

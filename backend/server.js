@@ -20,8 +20,8 @@ const fs = require('fs');
 const PYQ = require('./models/PYQ');
 const Note = require('./models/Note');
 const Achievement = require('./models/Achievement');
-const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
+const { apiReference } = require('@scalar/express-api-reference');
 const passport = require('./config/passport');
 const { getCorsMiddleware, getSocketCorsOrigin } = require('./middleware/corsHandler');
 
@@ -332,29 +332,33 @@ app.get('/api/test-error', (req, res) => {
   throw new Error('Test error for Sentry verification');
 });
 
-// Swagger UI Documentation & Spec endpoints
-const swaggerEnabled = process.env.SWAGGER_ENABLED === 'true' || process.env.NODE_ENV !== 'production';
+// Scalar API Reference & OpenAPI Spec endpoints (OpenAPI 3.1)
+const isSwaggerEnabled = () => process.env.SWAGGER_ENABLED === 'true' || process.env.NODE_ENV !== 'production';
 
-app.use(['/api-docs', '/api/docs'], (req, res, next) => {
-  if (!swaggerEnabled) {
-    return res.status(403).json({ success: false, error: 'Swagger API documentation is disabled in this environment.' });
-  }
-  next();
-}, swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-  customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: 'OpenPrep AI API Documentation',
-  swaggerOptions: {
-    persistAuthorization: true,
-    displayRequestDuration: true,
-  },
-}));
-
-app.get(['/api-docs.json', '/api/docs.json'], (req, res) => {
-  if (!swaggerEnabled) {
-    return res.status(403).json({ success: false, error: 'Swagger API documentation is disabled in this environment.' });
+// Serve raw OpenAPI JSON at both legacy and new paths
+app.get(['/api-docs.json', '/api/docs.json', '/api/openapi.json'], (req, res) => {
+  if (!isSwaggerEnabled()) {
+    return res.status(403).json({ success: false, error: 'API documentation is disabled in this environment.' });
   }
   res.json(swaggerSpec);
 });
+
+// Interactive Scalar docs at /api/docs (and legacy /api-docs)
+app.use(['/api-docs', '/api/docs'], (req, res, next) => {
+  if (!isSwaggerEnabled()) {
+    return res.status(403).json({ success: false, error: 'API documentation is disabled in this environment.' });
+  }
+  next();
+}, apiReference({
+  content: swaggerSpec,
+  theme: 'kepler',
+  darkMode: true,
+  layout: 'modern',
+  metaData: {
+    title: 'OpenPrep AI API Documentation',
+  },
+  customCss: '.scalar-api-reference { --scalar-color-accent: #f59e0b; }',
+}));
 
 // Error Handler Middleware
 if (process.env.NODE_ENV !== 'test' && process.env.SENTRY_DSN) {
