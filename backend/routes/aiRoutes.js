@@ -4,6 +4,7 @@ const { generateMindMap, getMindMapById, getUserMindMaps } = require('../control
 const { protect } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
 const { checkAiQuota } = require('../middleware/aiQuotaMiddleware');
+const { aiSanitizer } = require('../middleware/aiSanitizer');
 const { validateGenerateMindMap } = require('../middleware/validators');
 
 
@@ -131,6 +132,7 @@ router.post(
   protect,
   aiLimiter,
   checkAiQuota,
+  aiSanitizer,
   explainQuestion
 );
 
@@ -139,6 +141,7 @@ router.post(
   protect,
   aiLimiter,
   checkAiQuota,
+  aiSanitizer,
   chatWithAssistant
 );
 
@@ -183,6 +186,7 @@ router.post(
   protect,
   aiLimiter,
   checkAiQuota,
+  aiSanitizer,
   validateGenerateMindMap,
   generateMindMap
 );

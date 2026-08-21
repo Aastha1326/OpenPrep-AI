@@ -106,6 +106,11 @@ This document outlines the security architecture, data validation flows, and pol
 * **UTC Rollover Reset**: The daily usage counters reset automatically at midnight UTC.
 * **Failure Guard**: The quota count is incremented post-response only for successful 2xx responses, ensuring failed requests do not drain the user's daily quota.
 
+### 12. Strict Prompt Injection Sanitization & LLM Safety
+* **Jailbreak Detection (`aiSanitizer.js`)**: Incoming AI prompts, topics, and message inputs are scanned against known LLM jailbreak signatures (e.g. `ignore previous instructions`, `system override`, `you are now DAN`).
+* **Violation Handling**: Detected jailbreak attempts are flagged, blocked immediately with HTTP `400 Bad Request` (`securityViolation: true`), and logged in backend security audit logs.
+* **XSS Vector Stripping**: Input strings are sanitized to strip inline `<script>` tags and executable JavaScript injection vectors before passing data to Gemini API services.
+
 ---
 
 ## 🚨 Vulnerability Disclosure Policy
