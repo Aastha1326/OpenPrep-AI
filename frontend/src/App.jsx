@@ -138,8 +138,10 @@ function App() {
       <ScrollToTop />
       <MobileNavDrawer />
       <QuotaExceededModal />
+      <SessionTimeoutModal />
       <Walkthrough />
       <CommandPalette isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+
       <Suspense fallback={<PageSkeleton />}>
         <Routes>
           <Route path="/" element={<Landing />} />
