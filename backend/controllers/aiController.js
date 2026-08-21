@@ -84,3 +84,43 @@ exports.chatWithAssistant = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Solve uploaded math/physics formula or diagram image via Gemini Multimodal Vision
+// @route   POST /api/ai/solve-image
+// @access  Private
+exports.solveImageQuestion = async (req, res, next) => {
+  try {
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ success: false, error: 'Please upload an image file of the equation or diagram.' });
+    }
+
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    if (!allowedMimeTypes.includes(req.file.mimetype)) {
+      return res.status(400).json({ success: false, error: 'Invalid file format. Only JPEG, PNG, and WebP images are supported.' });
+    }
+
+    const { prompt } = req.body;
+    const solution = await geminiService.solveImageQuestion(req.file.buffer, req.file.mimetype, prompt || '');
+
+    res.status(200).json({
+      success: true,
+      data: solution,
+    });
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    if (error instanceof GeminiServerError) {
+      return res.status(503).json({
+        success: false,
+        error: error.message,
+      });
+    }
+    next(error);
+  }
+};
+
