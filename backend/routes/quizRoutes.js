@@ -41,10 +41,10 @@ const router = express.Router();
 const { getNextAdaptiveQuestion } = require('../controllers/adaptiveQuizController');
 
 // Register solution explainer route
-router.get('/questions/:questionId/explanation', protect, getEnhancedExplanation);
+router.get('/questions/:questionId/explanation', protect, aiLimiter, checkAiQuota, getEnhancedExplanation);
 
 // Register adaptive route
-router.post('/adaptive/next-question', protect, getNextAdaptiveQuestion);
+router.post('/adaptive/next-question', protect, aiLimiter, checkAiQuota, getNextAdaptiveQuestion);
 
 /**
  * @swagger

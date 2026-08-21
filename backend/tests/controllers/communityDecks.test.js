@@ -103,4 +103,42 @@ describe('Community Decks and Ratings API', () => {
       expect(res.status).toBe(400);
     });
   });
+
+  describe('GET /api/community/decks/:id/reviews', () => {
+    it('should fetch reviews and user details for a community deck', async () => {
+      await DeckRating.create({
+        deckId: publicDeck.id,
+        userId: peerUser.id,
+        stars: 4,
+        comment: 'Great explanations.',
+      });
+
+      const res = await request(app)
+        .get(`/api/community/decks/${publicDeck.id}/reviews`)
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.count).toBe(1);
+      expect(res.body.data[0].stars).toBe(4);
+      expect(res.body.data[0].comment).toBe('Great explanations.');
+      expect(res.body.data[0].userRef).toBeDefined();
+      expect(res.body.data[0].userRef.name).toBe(peerUser.name);
+    });
+
+    it('should return 404 for non-existent or non-public deck reviews', async () => {
+      const privateDeck = await Subject.create({
+        name: 'Private Math Deck',
+        exam: testExam.id,
+        user: testUser.id,
+        isPublic: false,
+      });
+
+      const res = await request(app)
+        .get(`/api/community/decks/${privateDeck.id}/reviews`)
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(404);
+    });
+  });
 });

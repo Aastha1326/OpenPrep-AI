@@ -57,6 +57,11 @@ const StudyPlan = sequelize.define(
         name: 'studyplan_user_exam_created_idx',
         fields: ['user', 'exam', 'createdAt'],
       },
+      {
+        name: 'studyplan_dailygoals_idx',
+        fields: ['dailyGoals'],
+        using: 'GIN',
+      },
     ],
   }
 );

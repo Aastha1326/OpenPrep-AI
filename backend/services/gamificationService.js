@@ -1,6 +1,7 @@
 const { User, UserBadge, QuizAttempt, SquadMember, SquadChallenge, SquadChallengeContribution, SquadAchievement } = require('../models');
 const { checkAndAwardBadges } = require('./achievementService');
 const { createNotification } = require('./notificationService');
+const xpRateLimiter = require('./xpRateLimiter');
 let logSquadActivity = async () => {};
 try {
   const squadSvc = require('./squadActivityService');
@@ -21,47 +22,35 @@ function getNextLevelXP(level) {
 
 /**
  * Handle XP award and level up check.
- * Maximum XP per hour cap: 500 XP to prevent exploitation.
+ *
+ * The hourly cap is enforced by xpRateLimiter, which claims the allowance
+ * atomically over a rolling window. The counter here used to be a get/set pair
+ * against a bucket keyed on the wall-clock hour, which meant concurrent awards
+ * all read the same value and the whole allowance reset at the top of every
+ * hour.
  */
 async function awardXP(userId, amount, reason) {
   const user = await User.findByPk(userId);
   if (!user) return { leveledUp: false, newLevel: 1 };
 
-  const now = Date.now();
-  const oneHourAgo = now - 60 * 60 * 1000;
+  const reservation = await xpRateLimiter.consume(userId, amount);
 
-  // Implement hourly XP cap to prevent spamming
-  const cacheService = require('./cacheService'); // Or handle inline
-  const hourlyKey = `xp_earned:${userId}:${Math.floor(now / (60 * 60 * 1000))}`;
-  
-  let hourlyXP = 0;
-  try {
-    const cached = await cacheService.get(hourlyKey);
-    hourlyXP = cached ? parseInt(cached, 10) : 0;
-  } catch (e) {
-    // Cache service fallback
+  if (reservation.degraded) {
+    // Worth saying out loud: without Redis the counter is per-process, so the
+    // effective cap scales with the replica count.
+    console.warn(
+      `XP rate limit for user ${userId} is running on the in-process fallback; the cap is not shared across instances.`
+    );
   }
 
-  if (hourlyXP >= 500) {
-    console.log(`XP award capped for user ${userId} due to hourly limit.`);
+  const allowedAmount = reservation.granted;
+  if (allowedAmount <= 0) {
     return {
       leveledUp: false,
       xp: user.xp,
       level: user.level,
       message: 'Hourly XP limit reached',
     };
-  }
-
-  const allowedAmount = Math.min(amount, 500 - hourlyXP);
-  if (allowedAmount <= 0) {
-    return { leveledUp: false, xp: user.xp, level: user.level };
-  }
-
-  try {
-    const cacheService = require('./cacheService');
-    await cacheService.set(hourlyKey, String(hourlyXP + allowedAmount), 3600);
-  } catch (e) {
-    // Cache service fallback
   }
 
   const previousLevel = user.level || 1;
@@ -75,7 +64,14 @@ async function awardXP(userId, amount, reason) {
     leveledUp = true;
   }
 
-  await user.save();
+  try {
+    await user.save();
+  } catch (error) {
+    // The allowance was claimed before the write; hand it back rather than
+    // charging the user for XP they never received.
+    await xpRateLimiter.refund(userId, allowedAmount);
+    throw error;
+  }
 
   // Distribute XP to active squad challenges
   try {
@@ -215,15 +211,26 @@ async function updateStreak(userId, timezoneOffsetMinutes = 0) {
     timezoneOffsetMinutes,
   });
 
-// Issue #1053: Check for Week Warrior badge
-  await checkAndAwardBadges(userId, {
-    type: 'STREAK_UPDATED',
-    payload: { streakDays: user.currentStreak }
-  });
+  // Issue #1053: Check for Week Warrior badge
+  try {
+    await checkAndAwardBadges(userId, {
+      type: 'STREAK_UPDATED',
+      payload: { streakDays: user.currentStreak },
+    });
+  } catch (e) {
+    // Graceful fallback if achievement service DB query is unavailable
+  }
 
-  // Issue #764: Post a "Streak hit" milestone to the user's study squad feeds
+  // Issue #764: Post a "Streak hit" milestone to the user's study squad feeds.
+  // logSquadActivity reports failures instead of throwing, so a feed outage
+  // cannot roll back a streak the user has already earned.
   if (user.currentStreak >= 7 && user.currentStreak % 7 === 0) {
-    await logSquadActivity(userId, 'streak_hit', `hit a ${user.currentStreak}-day study streak 🔥`);
+    await logSquadActivity(
+      userId,
+      'streak_hit',
+      `hit a ${user.currentStreak}-day study streak 🔥`,
+      { streakDays: user.currentStreak }
+    );
   }
 
   return {
@@ -271,16 +278,18 @@ newUnlocks.push({
   freezeReward: freezeRewardBadges.has(badgeCode) ? 1 : 0,
 });
 
-// Import io dynamically if needed, or pass null and it will just do Web Push + DB.
-// Since we don't have direct access to io here, we'll pass null.
-await createNotification(
-  user.id,
-  `Badge Earned: ${getBadgeTitle(badgeCode)}`,
-  getBadgeDescription(badgeCode),
-  'badge_earned',
-  '/dashboard',
-  global.io // Assuming we attach io to global, or let notificationService handle it. But server.js doesn't export io. We'll leave io as null or we can require server.js? Actually, if we just pass null, it won't emit real-time over socket, which fails the requirement. Wait!
-);
+try {
+  await createNotification(
+    user.id,
+    `Badge Earned: ${getBadgeTitle(badgeCode)}`,
+    getBadgeDescription(badgeCode),
+    'badge_earned',
+    '/dashboard',
+    global.io
+  );
+} catch (err) {
+  // Notification creation error fallback
+}
 
     }
   };

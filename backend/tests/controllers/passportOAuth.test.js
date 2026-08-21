@@ -1,8 +1,6 @@
 const passport = require('../../config/passport');
 const User = require('../../models/User');
 
-vi.mock('../../models/User');
-
 describe('Passport OAuth 2.0 Strategy Callbacks', () => {
   let googleCallback;
   let githubCallback;
@@ -17,7 +15,7 @@ describe('Passport OAuth 2.0 Strategy Callbacks', () => {
   });
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   describe('Google Strategy Callback', () => {
@@ -25,7 +23,7 @@ describe('Passport OAuth 2.0 Strategy Callbacks', () => {
       const mockProfile = {
         id: 'google-999',
         displayName: 'Google Linker',
-        emails: [{ value: 'linker@example.com' }],
+        emails: [{ value: 'linker@example.com', verified: true }],
         photos: [{ value: 'http://avatar.com/google.png' }],
       };
 
@@ -39,7 +37,7 @@ describe('Passport OAuth 2.0 Strategy Callbacks', () => {
       };
 
       // Mock User.findOne to not find by googleId, but find by email
-      User.findOne
+      const findOneSpy = vi.spyOn(User, 'findOne')
         .mockResolvedValueOnce(null) // googleId check
         .mockResolvedValueOnce(mockUser); // email check
 
@@ -57,7 +55,7 @@ describe('Passport OAuth 2.0 Strategy Callbacks', () => {
       const mockProfile = {
         id: 'google-777',
         displayName: 'New Google User',
-        emails: [{ value: 'newgoogle@example.com' }],
+        emails: [{ value: 'newgoogle@example.com', verified: true }],
         photos: [{ value: 'http://avatar.com/newgoogle.png' }],
       };
 
@@ -69,15 +67,15 @@ describe('Passport OAuth 2.0 Strategy Callbacks', () => {
         save: vi.fn(),
       };
 
-      User.findOne
+      vi.spyOn(User, 'findOne')
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(null);
-      User.create.mockResolvedValueOnce(mockCreatedUser);
+      const createSpy = vi.spyOn(User, 'create').mockResolvedValueOnce(mockCreatedUser);
 
       const done = vi.fn();
       await googleCallback('access_token', 'refresh_token', mockProfile, done);
 
-      expect(User.create).toHaveBeenCalledWith(expect.objectContaining({
+      expect(createSpy).toHaveBeenCalledWith(expect.objectContaining({
         email: 'newgoogle@example.com',
         googleId: 'google-777',
         authProvider: 'google',
@@ -105,7 +103,7 @@ describe('Passport OAuth 2.0 Strategy Callbacks', () => {
       const mockProfile = {
         id: 'github-123',
         username: 'gitlink',
-        emails: [{ value: 'gitlink@example.com' }],
+        emails: [{ value: 'gitlink@example.com', primary: true, verified: true }],
         photos: [{ value: 'http://avatar.com/git.png' }],
       };
 
@@ -118,7 +116,7 @@ describe('Passport OAuth 2.0 Strategy Callbacks', () => {
         save: vi.fn().mockResolvedValue(true),
       };
 
-      User.findOne
+      vi.spyOn(User, 'findOne')
         .mockResolvedValueOnce(null) // githubId check
         .mockResolvedValueOnce(mockUser); // email check
 
@@ -139,7 +137,7 @@ describe('Passport OAuth 2.0 Strategy Callbacks', () => {
         photos: [{ value: 'http://avatar.com/priv.png' }],
       };
 
-      User.findOne.mockResolvedValueOnce(null); // githubId check
+      vi.spyOn(User, 'findOne').mockResolvedValueOnce(null); // githubId check
 
       const done = vi.fn();
       await githubCallback('access_token', 'refresh_token', mockProfile, done);

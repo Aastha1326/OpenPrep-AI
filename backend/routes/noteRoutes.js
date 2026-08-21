@@ -17,9 +17,12 @@ const { transcribeAndSummarize } = require('../controllers/audioNoteController')
 const { protect } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const { uploadMarkdown } = require('../middleware/upload');
+const audioNoteUpload = require('../middleware/audioNoteUpload');
 const { validateUploadNote, validateImportNotes } = require('../middleware/validators');
 const cacheMiddleware = require('../middleware/cache');
 const clearCache = require('../middleware/clearCache');
+const { aiLimiter } = require('../middleware/rateLimiter');
+const { checkAiQuota } = require('../middleware/aiQuotaMiddleware');
 
 const router = express.Router();
 
@@ -231,7 +234,7 @@ router.post(
 router.post(
   '/voice',
   protect,
-  upload.single('file'),
+  audioNoteUpload.single('file'),
   validateUploadNote,
   clearCache('notes:*'),
   uploadVoiceNote
@@ -240,6 +243,8 @@ router.post(
 router.post(
   '/transcribe-and-summarize',
   protect,
+  aiLimiter,
+  checkAiQuota,
   upload.single('file'),
   transcribeAndSummarize
 );
@@ -412,7 +417,7 @@ router.put('/:id/download', protect, downloadNote); // downloading doesn't chang
  *               $ref: '#/components/schemas/Error'
  */
 
-router.post('/:id/summarize', protect, summarizeNote);
+router.post('/:id/summarize', protect, aiLimiter, checkAiQuota, summarizeNote);
 
 /**
  * @swagger

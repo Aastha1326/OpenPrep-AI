@@ -50,6 +50,37 @@ Most students waste critical preparation hours trying to figure out:
 
 ---
 
+## 🏛️ System Architecture
+
+OpenPrep AI is structured as a multi-tier system separating client presentation, server business logic, persistent data storage, and external AI processing.
+
+```mermaid
+graph TD
+    User["👤 Student / Client Browser"] <-->|"HTTP / REST API / JWT"| ReactUI["📱 React UI (Vite + Redux)"]
+    
+    subgraph Frontend["Client Layer (Frontend)"]
+        ReactUI -->|"Axios Client"| APIClient["API Service Layer"]
+    end
+    
+    APIClient <-->|"JSON Payloads & Bearer Auth"| ExpressBackend["⚙️ Express.js Server"]
+    
+    subgraph Backend["Server Layer (Backend)"]
+        ExpressBackend -->|"Auth Middleware"| Middleware["JWT Protection"]
+        Middleware -->|"Route Request"| Controller["Express Controllers"]
+        Controller -->|"ORM Abstraction"| Sequelize["Sequelize ORM"]
+        Controller -->|"AI Generation"| GeminiService["Gemini AI Service"]
+    end
+    
+    subgraph Storage["Data & AI Layer"]
+        Sequelize <-->|"SQL Queries"| PostgresDB[("🐘 PostgreSQL Database")]
+        GeminiService <-->|"NLP Analysis & Summaries"| GoogleGemini["✨ Google Gemini API (gemini-1.5-flash)"]
+    end
+```
+
+For detailed architectural decision records (ADRs) and sequence diagrams, review the [System Architecture Documentation](./docs/architecture.md).
+
+---
+
 ## 📂 Project Structure
 
 The repository is organized into separate frontend, backend, documentation, and development-support directories.

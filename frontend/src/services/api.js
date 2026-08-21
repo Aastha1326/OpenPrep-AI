@@ -270,6 +270,8 @@ API.interceptors.response.use(
       localStorage.setItem('token', newToken);
       localStorage.setItem('refreshToken', newRefreshToken);
 
+      store.dispatch({ type: 'auth/refreshToken/fulfilled', payload: response.data });
+
       API.defaults.headers.common.Authorization = `Bearer ${newToken}`;
       originalRequest.headers.Authorization = `Bearer ${newToken}`;
 
@@ -288,6 +290,7 @@ API.interceptors.response.use(
     }
   }
 );
+
 
 export const getReadinessProjection = (params) => API.get('/dashboard/readiness-projection', { params });
 

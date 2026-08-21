@@ -1,5 +1,5 @@
 import Skeleton from '../components/dashboard/Skeleton';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -34,9 +34,15 @@ import {
   Brain,
   Bot,
   Users,
-} from 'lucide-react';import API from '../services/api';
+  Swords,
+} from 'lucide-react';
+import API from '../services/api';
 import { toDateOnlyString } from '../utils/dateUtils';
 import SkillTree from '../components/dashboard/SkillTree';
+import ModelViewer from '../components/dashboard/ModelViewer';
+import StudyTimetable from '../components/dashboard/StudyTimetable';
+import FocusRoom from '../components/dashboard/FocusRoom';
+import QuizBattleArena from '../components/dashboard/QuizBattleArena';
 import {
   LineChart,
   Line,
@@ -55,15 +61,13 @@ import {
 import LeatherBoard from '../components/dashboard/LeatherBoard';
 import VintagePaper from '../components/dashboard/VintagePaper';
 import GoldTabButton from '../components/dashboard/GoldTabButton';
+import CustomFolders from '../components/dashboard/CustomFolders';
 import PomodoroTimer from '../components/dashboard/PomodoroTimer';
 import FlashcardWidget from '../components/dashboard/FlashcardWidget';
 import BadgeGrid from '../components/dashboard/BadgeGrid';
 import PinnedTasks from '../components/dashboard/PinnedTasks';
 import FatigueMonitor from '../components/dashboard/FatigueMonitor';
 import UploadMaterial from '../components/dashboard/UploadMaterial';
-import CreateNoteModal from '../components/dashboard/CreateNoteModal';
-import StudyPlanModal from '../components/dashboard/StudyPlanModal';
-import PyqAnalysisModal from '../components/dashboard/PyqAnalysisModal';
 import WeaknessDashboardWidget from '../components/dashboard/WeaknessDashboardWidget';
 import SubjectMasteryWidget from '../components/dashboard/SubjectMasteryWidget';
 import FocusEfficiencyWidget from '../components/dashboard/FocusEfficiencyWidget';
@@ -73,21 +77,27 @@ import LeaderboardWidget from '../components/dashboard/LeaderboardWidget';
 import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
 import ExamCountdownCard from '../components/dashboard/ExamCountdownCard';
 import TargetExamOverviewWidget from '../components/dashboard/TargetExamOverviewWidget';
-import CompositeBundleModal from '../components/dashboard/CompositeBundleModal';
-import SyllabusImportModal from '../components/dashboard/SyllabusImportModal';
 import NotesWidget from '../components/dashboard/NotesWidget';
 import ThemeToggle from '../components/ThemeToggle';
 import ReadinessWidget from '../components/dashboard/ReadinessWidget';
 import BadgesList from '../components/BadgesList';
-import SM2SettingsModal from '../components/dashboard/SM2SettingsModal';
 import LevelProgressBar from '../components/gamification/LevelProgressBar';
 import StreakWidget from '../components/gamification/StreakWidget';
 import BadgeCard from '../components/gamification/BadgeCard';
-import BadgeUnlockModal from '../components/gamification/BadgeUnlockModal';
-import LevelUpModal from '../components/gamification/LevelUpModal';
-import CommunityDecksModal from '../components/dashboard/CommunityDecksModal';
-import QuizSetupModal from '../components/dashboard/QuizSetupModal';
-import GenerateFlashcardsFromYouTubeModal from '../components/dashboard/GenerateFlashcardsFromYouTubeModal';
+import GlobalSearchBar from '../components/common/GlobalSearchBar';
+
+// Lazy-loaded heavy modal components for bundle size reduction
+const RichTextEditor = lazy(() => import('../components/dashboard/RichTextEditor'));
+const StudyPlanModal = lazy(() => import('../components/dashboard/StudyPlanModal'));
+const PyqAnalysisModal = lazy(() => import('../components/dashboard/PyqAnalysisModal'));
+const CompositeBundleModal = lazy(() => import('../components/dashboard/CompositeBundleModal'));
+const SyllabusImportModal = lazy(() => import('../components/dashboard/SyllabusImportModal'));
+const SM2SettingsModal = lazy(() => import('../components/dashboard/SM2SettingsModal'));
+const BadgeUnlockModal = lazy(() => import('../components/gamification/BadgeUnlockModal'));
+const LevelUpModal = lazy(() => import('../components/gamification/LevelUpModal'));
+const CommunityDecksModal = lazy(() => import('../components/dashboard/CommunityDecksModal'));
+const QuizSetupModal = lazy(() => import('../components/dashboard/QuizSetupModal'));
+const GenerateFlashcardsFromYouTubeModal = lazy(() => import('../components/dashboard/GenerateFlashcardsFromYouTubeModal'));
 import {
   fetchDashboardStats,
   fetchSubjectBreakdown,
@@ -342,6 +352,10 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [sessionStartTime] = useState(Date.now());
   const [isExporting, setIsExporting] = useState(false);
   const [isSkillTreeOpen, setIsSkillTreeOpen] = useState(false);
+  const [isModelViewerOpen, setIsModelViewerOpen] = useState(false);
+  const [isTimetableOpen, setIsTimetableOpen] = useState(false);
+  const [isFocusRoomOpen, setIsFocusRoomOpen] = useState(false);
+  const [isBattleOpen, setIsBattleOpen] = useState(false);
   const [showLevelUpModal, setShowLevelUpModal] = useState(false);
   const [levelUpLevel, setLevelUpLevel] = useState(null);
   const [prevLevel, setPrevLevel] = useState(null);
@@ -496,19 +510,23 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   return (
     <LeatherBoard>
       {/* --- QUICK ACTIONS TABS --- */}
-      <div className="absolute -left-4 top-24 flex-col gap-4 z-30 hidden md:flex">
-        <GoldTabButton
+        <div className="absolute -left-4 top-24 flex-col gap-4 z-30 hidden md:flex">
+          <GoldTabButton icon={Swords} label="Battle Arena" delay={0.05} onClick={() => setIsBattleOpen(true)} />
+          <GoldTabButton
           icon={Play}
           label="Start Quiz"
           delay={0.1}
           onClick={() => setIsQuizSetupOpen(true)}
         />
-        <GoldTabButton
-          icon={FileText}
-          label="PYQ Intelligence"
-          delay={0.2}
-          onClick={() => navigate('/pyqs')}
-        />
+          <GoldTabButton
+            icon={FileText}
+            label="PYQ Intelligence"
+            delay={0.2}
+            onClick={() => setIsPyqModalOpen(true)}
+          />
+          <GoldTabButton icon={Box} label="3D Anatomy" delay={0.25} onClick={() => setIsModelViewerOpen(true)} />
+          <GoldTabButton icon={Calendar} label="Timetable DnD" delay={0.3} onClick={() => setIsTimetableOpen(true)} />
+          <GoldTabButton icon={Headphones} label="Lofi Room" delay={0.45} onClick={() => setIsFocusRoomOpen(true)} />
         <GoldTabButton
           icon={Calendar}
           label="Study Plan"
@@ -550,6 +568,12 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           label="AI Study Assistant"
           delay={0.5}
           onClick={() => navigate('/ai-assistant')}
+        />
+        <GoldTabButton
+          icon={Network}
+          label="Topic Mind Map"
+          delay={0.52}
+          onClick={() => navigate('/mind-map')}
         />
         <button
           onClick={() => {
@@ -610,6 +634,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             transition={{ duration: 0.5, delay: 0.3 }}
             className="flex flex-wrap md:flex-nowrap items-center gap-3 sm:gap-4 mt-2 md:mt-0 max-w-full"
           >
+            <GlobalSearchBar />
             <div className="relative group z-50">
               <button className="bg-neutral-800 text-gold-foil border border-yellow-700/50 hover:bg-neutral-700 px-4 py-2.5 rounded-sm shadow-[0_4px_15px_rgba(0,0,0,0.5)] flex items-center gap-2 font-playfair font-bold text-sm tracking-wide min-h-[44px]">
                 <Download className="w-4 h-4" /> {t('export_analytics')}
@@ -1026,9 +1051,11 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
 
         <div className="my-6">
           <FocusEfficiencyWidget />
-        </div>
-        <div className="my-6">
-          <ActivityHeatmap />
+          {/* Folders & Activity */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <CustomFolders />
+            <ActivityHeatmap data={chartData} />
+          </div>
         </div>
 
 
@@ -1227,12 +1254,13 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             </p>
           </VintagePaper>
         </div>
-{/* --- CREATE NOTE MODAL --- */}
-      <CreateNoteModal
-        isOpen={isNoteModalOpen}
-        onClose={() => setIsNoteModalOpen(false)}
-        onNoteCreated={() => setIsNoteModalOpen(false)}
-      />
+  {/* --- RICH TEXT EDITOR (AI MVP) --- */}
+        <Suspense fallback={null}>
+          <AnimatePresence>
+            {isNoteModalOpen && (
+              <RichTextEditor onClose={() => setIsNoteModalOpen(false)} />
+            )}
+          </AnimatePresence>
 
       {/* --- YOUTUBE FLASHCARD DECK MODAL --- */}
       {isYoutubeFlashcardModalOpen && (
@@ -1350,6 +1378,34 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
         )}
       </AnimatePresence>
 
+      {/* --- MODEL VIEWER (3D MVP) --- */}
+      <AnimatePresence>
+        {isModelViewerOpen && (
+          <ModelViewer onClose={() => setIsModelViewerOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* --- TIMETABLE DND MVP --- */}
+      <AnimatePresence>
+        {isTimetableOpen && (
+          <StudyTimetable onClose={() => setIsTimetableOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* --- LOFI FOCUS ROOM MVP --- */}
+      <AnimatePresence>
+        {isFocusRoomOpen && (
+          <FocusRoom onClose={() => setIsFocusRoomOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* --- QUIZ BATTLE ARENA MVP --- */}
+      <AnimatePresence>
+        {isBattleOpen && (
+          <QuizBattleArena onClose={() => setIsBattleOpen(false)} />
+        )}
+      </AnimatePresence>
+
       {/* --- LEVEL UP MODAL --- */}
       <AnimatePresence>
         {showLevelUpModal && (
@@ -1406,6 +1462,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
         description={activeBadgeUnlock?.description}
         onClose={() => setActiveBadgeUnlock(null)}
       />
+      </Suspense>
 
       {/* --- SECURITY SETTINGS (2FA) --- */}
       <div className="my-6">

@@ -13,12 +13,12 @@ const markdownComponents = {
   ),
   p: ({ children }) => <p className="text-sm text-slate-300 leading-relaxed my-1.5">{children}</p>,
   ul: ({ children }) => (
-    <ul className="list-disc list-inside text-sm text-slate-300 my-1.5 space-y-1">{children}</ul>
+    <ul className="list-disc list-outside pl-6 text-sm text-slate-300 my-1.5 space-y-1">{children}</ul>
   ),
   ol: ({ children }) => (
-    <ol className="list-decimal list-inside text-sm text-slate-300 my-1.5 space-y-1">{children}</ol>
+    <ol className="list-decimal list-outside pl-6 text-sm text-slate-300 my-1.5 space-y-1">{children}</ol>
   ),
-  li: ({ children }) => <li className="text-sm text-slate-300">{children}</li>,
+  li: ({ children }) => <li className="text-sm text-slate-300 my-0.5">{children}</li>,
   strong: ({ children }) => <strong className="text-slate-100 font-semibold">{children}</strong>,
   em: ({ children }) => <em className="italic text-slate-300">{children}</em>,
   blockquote: ({ children }) => (

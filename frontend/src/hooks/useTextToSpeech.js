@@ -1,28 +1,50 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { splitSentences, findSentenceAt } from '../utils/textUtils';
+import { splitSentences, findSentenceAt, stripMarkdown } from '../utils/textUtils';
 
-const DEFAULT_RATES = [1, 1.25, 1.5];
+const DEFAULT_RATES = [0.5, 1, 1.25, 1.5];
 
 const supportsSpeech = () =>
   typeof window !== 'undefined' && 'speechSynthesis' in window;
 
-/**
- * The exact string handed to the speech engine. `charIndex` on a boundary
- * event is an offset into *this*, so sentence offsets have to be derived from
- * the same value — deriving them from the raw prop shifted every comparison by
- * however much leading whitespace `trim()` removed.
- */
-const toSpokenContent = (value) => (value || '').trim();
+const getSavedSpeed = (fallback = 1) => {
+  try {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined' || typeof localStorage.getItem !== 'function') {
+      return fallback;
+    }
+    const saved = localStorage.getItem('openprep_tts_speed');
+    const num = parseFloat(saved);
+    return Number.isFinite(num) && num > 0 ? num : fallback;
+  } catch {
+    return fallback;
+  }
+};
 
-export function useTextToSpeech(text, { rates = DEFAULT_RATES, initialRate = 1 } = {}) {
+/**
+ * The exact string handed to the speech engine, with markdown stripped so
+ * symbols like ** asterisks or headers are not read out loud as characters.
+ */
+const toSpokenContent = (value) => stripMarkdown(value || '').trim();
+
+export function useTextToSpeech(text, { rates = DEFAULT_RATES, initialRate = getSavedSpeed() } = {}) {
   const [supported] = useState(supportsSpeech);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [rate, setRate] = useState(initialRate);
+  const [rate, setRate] = useState(() => getSavedSpeed(initialRate));
   const [activeSentenceIndex, setActiveSentenceIndex] = useState(-1);
 
   const textRef = useRef(text);
   const sentencesRef = useRef(splitSentences(toSpokenContent(text)));
-  const rateRef = useRef(initialRate);
+  const rateRef = useRef(rate);
+
+  useEffect(() => {
+    rateRef.current = rate;
+    try {
+      if (typeof window !== 'undefined' && typeof localStorage !== 'undefined' && typeof localStorage.setItem === 'function') {
+        localStorage.setItem('openprep_tts_speed', String(rate));
+      }
+    } catch {
+      // ignore storage access restrictions
+    }
+  }, [rate]);
 
   useEffect(() => {
     textRef.current = text;

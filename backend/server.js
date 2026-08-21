@@ -64,6 +64,8 @@ const communityRoutes = require('./routes/communityRoutes');
 const userRoutes = require('./routes/userRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const aiRoutes = require('./routes/aiRoutes');
+const aiEditorRoutes = require('./routes/aiEditorRoutes');
+const quizBattleRoutes = require('./routes/quizBattleRoutes');
 const pdfAnnotationRoutes = require('./routes/pdfAnnotationRoutes');
 const folderRoutes = require('./routes/folderRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
@@ -77,6 +79,7 @@ const battleRoutes = require('./routes/battleRoutes');
 const readinessRoutes = require('./routes/readinessRoutes');
 const squadRoutes = require('./routes/squadRoutes');
 const badgeRoutes = require('./routes/badgeRoutes');
+const visualizerRoutes = require('./routes/visualizerRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 
@@ -249,6 +252,7 @@ app.use('/api/academic', academicRoutes);
 app.use('/api/pyqs', pyqRoutes);
 app.use('/api/pyq', pyqRoutes);
 app.use('/api/community', communityRoutes);
+app.use('/api/squads', squadRoutes);
 app.use('/api/study', fatigueRoutes);
 app.use('/api/documents', pdfAnnotationRoutes);
 app.use('/api/sync', syncRoutes);
@@ -266,6 +270,8 @@ app.use('/api/progress', progressRoutes);
 app.use('/api/users', userRoutes);
 app.get('/api/user/quota', protect, require('./controllers/userController').getQuota);
 app.use('/api/ai', aiRoutes);
+app.use('/api/ai-editor', aiEditorRoutes);
+app.use('/api/quiz-battles', quizBattleRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/readiness', readinessRoutes);
 app.use('/api/analytics', analyticsRoutes);
@@ -277,6 +283,8 @@ app.use('/api/battles', battleRoutes);
 app.use('/api/folders', folderRoutes);
 app.use('/api/squads', squadRoutes);
 app.use('/api/badges', badgeRoutes);
+app.use('/api/community', communityRoutes);
+app.use('/api/visualizer', visualizerRoutes);
 
 // Serve static assets from frontend build folder in production
 if (process.env.NODE_ENV === 'production') {
@@ -318,6 +326,10 @@ app.get(['/api/v1/health', '/api/health'], async (req, res) => {
 
 app.get('/healthz', (req, res) => {
   res.status(200).send('OK');
+});
+
+app.get('/api/test-error', (req, res) => {
+  throw new Error('Test error for Sentry verification');
 });
 
 // Swagger UI Documentation & Spec endpoints
@@ -372,6 +384,7 @@ require('./sockets/chatHandler')(io);
 require('./sockets/crdtHandler')(io);
 require('./sockets/squadHandler')(io);
 require('./sockets/flashcardCollaborationHandler')(io);
+require('./sockets/focusRoomHandler')(io);
 // Authenticate Socket.io connections
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
@@ -403,8 +416,11 @@ startScheduler();
 
 const { initStudyReminderCron } = require('./jobs/studyReminderCron');
 const { initStreakReminderCron } = require('./jobs/streakReminderCron');
+const { initBackupScheduler } = require('./services/backupScheduler');
 initStudyReminderCron(io);
 initStreakReminderCron(io);
+initBackupScheduler();
+
 
 if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   server.listen(PORT, () => {
@@ -457,3 +473,4 @@ const gracefulShutdown = (signal) => {
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+

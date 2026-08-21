@@ -1,42 +1,75 @@
+/**
+ * @fileoverview Controller for managing Oral Viva sessions and evaluations.
+ */
 const { VivaSession, Subject } = require('../models');
-const { generateFirstQuestion, generateFollowUp, generateFinalScorecard } = require('../services/vivaService');
+const vivaService = require('../services/geminiVivaService');
 
+/**
+ * Starts a new viva session by generating an initial question.
+ * 
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ * @param {Function} next - Express next middleware function.
+ */
 exports.startSession = async (req, res, next) => {
   try {
-    const { subjectId } = req.body;
-    if (!subjectId) {
-      return res.status(400).json({ success: false, error: 'Please select a subject.' });
+    const { topic } = req.body;
+
+    if (!topic || typeof topic !== 'string' || topic.trim().length < 3) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid topic string is required (min 3 characters).'
+      });
     }
 
-    const subject = await Subject.findByPk(subjectId);
-    const subjectName = subject ? subject.name : 'General Studies';
+    const initialQuestion = await vivaService.generateInitialQuestion(topic.trim());
 
-    const firstQuestion = await generateFirstQuestion(subjectName);
-
+    // Save session to database
     const session = await VivaSession.create({
       userId: req.user.id,
-      subjectId,
-      turns: [{ speaker: 'AI', text: firstQuestion }],
+      subjectId: null, // Using topic-based approach instead of subjectId
+      topic: topic.trim(),
+      turns: [],
     });
 
     res.status(201).json({
       success: true,
       data: {
         sessionId: session.id,
-        turns: session.turns,
-        nextQuestion: firstQuestion,
+        topic: topic.trim(),
+        currentQuestion: initialQuestion,
+        conversationHistory: [],
       },
     });
   } catch (error) {
+    console.error('Error starting viva session:', error);
     next(error);
   }
 };
 
+/**
+ * Evaluates a user's answer and returns feedback + next question.
+ * 
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ * @param {Function} next - Express next middleware function.
+ */
 exports.respondSession = async (req, res, next) => {
   try {
-    const { sessionId, studentAnswer } = req.body;
-    if (!sessionId || !studentAnswer) {
-      return res.status(400).json({ success: false, error: 'Provide sessionId and studentAnswer.' });
+    const { sessionId, currentQuestion, userAnswer } = req.body;
+
+    if (!sessionId || !currentQuestion || !userAnswer) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: sessionId, currentQuestion, or userAnswer.'
+      });
+    }
+
+    if (userAnswer.trim().length < 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'Answer is too short to evaluate.'
+      });
     }
 
     const session = await VivaSession.findOne({
@@ -44,41 +77,67 @@ exports.respondSession = async (req, res, next) => {
     });
 
     if (!session) {
-      return res.status(404).json({ success: false, error: 'Viva session not found.' });
+      return res.status(404).json({
+        success: false,
+        message: 'Viva session not found.'
+      });
     }
 
-    const subject = await Subject.findByPk(session.subjectId);
-    const subjectName = subject ? subject.name : 'General Studies';
+    const evaluation = await vivaService.evaluateVivaResponse(
+      currentQuestion,
+      userAnswer,
+      session.topic
+    );
 
-    // 1. Append student response
-    const currentTurns = [...session.turns, { speaker: 'student', text: studentAnswer }];
+    // Update conversation history
+    const updatedHistory = [
+      ...session.turns,
+      {
+        speaker: 'student',
+        text: userAnswer,
+        score: evaluation.score,
+        feedback: evaluation.feedback,
+      },
+      {
+        speaker: 'AI',
+        text: evaluation.nextQuestion,
+      }
+    ];
 
-    // 2. Generate next question
-    const nextQuestion = await generateFollowUp(subjectName, currentTurns, studentAnswer);
-
-    // 3. Append examiner follow-up question
-    const updatedTurns = [...currentTurns, { speaker: 'AI', text: nextQuestion }];
-
-    session.turns = updatedTurns;
+    session.turns = updatedHistory;
     await session.save();
 
     res.status(200).json({
       success: true,
       data: {
-        turns: updatedTurns,
-        nextQuestion,
+        sessionId: session.id,
+        evaluation,
+        conversationHistory: updatedHistory,
+        nextQuestion: evaluation.nextQuestion,
       },
     });
   } catch (error) {
+    console.error('Error evaluating viva answer:', error);
     next(error);
   }
 };
 
+/**
+ * Evaluates the entire viva session and generates a final scorecard.
+ * 
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ * @param {Function} next - Express next middleware function.
+ */
 exports.evaluateSession = async (req, res, next) => {
   try {
     const { sessionId } = req.body;
+
     if (!sessionId) {
-      return res.status(400).json({ success: false, error: 'Provide sessionId.' });
+      return res.status(400).json({
+        success: false,
+        message: 'Provide sessionId.'
+      });
     }
 
     const session = await VivaSession.findOne({
@@ -86,13 +145,13 @@ exports.evaluateSession = async (req, res, next) => {
     });
 
     if (!session) {
-      return res.status(404).json({ success: false, error: 'Viva session not found.' });
+      return res.status(404).json({
+        success: false,
+        message: 'Viva session not found.'
+      });
     }
 
-    const subject = await Subject.findByPk(session.subjectId);
-    const subjectName = subject ? subject.name : 'General Studies';
-
-    const scorecard = await generateFinalScorecard(subjectName, session.turns);
+    const scorecard = await vivaService.generateFinalScorecard(session.topic, session.turns);
 
     session.score = scorecard.score;
     session.feedback = scorecard;
@@ -103,6 +162,7 @@ exports.evaluateSession = async (req, res, next) => {
       data: scorecard,
     });
   } catch (error) {
+    console.error('Error evaluating viva session:', error);
     next(error);
   }
 };
