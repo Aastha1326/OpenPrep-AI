@@ -87,6 +87,10 @@ const User = sequelize.define(
       type: DataTypes.STRING,
       defaultValue: '',
     },
+    locale: {
+      type: DataTypes.STRING,
+      defaultValue: 'en',
+    },
     leaderboardVisible: {
       type: DataTypes.BOOLEAN,
       defaultValue: true,
