@@ -136,6 +136,7 @@ router.post(
   protect,
   aiLimiter,
   checkAiQuota,
+  aiSanitizer,
   explainQuestion
 );
 
@@ -144,6 +145,7 @@ router.post(
   protect,
   aiLimiter,
   checkAiQuota,
+  aiSanitizer,
   chatWithAssistant
 );
 
@@ -188,6 +190,7 @@ router.post(
   protect,
   aiLimiter,
   checkAiQuota,
+  aiSanitizer,
   validateGenerateMindMap,
   generateMindMap
 );
