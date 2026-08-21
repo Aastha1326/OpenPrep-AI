@@ -82,8 +82,20 @@ const badgeRoutes = require('./routes/badgeRoutes');
 const visualizerRoutes = require('./routes/visualizerRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
-
 initDifficultyCalibratorCron();
+
+const cron = require('node-cron');
+const calendarService = require('./services/calendarService');
+
+// Run webhook channel renewal daily at midnight
+cron.schedule('0 0 * * *', async () => {
+  try {
+    await calendarService.renewExpiringWebhookChannels();
+    logger.info('Google Calendar Webhook Channels renewed successfully.');
+  } catch (err) {
+    logger.error('Failed to renew Google Calendar Webhook Channels:', err);
+  }
+});
 
 // Connect to Database
 connectDB();
@@ -278,6 +290,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/dashboard', analyticsRoutes);
 app.use('/api/calendar', calendarRoutes);
+app.use('/api/integrations/google-calendar', calendarRoutes);
 app.use('/api/gamification', gamificationRoutes);
 app.use('/api/battles', battleRoutes);
 app.use('/api/folders', folderRoutes);
