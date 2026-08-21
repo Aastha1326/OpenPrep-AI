@@ -393,7 +393,25 @@ const io = new Server(server, {
   // tabs, so active lobby players aren't disconnected on a missed heartbeat.
   pingTimeout: 60000,
   pingInterval: 25000,
+  connectionStateRecovery: {
+    maxDisruption: 120000,
+    restoreSession: true,
+  },
 });
+
+// Configure Redis adapter for multi-instance pub/sub if available
+try {
+  const { createAdapter } = require('@socket.io/redis-adapter');
+  if (redisService.client) {
+    const pubClient = redisService.client;
+    const subClient = pubClient.duplicate();
+    io.adapter(createAdapter(pubClient, subClient));
+    logger.info('Socket.io Redis adapter configured successfully');
+  }
+} catch (adapterErr) {
+  logger.warn('Socket.io Redis adapter skipped or failed to initialize, using memory adapter instead:', { err: adapterErr.message });
+}
+
 global.io = io;
 // Initialize socket handlers
 require('./sockets/battleHandler')(io);
@@ -402,6 +420,7 @@ require('./sockets/crdtHandler')(io);
 require('./sockets/squadHandler')(io);
 require('./sockets/flashcardCollaborationHandler')(io);
 require('./sockets/focusRoomHandler')(io);
+require('./sockets/studyRoomSocket')(io);
 // Authenticate Socket.io connections
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
