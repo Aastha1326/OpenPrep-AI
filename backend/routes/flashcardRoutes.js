@@ -876,6 +876,7 @@ router.post('/decks/:subjectId/clone', protect, cloneCommunityDeck);
 router.post('/decks/:subjectId/rate', protect, rateCommunityDeck);
 router.post('/decks/:subjectId/star', protect, starCommunityDeck);
 router.post('/batch-sync', protect, batchSyncOfflineReviews);
+router.post('/sync-batch', protect, batchSyncOfflineReviews);
 
 router.delete('/:id', protect, deleteFlashcard);
 
