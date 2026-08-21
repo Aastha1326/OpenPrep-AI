@@ -16,6 +16,7 @@ import PwaInstallPrompt from './components/common/PwaInstallPrompt';
 import OfflineIndicator from './components/common/OfflineIndicator';
 import Walkthrough from './components/tutorial/Walkthrough';
 import MobileBottomNav from './components/common/MobileBottomNav';
+import PomodoroWidget from './components/timer/PomodoroWidget';
 import './App.css';
 
 
@@ -153,6 +154,7 @@ function App() {
       <SessionTimeoutModal />
       <Walkthrough />
       <CommandPalette isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+      {localStorage.getItem('token') && <PomodoroWidget />}
       <main id="main-content" tabIndex="-1" role="main" className="focus:outline-none min-h-screen">
         <Suspense fallback={<PageSkeleton />}>
         <Routes>

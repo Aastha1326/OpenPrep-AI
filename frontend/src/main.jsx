@@ -6,6 +6,7 @@ import * as Sentry from '@sentry/react'
 import { store } from './store'
 import { ThemeProvider } from './context/ThemeContext'
 import { SyncProvider } from './context/SyncContext'
+import { PomodoroProvider } from './context/PomodoroContext'
 import ErrorBoundary from './components/common/ErrorBoundary'
 import './index.css'
 import './i18n';
@@ -65,9 +66,11 @@ createRoot(document.getElementById('root')).render(
         <Provider store={store}>
           <ThemeProvider>
             <SyncProvider>
-              <BrowserRouter>
-                <App />
-              </BrowserRouter>
+              <PomodoroProvider>
+                <BrowserRouter>
+                  <App />
+                </BrowserRouter>
+              </PomodoroProvider>
             </SyncProvider>
           </ThemeProvider>
         </Provider>
