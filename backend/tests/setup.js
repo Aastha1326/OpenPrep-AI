@@ -1,4 +1,7 @@
 process.env.NODE_ENV = 'test';
+if (!process.env.JWT_SECRET) process.env.JWT_SECRET = 'test_jwt_secret_for_tests_must_be_long_enough_32_bytes';
+if (!process.env.CSRF_SECRET) process.env.CSRF_SECRET = 'test_csrf_secret_for_tests_must_be_long_enough_32_bytes';
+if (!process.env.ENCRYPTION_KEY) process.env.ENCRYPTION_KEY = 'test_encryption_key_for_tests_must_be_long_enough_32_bytes';
 process.env.DATABASE_URL =
   process.env.DATABASE_URL_TEST || 'postgres://postgres:postgres@localhost:5432/openprep_test';
 
