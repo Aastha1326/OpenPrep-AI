@@ -624,7 +624,7 @@ exports.getMe = async (req, res, next) => {
  */
 exports.updateSettings = async (req, res, next) => {
   try {
-    const { leaderboardVisible, hideActivityFromSquad, syncGoogleCalendar } = req.body;
+    const { leaderboardVisible, hideActivityFromSquad, locale } = req.body;
 
     if (typeof leaderboardVisible === 'boolean') {
       req.user.leaderboardVisible = leaderboardVisible;
@@ -632,8 +632,8 @@ exports.updateSettings = async (req, res, next) => {
     if (typeof hideActivityFromSquad === 'boolean') {
       req.user.hideActivityFromSquad = hideActivityFromSquad;
     }
-    if (typeof syncGoogleCalendar === 'boolean') {
-      req.user.syncGoogleCalendar = syncGoogleCalendar;
+    if (locale && typeof locale === 'string') {
+      req.user.locale = locale;
     }
     await req.user.save();
 
@@ -644,6 +644,7 @@ exports.updateSettings = async (req, res, next) => {
         name: req.user.name,
         email: req.user.email,
         role: req.user.role,
+        locale: req.user.locale || 'en',
         streak: {
           count: req.user.streakCount,
           lastActive: req.user.streakLastActive,
