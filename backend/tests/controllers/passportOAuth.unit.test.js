@@ -23,7 +23,7 @@ describe('Passport OAuth 2.0 Strategy Callbacks', () => {
       const mockProfile = {
         id: 'google-999',
         displayName: 'Google Linker',
-        emails: [{ value: 'linker@example.com' }],
+        emails: [{ value: 'linker@example.com', verified: true }],
         photos: [{ value: 'http://avatar.com/google.png' }],
       };
 
@@ -54,7 +54,7 @@ describe('Passport OAuth 2.0 Strategy Callbacks', () => {
       const mockProfile = {
         id: 'google-777',
         displayName: 'New Google User',
-        emails: [{ value: 'newgoogle@example.com' }],
+        emails: [{ value: 'newgoogle@example.com', verified: true }],
         photos: [{ value: 'http://avatar.com/newgoogle.png' }],
       };
 
@@ -82,6 +82,33 @@ describe('Passport OAuth 2.0 Strategy Callbacks', () => {
       expect(done).toHaveBeenCalledWith(null, mockCreatedUser);
     });
 
+    it('should refuse to link an account when Google has not verified the email', async () => {
+      const mockProfile = {
+        id: 'google-evil',
+        displayName: 'Unverified',
+        emails: [{ value: 'victim@example.com', verified: false }],
+      };
+
+      const victim = {
+        id: 'user-victim',
+        email: 'victim@example.com',
+        googleId: null,
+        authProvider: 'local',
+        save: vi.fn().mockResolvedValue(true),
+      };
+
+      vi.spyOn(User, 'findOne')
+        .mockResolvedValueOnce(null) // googleId check
+        .mockResolvedValueOnce(victim); // email check
+
+      const done = vi.fn();
+      await googleCallback('access_token', 'refresh_token', mockProfile, done);
+
+      expect(victim.googleId).toBeNull();
+      expect(victim.save).not.toHaveBeenCalled();
+      expect(done).toHaveBeenCalledWith(expect.any(Error), null);
+    });
+
     it('should return error if email is missing in Google profile', async () => {
       const mockProfile = {
         id: 'google-888',
@@ -101,7 +128,7 @@ describe('Passport OAuth 2.0 Strategy Callbacks', () => {
       const mockProfile = {
         id: 'github-123',
         username: 'gitlink',
-        emails: [{ value: 'gitlink@example.com' }],
+        emails: [{ value: 'gitlink@example.com', primary: true, verified: true }],
         photos: [{ value: 'http://avatar.com/git.png' }],
       };
 
@@ -125,6 +152,58 @@ describe('Passport OAuth 2.0 Strategy Callbacks', () => {
       expect(mockUser.authProvider).toBe('github');
       expect(mockUser.save).toHaveBeenCalled();
       expect(done).toHaveBeenCalledWith(null, mockUser);
+    });
+
+    it('should refuse to link an account on an unverified GitHub email', async () => {
+      // The attack: attacker adds the victim's address to their GitHub account
+      // and makes it primary, without verifying it.
+      const mockProfile = {
+        id: 'github-evil',
+        username: 'attacker',
+        emails: [{ value: 'victim@example.com', primary: true, verified: false }],
+      };
+
+      const victim = {
+        id: 'user-victim-2',
+        email: 'victim@example.com',
+        githubId: null,
+        authProvider: 'local',
+        save: vi.fn().mockResolvedValue(true),
+      };
+
+      vi.spyOn(User, 'findOne')
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(victim);
+
+      const done = vi.fn();
+      await githubCallback('access_token', 'refresh_token', mockProfile, done);
+
+      expect(victim.githubId).toBeNull();
+      expect(victim.save).not.toHaveBeenCalled();
+      expect(done).toHaveBeenCalledWith(expect.any(Error), null);
+    });
+
+    it('should pick the verified address over an unverified primary', async () => {
+      const mockProfile = {
+        id: 'github-multi',
+        username: 'multimail',
+        emails: [
+          { value: 'victim@example.com', primary: true, verified: false },
+          { value: 'attacker@example.com', primary: false, verified: true },
+        ],
+      };
+
+      const created = { id: 'user-new', email: 'attacker@example.com' };
+      vi.spyOn(User, 'findOne').mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+      vi.spyOn(User, 'create').mockResolvedValueOnce(created);
+
+      const done = vi.fn();
+      await githubCallback('access_token', 'refresh_token', mockProfile, done);
+
+      expect(User.create).toHaveBeenCalledWith(
+        expect.objectContaining({ email: 'attacker@example.com' })
+      );
+      expect(done).toHaveBeenCalledWith(null, created);
     });
 
     it('should return temporary user payload if email is missing or private in GitHub profile', async () => {
