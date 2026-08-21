@@ -559,8 +559,19 @@ exports.createFlashcard = async (req, res, next) => {
 exports.getFlashcards = async (req, res, next) => {
   try {
     const { subjectId, dueOnly, search } = req.query;
+    
+    if (req.query.page !== undefined && parseInt(req.query.page, 10) < 0) {
+      return res.status(400).json({ success: false, error: 'Page cannot be negative' });
+    }
+    if (req.query.limit !== undefined && parseInt(req.query.limit, 10) <= 0) {
+      return res.status(400).json({ success: false, error: 'Limit cannot be zero or negative' });
+    }
+    if (req.query.pageSize !== undefined && parseInt(req.query.pageSize, 10) <= 0) {
+      return res.status(400).json({ success: false, error: 'Page size cannot be zero or negative' });
+    }
+
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit || req.query.pageSize, 10) || 20));
     const offset = (page - 1) * limit;
 
     const filter = { user: req.user.id };
@@ -1143,8 +1154,19 @@ exports.shareFlashcardDeck = async (req, res, next) => {
 exports.getCommunityDecks = async (req, res, next) => {
   try {
     const { search, subject, subjectId, exam, rating, sort } = req.query;
+
+    if (req.query.page !== undefined && parseInt(req.query.page, 10) < 0) {
+      return res.status(400).json({ success: false, error: 'Page cannot be negative' });
+    }
+    if (req.query.limit !== undefined && parseInt(req.query.limit, 10) <= 0) {
+      return res.status(400).json({ success: false, error: 'Limit cannot be zero or negative' });
+    }
+    if (req.query.pageSize !== undefined && parseInt(req.query.pageSize, 10) <= 0) {
+      return res.status(400).json({ success: false, error: 'Page size cannot be zero or negative' });
+    }
+
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit || req.query.pageSize, 10) || 20));
     const offset = (page - 1) * limit;
 
     const filter = { isPublic: true };
