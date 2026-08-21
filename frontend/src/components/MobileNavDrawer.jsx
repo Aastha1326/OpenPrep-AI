@@ -28,8 +28,20 @@ const MobileNavDrawer = () => {
     setIsOpen(false);
   }, [location.pathname]);
 
+  // Handle Esc key to close open drawer
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
   return (
-    <div className="md:hidden flex items-center gap-3 fixed top-4 right-4 z-[60]">
+    <div className="md:hidden flex items-center gap-3 fixed top-4 right-4 z-[60]" role="region" aria-label="Mobile Header Actions">
       <ThemeToggle />
       <div className="bg-slate-800 rounded-full border border-slate-700/50">
         <NotificationBell />
@@ -39,7 +51,7 @@ const MobileNavDrawer = () => {
         onClick={() => setIsOpen((prev) => !prev)}
         aria-label={isOpen ? 'Close menu' : 'Open menu'}
         aria-expanded={isOpen}
-        className="p-2 rounded-lg bg-slate-800 text-slate-100"
+        className="p-2 rounded-lg bg-slate-800 text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
       >
         {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
       </button>
@@ -48,19 +60,22 @@ const MobileNavDrawer = () => {
         {isOpen && (
           <motion.div
             data-testid="mobile-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Mobile Navigation Menu"
             initial={{ opacity: 0, x: '100%' }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: '100%' }}
             transition={{ duration: 0.25, ease: 'easeInOut' }}
             className="fixed inset-0 z-50 bg-slate-900/95 flex flex-col p-6"
           >
-            <nav className="flex flex-col space-y-4 mt-16">
+            <nav className="flex flex-col space-y-4 mt-16" role="navigation" aria-label="Mobile Navigation">
               {NAV_LINKS.map((link) => (
                 <Link
                   key={link.to}
                   to={link.to}
                   onMouseEnter={() => link.preload()}
-                  className="text-lg font-medium text-slate-100 hover:text-indigo-400"
+                  className="text-lg font-medium text-slate-100 hover:text-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400 rounded px-2 py-1"
                 >
                   {link.label}
                 </Link>
@@ -72,5 +87,6 @@ const MobileNavDrawer = () => {
     </div>
   );
 };
+
 
 export default MobileNavDrawer;

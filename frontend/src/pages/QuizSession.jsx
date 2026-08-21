@@ -684,6 +684,13 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
       )}
 
       <div className="max-w-3xl mx-auto">
+        {/* Accessible Screen Reader Live Announcements */}
+        <div aria-live="polite" aria-atomic="true" className="sr-only">
+          {submitted
+            ? `Quiz completed. Final score: ${result?.score ?? 0} percent.`
+            : `Question ${currentQuestionIndex + 1} of ${quiz.questions.length}. Time remaining: ${formatTime(timeLeft)}.`}
+        </div>
+
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8 border-b border-slate-700 pb-4">
           <h1 className="text-xl sm:text-2xl font-bold text-slate-100">{quiz.title}</h1>
@@ -713,6 +720,7 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
             </div>
           )}
         </div>
+
         {/* Quiz Content */}
         {!submitted ? (
           <>
