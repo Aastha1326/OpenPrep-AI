@@ -416,8 +416,11 @@ startScheduler();
 
 const { initStudyReminderCron } = require('./jobs/studyReminderCron');
 const { initStreakReminderCron } = require('./jobs/streakReminderCron');
+const { initBackupScheduler } = require('./services/backupScheduler');
 initStudyReminderCron(io);
 initStreakReminderCron(io);
+initBackupScheduler();
+
 
 if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   server.listen(PORT, () => {
