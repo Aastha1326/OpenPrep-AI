@@ -246,6 +246,20 @@ examCountdownPreferences: {
       type: DataTypes.INTEGER,
       defaultValue: 0,
     },
+    timezone: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'Asia/Kolkata',
+      validate: {
+        isValidTimezone(value) {
+          try {
+            Intl.DateTimeFormat(undefined, { timeZone: value });
+          } catch {
+            throw new Error('Invalid IANA timezone');
+          }
+        },
+      },
+    },
   },
   {
     timestamps: true,

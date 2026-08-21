@@ -107,6 +107,12 @@ API.interceptors.request.use(async (config) => {
 
   // Issue #1176: Attach client timezone offset to headers
   config.headers['X-Timezone-Offset'] = new Date().getTimezoneOffset();
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (tz) config.headers['X-Timezone'] = tz;
+  } catch (_e) {
+    /* ignore */
+  }
 
   return config;
 }, (error) => {
