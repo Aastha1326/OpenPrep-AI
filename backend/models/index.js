@@ -41,7 +41,7 @@ const SquadActivity = require('./SquadActivity');
 const SquadActivityReaction = require('./SquadActivityReaction');
 const Syllabus = require('./Syllabus');
 const SyllabusTopic = require('./SyllabusTopic');
-
+const PDFAnnotation = require('./PDFAnnotation');
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -243,6 +243,9 @@ Syllabus.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 Syllabus.hasMany(SyllabusTopic, { foreignKey: 'syllabusId', onDelete: 'CASCADE' });
 SyllabusTopic.belongsTo(Syllabus, { foreignKey: 'syllabusId', as: 'syllabusRef' });
 
+// PDFAnnotation associations
+User.hasMany(PDFAnnotation, { foreignKey: 'userId', onDelete: 'CASCADE' });
+PDFAnnotation.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 // DeckRating associations
 DeckRating.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 User.hasMany(DeckRating, { foreignKey: 'userId', as: 'ratings', onDelete: 'CASCADE' });
@@ -285,4 +288,5 @@ module.exports = {  sequelize,  User,  Exam,
   SquadActivityReaction,
   FlashcardDeck,
   DeckCollaborator,
+  PDFAnnotation,
 };
