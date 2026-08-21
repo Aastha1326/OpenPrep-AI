@@ -33,7 +33,7 @@ const getAccessTokenCookieOptions = () => ({
 });
 
 const generateAccessToken = (id) => {
-  return jwt.sign({ id, type: 'access' }, process.env.JWT_SECRET || 'supersecret_openprep_key', {
+  return jwt.sign({ id, type: 'access' }, jwtSecret, {
     expiresIn: process.env.JWT_EXPIRE || '15m',
   });
 };
@@ -50,13 +50,13 @@ const PENDING_OAUTH_TTL = '15m';
 const generatePendingOAuthToken = (payload) =>
   jwt.sign(
     { ...payload, type: 'oauth_pending' },
-    process.env.JWT_SECRET || 'supersecret_openprep_key',
+    jwtSecret,
     { expiresIn: PENDING_OAUTH_TTL }
   );
 
 const verifyPendingOAuthToken = (token) => {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'supersecret_openprep_key');
+    const decoded = jwt.verify(token, jwtSecret);
     if (decoded.type !== 'oauth_pending' || !decoded.githubId) return null;
     return decoded;
   } catch {

@@ -1,6 +1,9 @@
 const { Sequelize } = require('sequelize');
 
-const dbUrl = process.env.DATABASE_URL || 'postgresql://postgres:NISHIT382424@db.eymuyrdtbinvexvaynxw.supabase.co:5432/postgres';
+const dbUrl = process.env.DATABASE_URL;
+if (!dbUrl) {
+  throw new Error('DATABASE_URL environment variable is required');
+}
 
 const sequelize = new Sequelize(
   dbUrl,

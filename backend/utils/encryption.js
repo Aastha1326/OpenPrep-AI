@@ -10,7 +10,10 @@ const KEY_LENGTH = 32;
  * Derives a robust key if the provided key is too short.
  */
 function getKey() {
-  const secret = process.env.ENCRYPTION_KEY || 'default_test_encryption_key_must_change';
+  const secret = process.env.ENCRYPTION_KEY;
+  if (!secret) {
+    throw new Error('ENCRYPTION_KEY environment variable is required');
+  }
   // Use a hash to ensure exactly 32 bytes (256 bits)
   return crypto.createHash('sha256').update(secret).digest();
 }
