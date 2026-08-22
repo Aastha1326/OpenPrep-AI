@@ -60,6 +60,9 @@ sequelize.addHook('beforeQuery', async (options, query) => {
   }
 });
 
+const { initializeQueryAudit } = require('../services/queryAuditService');
+initializeQueryAudit(sequelize);
+
 const connectDB = async () => {
   try {
     await sequelize.authenticate();
