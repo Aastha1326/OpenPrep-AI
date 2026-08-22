@@ -82,8 +82,20 @@ const badgeRoutes = require('./routes/badgeRoutes');
 const visualizerRoutes = require('./routes/visualizerRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
-
 initDifficultyCalibratorCron();
+
+const cron = require('node-cron');
+const calendarService = require('./services/calendarService');
+
+// Run webhook channel renewal daily at midnight
+cron.schedule('0 0 * * *', async () => {
+  try {
+    await calendarService.renewExpiringWebhookChannels();
+    logger.info('Google Calendar Webhook Channels renewed successfully.');
+  } catch (err) {
+    logger.error('Failed to renew Google Calendar Webhook Channels:', err);
+  }
+});
 
 // Connect to Database
 connectDB();
@@ -248,6 +260,7 @@ app.get('/uploads/:filename', protect, async (req, res, next) => {
 
 // Mount routes
 app.use('/api/auth', authRoutes);
+app.post('/api/session/keepalive', protect, require('./controllers/authController').keepalive);
 app.use('/api/academic', academicRoutes);
 app.use('/api/pyqs', pyqRoutes);
 app.use('/api/pyq', pyqRoutes);
@@ -278,6 +291,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/dashboard', analyticsRoutes);
 app.use('/api/calendar', calendarRoutes);
+app.use('/api/integrations/google-calendar', calendarRoutes);
 app.use('/api/gamification', gamificationRoutes);
 app.use('/api/battles', battleRoutes);
 app.use('/api/folders', folderRoutes);
@@ -380,7 +394,25 @@ const io = new Server(server, {
   // tabs, so active lobby players aren't disconnected on a missed heartbeat.
   pingTimeout: 60000,
   pingInterval: 25000,
+  connectionStateRecovery: {
+    maxDisruption: 120000,
+    restoreSession: true,
+  },
 });
+
+// Configure Redis adapter for multi-instance pub/sub if available
+try {
+  const { createAdapter } = require('@socket.io/redis-adapter');
+  if (redisService.client) {
+    const pubClient = redisService.client;
+    const subClient = pubClient.duplicate();
+    io.adapter(createAdapter(pubClient, subClient));
+    logger.info('Socket.io Redis adapter configured successfully');
+  }
+} catch (adapterErr) {
+  logger.warn('Socket.io Redis adapter skipped or failed to initialize, using memory adapter instead:', { err: adapterErr.message });
+}
+
 global.io = io;
 // Initialize socket handlers
 require('./sockets/battleHandler')(io);
@@ -389,7 +421,7 @@ require('./sockets/crdtHandler')(io);
 require('./sockets/squadHandler')(io);
 require('./sockets/flashcardCollaborationHandler')(io);
 require('./sockets/focusRoomHandler')(io);
-require('./src/socket')(io);
+require('./sockets/studyRoomSocket')(io);
 // Authenticate Socket.io connections
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
