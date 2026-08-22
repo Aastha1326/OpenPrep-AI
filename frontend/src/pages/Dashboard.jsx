@@ -61,6 +61,7 @@ import {
 import LeatherBoard from '../components/dashboard/LeatherBoard';
 import VintagePaper from '../components/dashboard/VintagePaper';
 import GoldTabButton from '../components/dashboard/GoldTabButton';
+import CustomFolders from '../components/dashboard/CustomFolders';
 import PomodoroTimer from '../components/dashboard/PomodoroTimer';
 import FlashcardWidget from '../components/dashboard/FlashcardWidget';
 import BadgeGrid from '../components/dashboard/BadgeGrid';
@@ -76,6 +77,7 @@ import LeaderboardWidget from '../components/dashboard/LeaderboardWidget';
 import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
 import ExamCountdownCard from '../components/dashboard/ExamCountdownCard';
 import TargetExamOverviewWidget from '../components/dashboard/TargetExamOverviewWidget';
+import InteractiveDashboard from '../components/dashboard/InteractiveDashboard';
 import NotesWidget from '../components/dashboard/NotesWidget';
 import ThemeToggle from '../components/ThemeToggle';
 import ReadinessWidget from '../components/dashboard/ReadinessWidget';
@@ -83,6 +85,7 @@ import BadgesList from '../components/BadgesList';
 import LevelProgressBar from '../components/gamification/LevelProgressBar';
 import StreakWidget from '../components/gamification/StreakWidget';
 import BadgeCard from '../components/gamification/BadgeCard';
+import GlobalSearchBar from '../components/common/GlobalSearchBar';
 
 // Lazy-loaded heavy modal components for bundle size reduction
 const RichTextEditor = lazy(() => import('../components/dashboard/RichTextEditor'));
@@ -567,6 +570,12 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           delay={0.5}
           onClick={() => navigate('/ai-assistant')}
         />
+        <GoldTabButton
+          icon={Network}
+          label="Topic Mind Map"
+          delay={0.52}
+          onClick={() => navigate('/mind-map')}
+        />
         <button
           onClick={() => {
             setIsNoteModalOpen(true);
@@ -626,6 +635,7 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
             transition={{ duration: 0.5, delay: 0.3 }}
             className="flex flex-wrap md:flex-nowrap items-center gap-3 sm:gap-4 mt-2 md:mt-0 max-w-full"
           >
+            <GlobalSearchBar />
             <div className="relative group z-50">
               <button className="bg-neutral-800 text-gold-foil border border-yellow-700/50 hover:bg-neutral-700 px-4 py-2.5 rounded-sm shadow-[0_4px_15px_rgba(0,0,0,0.5)] flex items-center gap-2 font-playfair font-bold text-sm tracking-wide min-h-[44px]">
                 <Download className="w-4 h-4" /> {t('export_analytics')}
@@ -724,6 +734,9 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           onOpenBundleModal={() => setIsBundleModalOpen(true)}
           onGenerateStudyPlan={() => setIsStudyPlanOpen(true)}
         />
+
+        {/* --- INTERACTIVE PROGRESS DASHBOARD WITH ANIMATED CHARTS --- */}
+        <InteractiveDashboard />
 
         {/* --- STATISTICS OVERVIEW --- */}
         {errorStats && !loadingStats ? (
@@ -1042,9 +1055,11 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
 
         <div className="my-6">
           <FocusEfficiencyWidget />
-        </div>
-        <div className="my-6">
-          <ActivityHeatmap />
+          {/* Folders & Activity */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <CustomFolders />
+            <ActivityHeatmap data={chartData} />
+          </div>
         </div>
 
 

@@ -530,55 +530,39 @@ describe('Note Controller - Integration Tests', () => {
   });
 
   // =========================================================================
-  // GET /api/notes/export — Export Notes
+  // GET /api/notes/export — Export user notes with configured limit
   // =========================================================================
   describe('GET /api/notes/export', () => {
-    it('should reject when export format is missing with 400', async () => {
+    it('exports notes correctly within default limit', async () => {
+      // Since there is no custom configuration provided, it falls back to the limit of 100
       const res = await request(app)
         .get('/api/notes/export')
         .set('Authorization', `Bearer ${authToken}`);
-
-      expect(res.status).toBe(400);
-      expect(res.body.success).toBe(false);
-      expect(res.body.error).toContain('Export format is required');
-    });
-
-    it('should reject when export format is blank with 400', async () => {
-      const res = await request(app)
-        .get('/api/notes/export?format=   ')
-        .set('Authorization', `Bearer ${authToken}`);
-
-      expect(res.status).toBe(400);
-      expect(res.body.success).toBe(false);
-      expect(res.body.error).toContain('Export format is required');
-    });
-
-    it('should reject when export format is unsupported with 400', async () => {
-      const res = await request(app)
-        .get('/api/notes/export?format=pdf')
-        .set('Authorization', `Bearer ${authToken}`);
-
-      expect(res.status).toBe(400);
-      expect(res.body.success).toBe(false);
-      expect(res.body.error).toContain('Unsupported export format');
-    });
-
-    it('should succeed when export format is json', async () => {
-      const res = await request(app)
-        .get('/api/notes/export?format=json')
-        .set('Authorization', `Bearer ${authToken}`);
-
+      
       expect(res.status).toBe(200);
-      expect(res.headers['content-type']).toContain('application/json');
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
     });
 
-    it('should succeed when export format is zip', async () => {
-      const res = await request(app)
-        .get('/api/notes/export?format=zip')
-        .set('Authorization', `Bearer ${authToken}`);
+    it('rejects export if notes exceed configured limit', async () => {
+      const originalLimit = process.env.NOTE_EXPORT_LIMIT;
+      // Configure a custom export limit to be extremely small (0) so it always fails.
+      process.env.NOTE_EXPORT_LIMIT = '0'; 
 
-      expect(res.status).toBe(200);
-      expect(res.headers['content-type']).toContain('application/zip');
+      const res = await request(app)
+        .get('/api/notes/export')
+        .set('Authorization', `Bearer ${authToken}`);
+        
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toContain('Export exceeds the configured limit');
+
+      // Restore original config
+      if (originalLimit === undefined) {
+        delete process.env.NOTE_EXPORT_LIMIT;
+      } else {
+        process.env.NOTE_EXPORT_LIMIT = originalLimit;
+      }
     });
   });
 });

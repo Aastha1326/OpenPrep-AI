@@ -20,8 +20,8 @@ const fs = require('fs');
 const PYQ = require('./models/PYQ');
 const Note = require('./models/Note');
 const Achievement = require('./models/Achievement');
-const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
+const { apiReference } = require('@scalar/express-api-reference');
 const passport = require('./config/passport');
 const { getCorsMiddleware, getSocketCorsOrigin } = require('./middleware/corsHandler');
 
@@ -80,10 +80,23 @@ const readinessRoutes = require('./routes/readinessRoutes');
 const squadRoutes = require('./routes/squadRoutes');
 const badgeRoutes = require('./routes/badgeRoutes');
 const visualizerRoutes = require('./routes/visualizerRoutes');
+const analyticsInsightsRoutes = require('./routes/analyticsInsightsRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
-
 initDifficultyCalibratorCron();
+
+const cron = require('node-cron');
+const calendarService = require('./services/calendarService');
+
+// Run webhook channel renewal daily at midnight
+cron.schedule('0 0 * * *', async () => {
+  try {
+    await calendarService.renewExpiringWebhookChannels();
+    logger.info('Google Calendar Webhook Channels renewed successfully.');
+  } catch (err) {
+    logger.error('Failed to renew Google Calendar Webhook Channels:', err);
+  }
+});
 
 // Connect to Database
 connectDB();
@@ -248,10 +261,12 @@ app.get('/uploads/:filename', protect, async (req, res, next) => {
 
 // Mount routes
 app.use('/api/auth', authRoutes);
+app.post('/api/session/keepalive', protect, require('./controllers/authController').keepalive);
 app.use('/api/academic', academicRoutes);
 app.use('/api/pyqs', pyqRoutes);
 app.use('/api/pyq', pyqRoutes);
 app.use('/api/community', communityRoutes);
+app.use('/api/squads', squadRoutes);
 app.use('/api/study', fatigueRoutes);
 app.use('/api/documents', pdfAnnotationRoutes);
 app.use('/api/sync', syncRoutes);
@@ -277,6 +292,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/dashboard', analyticsRoutes);
 app.use('/api/calendar', calendarRoutes);
+app.use('/api/integrations/google-calendar', calendarRoutes);
 app.use('/api/gamification', gamificationRoutes);
 app.use('/api/battles', battleRoutes);
 app.use('/api/folders', folderRoutes);
@@ -284,6 +300,7 @@ app.use('/api/squads', squadRoutes);
 app.use('/api/badges', badgeRoutes);
 app.use('/api/community', communityRoutes);
 app.use('/api/visualizer', visualizerRoutes);
+app.use('/api/analytics-insights', analyticsInsightsRoutes);
 
 // Serve static assets from frontend build folder in production
 if (process.env.NODE_ENV === 'production') {
@@ -331,29 +348,33 @@ app.get('/api/test-error', (req, res) => {
   throw new Error('Test error for Sentry verification');
 });
 
-// Swagger UI Documentation & Spec endpoints
-const swaggerEnabled = process.env.SWAGGER_ENABLED === 'true' || process.env.NODE_ENV !== 'production';
+// Scalar API Reference & OpenAPI Spec endpoints (OpenAPI 3.1)
+const isSwaggerEnabled = () => process.env.SWAGGER_ENABLED === 'true' || process.env.NODE_ENV !== 'production';
 
-app.use(['/api-docs', '/api/docs'], (req, res, next) => {
-  if (!swaggerEnabled) {
-    return res.status(403).json({ success: false, error: 'Swagger API documentation is disabled in this environment.' });
-  }
-  next();
-}, swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-  customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: 'OpenPrep AI API Documentation',
-  swaggerOptions: {
-    persistAuthorization: true,
-    displayRequestDuration: true,
-  },
-}));
-
-app.get(['/api-docs.json', '/api/docs.json'], (req, res) => {
-  if (!swaggerEnabled) {
-    return res.status(403).json({ success: false, error: 'Swagger API documentation is disabled in this environment.' });
+// Serve raw OpenAPI JSON at both legacy and new paths
+app.get(['/api-docs.json', '/api/docs.json', '/api/openapi.json'], (req, res) => {
+  if (!isSwaggerEnabled()) {
+    return res.status(403).json({ success: false, error: 'API documentation is disabled in this environment.' });
   }
   res.json(swaggerSpec);
 });
+
+// Interactive Scalar docs at /api/docs (and legacy /api-docs)
+app.use(['/api-docs', '/api/docs'], (req, res, next) => {
+  if (!isSwaggerEnabled()) {
+    return res.status(403).json({ success: false, error: 'API documentation is disabled in this environment.' });
+  }
+  next();
+}, apiReference({
+  content: swaggerSpec,
+  theme: 'kepler',
+  darkMode: true,
+  layout: 'modern',
+  metaData: {
+    title: 'OpenPrep AI API Documentation',
+  },
+  customCss: '.scalar-api-reference { --scalar-color-accent: #f59e0b; }',
+}));
 
 // Error Handler Middleware
 if (process.env.NODE_ENV !== 'test' && process.env.SENTRY_DSN) {
@@ -375,7 +396,25 @@ const io = new Server(server, {
   // tabs, so active lobby players aren't disconnected on a missed heartbeat.
   pingTimeout: 60000,
   pingInterval: 25000,
+  connectionStateRecovery: {
+    maxDisruption: 120000,
+    restoreSession: true,
+  },
 });
+
+// Configure Redis adapter for multi-instance pub/sub if available
+try {
+  const { createAdapter } = require('@socket.io/redis-adapter');
+  if (redisService.client) {
+    const pubClient = redisService.client;
+    const subClient = pubClient.duplicate();
+    io.adapter(createAdapter(pubClient, subClient));
+    logger.info('Socket.io Redis adapter configured successfully');
+  }
+} catch (adapterErr) {
+  logger.warn('Socket.io Redis adapter skipped or failed to initialize, using memory adapter instead:', { err: adapterErr.message });
+}
+
 global.io = io;
 // Initialize socket handlers
 require('./sockets/battleHandler')(io);
@@ -384,6 +423,7 @@ require('./sockets/crdtHandler')(io);
 require('./sockets/squadHandler')(io);
 require('./sockets/flashcardCollaborationHandler')(io);
 require('./sockets/focusRoomHandler')(io);
+require('./sockets/studyRoomSocket')(io);
 // Authenticate Socket.io connections
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
@@ -415,8 +455,11 @@ startScheduler();
 
 const { initStudyReminderCron } = require('./jobs/studyReminderCron');
 const { initStreakReminderCron } = require('./jobs/streakReminderCron');
+const { initBackupScheduler } = require('./services/backupScheduler');
 initStudyReminderCron(io);
 initStreakReminderCron(io);
+initBackupScheduler();
+
 
 if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   server.listen(PORT, () => {

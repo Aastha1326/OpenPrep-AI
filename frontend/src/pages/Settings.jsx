@@ -18,6 +18,8 @@ import {
   Award,
   Users,
   CalendarDays,
+  Volume2,
+  Palette,
 } from 'lucide-react';import LeatherBoard from '../components/dashboard/LeatherBoard';
 import VintagePaper from '../components/dashboard/VintagePaper';
 import ThemeToggle from '../components/ThemeToggle';
@@ -32,6 +34,9 @@ import { loadUser } from '../store/slices/authSlice';
 import { validateAvatarFile } from '../utils/fileValidation';
 import { BADGE_LIST, BADGE_ICONS } from '../config/badges';
 import LazyImage from '../components/common/LazyImage';
+import ThemeCustomizerDrawer from '../components/ThemeCustomizerDrawer';
+import { useTheme } from '../context/ThemeContext';
+import { THEME_PRESETS } from '../themePresets';
 
 const urlBase64ToUint8Array = (base64String) => {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -48,6 +53,8 @@ const Settings = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { user } = useSelector((state) => state.auth);
+  const { theme, resolvedTheme, accentColors } = useTheme();
+  const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
 
   const [leaderboardVisible, setLeaderboardVisible] = useState(
     typeof user?.leaderboardVisible === 'boolean' ? user.leaderboardVisible : true
@@ -63,6 +70,16 @@ const Settings = () => {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
+
+  const [ttsSpeed, setTtsSpeed] = useState(() => {
+    const savedSpeed = localStorage.getItem('openprep_tts_speed');
+    return savedSpeed ? parseFloat(savedSpeed) : 1;
+  });
+
+  const handleTtsSpeedChange = (speed) => {
+    setTtsSpeed(speed);
+    localStorage.setItem('openprep_tts_speed', String(speed));
+  };
 
   // Avatar Upload States
   const [file, setFile] = useState(null);
@@ -198,14 +215,11 @@ const Settings = () => {
       setPushStatus(permission);
 
       if (permission === 'granted') {
-        const registration = await navigator.serviceWorker.register('/service-worker.js');
+        // Subscribes against the worker vite-plugin-pwa already registered.
+        // This used to register /service-worker.js and subscribe to that — a
+        // worker with no push listener, so nothing was ever displayed.
         const vapidPublicKey = await getVapidPublicKey();
-        const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
-
-        const subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: convertedVapidKey,
-        });
+        const subscription = await subscribeToPushNotifications(vapidPublicKey);
 
         await subscribeToPush(subscription);
         setPushSubscribed(true);
@@ -222,11 +236,7 @@ const Settings = () => {
   const handleDisablePush = async () => {
     try {
       setPushLoading(true);
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
-      if (subscription) {
-        await subscription.unsubscribe();
-      }
+      await unsubscribeFromPushNotifications();
       await unsubscribeFromPush();
       setPushSubscribed(false);
       dispatch(loadUser());
@@ -245,7 +255,7 @@ const Settings = () => {
       await updateNotificationPreferences(reminderTime);
       setSaved(true);
       dispatch(loadUser());
-    } catch (err) {
+    } catch {
       setError('Failed to update reminder time.');
     } finally {
       setSaving(false);
@@ -384,25 +394,96 @@ const Settings = () => {
             </div>
           </div>
         </VintagePaper>
-        {/* --- APPEARANCE / THEME --- */}
+        {/* --- APPEARANCE / THEME CUSTOMIZER --- */}
+        <VintagePaper className="border-t-4 border-t-amber-700">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <Palette className="w-7 h-7 text-amber-700" />
+              <div>
+                <h2 className="text-2xl font-bold font-playfair text-neutral-800 dark:text-neutral-100">
+                  Appearance & Theme Customizer
+                </h2>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                  Current Preset: <span className="font-semibold text-amber-800 dark:text-amber-300">{THEME_PRESETS[theme]?.name || THEME_PRESETS[resolvedTheme]?.name}</span>
+                </p>
+              </div>
+            </div>
+
+            <ThemeToggle showPaletteOption />
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-neutral-100/60 dark:bg-neutral-800/60 border border-neutral-300 dark:border-neutral-600 rounded-lg">
+            <div>
+              <p className="text-sm text-neutral-700 dark:text-neutral-200 font-semibold">
+                Theme Presets & Custom HSL Accent Colors
+              </p>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                Customize presets (Modern Glassmorphism, Midnight AMOLED Dark, Emerald Study, Sunset Warm, Sepia Reading) or fine-tune CSS accent colors.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {/* Swatch Preview */}
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900">
+                <span
+                  className="w-3.5 h-3.5 rounded-full border border-black/20"
+                  style={{ backgroundColor: accentColors?.primary?.hex || '#ad8b73' }}
+                  title="Primary Accent"
+                />
+                <span
+                  className="w-3.5 h-3.5 rounded-full border border-black/20"
+                  style={{ backgroundColor: accentColors?.secondary?.hex || '#e3caa5' }}
+                  title="Secondary Accent"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsCustomizerOpen(true)}
+                className="px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white rounded-lg text-xs font-semibold shadow transition-all flex items-center gap-2 cursor-pointer shrink-0"
+              >
+                <Palette className="w-4 h-4" /> Open Customizer
+              </button>
+            </div>
+          </div>
+
+          <ThemeCustomizerDrawer isOpen={isCustomizerOpen} onClose={() => setIsCustomizerOpen(false)} />
+        </VintagePaper>
+
+        {/* --- ACCESSIBILITY & TEXT-TO-SPEECH --- */}
         <VintagePaper className="border-t-4 border-t-amber-700">
           <div className="flex items-center gap-3 mb-4">
-            <Palette className="w-7 h-7 text-amber-700" />
+            <Volume2 className="w-7 h-7 text-amber-700" />
             <h2 className="text-2xl font-bold font-playfair text-neutral-800 dark:text-neutral-100">
-              Appearance
+              Accessibility & Text-to-Speech
             </h2>
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <p className="text-sm text-neutral-600 dark:text-neutral-300">
-                Choose between Light, Dark, High Contrast, or System Default.
+              <p className="text-sm text-neutral-600 dark:text-neutral-300 font-semibold">
+                Default Voice Reading Speed
               </p>
               <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-                High Contrast mode guarantees a minimum 7:1 contrast ratio (WCAG 2.1 AA).
+                Select your preferred playback rate (0.5x, 1x, 1.25x, 1.5x) when listening to study notes and flashcards.
               </p>
             </div>
-            <ThemeToggle />
+            <div className="flex items-center gap-2">
+              {[0.5, 1, 1.25, 1.5].map((speed) => (
+                <button
+                  key={speed}
+                  type="button"
+                  onClick={() => handleTtsSpeedChange(speed)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                    ttsSpeed === speed
+                      ? 'bg-amber-700 text-white shadow-md'
+                      : 'bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-300 dark:hover:bg-neutral-600'
+                  }`}
+                >
+                  {speed}x
+                </button>
+              ))}
+            </div>
           </div>
         </VintagePaper>
         {/* --- BADGE GALLERY --- */}

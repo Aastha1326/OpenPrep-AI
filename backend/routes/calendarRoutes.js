@@ -275,4 +275,60 @@ router.post('/sync', async (req, res) => {
   }
 });
 
+/**
+ * Public webhook callback route for Google Calendar push notifications.
+ */
+router.post('/webhook', async (req, res) => {
+  try {
+    const channelId = req.headers['x-goog-channel-id'];
+    const resourceId = req.headers['x-goog-resource-id'];
+    const resourceState = req.headers['x-goog-resource-state'];
+
+    if (!channelId || !resourceId || !resourceState) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing webhook headers',
+      });
+    }
+
+    // Google sends 'sync' event when channel is created
+    if (resourceState === 'sync') {
+      return res.status(200).send('Sync confirmation');
+    }
+
+    // Look up user by channel ID
+    const user = await User.findOne({
+      where: {
+        googleCalendarWebhookChannelId: channelId,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'Channel not found',
+      });
+    }
+
+    // Verify authenticity: check resource ID match
+    if (user.googleCalendarWebhookResourceId !== resourceId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Resource ID mismatch',
+      });
+    }
+
+    // Call service to handle change sync
+    await calendarService.handleGoogleCalendarWebhook(user);
+
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('[Google Calendar Webhook Error]:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 module.exports = router;

@@ -11,6 +11,7 @@ const { escapeLikePattern } = require('../utils/likePattern');
 const { summarizeNoteText, transcribeAndSummarizeAudio } = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
 const { extractTextFromImage, extractTextFromPDF } = require('../services/ocrService');
+const { loadEnv } = require('../config/env');
 
 // Helper to escape regex special characters if regex search is used anywhere
 const escapeRegex = (string) => {
@@ -38,16 +39,22 @@ const escapeRegex = (string) => {
  */
 exports.exportNotes = async (req, res, next) => {
   try {
-    const requestedFormat = req.query.format;
-    if (!requestedFormat || requestedFormat.trim() === '') {
-      return res.status(400).json({ success: false, error: 'Export format is required' });
+    const config = loadEnv();
+    if (!config) {
+      return res.status(500).json({ success: false, error: 'Configuration could not be loaded.' });
     }
     
-    if (requestedFormat !== 'zip' && requestedFormat !== 'json') {
-      return res.status(400).json({ success: false, error: 'Unsupported export format' });
+    const limit = config.NOTE_EXPORT_LIMIT;
+    const noteCount = await Note.count({ where: { user: req.user.id } });
+    
+    if (noteCount > limit) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Export exceeds the configured limit of ${limit} notes.` 
+      });
     }
 
-    const format = requestedFormat;
+    const format = req.query.format === 'zip' ? 'zip' : 'json';
 
     const notes = await Note.findAll({
       where: { user: req.user.id },
@@ -182,7 +189,18 @@ exports.importNotes = async (req, res, next) => {
  */
 exports.uploadNote = async (req, res, next) => {
   try {
-    const { title, content, subjectId, topicId, isPublic, category, tags } = req.body;
+    const {
+      title,
+      content,
+      subjectId,
+      topicId,
+      isPublic,
+      category,
+      tags,
+      isOcrExtracted,
+      ocrConfidence,
+      originalImageUrl,
+    } = req.body;
 
     const subject = await Subject.findByPk(subjectId);
     if (!subject) {
@@ -209,6 +227,9 @@ exports.uploadNote = async (req, res, next) => {
       category: category || 'Lecture Notes',
       tags: typeof tags === 'string' ? tags.split(',').map(t => t.trim()).filter(Boolean) : (Array.isArray(tags) ? tags : []),
       user: req.user.id,
+      isOcrExtracted: isOcrExtracted === 'true' || isOcrExtracted === true,
+      ocrConfidence: ocrConfidence ? parseFloat(ocrConfidence) : null,
+      originalImageUrl: originalImageUrl || null,
     });
 
     // Log activity

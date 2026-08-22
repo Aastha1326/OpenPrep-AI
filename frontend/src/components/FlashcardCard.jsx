@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Lightbulb, RotateCw, Play, X } from 'lucide-react';
 import MathRenderer from './common/MathRenderer';
+import AudioReader from './AudioReader';
 
-const FlashcardCard = ({ flashcard, style }) => {
-  const [isFlipped, setIsFlipped] = useState(false);
+const FlashcardCard = ({ flashcard, style, rowIndex, columnIndex, cardIndex }) => {  const [isFlipped, setIsFlipped] = useState(false);
   const [showVideoModal, setShowVideoModal] = useState(false);
 
   const handleFlip = () => {
@@ -37,15 +37,20 @@ const FlashcardCard = ({ flashcard, style }) => {
   };
 
   return (
-    <div style={style} className="p-2">
-      <div
+    <div
+      style={style}
+      className="p-2"
+      role="gridcell"
+      aria-rowindex={rowIndex + 1}
+      aria-colindex={columnIndex + 1}
+    >            <div
         role="button"
         tabIndex={0}
+        data-card-index={cardIndex}
         onClick={handleFlip}
         onKeyDown={handleKeyDown}
         aria-label={isFlipped ? 'Show front of card' : 'Show back of card'}
         className="w-full h-full relative cursor-pointer select-none perspective-1000"
-        style={{
           touchAction: 'manipulation',
         }}
       >
@@ -69,6 +74,9 @@ const FlashcardCard = ({ flashcard, style }) => {
               <span className="flex items-center gap-1">
                 <Lightbulb className="w-3.5 h-3.5 text-yellow-500" /> Question
               </span>
+              <div onClick={(e) => e.stopPropagation()}>
+                <AudioReader text={flashcard?.front} />
+              </div>
             </div>
             <div className="text-center font-bold text-sm text-neutral-800 dark:text-neutral-100 overflow-y-auto max-h-[70%]">
               {flashcard?.front ? (
@@ -106,8 +114,11 @@ const FlashcardCard = ({ flashcard, style }) => {
               transform: 'rotateY(180deg)',
             }}
           >
-            <div className="w-full text-left text-[10px] font-bold text-yellow-700 dark:text-yellow-400 uppercase tracking-widest">
-              Answer
+            <div className="w-full flex justify-between items-center text-[10px] font-bold text-yellow-700 dark:text-yellow-400 uppercase tracking-widest font-mono">
+              <span>Answer</span>
+              <div onClick={(e) => e.stopPropagation()}>
+                <AudioReader text={flashcard?.back} />
+              </div>
             </div>
             <div className="text-center text-xs text-neutral-800 dark:text-neutral-200 overflow-y-auto max-h-[70%] bg-transparent">
               {flashcard?.back ? (

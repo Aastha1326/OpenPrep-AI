@@ -15,6 +15,18 @@ export const fetchDashboardStats = createAsyncThunk(
   }
 );
 
+export const fetchInteractiveAnalytics = createAsyncThunk(
+  'dashboard/fetchInteractiveAnalytics',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await API.get('/progress/analytics');
+      return response.data.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.error || 'Failed to fetch interactive analytics');
+    }
+  }
+);
+
 export const fetchSubjectBreakdown = createAsyncThunk(
   'dashboard/fetchSubjects',
   async (_, { rejectWithValue }) => {
@@ -65,9 +77,17 @@ export const reviewFlashcard = createAsyncThunk(
 
 // ── Helper: Initial theme detection ──
 const getInitialTheme = () => {
-  const saved = localStorage.getItem('openprep_theme') || localStorage.getItem('theme');
-  return saved === 'dark' ? 'dark' : 'light';
+  try {
+    if (typeof localStorage === 'undefined' || !localStorage || typeof localStorage.getItem !== 'function') {
+      return 'light';
+    }
+    const saved = localStorage.getItem('openprep_theme') || localStorage.getItem('theme');
+    return saved === 'dark' ? 'dark' : 'light';
+  } catch (e) {
+    return 'light';
+  }
 };
+
 
 // ── Initial State ──
 const initialState = {
@@ -78,16 +98,19 @@ const initialState = {
   subjectBreakdown: [],
   activePlan: null,
   dueFlashcards: [],
+  interactiveAnalytics: null,
 
   loadingStats: false,
   loadingSubjects: false,
   loadingPlan: false,
   loadingFlashcards: false,
+  loadingAnalytics: false,
 
   errorStats: null,
   errorSubjects: null,
   errorPlan: null,
   errorFlashcards: null,
+  errorAnalytics: null,
 };
 
 // ── Slice ──
@@ -185,6 +208,20 @@ const dashboardSlice = createSlice({
       .addCase(reviewFlashcard.fulfilled, (state, action) => {
         const reviewedId = action.meta.arg.cardId;
         state.dueFlashcards = state.dueFlashcards.filter((c) => c.id !== reviewedId);
+      })
+
+      // ── Interactive Analytics ──
+      .addCase(fetchInteractiveAnalytics.pending, (state) => {
+        state.loadingAnalytics = true;
+        state.errorAnalytics = null;
+      })
+      .addCase(fetchInteractiveAnalytics.fulfilled, (state, action) => {
+        state.loadingAnalytics = false;
+        state.interactiveAnalytics = action.payload;
+      })
+      .addCase(fetchInteractiveAnalytics.rejected, (state, action) => {
+        state.loadingAnalytics = false;
+        state.errorAnalytics = action.payload;
       });
   },
 });

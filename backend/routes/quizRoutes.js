@@ -22,10 +22,13 @@ const {
   generateCustomQuiz,
   evaluateSubjectiveAnswer,
   generateRemediationQuiz,
+  getNextAdaptiveQuestionEndpoint,
 } = require('../controllers/quizController');
 const { generateQuizFromPdf } = require('../controllers/pdfQuizController');
 const { protect } = require('../middleware/auth');
-const telemetryAuth = require('../middleware/telemetryAuth');const { aiLimiter } = require('../middleware/rateLimiter');
+const telemetryAuth = require('../middleware/telemetryAuth');
+const { aiLimiter } = require('../middleware/rateLimiter');
+const { aiSanitizer } = require('../middleware/aiSanitizer');
 const { checkAiQuota } = require('../middleware/aiQuotaMiddleware');
 const {
   validateGenerateAIQuiz,
@@ -41,10 +44,12 @@ const router = express.Router();
 const { getNextAdaptiveQuestion } = require('../controllers/adaptiveQuizController');
 
 // Register solution explainer route
-router.get('/questions/:questionId/explanation', protect, getEnhancedExplanation);
+router.get('/questions/:questionId/explanation', protect, aiLimiter, checkAiQuota, getEnhancedExplanation);
 
-// Register adaptive route
-router.post('/adaptive/next-question', protect, getNextAdaptiveQuestion);
+// Register adaptive routes
+router.get('/next', getNextAdaptiveQuestionEndpoint);
+router.get('/adaptive/next', getNextAdaptiveQuestionEndpoint);
+router.post('/adaptive/next-question', protect, aiLimiter, checkAiQuota, getNextAdaptiveQuestion);
 
 /**
  * @swagger
@@ -160,8 +165,8 @@ router.post('/evaluate-subjective', protect, aiLimiter, checkAiQuota, validateEv
  *               $ref: '#/components/schemas/Error'
  */
 
-router.post('/generate-ai', protect, aiLimiter, checkAiQuota, validateGenerateAIQuiz, generateAIQuiz);
-router.post('/generate-custom', protect, aiLimiter, checkAiQuota, generateCustomQuiz);
+router.post('/generate-ai', protect, aiLimiter, checkAiQuota, aiSanitizer, validateGenerateAIQuiz, generateAIQuiz);
+router.post('/generate-custom', protect, aiLimiter, checkAiQuota, aiSanitizer, generateCustomQuiz);
 
 /**
  * @swagger

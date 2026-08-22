@@ -14,6 +14,8 @@ const User = require('../models/User');
 const Achievement = require('../models/Achievement');
 const sendEmail = require('../services/emailService');
 
+const MAX_ACTIVE_SESSIONS = parseInt(process.env.MAX_ACTIVE_SESSIONS, 10) || 10;
+
 const getAuthCookieOptions = () => ({
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
@@ -31,9 +33,35 @@ const getAccessTokenCookieOptions = () => ({
 });
 
 const generateAccessToken = (id) => {
-  return jwt.sign({ id, type: 'access' }, process.env.JWT_SECRET || 'supersecret_openprep_key', {
+  return jwt.sign({ id, type: 'access' }, jwtSecret, {
     expiresIn: process.env.JWT_EXPIRE || '15m',
   });
+};
+
+/**
+ * Short-lived token binding a provider identity we have already authenticated.
+ *
+ * Used when a provider gives us no usable email and the user has to supply one.
+ * Signing it means the follow-up request proves it came from a real OAuth
+ * round trip rather than simply naming an identity.
+ */
+const PENDING_OAUTH_TTL = '15m';
+
+const generatePendingOAuthToken = (payload) =>
+  jwt.sign(
+    { ...payload, type: 'oauth_pending' },
+    jwtSecret,
+    { expiresIn: PENDING_OAUTH_TTL }
+  );
+
+const verifyPendingOAuthToken = (token) => {
+  try {
+    const decoded = jwt.verify(token, jwtSecret);
+    if (decoded.type !== 'oauth_pending' || !decoded.githubId) return null;
+    return decoded;
+  } catch {
+    return null;
+  }
 };
 
 const generateTokenFamily = () => crypto.randomBytes(16).toString('hex');
@@ -596,7 +624,7 @@ exports.getMe = async (req, res, next) => {
  */
 exports.updateSettings = async (req, res, next) => {
   try {
-    const { leaderboardVisible, hideActivityFromSquad, syncGoogleCalendar } = req.body;
+    const { leaderboardVisible, hideActivityFromSquad, locale } = req.body;
 
     if (typeof leaderboardVisible === 'boolean') {
       req.user.leaderboardVisible = leaderboardVisible;
@@ -604,8 +632,8 @@ exports.updateSettings = async (req, res, next) => {
     if (typeof hideActivityFromSquad === 'boolean') {
       req.user.hideActivityFromSquad = hideActivityFromSquad;
     }
-    if (typeof syncGoogleCalendar === 'boolean') {
-      req.user.syncGoogleCalendar = syncGoogleCalendar;
+    if (locale && typeof locale === 'string') {
+      req.user.locale = locale;
     }
     await req.user.save();
 
@@ -616,6 +644,7 @@ exports.updateSettings = async (req, res, next) => {
         name: req.user.name,
         email: req.user.email,
         role: req.user.role,
+        locale: req.user.locale || 'en',
         streak: {
           count: req.user.streakCount,
           lastActive: req.user.streakLastActive,
@@ -1109,8 +1138,18 @@ exports.oauthSuccessCallback = async (req, res, next) => {
 
     if (user.isTemp) {
       const frontendBase = process.env.FRONTEND_URL || 'http://localhost:5173';
+      // The provider id goes back to the browser inside a short-lived signed
+      // token, not as a query parameter. registerOAuthEmail used to accept a
+      // raw githubId from the request body, which let anyone claim any identity
+      // without going through the provider at all.
+      const pendingToken = generatePendingOAuthToken({
+        provider: user.provider || 'github',
+        githubId: user.githubId,
+        name: user.name,
+        avatarUrl: user.avatarUrl,
+      });
       return res.redirect(
-        `${frontendBase.replace(/\/$/, '')}/oauth-callback?prompt_email=true&githubId=${user.githubId}&name=${encodeURIComponent(user.name)}&avatarUrl=${encodeURIComponent(user.avatarUrl || '')}`
+        `${frontendBase.replace(/\/$/, '')}/oauth-callback?prompt_email=true&pendingToken=${encodeURIComponent(pendingToken)}`
       );
     }
 
@@ -1128,30 +1167,48 @@ exports.oauthSuccessCallback = async (req, res, next) => {
 
 exports.registerOAuthEmail = async (req, res, next) => {
   try {
-    const { email, githubId, name, avatarUrl } = req.body;
-    if (!email || !githubId) {
-      return res.status(400).json({ success: false, error: 'Email and GitHub ID are required.' });
+    const { email, pendingToken } = req.body;
+    if (!email || !pendingToken) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'Email and a valid sign-in token are required.' });
     }
+
+    const pending = verifyPendingOAuthToken(pendingToken);
+    if (!pending) {
+      return res
+        .status(401)
+        .json({ success: false, error: 'This sign-in link has expired. Start again.' });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const { githubId, name, avatarUrl } = pending;
 
     let user = await User.findOne({ where: { githubId } });
     if (!user) {
-      user = await User.findOne({ where: { email } });
-      if (user) {
-        user.githubId = githubId;
-        user.authProvider = 'github';
-        user.avatarUrl = avatarUrl || user.avatarUrl;
-        await user.save();
-      } else {
-        user = await User.create({
-          name: name || 'GitHub User',
-          email,
-          githubId,
-          authProvider: 'github',
-          avatarUrl,
-          isEmailVerified: true,
-          password: null,
+      const existingByEmail = await User.findOne({ where: { email: normalizedEmail } });
+      if (existingByEmail) {
+        // The address came from the user, not from GitHub — nothing has
+        // verified that they own it. Attaching the provider id to somebody
+        // else's account on that basis is the takeover this flow used to allow.
+        return res.status(409).json({
+          success: false,
+          error:
+            'An account already uses this email. Sign in with your password and connect GitHub from Settings.',
         });
       }
+
+      user = await User.create({
+        name: name || 'GitHub User',
+        email: normalizedEmail,
+        githubId,
+        authProvider: 'github',
+        avatarUrl,
+        // GitHub did not give us this address, so it is unconfirmed until the
+        // usual verification email is completed.
+        isEmailVerified: false,
+        password: null,
+      });
     }
 
     const accessToken = generateAccessToken(user.id);
@@ -1505,3 +1562,28 @@ exports.verifyEmail = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Keepalive session update - refreshes access token and extends session timestamp
+// @route   POST /api/session/keepalive or POST /api/auth/session/keepalive
+// @access  Private
+exports.keepalive = async (req, res, next) => {
+  try {
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    const token = generateAccessToken(user.id);
+    res.cookie('token', token, getAccessTokenCookieOptions());
+
+    res.status(200).json({
+      success: true,
+      message: 'Session expiration extended successfully',
+      token,
+      expiresAt: Date.now() + 15 * 60 * 1000,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
