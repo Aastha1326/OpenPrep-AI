@@ -337,6 +337,24 @@ function App() {
           />
 
           <Route
+            path="/analytics"
+            element={
+              <ProtectedRoute>
+                <StudyAnalytics />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/tools/calculator"
+            element={
+              <ProtectedRoute>
+                <FormulaScratchpad />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/settings"
             element={
               <ProtectedRoute>
