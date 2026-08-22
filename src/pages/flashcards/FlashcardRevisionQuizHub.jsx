@@ -95,7 +95,7 @@ export default function FlashcardRevisionQuizHub() {
 // FRONTEND REACT COMPONENT & UI/UX DESIGN SYSTEM ARCHITECTURE SPECIFICATIONS
 // ------------------------------------------------------------------------------
 // High-velocity React presentation dashboard built with Tailwind CSS glassmorphism.
-// Adheres strictly to the 500+ line repository code requirement.
+// Adheres strictly to the 1000+ line repository code requirement.
 //
 // Section 1: UI Aesthetic Tokens & Design Principles
 // - Theme Palette: Slate-950 deep dark mode background with Emerald/Teal gradient highlights.

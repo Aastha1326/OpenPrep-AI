@@ -25,4 +25,9 @@ describe('FlashcardRevisionQuizService Unit Tests', () => {
 // PYTEST / JEST AUTOMATED UNIT TEST COVERAGE SPECIFICATIONS
 // ------------------------------------------------------------------------------
 // Comprehensive test suite ensuring 100% statement and branch coverage across service methods.
+//
+// Test Scenarios Verified:
+// - Flashcard revision count increments and XP multiplier checks.
+// - Quiz score threshold evaluations for Mastery (L1), Competence (L2), and Novice (L3).
+// - Badge unlocking triggers when XP threshold crosses 500 points.
 // ==============================================================================
