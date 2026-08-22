@@ -24,6 +24,7 @@ const swaggerSpec = require('./config/swagger');
 const { apiReference } = require('@scalar/express-api-reference');
 const passport = require('./config/passport');
 const { getCorsMiddleware, getSocketCorsOrigin } = require('./middleware/corsHandler');
+const { metricsMiddleware, getMetrics } = require('./middleware/metricsMiddleware');
 
 // Validate the whole environment against the schema in config/env.js before
 // anything else loads. Reports every problem at once and exits in production;
@@ -178,17 +179,24 @@ app.use(passport.initialize());
 // Cookie parser (required for csurf cookie-based tokens)
 app.use(cookieParser());
 
+// Prometheus metrics middleware
+app.use(metricsMiddleware);
+
 // CSRF protection middleware
 // The batched quiz-telemetry endpoint is flushed via navigator.sendBeacon()
 // on tab close/navigation, which cannot attach a CSRF header. It's already
 // protected by its own JWT-based auth (see middleware/telemetryAuth.js), so
-// CSRF protection is skipped only for this one route.
+// CSRF protection is skipped only for this one route and /metrics.
 app.use((req, res, next) => {
-  if (req.path === '/api/quiz/telemetry/batch' || req.path === '/api/quizzes/telemetry/batch') {
+  if (req.path === '/api/quiz/telemetry/batch' || req.path === '/api/quizzes/telemetry/batch' || req.path === '/metrics') {
     return next();
   }
   return doubleCsrfProtection(req, res, next);
 });
+
+// Prometheus Metrics Exporter Endpoint
+app.get('/metrics', getMetrics);
+
 // CSRF Token Endpoint for frontend clients
 app.get('/api/csrf-token', (req, res) => {
   const token = generateCsrfToken(req, res);
