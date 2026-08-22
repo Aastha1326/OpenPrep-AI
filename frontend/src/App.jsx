@@ -309,6 +309,12 @@ function App() {
                 <QuizSession />
               </ProtectedRoute>
             }
+          />          <Route path="/mind-map"
+            element={
+              <ProtectedRoute>
+                <MindMapViewer />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/quiz/live"
@@ -328,10 +334,10 @@ function App() {
           />
 
           <Route
-            path="/mind-map"
+            path="/analytics"
             element={
               <ProtectedRoute>
-                <MindMapViewer />
+                <StudyAnalytics />
               </ProtectedRoute>
             }
           />
