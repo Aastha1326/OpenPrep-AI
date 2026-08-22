@@ -464,6 +464,9 @@ initBackupScheduler();
 const { startWorker } = require('./workers/squadActivityWorker');
 startWorker();
 
+const { startWorker: startTaskWorker } = require('./workers/taskQueueWorker');
+startTaskWorker();
+
 
 if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   server.listen(PORT, () => {
@@ -498,6 +501,14 @@ const gracefulShutdown = (signal) => {
       logger.info('squad activity worker stopped');
     } catch (workerErr) {
       logger.error('error stopping squad activity worker', { err: workerErr });
+    }
+
+    try {
+      const { stopWorker: stopTaskWorker } = require('./workers/taskQueueWorker');
+      stopTaskWorker();
+      logger.info('task queue worker stopped');
+    } catch (taskWorkerErr) {
+      logger.error('error stopping task queue worker', { err: taskWorkerErr });
     }
 
     try {
