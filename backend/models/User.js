@@ -171,9 +171,21 @@ const User = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
-syncGoogleCalendar: {
+    syncGoogleCalendar: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
+    },
+    googleCalendarWebhookChannelId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    googleCalendarWebhookResourceId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    googleCalendarWebhookExpiration: {
+      type: DataTypes.DATE,
+      allowNull: true,
     },
     hideActivityFromSquad: {
       type: DataTypes.BOOLEAN,

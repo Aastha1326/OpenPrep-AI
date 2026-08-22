@@ -614,12 +614,30 @@ exports.submitQuizAttempt = async (req, res, next) => {
 // @access  Private
 exports.getAttemptHistory = async (req, res, next) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
-    const offset = (page - 1) * limit;
+    let whereClause = { user: req.user.id };
+    let offset = undefined;
 
-    const { count: total, rows: attempts } = await QuizAttempt.findAndCountAll({
-      where: { user: req.user.id },
+    if (req.query.cursor) {
+      let cursorDate;
+      try {
+        const decoded = Buffer.from(req.query.cursor, 'base64').toString('ascii');
+        cursorDate = new Date(decoded);
+      } catch (err) {
+        cursorDate = new Date(req.query.cursor);
+      }
+
+      if (!isNaN(cursorDate.getTime())) {
+        whereClause.createdAt = { [Op.lt]: cursorDate };
+      }
+    } else if (req.query.page) {
+      const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+      offset = (page - 1) * limit;
+    }
+
+    const { count: total, rows: rawAttempts } = await QuizAttempt.findAndCountAll({
+      where: whereClause,
+      attributes: { exclude: ['answers'] },
       distinct: true,
       include: [
         {
@@ -633,8 +651,15 @@ exports.getAttemptHistory = async (req, res, next) => {
       ],
       order: [['createdAt', 'DESC']],
       offset,
-      limit,
+      limit: limit + 1,
     });
+
+    const hasMore = rawAttempts.length > limit;
+    const attempts = hasMore ? rawAttempts.slice(0, limit) : rawAttempts;
+
+    const nextCursor = (hasMore && attempts.length > 0)
+      ? Buffer.from(attempts[attempts.length - 1].createdAt.toISOString()).toString('base64')
+      : null;
 
     const populatedAttempts = attempts.map((att) => {
       const json = att.toJSON();
@@ -646,14 +671,22 @@ exports.getAttemptHistory = async (req, res, next) => {
       return json;
     });
 
-    res.status(200).json({
+    const responsePayload = {
       success: true,
       count: populatedAttempts.length,
       total,
-      page,
-      totalPages: Math.ceil(total / limit),
+      hasMore,
+      nextCursor,
       data: populatedAttempts,
-    });
+    };
+
+    if (!req.query.cursor) {
+      const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+      responsePayload.page = page;
+      responsePayload.totalPages = Math.ceil(total / limit);
+    }
+
+    res.status(200).json(responsePayload);
   } catch (error) {
     next(error);
   }

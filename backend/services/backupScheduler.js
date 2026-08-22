@@ -1,5 +1,5 @@
 const cron = require('node-cron');
-const { runBackup } = require('../scripts/db-backup');
+const { runBackupFlow } = require('./backupService');
 
 let cronJob = null;
 
@@ -25,7 +25,7 @@ function initBackupScheduler() {
   cronJob = cron.schedule(schedule, async () => {
     console.log('[BackupScheduler] Running scheduled database backup...');
     try {
-      const result = await runBackup();
+      const result = await runBackupFlow();
       console.log(`[BackupScheduler] Scheduled backup created successfully: ${result.fileName}`);
     } catch (err) {
       console.error('[BackupScheduler] Scheduled database backup failed:', err.message);
