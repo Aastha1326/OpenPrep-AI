@@ -7,6 +7,7 @@ import { store } from './store'
 import { ThemeProvider } from './context/ThemeContext'
 import { SyncProvider } from './context/SyncContext'
 import { PomodoroProvider } from './context/PomodoroContext'
+import { SessionTimerProvider } from './context/SessionTimerContext'
 import ErrorBoundary from './components/common/ErrorBoundary'
 import './index.css'
 import './i18n';
@@ -68,7 +69,9 @@ createRoot(document.getElementById('root')).render(
             <SyncProvider>
               <PomodoroProvider>
                 <BrowserRouter>
-                  <App />
+                  <SessionTimerProvider>
+                    <App />
+                  </SessionTimerProvider>
                 </BrowserRouter>
               </PomodoroProvider>
             </SyncProvider>
