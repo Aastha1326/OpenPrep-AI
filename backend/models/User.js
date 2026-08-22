@@ -258,6 +258,14 @@ examCountdownPreferences: {
       type: DataTypes.INTEGER,
       defaultValue: 0,
     },
+    skillScore: {
+      type: DataTypes.FLOAT,
+      defaultValue: 1000.0,
+    },
+    recentAnswerHistory: {
+      type: DataTypes.JSONB,
+      defaultValue: [],
+    },
   },
   {
     timestamps: true,
