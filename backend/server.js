@@ -389,6 +389,7 @@ require('./sockets/crdtHandler')(io);
 require('./sockets/squadHandler')(io);
 require('./sockets/flashcardCollaborationHandler')(io);
 require('./sockets/focusRoomHandler')(io);
+require('./src/socket')(io);
 // Authenticate Socket.io connections
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;

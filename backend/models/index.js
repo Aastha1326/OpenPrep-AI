@@ -42,6 +42,8 @@ const SquadActivityReaction = require('./SquadActivityReaction');
 const Syllabus = require('./Syllabus');
 const SyllabusTopic = require('./SyllabusTopic');
 const PDFAnnotation = require('./PDFAnnotation');
+const QuizRoom = require('./QuizRoom');
+
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -289,4 +291,5 @@ module.exports = {  sequelize,  User,  Exam,
   FlashcardDeck,
   DeckCollaborator,
   PDFAnnotation,
+  QuizRoom,
 };
