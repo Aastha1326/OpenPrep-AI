@@ -218,6 +218,39 @@ describe('POST /api/flashcards/from-audio', () => {
       expect(res.body.flashcards).toBeDefined();
     });
 
+    it('should reject negative page with HTTP 400', async () => {
+      const res = await request(app)
+        .get('/api/flashcards')
+        .set('Authorization', `Bearer ${authToken}`)
+        .query({ page: -1, limit: 10 });
+      
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toContain('Page cannot be negative');
+    });
+
+    it('should reject zero limit with HTTP 400', async () => {
+      const res = await request(app)
+        .get('/api/flashcards')
+        .set('Authorization', `Bearer ${authToken}`)
+        .query({ page: 1, limit: 0 });
+      
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toContain('Limit cannot be zero or negative');
+    });
+
+    it('should reject negative pageSize with HTTP 400', async () => {
+      const res = await request(app)
+        .get('/api/flashcards')
+        .set('Authorization', `Bearer ${authToken}`)
+        .query({ page: 1, pageSize: -5 });
+      
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toContain('Page size cannot be zero or negative');
+    });
+
     it('should filter flashcards by search query', async () => {
       await Flashcard.create({
         user: testUser.id,
