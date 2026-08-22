@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const redisService = require('../services/redisService');
 
 const TIER_LIMITS = {
   student: 15,
@@ -7,6 +8,16 @@ const TIER_LIMITS = {
   premium: 100,
   default: 15,
 };
+
+const BUCKET_LIMITS = {
+  student: { capacity: 20, refillRate: 20 / 3600 },
+  contributor: { capacity: 100, refillRate: 100 / 3600 },
+  admin: { capacity: 100, refillRate: 100 / 3600 },
+  premium: { capacity: 100, refillRate: 100 / 3600 },
+  default: { capacity: 20, refillRate: 20 / 3600 },
+};
+
+const localTokenBuckets = new Map();
 
 const checkAiQuota = async (req, res, next) => {
   try {
@@ -63,6 +74,60 @@ const checkAiQuota = async (req, res, next) => {
       });
     }
 
+    // Token-bucket hourly rate limiter
+    const tier = user.role || 'default';
+    const limits = BUCKET_LIMITS[tier] || BUCKET_LIMITS.default;
+    const { capacity, refillRate } = limits;
+
+    const bucketKey = `ai_bucket:${userId}`;
+    let bucket = null;
+
+    if (redisService.isReady) {
+      bucket = await redisService.get(bucketKey);
+    } else {
+      bucket = localTokenBuckets.get(userId) || null;
+    }
+
+    const currentTime = Date.now();
+
+    if (!bucket) {
+      bucket = {
+        tokens: capacity,
+        lastRefillTime: currentTime,
+      };
+    } else {
+      const elapsedSeconds = Math.max(0, (currentTime - bucket.lastRefillTime) / 1000);
+      bucket.tokens = Math.min(capacity, bucket.tokens + elapsedSeconds * refillRate);
+      bucket.lastRefillTime = currentTime;
+    }
+
+    if (bucket.tokens < 1) {
+      const waitSeconds = Math.ceil((1 - bucket.tokens) / refillRate);
+      
+      if (redisService.isReady) {
+        await redisService.set(bucketKey, bucket, 3600);
+      } else {
+        localTokenBuckets.set(userId, bucket);
+      }
+
+      res.setHeader('Retry-After', waitSeconds);
+      res.setHeader('X-RateLimit-Remaining', 0);
+      return res.status(429).json({
+        success: false,
+        error: 'Too many requests. Please wait before retrying.',
+        retryInSeconds: waitSeconds,
+      });
+    }
+
+    // Consume 1 token
+    bucket.tokens -= 1;
+
+    if (redisService.isReady) {
+      await redisService.set(bucketKey, bucket, 3600);
+    } else {
+      localTokenBuckets.set(userId, bucket);
+    }
+
     res.setHeader('X-RateLimit-Remaining', remaining - 1);
 
     // Increment daily usage only on a successful 2xx status response
@@ -85,4 +150,4 @@ const checkAiQuota = async (req, res, next) => {
   }
 };
 
-module.exports = { checkAiQuota };
+module.exports = { checkAiQuota, BUCKET_LIMITS, localTokenBuckets };

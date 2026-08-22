@@ -131,6 +131,67 @@ describe('Quiz Controller - Integration Tests', () => {
       expect(res.body.count).toBe(0);
       expect(res.body.data).toEqual([]);
     });
+
+    it('should support pagination (cursor and limit) and exclude detailed answers', async () => {
+      // 1. Seed some attempts for testUser
+      const attempt1 = await QuizAttempt.create({
+        user: testUser.id,
+        quiz: testQuiz.id,
+        score: 80,
+        totalQuestions: 10,
+        timeSpent: 300,
+        answers: [{ questionId: 'q1', answer: 'A' }],
+        createdAt: new Date('2026-08-21T10:00:00Z'),
+      });
+
+      const attempt2 = await QuizAttempt.create({
+        user: testUser.id,
+        quiz: testQuiz.id,
+        score: 90,
+        totalQuestions: 10,
+        timeSpent: 250,
+        answers: [{ questionId: 'q1', answer: 'B' }],
+        createdAt: new Date('2026-08-21T11:00:00Z'),
+      });
+
+      const attempt3 = await QuizAttempt.create({
+        user: testUser.id,
+        quiz: testQuiz.id,
+        score: 100,
+        totalQuestions: 10,
+        timeSpent: 200,
+        answers: [{ questionId: 'q1', answer: 'C' }],
+        createdAt: new Date('2026-08-21T12:00:00Z'),
+      });
+
+      // 2. Fetch page 1 (limit 2)
+      const res1 = await request(app)
+        .get('/api/quizzes/attempts/history?limit=2')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res1.status).toBe(200);
+      expect(res1.body.success).toBe(true);
+      expect(res1.body.count).toBe(2);
+      expect(res1.body.hasMore).toBe(true);
+      expect(res1.body.nextCursor).toBeDefined();
+      expect(res1.body.data[0].answers).toBeUndefined(); // Excluded!
+      expect(res1.body.data[1].answers).toBeUndefined(); // Excluded!
+
+      // 3. Fetch page 2 using the nextCursor
+      const res2 = await request(app)
+        .get(`/api/quizzes/attempts/history?limit=2&cursor=${res1.body.nextCursor}`)
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res2.status).toBe(200);
+      expect(res2.body.success).toBe(true);
+      expect(res2.body.count).toBe(1);
+      expect(res2.body.hasMore).toBe(false);
+      expect(res2.body.nextCursor).toBeNull();
+      expect(res2.body.data[0].answers).toBeUndefined(); // Excluded!
+
+      // Cleanup
+      await QuizAttempt.destroy({ where: { id: [attempt1.id, attempt2.id, attempt3.id] } });
+    });
   });
 
   describe('GET /api/quizzes/:id', () => {

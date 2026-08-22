@@ -528,4 +528,41 @@ describe('Note Controller - Integration Tests', () => {
       expect(res.body.error).toContain('exceeds the maximum allowed size');
     });
   });
+
+  // =========================================================================
+  // GET /api/notes/export — Export user notes with configured limit
+  // =========================================================================
+  describe('GET /api/notes/export', () => {
+    it('exports notes correctly within default limit', async () => {
+      // Since there is no custom configuration provided, it falls back to the limit of 100
+      const res = await request(app)
+        .get('/api/notes/export')
+        .set('Authorization', `Bearer ${authToken}`);
+      
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
+    });
+
+    it('rejects export if notes exceed configured limit', async () => {
+      const originalLimit = process.env.NOTE_EXPORT_LIMIT;
+      // Configure a custom export limit to be extremely small (0) so it always fails.
+      process.env.NOTE_EXPORT_LIMIT = '0'; 
+
+      const res = await request(app)
+        .get('/api/notes/export')
+        .set('Authorization', `Bearer ${authToken}`);
+        
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toContain('Export exceeds the configured limit');
+
+      // Restore original config
+      if (originalLimit === undefined) {
+        delete process.env.NOTE_EXPORT_LIMIT;
+      } else {
+        process.env.NOTE_EXPORT_LIMIT = originalLimit;
+      }
+    });
+  });
 });

@@ -80,4 +80,84 @@ describe('aiQuotaMiddleware Unit Tests', () => {
     expect(res.setHeader).toHaveBeenCalledWith('X-RateLimit-Remaining', 9);
     expect(next).toHaveBeenCalled();
   });
+
+  describe('Token-Bucket Rate Limiter', () => {
+    const { BUCKET_LIMITS, localTokenBuckets } = require('../../middleware/aiQuotaMiddleware');
+    const redisService = require('../../services/redisService');
+
+    beforeEach(() => {
+      localTokenBuckets.clear();
+      redisService.isReady = false;
+    });
+
+    it('should allow consecutive requests within token capacity', async () => {
+      const mockUser = {
+        id: 'user-123',
+        role: 'student',
+        dailyAiUsageCount: 0,
+        lastAiUsageReset: new Date(),
+        save: vi.fn(),
+      };
+      vi.spyOn(User, 'findByPk').mockResolvedValue(mockUser);
+
+      await checkAiQuota(req, res, next);
+      expect(next).toHaveBeenCalled();
+      expect(res.status).not.toHaveBeenCalled();
+    });
+
+    it('should reject requests when tokens run dry (local fallback)', async () => {
+      const mockUser = {
+        id: 'user-123',
+        role: 'student',
+        dailyAiUsageCount: 0,
+        lastAiUsageReset: new Date(),
+        save: vi.fn(),
+      };
+      vi.spyOn(User, 'findByPk').mockResolvedValue(mockUser);
+
+      // Artificially empty the local token bucket
+      localTokenBuckets.set('user-123', {
+        tokens: 0.2,
+        lastRefillTime: Date.now(),
+      });
+
+      await checkAiQuota(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(429);
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          error: 'Too many requests. Please wait before retrying.',
+        })
+      );
+      expect(res.setHeader).toHaveBeenCalledWith('Retry-After', expect.any(Number));
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('should query Redis for bucket state if Redis is ready', async () => {
+      const mockUser = {
+        id: 'user-123',
+        role: 'student',
+        dailyAiUsageCount: 0,
+        lastAiUsageReset: new Date(),
+        save: vi.fn(),
+      };
+      vi.spyOn(User, 'findByPk').mockResolvedValue(mockUser);
+
+      redisService.isReady = true;
+      const getSpy = vi.spyOn(redisService, 'get').mockResolvedValue({
+        tokens: 15,
+        lastRefillTime: Date.now() - 60000, // 1 minute ago
+      });
+      const setSpy = vi.spyOn(redisService, 'set').mockResolvedValue();
+
+      await checkAiQuota(req, res, next);
+
+      expect(getSpy).toHaveBeenCalledWith('ai_bucket:user-123');
+      expect(setSpy).toHaveBeenCalled();
+      expect(next).toHaveBeenCalled();
+
+      redisService.isReady = false;
+    });
+  });
 });
