@@ -67,6 +67,12 @@ async function logSquadActivity(userId, type, message, metadata = {}, deps = {})
     return { posted: 0, skipped: true };
   }
 
+  const lockService = require('./lockService');
+  const lockValue = await lockService.acquireLock(`squad:activity:${userId}`, 5000);
+  if (!lockValue) {
+    return { posted: 0, skipped: true, error: 'Concurrent activity logging locked.' };
+  }
+
   try {
     const memberships = await squadMemberModel.findAll({ where: { userId } });
     if (memberships.length === 0) {
@@ -121,6 +127,8 @@ async function logSquadActivity(userId, type, message, metadata = {}, deps = {})
   } catch (error) {
     console.error('Failed to post squad activity:', error.message);
     return { posted: 0, skipped: false, error: error.message };
+  } finally {
+    await lockService.releaseLock(`squad:activity:${userId}`, lockValue);
   }
 }
 
