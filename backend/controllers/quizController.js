@@ -568,13 +568,14 @@ exports.submitQuizAttempt = async (req, res, next) => {
     // Award XP and check gamification badges/streaks
     const gamificationService = require('../services/gamificationService');    const progression = await gamificationService.awardXP(req.user.id, 100, 'quiz_complete');
 
-    const timezoneOffset = Number(req.headers['x-timezone-offset']) || 0;
-    await gamificationService.updateStreak(req.user.id, timezoneOffset);
+    const timeZoneParam = req.headers['x-timezone'] || (req.headers['x-timezone-offset'] !== undefined ? Number(req.headers['x-timezone-offset']) : null);
+    await gamificationService.updateStreak(req.user.id, timeZoneParam);
 
     const user = await User.findByPk(req.user.id);
-    const newBadges = await gamificationService.checkAndUnlockBadges(user, 'quiz_complete', {
-      timezoneOffsetMinutes: timezoneOffset
-    });
+    const badgeDetails = req.headers['x-timezone']
+      ? { timeZone: req.headers['x-timezone'] }
+      : { timezoneOffsetMinutes: Number(req.headers['x-timezone-offset']) || 0 };
+    const newBadges = await gamificationService.checkAndUnlockBadges(user, 'quiz_complete', badgeDetails);
     progression.newBadges = newBadges;
 
     // Issue #1053: Check for Quiz Master and Sharpshooter

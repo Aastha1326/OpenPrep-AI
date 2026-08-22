@@ -740,13 +740,14 @@ exports.reviewFlashcard = async (req, res, next) => {
     const gamificationService = require('../services/gamificationService');
     const progression = await gamificationService.awardXP(req.user.id, 30, 'flashcard_review');
 
-    const timezoneOffset = Number(req.headers['x-timezone-offset']) || 0;
-    await gamificationService.updateStreak(req.user.id, timezoneOffset);
+    const timeZoneParam = req.headers['x-timezone'] || (req.headers['x-timezone-offset'] !== undefined ? Number(req.headers['x-timezone-offset']) : null);
+    await gamificationService.updateStreak(req.user.id, timeZoneParam);
 
     const user = await User.findByPk(req.user.id);
-    const newBadges = await gamificationService.checkAndUnlockBadges(user, 'flashcard_review', {
-      timezoneOffsetMinutes: timezoneOffset,
-    });
+    const badgeDetails = req.headers['x-timezone']
+      ? { timeZone: req.headers['x-timezone'] }
+      : { timezoneOffsetMinutes: Number(req.headers['x-timezone-offset']) || 0 };
+    const newBadges = await gamificationService.checkAndUnlockBadges(user, 'flashcard_review', badgeDetails);
     progression.newBadges = newBadges;
 
     res.status(200).json({ success: true, data: card, progression });

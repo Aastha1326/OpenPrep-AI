@@ -59,11 +59,17 @@ exports.useStreakFreeze = async (req, res, next) => {
 
     user.streakFreezesAvailable -= 1;
 
-    // Set lastActivityDate to today in user's timezone to freeze the streak
+    // Set lastActivityDate to today in user's timezone to freeze the streak (IANA-aware)
     const now = new Date();
-    const timezoneOffset = Number(req.headers['x-timezone-offset']) || 0;
-    const localTime = new Date(now.getTime() - timezoneOffset * 60 * 1000);
-    const todayStr = localTime.toISOString().split('T')[0];
+    let todayStr;
+    if (req.headers['x-timezone']) {
+      const { getLocalDateString } = require('../utils/streakCalculator');
+      todayStr = getLocalDateString(now, req.headers['x-timezone']);
+    } else {
+      const timezoneOffset = Number(req.headers['x-timezone-offset']) || 0;
+      const localTime = new Date(now.getTime() - timezoneOffset * 60 * 1000);
+      todayStr = localTime.toISOString().split('T')[0];
+    }
 
     user.lastActivityDate = todayStr;
     await user.save();

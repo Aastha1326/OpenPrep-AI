@@ -283,6 +283,7 @@ app.use('/api/search', searchRoutes);
 app.use('/api/progress', progressRoutes);
 app.use('/api/users', userRoutes);
 app.get('/api/user/quota', protect, require('./controllers/userController').getQuota);
+app.put('/api/user/preferences/timezone', protect, require('./controllers/userController').updateTimezone);
 app.use('/api/ai', aiRoutes);
 app.use('/api/ai-editor', aiEditorRoutes);
 app.use('/api/quiz-battles', quizBattleRoutes);
