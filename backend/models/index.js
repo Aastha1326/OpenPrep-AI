@@ -300,4 +300,5 @@ module.exports = {  sequelize,  User,  Exam,
   LearningPath,
   PDFAnnotation,
   QuizRoom,
+  AuditLog,
 };

@@ -153,7 +153,7 @@ exports.deleteUser = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: 'User deleted/banned successfully',
+      message: 'User deleted successfully',
     });
   } catch (error) {
     console.error('[adminController.deleteUser] Error:', error);
