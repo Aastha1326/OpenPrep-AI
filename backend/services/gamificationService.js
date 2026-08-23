@@ -2,6 +2,14 @@ const { User, UserBadge, QuizAttempt, SquadMember, SquadChallenge, SquadChalleng
 const { checkAndAwardBadges } = require('./achievementService');
 const { createNotification } = require('./notificationService');
 const xpRateLimiter = require('./xpRateLimiter');
+const {
+  isValidTimezone,
+  getLocalDateString,
+  getLocalHour,
+  diffCalendarDays,
+  resolveTimezone,
+  getLocalDateStringFromOffset,
+} = require('../utils/streakCalculator');
 let logSquadActivity = async () => {};
 try {
   const squadSvc = require('./squadActivityService');
@@ -143,27 +151,24 @@ async function awardXP(userId, amount, reason) {
 }
 
 /**
- * Update the user's daily study streak.
+ * Update the user's daily study streak — IANA timezone-aware (DST correct).
  * @param {string} userId
- * @param {number} timezoneOffsetMinutes - client's offset in minutes (e.g. -330 for UTC+5:30)
+ * @param {string|number} timeZoneOrOffset - IANA string (e.g. 'Asia/Kolkata') or legacy numeric offset minutes
  */
-async function updateStreak(userId, timezoneOffsetMinutes = 0) {
+async function updateStreak(userId, timeZoneOrOffset = null) {
   const user = await User.findByPk(userId);
   if (!user) return null;
 
   const now = new Date();
 
-  // Convert the current UTC time to the user's local calendar date.
-  const localTime = new Date(
-    now.getTime() - timezoneOffsetMinutes * 60 * 1000
-  );
-
-  const todayStr = localTime.toISOString().split('T')[0];
-
-  const toUtcDate = (dateString) => {
-    const [year, month, day] = dateString.split('-').map(Number);
-    return Date.UTC(year, month - 1, day);
-  };
+  let todayStr;
+  // Backward compat: numeric offset from old clients
+  if (typeof timeZoneOrOffset === 'number' && Number.isFinite(timeZoneOrOffset)) {
+    todayStr = getLocalDateStringFromOffset(now, timeZoneOrOffset);
+  } else {
+    const tz = resolveTimezone(timeZoneOrOffset, user.timezone);
+    todayStr = getLocalDateString(now, tz);
+  }
 
   const lastActivityStr = user.lastActivityDate
     ? String(user.lastActivityDate).slice(0, 10)
@@ -173,10 +178,7 @@ async function updateStreak(userId, timezoneOffsetMinutes = 0) {
     user.currentStreak = 1;
     user.longestStreak = 1;
   } else if (lastActivityStr !== todayStr) {
-    const daysSinceLastActivity = Math.round(
-      (toUtcDate(todayStr) - toUtcDate(lastActivityStr)) /
-        (24 * 60 * 60 * 1000)
-    );
+    const daysSinceLastActivity = diffCalendarDays(todayStr, lastActivityStr);
 
     if (daysSinceLastActivity === 1) {
       // Studied on consecutive days.
@@ -207,9 +209,19 @@ async function updateStreak(userId, timezoneOffsetMinutes = 0) {
 
   await user.save();
 
-  const unlockedBadges = await checkAndUnlockBadges(user, 'streak_check', {
-    timezoneOffsetMinutes,
-  });
+  // Preserve IANA tz for badge checks; fallback to offset for legacy clients
+  const badgeTimeZone =
+    typeof timeZoneOrOffset === 'string' && isValidTimezone(timeZoneOrOffset)
+      ? timeZoneOrOffset
+      : user.timezone && isValidTimezone(user.timezone)
+        ? user.timezone
+        : null;
+  const badgeDetails =
+    typeof timeZoneOrOffset === 'number' && Number.isFinite(timeZoneOrOffset)
+      ? { timezoneOffsetMinutes: timeZoneOrOffset }
+      : { timeZone: badgeTimeZone || 'Asia/Kolkata' };
+
+  const unlockedBadges = await checkAndUnlockBadges(user, 'streak_check', badgeDetails);
 
   // Issue #1053: Check for Week Warrior badge
   try {
@@ -307,9 +319,14 @@ if (user.currentStreak >= 30) {
 if (user.currentStreak >= 100) {
   await checkAndCreateBadge('hundred_day_streak');
 }
-  // 2. "Night Owl" badge: activity between 11 PM and 4 AM user local time
-  const offset = details.timezoneOffsetMinutes || 0;
-  const localHour = new Date(Date.now() - offset * 60 * 1000).getHours();
+  // 2. "Night Owl" badge: activity between 11 PM and 4 AM user local time (IANA-aware)
+  let localHour;
+  if (details.timeZone && isValidTimezone(details.timeZone)) {
+    localHour = getLocalHour(new Date(), details.timeZone);
+  } else {
+    const offset = details.timezoneOffsetMinutes || 0;
+    localHour = new Date(Date.now() - offset * 60 * 1000).getHours();
+  }
   if (localHour >= 23 || localHour < 4) {
     await checkAndCreateBadge('night_owl');
   }
