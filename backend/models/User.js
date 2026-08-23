@@ -63,6 +63,10 @@ const User = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
+    currentLearningPathId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
     authProvider: {
       type: DataTypes.ENUM('local', 'google', 'github'),
       defaultValue: 'local',
@@ -76,6 +80,10 @@ const User = sequelize.define(
       defaultValue: DataTypes.NOW,
     },
     streakFreezes: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+    xp: {
       type: DataTypes.INTEGER,
       defaultValue: 0,
     },

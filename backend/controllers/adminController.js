@@ -160,3 +160,96 @@ exports.deleteUser = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Get all badges for admin management
+// @route   GET /api/admin/badges
+// @access  Private/Admin
+exports.getAdminBadges = async (req, res, next) => {
+  try {
+    const { Badge } = require('../models');
+    const badges = await Badge.findAll({ order: [['category', 'ASC'], ['name', 'ASC']] });
+    res.status(200).json({ success: true, data: badges });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Create a new badge with criteria
+// @route   POST /api/admin/badges
+// @access  Private/Admin
+exports.createAdminBadge = async (req, res, next) => {
+  try {
+    const { Badge } = require('../models');
+    const { id, name, description, icon, category, criteriaType, criteriaThreshold, isActive } = req.body;
+
+    if (!id || !name || !description) {
+      return res.status(400).json({ success: false, error: 'id, name, and description are required' });
+    }
+
+    const newBadge = await Badge.create({
+      id: id.toLowerCase().replace(/\s+/g, '_'),
+      name,
+      description,
+      icon: icon || 'Award',
+      category: category || 'achievement',
+      criteriaType: criteriaType || 'streak_days',
+      criteriaThreshold: Number(criteriaThreshold) || 1,
+      isActive: isActive !== false,
+    });
+
+    res.status(201).json({ success: true, data: newBadge });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Update badge criteria
+// @route   PUT /api/admin/badges/:id
+// @access  Private/Admin
+exports.updateAdminBadge = async (req, res, next) => {
+  try {
+    const { Badge } = require('../models');
+    const { id } = req.params;
+    const { name, description, icon, category, criteriaType, criteriaThreshold, isActive } = req.body;
+
+    const badge = await Badge.findByPk(id);
+    if (!badge) {
+      return res.status(404).json({ success: false, error: 'Badge not found' });
+    }
+
+    await badge.update({
+      name: name ?? badge.name,
+      description: description ?? badge.description,
+      icon: icon ?? badge.icon,
+      category: category ?? badge.category,
+      criteriaType: criteriaType ?? badge.criteriaType,
+      criteriaThreshold: criteriaThreshold !== undefined ? Number(criteriaThreshold) : badge.criteriaThreshold,
+      isActive: isActive !== undefined ? isActive : badge.isActive,
+    });
+
+    res.status(200).json({ success: true, data: badge });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Delete a badge
+// @route   DELETE /api/admin/badges/:id
+// @access  Private/Admin
+exports.deleteAdminBadge = async (req, res, next) => {
+  try {
+    const { Badge } = require('../models');
+    const { id } = req.params;
+
+    const badge = await Badge.findByPk(id);
+    if (!badge) {
+      return res.status(404).json({ success: false, error: 'Badge not found' });
+    }
+
+    await badge.destroy();
+    res.status(200).json({ success: true, message: 'Badge deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
