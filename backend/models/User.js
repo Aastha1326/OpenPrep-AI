@@ -266,6 +266,11 @@ examCountdownPreferences: {
       type: DataTypes.JSONB,
       defaultValue: [],
     },
+    dashboardLayout: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      defaultValue: null,
+    },
   },
   {
     timestamps: true,
