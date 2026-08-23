@@ -310,6 +310,8 @@ app.use('/api/badges', badgeRoutes);
 app.use('/api/community', communityRoutes);
 app.use('/api/visualizer', visualizerRoutes);
 app.use('/api/analytics-insights', analyticsInsightsRoutes);
+app.use('/api/learning-path', require('./routes/learningPathRoutes'));
+app.use('/user/learning-path', require('./routes/learningPathRoutes'));
 
 // Serve static assets from frontend build folder in production
 if (process.env.NODE_ENV === 'production') {
