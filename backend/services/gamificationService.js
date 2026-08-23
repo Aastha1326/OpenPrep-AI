@@ -1,3 +1,66 @@
+/**
+ * @fileoverview Service for evaluating user actions and triggering gamification logic.
+ */
+
+/**
+ * Evaluates a user action and checks for achievement unlocks or streak updates.
+ * 
+ * @param {string} userId - The user's ID.
+ * @param {string} actionType - The type of action (e.g., 'quiz_completed', 'flashcard_reviewed').
+ * @param {number} count - The count or score associated with the action.
+ * @returns {Promise<Object>} Details of any newly unlocked achievements.
+ */
+async function processUserAction(userId, actionType, count) {
+  try {
+    // Mock logic: In production, fetch current achievements from DB and update counts.
+    // If count meets threshold, set isUnlocked = true and unlockedAt = now.
+    
+    const newUnlocks = [];
+    
+    if (actionType === 'flashcard_reviewed' && count >= 50) {
+      newUnlocks.push({
+        type: 'flashcard_pro',
+        name: 'Flashcard Pro',
+        description: 'Reviewed 50 flashcards',
+        icon: '🃏'
+      });
+    }
+
+    return {
+      newUnlocks,
+      currentStreak: 5, // Mocked streak value
+      totalXP: count * 10,
+    };
+  } catch (error) {
+    console.error('Error processing gamification action:', error.message);
+    throw new Error('Failed to process gamification logic.');
+  }
+}
+
+/**
+ * Fetches leaderboard data.
+ */
+async function getLeaderboard(timeframe = 'all_time') {
+  try {
+    // Mock DB query: SELECT userId, username, totalXP FROM users ORDER BY totalXP DESC LIMIT 50
+    return [
+      { rank: 1, username: 'StudyNinja', totalXP: 15400, badges: 12 },
+      { rank: 2, username: 'QuizMaster', totalXP: 14200, badges: 10 },
+      { rank: 3, username: 'BookWorm', totalXP: 13800, badges: 11 },
+      { rank: 4, username: 'Brainiac', totalXP: 12100, badges: 8 },
+      { rank: 5, username: 'Scholar', totalXP: 11500, badges: 9 },
+    ];
+  } catch (error) {
+    console.error('Error fetching leaderboard:', error.message);
+    throw new Error('Failed to fetch leaderboard data.');
+  }
+}
+
+module.exports = {
+  processUserAction,
+  getLeaderboard,
+};
+
 const { User, UserBadge, QuizAttempt, SquadMember, SquadChallenge, SquadChallengeContribution, SquadAchievement } = require('../models');
 const { checkAndAwardBadges } = require('./achievementService');
 const { createNotification } = require('./notificationService');

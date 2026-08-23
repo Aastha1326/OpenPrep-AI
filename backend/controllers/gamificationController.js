@@ -1,3 +1,71 @@
+/**
+ * @fileoverview Controller for managing gamification dashboard and leaderboard data.
+ */
+const gamificationService = require('../services/gamificationService');
+
+/**
+ * Processes a user action and returns updated gamification stats.
+ */
+const recordAction = async (req, res) => {
+  try {
+    const { actionType, count } = req.body;
+    // const userId = req.user.id;
+
+    if (!actionType || typeof count !== 'number') {
+      return res.status(400).json({ success: false, message: 'Valid actionType and count are required.' });
+    }
+
+    const result = await gamificationService.processUserAction('mock-user-id', actionType, count);
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error('Error recording action:', error);
+    res.status(500).json({ success: false, message: 'Internal server error.' });
+  }
+};
+
+/**
+ * Fetches the user's dashboard stats and the global leaderboard.
+ */
+const getDashboardData = async (req, res) => {
+  try {
+    const { timeframe } = req.query;
+    
+    // Mock user stats
+    const userStats = {
+      currentStreak: 5,
+      longestStreak: 12,
+      totalXP: 4500,
+      unlockedBadges: [
+        { type: 'streak_3', name: 'Getting Started', icon: '🔥' },
+        { type: 'quiz_master', name: 'Quiz Master', icon: '🏆' }
+      ]
+    };
+
+    const leaderboard = await gamificationService.getLeaderboard(timeframe);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        userStats,
+        leaderboard,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching dashboard data:', error);
+    res.status(500).json({ success: false, message: 'Internal server error.' });
+  }
+};
+
+module.exports = {
+  recordAction,
+  getDashboardData,
+};
+
+
 const { User, UserBadge, Badge } = require('../models');
 
 exports.getSummary = async (req, res, next) => {
