@@ -1,47 +1,51 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
 
-const Badge = sequelize.define('Badge', {
-  id: {
-    type: DataTypes.UUID,
-    defaultValue: DataTypes.UUIDV4,
-    primaryKey: true,
+const Badge = sequelize.define(
+  'Badge',
+  {
+    id: {
+      type: DataTypes.STRING,
+      primaryKey: true,
+    },
+    name: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    description: {
+      type: DataTypes.TEXT,
+      allowNull: false,
+    },
+    icon: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    svgIcon: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    category: {
+      type: DataTypes.ENUM('streak', 'quiz', 'flashcard', 'study', 'achievement'),
+      defaultValue: 'achievement',
+    },
+    criteriaType: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      defaultValue: 'streak_days',
+    },
+    criteriaThreshold: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 1,
+    },
+    isActive: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+    },
   },
-  name: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    unique: true,
-  },
-  description: {
-    type: DataTypes.STRING,
-    allowNull: false,
-  },
-  category: {
-    type: DataTypes.ENUM('STREAK', 'QUIZ', 'STUDY_TIME', 'COMMUNITY', 'MASTERY'),
-    defaultValue: 'STUDY_TIME',
-  },
-  icon: {
-    type: DataTypes.STRING,
-    allowNull: false,
-  },
-  tier: {
-    type: DataTypes.ENUM('Bronze', 'Silver', 'Gold', 'Diamond'),
-    allowNull: false,
-  },
-  xpReward: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-  },
-  conditionType: {
-    type: DataTypes.STRING,
-    allowNull: false,
-  },
-  conditionValue: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-  },
-}, {
-  timestamps: true,
-});
+  {
+    timestamps: true,
+  }
+);
 
 module.exports = Badge;

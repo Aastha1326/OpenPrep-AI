@@ -63,6 +63,10 @@ const User = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
+    currentLearningPathId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
     authProvider: {
       type: DataTypes.ENUM('local', 'google', 'github'),
       defaultValue: 'local',
