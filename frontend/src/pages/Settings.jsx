@@ -35,6 +35,7 @@ import { validateAvatarFile } from '../utils/fileValidation';
 import { BADGE_LIST, BADGE_ICONS } from '../config/badges';
 import LazyImage from '../components/common/LazyImage';
 import ThemeCustomizerDrawer from '../components/ThemeCustomizerDrawer';
+import BadgeCarousel from '../components/badges/BadgeCarousel';
 import { useTheme } from '../context/ThemeContext';
 import { THEME_PRESETS } from '../themePresets';
 
@@ -738,6 +739,22 @@ const Settings = () => {
               </div>
             </div>
           </div>
+        </VintagePaper>
+
+        {/* --- PROGRESS BADGES & ACHIEVEMENTS --- */}
+        <VintagePaper className="border-t-4 border-t-amber-600">
+          <div className="flex items-center gap-3 mb-2">
+            <Award className="w-7 h-7 text-amber-600" />
+            <div>
+              <h2 className="text-2xl font-bold font-playfair text-neutral-800 dark:text-neutral-100">
+                Progress Badges & Achievements
+              </h2>
+              <p className="text-xs text-neutral-500 italic">
+                Track your study milestones, streaks, and gamified achievements in real time.
+              </p>
+            </div>
+          </div>
+          <BadgeCarousel userId={user?.id} />
         </VintagePaper>
 
         {/* --- GOOGLE CALENDAR SYNC --- */}

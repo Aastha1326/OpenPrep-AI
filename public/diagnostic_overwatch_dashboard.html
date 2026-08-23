@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise Diagnostic Overwatch & Biomedical Telemetry Suite | OpenPrep-AI</title>
+    <meta name="description" content="Real-time clinical diagnostic overwatch, HL7 FHIR R4 telemetry stream, genomic marker risk calculator, and biomedical ICU surveillance console.">
+    <link rel="stylesheet" href="styles/diagnostic_overwatch_dashboard.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="dark-theme">
+    <!-- Header Architecture Comment: Diagnostic Overwatch & Biomedical Telemetry Command Center -->
+    <!-- Design Pattern: Glassmorphic Clinical Dashboard with Real-Time FHIR Stream & Genomic Anomaly Calculator -->
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar-navigation" id="sidebar-nav">
+            <div class="brand-header">
+                <div class="brand-logo">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <h2>BioOverwatch AI</h2>
+                    <span>Clinical Suite v5.2</span>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="#diagnostic-matrix" class="nav-item active" id="nav-diagnostic-matrix">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    <span>Biomedical Matrix</span>
+                </a>
+                <a href="#fhir-streams" class="nav-item" id="nav-fhir-streams">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+                    <span>HL7 FHIR R4 Telemetry</span>
+                </a>
+                <a href="#genomic-risk" class="nav-item" id="nav-genomic">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20M2 12h20"></path></svg>
+                    <span>Genomic Marker Risk</span>
+                </a>
+                <a href="#icu-surveillance" class="nav-item" id="nav-icu">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path></svg>
+                    <span>ICU Hemodynamics</span>
+                </a>
+                <a href="#settings" class="nav-item" id="nav-settings">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    <span>Clinical Threshold Config</span>
+                </a>
+            </nav>
+
+            <div class="system-status-widget glass-card">
+                <div class="status-indicator online"></div>
+                <div class="status-info">
+                    <span class="status-title">FHIR R4 Gateway Connected</span>
+                    <span class="status-subtitle">2,850 Telemetry Signals Sync</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Surface -->
+        <main class="main-content">
+            <!-- Top Controls Bar -->
+            <header class="top-header glass-card">
+                <div class="header-search">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input type="text" id="bio-search-input" placeholder="Search patient ID, biomarker, genomic mutation, or ward..." aria-label="Search diagnostic telemetry">
+                </div>
+
+                <div class="header-actions">
+                    <div class="filter-dropdown">
+                        <select id="biomarker-risk-select" class="styled-select">
+                            <option value="all">All Diagnostic Risk Categories</option>
+                            <option value="critical">Critical Risk (Cardiovascular / Sepsis)</option>
+                            <option value="elevated">Elevated Marker (Genomic Variant)</option>
+                            <option value="stable">Stable Telemetry (98%+ Normal)</option>
+                        </select>
+                    </div>
+
+                    <button class="btn btn-secondary" id="btn-sync-bio-streams">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                        <span>Sync Telemetry</span>
+                    </button>
+
+                    <button class="btn btn-primary" id="btn-run-genomic-eval">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        <span>Run Genomic Overwatch</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Dashboard Body -->
+            <div class="dashboard-body">
+                <!-- Summary Metrics Banner -->
+                <section class="metrics-grid">
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon cyan-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">FHIR R4 Stream Telemetry</span>
+                            <span class="metric-value" id="val-fhir-rate">2,850 Signals/s</span>
+                            <span class="metric-trend positive">100% Zero-Loss</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon red-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Critical Biomarker Alerts</span>
+                            <span class="metric-value" id="val-critical-alerts">8 Active Alerts</span>
+                            <span class="metric-trend negative">Urgent Triage</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon green-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Genomic Variant Accuracy</span>
+                            <span class="metric-value" id="val-genomic-accuracy">99.6%</span>
+                            <span class="metric-trend positive">FDA 21 CFR Compliant</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon blue-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">ICU Cardiac Parity</span>
+                            <span class="metric-value" id="val-cardiac-parity">98.9%</span>
+                            <span class="metric-trend positive">Real-Time Sync</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Analytics Section Grid -->
+                <section class="analytics-section-grid">
+                    <!-- Diagnostic Biomarker Anomaly Spectrum Graph -->
+                    <div class="analytics-card glass-card span-col-2">
+                        <div class="card-header">
+                            <div class="title-group">
+                                <h3>Biomedical Biomarker & Genomic Risk Spectrum</h3>
+                                <p class="card-subtitle">Real-time physiological anomaly distribution across ICU and Genomic oncology wards</p>
+                            </div>
+                            <div class="card-actions">
+                                <span class="badge badge-danger" id="badge-top-bio-risk">Top Alert: Troponin-I Elevation</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="vector-graph-container" id="diagnostic-graph-visual">
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar cyan" style="height: 94%;"></div>
+                                    <span class="graph-label">Troponin-I</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar red" style="height: 82%;"></div>
+                                    <span class="graph-label">Lactate Sepsis</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar green" style="height: 48%;"></div>
+                                    <span class="graph-label">BRCA1/2 Mutation</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar cyan" style="height: 76%;"></div>
+                                    <span class="graph-label">D-Dimer Spike</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar red" style="height: 88%;"></div>
+                                    <span class="graph-label">Procalcitonin</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Clinical Threshold Config Console -->
+                    <div class="analytics-card glass-card">
+                        <div class="card-header">
+                            <h3>Diagnostic Threshold Console</h3>
+                        </div>
+                        <div class="card-body controls-form">
+                            <div class="form-group">
+                                <label for="range-troponin-cutoff">Troponin-I Cutoff: <span id="lbl-troponin-cutoff">0.04 ng/mL</span></label>
+                                <input type="range" id="range-troponin-cutoff" min="1" max="10" value="4" class="styled-range">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="range-sepsis-threshold">Lactate Sepsis Cutoff: <span id="lbl-sepsis-thresh">2.0 mmol/L</span></label>
+                                <input type="range" id="range-sepsis-threshold" min="10" max="50" value="20" class="styled-range">
+                            </div>
+
+                            <div class="form-group toggle-group">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="chk-auto-icu-alert" checked>
+                                    <span class="slider round"></span>
+                                </label>
+                                <span class="toggle-label">Auto-Trigger ICU Rapid Response Alert</span>
+                            </div>
+
+                            <button class="btn btn-primary btn-full" id="btn-recalibrate-clinical">
+                                <span>Recalibrate Bio-Sensors</span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Diagnostic Patient Telemetry Data Table -->
+                <section class="table-section glass-card">
+                    <div class="card-header">
+                        <div class="title-group">
+                            <h3>Real-Time Diagnostic Overwatch Telemetry Log</h3>
+                            <p class="card-subtitle">Patient ID, biomarker values, genomic variant profile, risk category, and clinical status</p>
+                        </div>
+                        <div class="table-actions">
+                            <button class="btn btn-sm btn-secondary" id="btn-export-bio-csv">Export FHIR CSV</button>
+                        </div>
+                    </div>
+
+                    <div class="table-wrapper">
+                        <table class="data-table" id="bio-telemetry-table">
+                            <thead>
+                                <tr>
+                                    <th>Patient ID</th>
+                                    <th>Ward Location</th>
+                                    <th>Target Biomarker</th>
+                                    <th>Measured Value</th>
+                                    <th>Genomic Profile</th>
+                                    <th>Risk Status</th>
+                                    <th>Clinical Action</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bio-table-body">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script src="src/services/diagnostic_overwatch_engine.js"></script>
+</body>
+</html>

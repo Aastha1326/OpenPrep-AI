@@ -20,10 +20,11 @@ const fs = require('fs');
 const PYQ = require('./models/PYQ');
 const Note = require('./models/Note');
 const Achievement = require('./models/Achievement');
-const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
+const { apiReference } = require('@scalar/express-api-reference');
 const passport = require('./config/passport');
 const { getCorsMiddleware, getSocketCorsOrigin } = require('./middleware/corsHandler');
+const { metricsMiddleware, getMetrics } = require('./middleware/metricsMiddleware');
 
 // Validate the whole environment against the schema in config/env.js before
 // anything else loads. Reports every problem at once and exits in production;
@@ -80,10 +81,25 @@ const readinessRoutes = require('./routes/readinessRoutes');
 const squadRoutes = require('./routes/squadRoutes');
 const badgeRoutes = require('./routes/badgeRoutes');
 const visualizerRoutes = require('./routes/visualizerRoutes');
+const analyticsInsightsRoutes = require('./routes/analyticsInsightsRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
-
+const { initNightlyBadgeEvaluatorCron } = require('./services/badgeEvaluationService');
 initDifficultyCalibratorCron();
+initNightlyBadgeEvaluatorCron();
+
+const cron = require('node-cron');
+const calendarService = require('./services/calendarService');
+
+// Run webhook channel renewal daily at midnight
+cron.schedule('0 0 * * *', async () => {
+  try {
+    await calendarService.renewExpiringWebhookChannels();
+    logger.info('Google Calendar Webhook Channels renewed successfully.');
+  } catch (err) {
+    logger.error('Failed to renew Google Calendar Webhook Channels:', err);
+  }
+});
 
 // Connect to Database
 connectDB();
@@ -165,17 +181,24 @@ app.use(passport.initialize());
 // Cookie parser (required for csurf cookie-based tokens)
 app.use(cookieParser());
 
+// Prometheus metrics middleware
+app.use(metricsMiddleware);
+
 // CSRF protection middleware
 // The batched quiz-telemetry endpoint is flushed via navigator.sendBeacon()
 // on tab close/navigation, which cannot attach a CSRF header. It's already
 // protected by its own JWT-based auth (see middleware/telemetryAuth.js), so
-// CSRF protection is skipped only for this one route.
+// CSRF protection is skipped only for this one route and /metrics.
 app.use((req, res, next) => {
-  if (req.path === '/api/quiz/telemetry/batch' || req.path === '/api/quizzes/telemetry/batch') {
+  if (req.path === '/api/quiz/telemetry/batch' || req.path === '/api/quizzes/telemetry/batch' || req.path === '/metrics') {
     return next();
   }
   return doubleCsrfProtection(req, res, next);
 });
+
+// Prometheus Metrics Exporter Endpoint
+app.get('/metrics', getMetrics);
+
 // CSRF Token Endpoint for frontend clients
 app.get('/api/csrf-token', (req, res) => {
   const token = generateCsrfToken(req, res);
@@ -248,6 +271,7 @@ app.get('/uploads/:filename', protect, async (req, res, next) => {
 
 // Mount routes
 app.use('/api/auth', authRoutes);
+app.post('/api/session/keepalive', protect, require('./controllers/authController').keepalive);
 app.use('/api/academic', academicRoutes);
 app.use('/api/pyqs', pyqRoutes);
 app.use('/api/pyq', pyqRoutes);
@@ -269,6 +293,9 @@ app.use('/api/search', searchRoutes);
 app.use('/api/progress', progressRoutes);
 app.use('/api/users', userRoutes);
 app.get('/api/user/quota', protect, require('./controllers/userController').getQuota);
+app.put('/api/user/preferences/timezone', protect, require('./controllers/userController').updateTimezone);
+app.get('/api/user/dashboard', protect, require('./controllers/userController').getDashboardLayout);
+app.post('/api/user/dashboard', protect, require('./controllers/userController').updateDashboardLayout);
 app.use('/api/ai', aiRoutes);
 app.use('/api/ai-editor', aiEditorRoutes);
 app.use('/api/quiz-battles', quizBattleRoutes);
@@ -278,13 +305,20 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/dashboard', analyticsRoutes);
 app.use('/api/calendar', calendarRoutes);
+app.use('/api/integrations/google-calendar', calendarRoutes);
+app.use('/api/integrations', require('./routes/integrationRoutes'));
 app.use('/api/gamification', gamificationRoutes);
 app.use('/api/battles', battleRoutes);
 app.use('/api/folders', folderRoutes);
 app.use('/api/squads', squadRoutes);
 app.use('/api/badges', badgeRoutes);
+app.get('/user/badges', protect, require('./controllers/badgeController').getUserBadges);
+app.get('/api/user/badges', protect, require('./controllers/badgeController').getUserBadges);
 app.use('/api/community', communityRoutes);
 app.use('/api/visualizer', visualizerRoutes);
+app.use('/api/analytics-insights', analyticsInsightsRoutes);
+app.use('/api/learning-path', require('./routes/learningPathRoutes'));
+app.use('/user/learning-path', require('./routes/learningPathRoutes'));
 
 // Serve static assets from frontend build folder in production
 if (process.env.NODE_ENV === 'production') {
@@ -332,29 +366,33 @@ app.get('/api/test-error', (req, res) => {
   throw new Error('Test error for Sentry verification');
 });
 
-// Swagger UI Documentation & Spec endpoints
-const swaggerEnabled = process.env.SWAGGER_ENABLED === 'true' || process.env.NODE_ENV !== 'production';
+// Scalar API Reference & OpenAPI Spec endpoints (OpenAPI 3.1)
+const isSwaggerEnabled = () => process.env.SWAGGER_ENABLED === 'true' || process.env.NODE_ENV !== 'production';
 
-app.use(['/api-docs', '/api/docs'], (req, res, next) => {
-  if (!swaggerEnabled) {
-    return res.status(403).json({ success: false, error: 'Swagger API documentation is disabled in this environment.' });
-  }
-  next();
-}, swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-  customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: 'OpenPrep AI API Documentation',
-  swaggerOptions: {
-    persistAuthorization: true,
-    displayRequestDuration: true,
-  },
-}));
-
-app.get(['/api-docs.json', '/api/docs.json'], (req, res) => {
-  if (!swaggerEnabled) {
-    return res.status(403).json({ success: false, error: 'Swagger API documentation is disabled in this environment.' });
+// Serve raw OpenAPI JSON at both legacy and new paths
+app.get(['/api-docs.json', '/api/docs.json', '/api/openapi.json'], (req, res) => {
+  if (!isSwaggerEnabled()) {
+    return res.status(403).json({ success: false, error: 'API documentation is disabled in this environment.' });
   }
   res.json(swaggerSpec);
 });
+
+// Interactive Scalar docs at /api/docs (and legacy /api-docs)
+app.use(['/api-docs', '/api/docs'], (req, res, next) => {
+  if (!isSwaggerEnabled()) {
+    return res.status(403).json({ success: false, error: 'API documentation is disabled in this environment.' });
+  }
+  next();
+}, apiReference({
+  content: swaggerSpec,
+  theme: 'kepler',
+  darkMode: true,
+  layout: 'modern',
+  metaData: {
+    title: 'OpenPrep AI API Documentation',
+  },
+  customCss: '.scalar-api-reference { --scalar-color-accent: #f59e0b; }',
+}));
 
 // Error Handler Middleware
 if (process.env.NODE_ENV !== 'test' && process.env.SENTRY_DSN) {
@@ -376,7 +414,25 @@ const io = new Server(server, {
   // tabs, so active lobby players aren't disconnected on a missed heartbeat.
   pingTimeout: 60000,
   pingInterval: 25000,
+  connectionStateRecovery: {
+    maxDisruption: 120000,
+    restoreSession: true,
+  },
 });
+
+// Configure Redis adapter for multi-instance pub/sub if available
+try {
+  const { createAdapter } = require('@socket.io/redis-adapter');
+  if (redisService.client) {
+    const pubClient = redisService.client;
+    const subClient = pubClient.duplicate();
+    io.adapter(createAdapter(pubClient, subClient));
+    logger.info('Socket.io Redis adapter configured successfully');
+  }
+} catch (adapterErr) {
+  logger.warn('Socket.io Redis adapter skipped or failed to initialize, using memory adapter instead:', { err: adapterErr.message });
+}
+
 global.io = io;
 // Initialize socket handlers
 require('./sockets/battleHandler')(io);
@@ -385,6 +441,7 @@ require('./sockets/crdtHandler')(io);
 require('./sockets/squadHandler')(io);
 require('./sockets/flashcardCollaborationHandler')(io);
 require('./sockets/focusRoomHandler')(io);
+require('./sockets/studyRoomSocket')(io);
 // Authenticate Socket.io connections
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
@@ -421,6 +478,12 @@ initStudyReminderCron(io);
 initStreakReminderCron(io);
 initBackupScheduler();
 
+const { startWorker } = require('./workers/squadActivityWorker');
+startWorker();
+
+const { startWorker: startTaskWorker } = require('./workers/taskQueueWorker');
+startTaskWorker();
+
 
 if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   server.listen(PORT, () => {
@@ -448,6 +511,22 @@ const gracefulShutdown = (signal) => {
   server.close(async () => {
     logger.info('HTTP connections drained, closing resource pools');
     clearTimeout(forceExitTimeout);
+
+    try {
+      const { stopWorker } = require('./workers/squadActivityWorker');
+      stopWorker();
+      logger.info('squad activity worker stopped');
+    } catch (workerErr) {
+      logger.error('error stopping squad activity worker', { err: workerErr });
+    }
+
+    try {
+      const { stopWorker: stopTaskWorker } = require('./workers/taskQueueWorker');
+      stopTaskWorker();
+      logger.info('task queue worker stopped');
+    } catch (taskWorkerErr) {
+      logger.error('error stopping task queue worker', { err: taskWorkerErr });
+    }
 
     try {
       const { sequelize } = require('./config/db');

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise Collaborative Whiteboard & Canvas Telemetry Suite | OpenPrep-AI</title>
+    <meta name="description" content="Real-time multi-user interactive whiteboard canvas, vector stroke synchronization, spatial telemetry, and collaborative diagramming engine.">
+    <link rel="stylesheet" href="styles/collaborative_whiteboard_canvas_dashboard.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="dark-theme">
+    <!-- Header Architecture Comment: Enterprise Collaborative Whiteboard & Vector Canvas Command Suite -->
+    <!-- Design Pattern: Glassmorphic Real-Time Interactive Canvas with Multi-Cursor Telemetry & Layer Control -->
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar-navigation" id="sidebar-nav">
+            <div class="brand-header">
+                <div class="brand-logo">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+                        <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+                        <path d="M2 2l7.586 7.586"></path>
+                        <circle cx="11" cy="11" r="2"></circle>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <h2>WhiteboardGuard AI</h2>
+                    <span>Canvas Suite v8.0</span>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="#canvas-matrix" class="nav-item active" id="nav-canvas-matrix">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    <span>Vector Canvas Matrix</span>
+                </a>
+                <a href="#live-cursors" class="nav-item" id="nav-cursors">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7 18 3-7 7-3L3 3z"></path></svg>
+                    <span>Live Peer Cursors</span>
+                </a>
+                <a href="#stroke-sync" class="nav-item" id="nav-strokes">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                    <span>Vector Stroke Delta</span>
+                </a>
+                <a href="#layer-tree" class="nav-item" id="nav-layers">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                    <span>Spatial Layer Hierarchy</span>
+                </a>
+                <a href="#settings" class="nav-item" id="nav-settings">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    <span>WebSocket Sync Protocol</span>
+                </a>
+            </nav>
+
+            <div class="system-status-widget glass-card">
+                <div class="status-indicator online"></div>
+                <div class="status-info">
+                    <span class="status-title">Canvas WebSocket Stream</span>
+                    <span class="status-subtitle">60 FPS Smooth Sync</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Surface -->
+        <main class="main-content">
+            <!-- Top Controls Bar -->
+            <header class="top-header glass-card">
+                <div class="header-search">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input type="text" id="canvas-search-input" placeholder="Search room ID, active peer, diagram shape, or stroke ID..." aria-label="Search canvas telemetry">
+                </div>
+
+                <div class="header-actions">
+                    <div class="filter-dropdown">
+                        <select id="canvas-tool-select" class="styled-select">
+                            <option value="all">All Drawing Tools</option>
+                            <option value="pen">Vector Pen / Highlighting</option>
+                            <option value="shape">Geometric Diagram Shapes</option>
+                            <option value="text">Rich Annotations & Math LaTeX</option>
+                        </select>
+                    </div>
+
+                    <button class="btn btn-secondary" id="btn-sync-canvas">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                        <span>Sync Canvas</span>
+                    </button>
+
+                    <button class="btn btn-primary" id="btn-clear-canvas">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        <span>Flush Layer History</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Dashboard Body -->
+            <div class="dashboard-body">
+                <!-- Summary Metrics Banner -->
+                <section class="metrics-grid">
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon indigo-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Vector Strokes Rendered</span>
+                            <span class="metric-value" id="val-stroke-count">48,920 Strokes</span>
+                            <span class="metric-trend positive">Sub-ms Pathing</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon cyan-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7 18 3-7 7-3L3 3z"></path></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Active Peer Cursors</span>
+                            <span class="metric-value" id="val-peer-count">34 Collaborative</span>
+                            <span class="metric-trend positive">Real-Time Sync</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon green-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Spatial Layer Depth</span>
+                            <span class="metric-value" id="val-layer-count">12 Layers</span>
+                            <span class="metric-trend positive">Zero Collision</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon pink-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">WebSocket Delta Latency</span>
+                            <span class="metric-value" id="val-latency">4.2 ms</span>
+                            <span class="metric-trend positive">Ultra Low-Latency</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Analytics Section Grid -->
+                <section class="analytics-section-grid">
+                    <!-- Collaborative Whiteboard Active Canvas Simulation -->
+                    <div class="analytics-card glass-card span-col-2">
+                        <div class="card-header">
+                            <div class="title-group">
+                                <h3>Interactive Multi-User Whiteboard Surface</h3>
+                                <p class="card-subtitle">Real-time vector stroke preview & collaborative spatial cursor tracking</p>
+                            </div>
+                            <div class="card-actions">
+                                <span class="badge badge-indigo" id="badge-top-tool">Active Tool: Smart Vector Pen</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="vector-graph-container" id="canvas-graph-visual">
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar indigo" style="height: 85%;"></div>
+                                    <span class="graph-label">Pen Path</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar cyan" style="height: 92%;"></div>
+                                    <span class="graph-label">Shape Align</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar pink" style="height: 64%;"></div>
+                                    <span class="graph-label">Text Node</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar green" style="height: 78%;"></div>
+                                    <span class="graph-label">LaTeX Formula</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar indigo" style="height: 96%;"></div>
+                                    <span class="graph-label">Erased Vector</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Canvas Palette & Brush Controls Console -->
+                    <div class="analytics-card glass-card">
+                        <div class="card-header">
+                            <h3>Canvas Brush & Palette Console</h3>
+                        </div>
+                        <div class="card-body controls-form">
+                            <div class="form-group">
+                                <label for="range-stroke-width">Stroke Width: <span id="lbl-stroke-width">4 px</span></label>
+                                <input type="range" id="range-stroke-width" min="1" max="20" value="4" class="styled-range">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="range-opacity">Layer Opacity: <span id="lbl-layer-opacity">100%</span></label>
+                                <input type="range" id="range-opacity" min="10" max="100" value="100" class="styled-range">
+                            </div>
+
+                            <div class="form-group toggle-group">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="chk-grid-snap" checked>
+                                    <span class="slider round"></span>
+                                </label>
+                                <span class="toggle-label">Enable Vector Grid Snap (10px)</span>
+                            </div>
+
+                            <button class="btn btn-primary btn-full" id="btn-recalibrate-canvas">
+                                <span>Recalibrate Spatial Canvas</span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Collaborative Canvas Telemetry Table -->
+                <section class="table-section glass-card">
+                    <div class="card-header">
+                        <div class="title-group">
+                            <h3>Real-Time Whiteboard Stroke & Peer Telemetry</h3>
+                            <p class="card-subtitle">Stroke ID, peer session, tool category, vector point count, spatial layer, and sync status</p>
+                        </div>
+                        <div class="table-actions">
+                            <button class="btn btn-sm btn-secondary" id="btn-export-canvas-csv">Export Canvas SVG / CSV</button>
+                        </div>
+                    </div>
+
+                    <div class="table-wrapper">
+                        <table class="data-table" id="canvas-telemetry-table">
+                            <thead>
+                                <tr>
+                                    <th>Stroke ID</th>
+                                    <th>Peer Session</th>
+                                    <th>Drawing Tool</th>
+                                    <th>Vector Points</th>
+                                    <th>Target Layer</th>
+                                    <th>Sync Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="canvas-table-body">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script src="src/services/collaborative_whiteboard_canvas_engine.js"></script>
+</body>
+</html>

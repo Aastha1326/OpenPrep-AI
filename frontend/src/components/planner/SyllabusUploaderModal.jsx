@@ -4,12 +4,11 @@ import { Loader2 } from 'lucide-react';
 import API from '../../services/api';
 
 export default function SyllabusUploaderModal({ isOpen, onClose, onImported }) {
-  if (!isOpen) return null;
-
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  if (!isOpen) return null;
   const handleFileChange = (e) => {
     const selected = e.target.files[0];
     if (selected && selected.type === 'application/pdf') {

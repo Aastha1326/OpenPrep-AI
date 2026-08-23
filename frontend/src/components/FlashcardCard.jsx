@@ -3,8 +3,7 @@ import { Lightbulb, RotateCw, Play, X } from 'lucide-react';
 import MathRenderer from './common/MathRenderer';
 import AudioReader from './AudioReader';
 
-const FlashcardCard = ({ flashcard, style }) => {
-  const [isFlipped, setIsFlipped] = useState(false);
+const FlashcardCard = ({ flashcard, style, rowIndex, columnIndex, cardIndex }) => {  const [isFlipped, setIsFlipped] = useState(false);
   const [showVideoModal, setShowVideoModal] = useState(false);
 
   const handleFlip = () => {
@@ -38,15 +37,20 @@ const FlashcardCard = ({ flashcard, style }) => {
   };
 
   return (
-    <div style={style} className="p-2">
-      <div
+    <div
+      style={style}
+      className="p-2"
+      role="gridcell"
+      aria-rowindex={rowIndex + 1}
+      aria-colindex={columnIndex + 1}
+    >            <div
         role="button"
         tabIndex={0}
+        data-card-index={cardIndex}
         onClick={handleFlip}
         onKeyDown={handleKeyDown}
         aria-label={isFlipped ? 'Show front of card' : 'Show back of card'}
         className="w-full h-full relative cursor-pointer select-none perspective-1000"
-        style={{
           touchAction: 'manipulation',
         }}
       >
