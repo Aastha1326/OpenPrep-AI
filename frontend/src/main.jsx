@@ -46,15 +46,17 @@ window.addEventListener('unhandledrejection', (event) => {
   }
 });
 
-// The PWA service worker is registered by vite-plugin-pwa (injectRegister
-// defaults to 'auto'). Registering a second one here — as this file used to,
-// against a hand-written /service-worker.js — put two workers at scope `/`,
-// both calling skipWaiting() and clientsClaim(), racing each other for control
-// on every load. All that is left to do is evict the retired worker from
-// browsers that still have it.
-if ('serviceWorker' in navigator) {
+// Register Service Worker for offline asset & API response caching
+if ('serviceWorker' in navigator && import.meta.env.MODE !== 'test') {
   window.addEventListener('load', () => {
-    unregisterLegacyServiceWorker();
+    navigator.serviceWorker
+      .register('/service-worker.js')
+      .then((reg) => {
+        console.log('✅ Service Worker registered successfully:', reg.scope);
+      })
+      .catch((err) => {
+        console.warn('⚠️ Service Worker registration failed:', err);
+      });
   });
 }
 

@@ -24,6 +24,7 @@ const swaggerSpec = require('./config/swagger');
 const { apiReference } = require('@scalar/express-api-reference');
 const passport = require('./config/passport');
 const { getCorsMiddleware, getSocketCorsOrigin } = require('./middleware/corsHandler');
+const { metricsMiddleware, getMetrics } = require('./middleware/metricsMiddleware');
 
 // Validate the whole environment against the schema in config/env.js before
 // anything else loads. Reports every problem at once and exits in production;
@@ -83,7 +84,9 @@ const visualizerRoutes = require('./routes/visualizerRoutes');
 const analyticsInsightsRoutes = require('./routes/analyticsInsightsRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
+const { initNightlyBadgeEvaluatorCron } = require('./services/badgeEvaluationService');
 initDifficultyCalibratorCron();
+initNightlyBadgeEvaluatorCron();
 
 const cron = require('node-cron');
 const calendarService = require('./services/calendarService');
@@ -178,17 +181,24 @@ app.use(passport.initialize());
 // Cookie parser (required for csurf cookie-based tokens)
 app.use(cookieParser());
 
+// Prometheus metrics middleware
+app.use(metricsMiddleware);
+
 // CSRF protection middleware
 // The batched quiz-telemetry endpoint is flushed via navigator.sendBeacon()
 // on tab close/navigation, which cannot attach a CSRF header. It's already
 // protected by its own JWT-based auth (see middleware/telemetryAuth.js), so
-// CSRF protection is skipped only for this one route.
+// CSRF protection is skipped only for this one route and /metrics.
 app.use((req, res, next) => {
-  if (req.path === '/api/quiz/telemetry/batch' || req.path === '/api/quizzes/telemetry/batch') {
+  if (req.path === '/api/quiz/telemetry/batch' || req.path === '/api/quizzes/telemetry/batch' || req.path === '/metrics') {
     return next();
   }
   return doubleCsrfProtection(req, res, next);
 });
+
+// Prometheus Metrics Exporter Endpoint
+app.get('/metrics', getMetrics);
+
 // CSRF Token Endpoint for frontend clients
 app.get('/api/csrf-token', (req, res) => {
   const token = generateCsrfToken(req, res);
@@ -284,6 +294,8 @@ app.use('/api/progress', progressRoutes);
 app.use('/api/users', userRoutes);
 app.get('/api/user/quota', protect, require('./controllers/userController').getQuota);
 app.put('/api/user/preferences/timezone', protect, require('./controllers/userController').updateTimezone);
+app.get('/api/user/dashboard', protect, require('./controllers/userController').getDashboardLayout);
+app.post('/api/user/dashboard', protect, require('./controllers/userController').updateDashboardLayout);
 app.use('/api/ai', aiRoutes);
 app.use('/api/ai-editor', aiEditorRoutes);
 app.use('/api/quiz-battles', quizBattleRoutes);
@@ -294,14 +306,19 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/dashboard', analyticsRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/integrations/google-calendar', calendarRoutes);
+app.use('/api/integrations', require('./routes/integrationRoutes'));
 app.use('/api/gamification', gamificationRoutes);
 app.use('/api/battles', battleRoutes);
 app.use('/api/folders', folderRoutes);
 app.use('/api/squads', squadRoutes);
 app.use('/api/badges', badgeRoutes);
+app.get('/user/badges', protect, require('./controllers/badgeController').getUserBadges);
+app.get('/api/user/badges', protect, require('./controllers/badgeController').getUserBadges);
 app.use('/api/community', communityRoutes);
 app.use('/api/visualizer', visualizerRoutes);
 app.use('/api/analytics-insights', analyticsInsightsRoutes);
+app.use('/api/learning-path', require('./routes/learningPathRoutes'));
+app.use('/user/learning-path', require('./routes/learningPathRoutes'));
 
 // Serve static assets from frontend build folder in production
 if (process.env.NODE_ENV === 'production') {

@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise Notion & Google Calendar Organizational Hub Sync Suite | OpenPrep-AI</title>
+    <meta name="description" content="Seamlessly synchronize study planner tasks, OAuth2 Google Calendar events, Notion database pages, and real-time organizational telemetry.">
+    <link rel="stylesheet" href="styles/notion_calendar_sync_dashboard.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="dark-theme">
+    <!-- Header Architecture Comment: Enterprise Notion & Google Calendar Integration Hub -->
+    <!-- Design Pattern: Glassmorphic Sync Command Dashboard with OAuth Status & Real-Time Push Telemetry -->
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar-navigation" id="sidebar-nav">
+            <div class="brand-header">
+                <div class="brand-logo">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <h2>OrgSync AI</h2>
+                    <span>Hub Suite v3.2</span>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="#sync-matrix" class="nav-item active" id="nav-sync-matrix">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    <span>Sync Hub Matrix</span>
+                </a>
+                <a href="#google-calendar" class="nav-item" id="nav-google-cal">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    <span>Google Calendar OAuth2</span>
+                </a>
+                <a href="#notion-db" class="nav-item" id="nav-notion">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                    <span>Notion Database Pages</span>
+                </a>
+                <a href="#webhook-stream" class="nav-item" id="nav-webhooks">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                    <span>Webhook Telemetry</span>
+                </a>
+                <a href="#settings" class="nav-item" id="nav-settings">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    <span>Integration Token Config</span>
+                </a>
+            </nav>
+
+            <div class="system-status-widget glass-card">
+                <div class="status-indicator online"></div>
+                <div class="status-info">
+                    <span class="status-title">Google & Notion APIs Connected</span>
+                    <span class="status-subtitle">OAuth2 Validated</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Surface -->
+        <main class="main-content">
+            <!-- Top Controls Bar -->
+            <header class="top-header glass-card">
+                <div class="header-search">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input type="text" id="sync-search-input" placeholder="Search event ID, study session, Notion page, or calendar..." aria-label="Search organizational telemetry">
+                </div>
+
+                <div class="header-actions">
+                    <div class="filter-dropdown">
+                        <select id="hub-type-select" class="styled-select">
+                            <option value="all">All Integration Hubs</option>
+                            <option value="google">Google Calendar (OAuth2 Sync)</option>
+                            <option value="notion">Notion Database (API v1)</option>
+                            <option value="internal">OpenPrep Internal Planner</option>
+                        </select>
+                    </div>
+
+                    <button class="btn btn-secondary" id="btn-sync-hub-telemetry">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                        <span>Sync Hub Streams</span>
+                    </button>
+
+                    <button class="btn btn-primary" id="btn-push-study-sessions">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                        <span>Push Sessions to Hubs</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Dashboard Body -->
+            <div class="dashboard-body">
+                <!-- Summary Metrics Banner -->
+                <section class="metrics-grid">
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon blue-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Google Calendar Events Pushed</span>
+                            <span class="metric-value" id="val-gcal-events">1,420 Events</span>
+                            <span class="metric-trend positive">OAuth2 Verified</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon black-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Notion Database Pages Synced</span>
+                            <span class="metric-value" id="val-notion-pages">890 Pages</span>
+                            <span class="metric-trend positive">Auto-Formatted</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon green-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Sync Success Parity</span>
+                            <span class="metric-value" id="val-sync-parity">99.8%</span>
+                            <span class="metric-trend positive">0 Collision</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon orange-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Webhook Latency</span>
+                            <span class="metric-value" id="val-webhook-latency">120 ms</span>
+                            <span class="metric-trend positive">Real-Time Webhook</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Analytics Section Grid -->
+                <section class="analytics-section-grid">
+                    <!-- Organizational Hub Distribution Spectrum Graph -->
+                    <div class="analytics-card glass-card span-col-2">
+                        <div class="card-header">
+                            <div class="title-group">
+                                <h3>Organizational Hub Push Volume & Sync Telemetry</h3>
+                                <p class="card-subtitle">Real-time study session synchronization breakdown across external platforms</p>
+                            </div>
+                            <div class="card-actions">
+                                <span class="badge badge-blue" id="badge-top-hub">Primary Hub: Google Calendar</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="vector-graph-container" id="hub-graph-visual">
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar blue" style="height: 94%;"></div>
+                                    <span class="graph-label">Google Cal Push</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar dark" style="height: 84%;"></div>
+                                    <span class="graph-label">Notion Database</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar green" style="height: 68%;"></div>
+                                    <span class="graph-label">Internal Planner</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar blue" style="height: 76%;"></div>
+                                    <span class="graph-label">OAuth2 Refresh</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar dark" style="height: 90%;"></div>
+                                    <span class="graph-label">Webhook Trigger</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hub Integration Controls Console -->
+                    <div class="analytics-card glass-card">
+                        <div class="card-header">
+                            <h3>Hub Sync Config Console</h3>
+                        </div>
+                        <div class="card-body controls-form">
+                            <div class="form-group">
+                                <label for="range-sync-frequency">Sync Interval: <span id="lbl-sync-freq">5 Min</span></label>
+                                <input type="range" id="range-sync-frequency" min="1" max="30" value="5" class="styled-range">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="select-default-target">Default Target Hub</label>
+                                <select id="select-default-target" class="styled-select">
+                                    <option value="gcal">Google Calendar (Primary)</option>
+                                    <option value="notion">Notion Study Database</option>
+                                    <option value="both">Dual Sync (Google + Notion)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group toggle-group">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="chk-auto-push-events" checked>
+                                    <span class="slider round"></span>
+                                </label>
+                                <span class="toggle-label">Auto-Push New Planner Sessions</span>
+                            </div>
+
+                            <button class="btn btn-primary btn-full" id="btn-recalibrate-hubs">
+                                <span>Recalibrate Integration Tokens</span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Organizational Hub Sync Telemetry Table -->
+                <section class="table-section glass-card">
+                    <div class="card-header">
+                        <div class="title-group">
+                            <h3>Study Planner Sessions & Hub Synchronization Log</h3>
+                            <p class="card-subtitle">Session ID, title, target hub, OAuth2 status, push timestamp, and sync state</p>
+                        </div>
+                        <div class="table-actions">
+                            <button class="btn btn-sm btn-secondary" id="btn-export-sync-csv">Export Sync CSV</button>
+                        </div>
+                    </div>
+
+                    <div class="table-wrapper">
+                        <table class="data-table" id="hub-telemetry-table">
+                            <thead>
+                                <tr>
+                                    <th>Session ID</th>
+                                    <th>Study Session Title</th>
+                                    <th>Target Hub</th>
+                                    <th>OAuth2 / API Token</th>
+                                    <th>Push Timestamp</th>
+                                    <th>Sync Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="hub-table-body">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script src="src/services/notion_calendar_sync_engine.js"></script>
+</body>
+</html>
