@@ -1562,3 +1562,28 @@ exports.verifyEmail = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Keepalive session update - refreshes access token and extends session timestamp
+// @route   POST /api/session/keepalive or POST /api/auth/session/keepalive
+// @access  Private
+exports.keepalive = async (req, res, next) => {
+  try {
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    const token = generateAccessToken(user.id);
+    res.cookie('token', token, getAccessTokenCookieOptions());
+
+    res.status(200).json({
+      success: true,
+      message: 'Session expiration extended successfully',
+      token,
+      expiresAt: Date.now() + 15 * 60 * 1000,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

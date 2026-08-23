@@ -77,6 +77,7 @@ import LeaderboardWidget from '../components/dashboard/LeaderboardWidget';
 import ExamCountdownWidget from '../components/dashboard/ExamCountdownWidget';
 import ExamCountdownCard from '../components/dashboard/ExamCountdownCard';
 import TargetExamOverviewWidget from '../components/dashboard/TargetExamOverviewWidget';
+import InteractiveDashboard from '../components/dashboard/InteractiveDashboard';
 import NotesWidget from '../components/dashboard/NotesWidget';
 import ThemeToggle from '../components/ThemeToggle';
 import ReadinessWidget from '../components/dashboard/ReadinessWidget';
@@ -733,6 +734,9 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           onOpenBundleModal={() => setIsBundleModalOpen(true)}
           onGenerateStudyPlan={() => setIsStudyPlanOpen(true)}
         />
+
+        {/* --- INTERACTIVE PROGRESS DASHBOARD WITH ANIMATED CHARTS --- */}
+        <InteractiveDashboard />
 
         {/* --- STATISTICS OVERVIEW --- */}
         {errorStats && !loadingStats ? (

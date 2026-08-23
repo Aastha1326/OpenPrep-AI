@@ -1,129 +1,208 @@
-const { DataTypes, Model } = require('sequelize');
-const sequelize = require('../config/database');
+const { Model, DataTypes } = require('sequelize');
 
 /**
  * JobApplication Model
- * Represents a single node on the Job Kanban Tracker.
- * Manages comprehensive state and metadata for telemetry.
+ * 
+ * Represents a student's personal relationship bridging to a JobOpportunity.
+ * Acts as the node within the Kanban board system, containing state arrays
+ * timeline data, and dynamic sequence IDs for visual drag-and-drop.
+ * 
+ * @class JobApplication
+ * @extends Model
  */
-class JobApplication extends Model { }
-
-JobApplication.init(
-    {
-        id: {
-            type: DataTypes.UUID,
-            defaultValue: DataTypes.UUIDV4,
-            primaryKey: true,
-        },
-        userId: {
-            type: DataTypes.UUID,
-            allowNull: false,
-            comment: 'Identifier of the student who owns this application'
-        },
-        companyName: {
-            type: DataTypes.STRING,
-            allowNull: false,
-            validate: {
-                notEmpty: true,
-            }
-        },
-        roleTitle: {
-            type: DataTypes.STRING,
-            allowNull: false,
-            validate: {
-                notEmpty: true,
-            }
-        },
-        status: {
-            type: DataTypes.ENUM(
-                'Wishlist',
-                'Applied',
-                'Interviewing',
-                'Offered',
-                'Rejected',
-                'Accepted'
-            ),
-            allowNull: false,
-            defaultValue: 'Wishlist',
-        },
-        location: {
-            type: DataTypes.STRING,
-            allowNull: true,
-        },
-        expectedSalary: {
-            type: DataTypes.FLOAT,
-            allowNull: true,
-            comment: 'Base expected salary track'
-        },
-        offeredSalary: {
-            type: DataTypes.FLOAT,
-            allowNull: true,
-            comment: 'Final package offering'
-        },
-        notes: {
-            type: DataTypes.TEXT,
-            allowNull: true,
-        },
-        applicationUrl: {
-            type: DataTypes.STRING,
-            allowNull: true,
-            validate: {
-                isUrl: true,
-            }
-        },
-        colorTag: {
-            type: DataTypes.STRING,
-            allowNull: true,
-            defaultValue: '#3b82f6', // Default blue tag
-        },
-        // Timeline tracking for analytics metrics
-        dateAddedToWishlist: { type: DataTypes.DATE, allowNull: true },
-        dateApplied: { type: DataTypes.DATE, allowNull: true },
-        dateFirstInterview: { type: DataTypes.DATE, allowNull: true },
-        dateOffered: { type: DataTypes.DATE, allowNull: true },
-        dateRejected: { type: DataTypes.DATE, allowNull: true },
-
-        kanbanOrder: {
-            type: DataTypes.INTEGER,
-            allowNull: false,
-            defaultValue: 0,
-            comment: 'Vertical sorting index within the specific status column'
+class JobApplication extends Model {
+    /**
+     * Helper method for defining associations.
+     * @static
+     */
+    static associate(models) {
+        if (models.User) {
+            JobApplication.belongsTo(models.User, {
+                foreignKey: 'studentUserId',
+                as: 'student',
+                onDelete: 'CASCADE',
+            });
         }
-    },
-    {
-        sequelize,
-        modelName: 'JobApplication',
-        tableName: 'job_applications',
-        timestamps: true,
-        indexes: [
-            { fields: ['userId', 'status'] },
-            { fields: ['companyName'] }
-        ]
+
+        if (models.JobOpportunity) {
+            JobApplication.belongsTo(models.JobOpportunity, {
+                foreignKey: 'jobOpportunityId',
+                as: 'opportunity',
+            });
+        }
+
+        if (models.Resume) {
+            // The specific resume version they used to apply
+            JobApplication.belongsTo(models.Resume, {
+                foreignKey: 'resumeId',
+                as: 'submittedResume',
+            });
+        }
+
+        if (models.CoverLetter) {
+            JobApplication.belongsTo(models.CoverLetter, {
+                foreignKey: 'coverLetterId',
+                as: 'submittedCoverLetter',
+            });
+        }
     }
-);
+
+    /**
+     * Helper to append a timeline tracking event transparently
+     */
+    async appendTimelineEvent(eventType, metadata = {}) {
+        this.timelineEvents = [
+            ...this.timelineEvents,
+            {
+                id: crypto.randomUUID(), // Assuming Node 15+ Crypto API available natively in execution environment
+                type: eventType,
+                timestamp: new Date().toISOString(),
+                metadata
+            }
+        ];
+        await this.save();
+    }
+}
 
 /**
- * Hook to automatically update timeline metrics based on status transitions
+ * Schema Initialization
  */
-JobApplication.beforeUpdate(async (job, options) => {
-    if (job.changed('status')) {
-        const now = new Date();
-        switch (job.status) {
-            case 'Applied':
-                if (!job.dateApplied) job.dateApplied = now;
-                break;
-            case 'Interviewing':
-                if (!job.dateFirstInterview) job.dateFirstInterview = now;
-                break;
-            case 'Offered':
-            case 'Accepted':
-                if (!job.dateOffered) job.dateOffered = now;
-                break;
-            case 'Rejected':
-                if (!job.dateRejected) job.dateRejected = now;
-                break;
-        }
-    }
-});
+function initJobApplication(sequelize) {
+    JobApplication.init(
+        {
+            id: {
+                type: DataTypes.UUID,
+                defaultValue: DataTypes.UUIDV4,
+                primaryKey: true,
+                allowNull: false,
+            },
+            studentUserId: {
+                type: DataTypes.UUID,
+                allowNull: false,
+            },
+            jobOpportunityId: {
+                type: DataTypes.UUID,
+                allowNull: false,
+            },
+            resumeId: {
+                type: DataTypes.UUID,
+                allowNull: true,
+            },
+            coverLetterId: {
+                type: DataTypes.UUID,
+                allowNull: true,
+            },
+            statusPhase: {
+                type: DataTypes.ENUM(
+                    'WISHLIST',
+                    'PREPARING',
+                    'APPLIED',
+                    'ONLINE_ASSESSMENT',
+                    'INTERVIEWING',
+                    'OFFER_RECEIVED',
+                    'ACCEPTED',
+                    'REJECTED',
+                    'WITHDRAWN'
+                ),
+                allowNull: false,
+                defaultValue: 'WISHLIST',
+                comment: 'Kanban Column Identifier',
+            },
+            kanbanSequence: {
+                type: DataTypes.FLOAT,
+                allowNull: false,
+                defaultValue: 0,
+                comment: 'Floating point lexical order index for resolving positional permutations during drag and drop',
+            },
+            notes: {
+                type: DataTypes.TEXT,
+                allowNull: true,
+                comment: 'Private markdown notes written by the student',
+            },
+            salaryExpectation: {
+                type: DataTypes.INTEGER,
+                allowNull: true,
+            },
+            matchConfidenceScore: {
+                type: DataTypes.FLOAT, // Personal match score specifically for this exact student
+                allowNull: true,
+            },
+            timelineEvents: {
+                type: DataTypes.JSONB,
+                allowNull: false,
+                defaultValue: [],
+                comment: 'Array of state transitions e.g. [{type: "STATUS_CHANGE", from: "WISHLIST", to: "APPLIED", timestamp: "..."}]',
+            },
+            customCompanyContactName: {
+                type: DataTypes.STRING(255),
+                allowNull: true,
+            },
+            customCompanyContactEmail: {
+                type: DataTypes.STRING(255),
+                allowNull: true,
+                validate: { isEmail: true }
+            },
+            dateApplied: {
+                type: DataTypes.DATE,
+                allowNull: true,
+            },
+            dateNextInterview: {
+                type: DataTypes.DATE,
+                allowNull: true,
+            }
+        },
+        {
+            sequelize,
+            modelName: 'JobApplication',
+            tableName: 'student_job_applications',
+            timestamps: true,
+            indexes: [
+                {
+                    name: 'idx_job_app_student',
+                    fields: ['studentUserId'],
+                },
+                {
+                    name: 'idx_job_app_status',
+                    fields: ['statusPhase'],
+                },
+                {
+                    name: 'idx_job_app_student_sequence', // Critical for optimized kanban load queries
+                    fields: ['studentUserId', 'statusPhase', 'kanbanSequence'],
+                }
+            ],
+            hooks: {
+                beforeUpdate: (app, options) => {
+                    // If the status phase changed, enforce recording the transition on the timeline JSONB list automatically
+                    if (app.changed('statusPhase')) {
+                        const history = app.timelineEvents || [];
+                        const previousStatus = app.previous('statusPhase');
+                        const newStatus = app.getDataValue('statusPhase');
 
-module.exports = JobApplication;
+                        history.push({
+                            id: require('crypto').randomUUID ? require('crypto').randomUUID() : Math.random().toString(),
+                            type: 'STATUS_SYSTEM_TRANSITION',
+                            timestamp: new Date().toISOString(),
+                            metadata: {
+                                from: previousStatus,
+                                to: newStatus
+                            }
+                        });
+
+                        app.timelineEvents = history;
+
+                        if (newStatus === 'APPLIED' && !app.dateApplied) {
+                            app.dateApplied = new Date();
+                        }
+                    }
+                }
+            }
+        }
+    );
+
+    return JobApplication;
+}
+
+module.exports = {
+    JobApplication,
+    initJobApplication
+};

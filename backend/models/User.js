@@ -63,6 +63,10 @@ const User = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
+    currentLearningPathId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
     authProvider: {
       type: DataTypes.ENUM('local', 'google', 'github'),
       defaultValue: 'local',
@@ -171,9 +175,21 @@ const User = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
-syncGoogleCalendar: {
+    syncGoogleCalendar: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
+    },
+    googleCalendarWebhookChannelId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    googleCalendarWebhookResourceId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    googleCalendarWebhookExpiration: {
+      type: DataTypes.DATE,
+      allowNull: true,
     },
     hideActivityFromSquad: {
       type: DataTypes.BOOLEAN,
@@ -245,6 +261,14 @@ examCountdownPreferences: {
     streakFreezesAvailable: {
       type: DataTypes.INTEGER,
       defaultValue: 0,
+    },
+    skillScore: {
+      type: DataTypes.FLOAT,
+      defaultValue: 1000.0,
+    },
+    recentAnswerHistory: {
+      type: DataTypes.JSONB,
+      defaultValue: [],
     },
   },
   {

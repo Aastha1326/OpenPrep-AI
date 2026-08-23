@@ -240,3 +240,31 @@ exports.updateExamCountdownPreferences = async (req, res, next) => {
     next(error);
   }
 };
+
+// ---------------------------------------------------------------------------
+// @desc    Update user timezone preference (IANA)
+// @route   PUT /api/users/preferences/timezone
+// @access  Private
+// ---------------------------------------------------------------------------
+exports.updateTimezone = async (req, res, next) => {
+  try {
+    const { timezone } = req.body;
+    if (!timezone || typeof timezone !== 'string') {
+      return res.status(400).json({ success: false, error: 'timezone is required' });
+    }
+    try {
+      Intl.DateTimeFormat(undefined, { timeZone: timezone });
+    } catch {
+      return res.status(400).json({ success: false, error: 'Invalid IANA timezone' });
+    }
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    user.timezone = timezone;
+    await user.save();
+    res.status(200).json({ success: true, data: { timezone: user.timezone } });
+  } catch (error) {
+    next(error);
+  }
+};
