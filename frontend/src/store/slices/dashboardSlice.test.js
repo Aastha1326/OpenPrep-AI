@@ -150,3 +150,58 @@ describe('dashboardSlice - theme persistence', () => {
   });
 });
 
+describe('dashboardSlice - layout management', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  test('adds a new widget to layout and persists to localStorage', () => {
+    const { addWidget } = require('./dashboardSlice');
+    const store = configureStore({ reducer: { dashboard: dashboardReducer } });
+
+    const initialCount = store.getState().dashboard.layout.length;
+    store.dispatch(addWidget({ id: 'readiness-widget', colSpan: 6 }));
+
+    const updatedLayout = store.getState().dashboard.layout;
+    expect(updatedLayout.length).toBe(initialCount + 1);
+    expect(updatedLayout.some((w) => w.id === 'readiness-widget')).toBe(true);
+
+    const savedLocalStorage = JSON.parse(localStorage.getItem('openprep_dashboard_layout'));
+    expect(savedLocalStorage).toBeDefined();
+    expect(savedLocalStorage.some((w) => w.id === 'readiness-widget')).toBe(true);
+  });
+
+  test('removes a widget from layout', () => {
+    const { removeWidget } = require('./dashboardSlice');
+    const store = configureStore({ reducer: { dashboard: dashboardReducer } });
+
+    store.dispatch(removeWidget('progress-chart'));
+
+    const updatedLayout = store.getState().dashboard.layout;
+    expect(updatedLayout.some((w) => w.id === 'progress-chart')).toBe(false);
+  });
+
+  test('resizes a widget colSpan in layout', () => {
+    const { resizeWidget } = require('./dashboardSlice');
+    const store = configureStore({ reducer: { dashboard: dashboardReducer } });
+
+    store.dispatch(resizeWidget({ id: 'progress-chart', colSpan: 12 }));
+
+    const targetWidget = store.getState().dashboard.layout.find((w) => w.id === 'progress-chart');
+    expect(targetWidget.colSpan).toBe(12);
+  });
+
+  test('resets layout to DEFAULT_LAYOUT', () => {
+    const { resetDashboardLayout, removeWidget, DEFAULT_LAYOUT } = require('./dashboardSlice');
+    const store = configureStore({ reducer: { dashboard: dashboardReducer } });
+
+    store.dispatch(removeWidget('progress-chart'));
+    expect(store.getState().dashboard.layout.length).toBeLessThan(DEFAULT_LAYOUT.length);
+
+    store.dispatch(resetDashboardLayout());
+    expect(store.getState().dashboard.layout).toEqual(DEFAULT_LAYOUT);
+  });
+});
+
+
