@@ -43,7 +43,7 @@ const Syllabus = require('./Syllabus');
 const SyllabusTopic = require('./SyllabusTopic');
 const PDFAnnotation = require('./PDFAnnotation');
 const QuizRoom = require('./QuizRoom');
-const Question = require('./Question');
+const LearningPath = require('./LearningPath');
 
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -51,6 +51,8 @@ User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Topic, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(PYQ, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(StudyPlan, { foreignKey: 'user', onDelete: 'CASCADE' });
+User.hasMany(LearningPath, { foreignKey: 'userId', onDelete: 'CASCADE' });
+LearningPath.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 User.hasMany(Quiz, { foreignKey: 'createdBy', onDelete: 'CASCADE' });
 User.hasMany(QuizAttempt, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Note, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -295,6 +297,7 @@ module.exports = {  sequelize,  User,  Exam,
   SquadActivityReaction,
   FlashcardDeck,
   DeckCollaborator,
+  LearningPath,
   PDFAnnotation,
   QuizRoom,
 };
