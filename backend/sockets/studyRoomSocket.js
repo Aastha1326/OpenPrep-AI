@@ -137,8 +137,8 @@ const initializeStudyRoomSockets = (io) => {
         console.log(`[Socket] User connected: ${socket.id}`);
 
         /**
-         * Event: User joins a specific study room.
-         * Payload: { roomId, username }
+         * Cleans up room membership state and removes event listeners
+         * from a client socket to prevent memory and listener leaks.
          */
         socket.on('join_room', async ({ roomId, username }) => {
             socket.join(roomId);
@@ -170,7 +170,30 @@ const initializeStudyRoomSockets = (io) => {
             });
 
             console.log(`[Socket] User ${username} joined room ${roomId}`);
-        });
+        };
+
+        const handleLeaveRoom = () => {
+            const roomId = socket.data.roomId;
+            const username = socket.data.username;
+
+            if (roomId) {
+                socket.leave(roomId);
+                if (username) {
+                    socket.to(roomId).emit('user_left', {
+                        username,
+                        message: `${username} has left the study room.`
+                    });
+                }
+                cleanupSocket(socket.id);
+            }
+        };
+
+        /**
+         * Event: User joins a specific study room.
+         * Payload: { roomId, username }
+         */
+        socket.on('join_room', handleJoinRoom);
+        socket.on('study:room:join', handleJoinRoom);
 
         /**
          * Event: Broadcast a whiteboard drawing stroke to the room.
@@ -219,10 +242,20 @@ const initializeStudyRoomSockets = (io) => {
                 message: message.trim(),
                 timestamp,
             };
-
-            // Broadcast to the entire room, including sender for consistency
             io.to(roomId).emit('receive_chat_message', chatPayload);
         });
+
+        /**
+         * Event: Heartbeat checks for socket connectivity
+         */
+        socket.on('study:room:heartbeat', () => {
+            socket.emit('study:room:heartbeat_ack');
+        });
+
+        /**
+         * Event: Explicit study room leave
+         */
+        socket.on('study:room:leave', handleLeaveRoom);
 
         /**
          * Event: User disconnects or leaves the room.
@@ -242,9 +275,11 @@ const initializeStudyRoomSockets = (io) => {
                     });
                 }
             }
+            cleanupSocket(socket.id);
             console.log(`[Socket] User disconnected: ${socket.id}`);
         });
     });
 };
 
 module.exports = initializeStudyRoomSockets;
+module.exports.activeRooms = activeRooms;
