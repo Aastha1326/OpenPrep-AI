@@ -79,6 +79,10 @@ const User = sequelize.define(
       type: DataTypes.INTEGER,
       defaultValue: 0,
     },
+    xp: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
     studyHours: {
       type: DataTypes.FLOAT,
       defaultValue: 0,
