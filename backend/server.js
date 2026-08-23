@@ -84,7 +84,9 @@ const visualizerRoutes = require('./routes/visualizerRoutes');
 const analyticsInsightsRoutes = require('./routes/analyticsInsightsRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
+const { initNightlyBadgeEvaluatorCron } = require('./services/badgeEvaluationService');
 initDifficultyCalibratorCron();
+initNightlyBadgeEvaluatorCron();
 
 const cron = require('node-cron');
 const calendarService = require('./services/calendarService');
@@ -307,6 +309,8 @@ app.use('/api/battles', battleRoutes);
 app.use('/api/folders', folderRoutes);
 app.use('/api/squads', squadRoutes);
 app.use('/api/badges', badgeRoutes);
+app.get('/user/badges', protect, require('./controllers/badgeController').getUserBadges);
+app.get('/api/user/badges', protect, require('./controllers/badgeController').getUserBadges);
 app.use('/api/community', communityRoutes);
 app.use('/api/visualizer', visualizerRoutes);
 app.use('/api/analytics-insights', analyticsInsightsRoutes);

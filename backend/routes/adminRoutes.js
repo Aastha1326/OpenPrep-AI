@@ -4,6 +4,10 @@ const {
   getUsers,
   updateUserRole,
   deleteUser,
+  getAdminBadges,
+  createAdminBadge,
+  updateAdminBadge,
+  deleteAdminBadge,
 } = require('../controllers/adminController');
 const { protect, requireAdmin } = require('../middleware/auth');
 
@@ -17,5 +21,11 @@ router.get('/stats', getStats);
 router.get('/users', getUsers);
 router.put('/users/:id/role', updateUserRole);
 router.delete('/users/:id', deleteUser);
+
+// Badge Criteria Management
+router.get('/badges', getAdminBadges);
+router.post('/badges', createAdminBadge);
+router.put('/badges/:id', updateAdminBadge);
+router.delete('/badges/:id', deleteAdminBadge);
 
 module.exports = router;
