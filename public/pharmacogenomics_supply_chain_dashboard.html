@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise Pharmacogenomics & Pharmacy Supply Chain Suite | OpenPrep-AI</title>
+    <meta name="description" content="Manage clinical pharmacogenomics drug-gene interactions, pharmaceutical supply chain cold-chain telemetry, and automated drug dispensing analytics.">
+    <link rel="stylesheet" href="styles/pharmacogenomics_supply_chain_dashboard.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="dark-theme">
+    <!-- Header Architecture Comment: Enterprise Pharmacogenomics & Pharmacy Supply Chain Analytics Suite -->
+    <!-- Design Pattern: Glassmorphic Clinical Dashboard with Drug-Gene Interaction Matrix & Cold-Chain Telemetry -->
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar-navigation" id="sidebar-nav">
+            <div class="brand-header">
+                <div class="brand-logo">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10.5 20.5l10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7z"></path>
+                        <path d="M8.5 8.5l7 7"></path>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <h2>PharmaGuard AI</h2>
+                    <span>Supply Suite v6.1</span>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="#drug-gene-matrix" class="nav-item active" id="nav-drug-gene-matrix">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    <span>Drug-Gene Matrix</span>
+                </a>
+                <a href="#cold-chain" class="nav-item" id="nav-cold-chain">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                    <span>Cold-Chain Telemetry</span>
+                </a>
+                <a href="#dispensing-alerts" class="nav-item" id="nav-alerts">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path></svg>
+                    <span>Toxicity Risk Flags</span>
+                </a>
+                <a href="#inventory-stream" class="nav-item" id="nav-inventory">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+                    <span>Automated Stock Stream</span>
+                </a>
+                <a href="#settings" class="nav-item" id="nav-settings">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    <span>CPIC Guideline Config</span>
+                </a>
+            </nav>
+
+            <div class="system-status-widget glass-card">
+                <div class="status-indicator online"></div>
+                <div class="status-info">
+                    <span class="status-title">CPIC Neural Gateway</span>
+                    <span class="status-subtitle">3,420 Prescriptions Evaluated</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Surface -->
+        <main class="main-content">
+            <!-- Top Controls Bar -->
+            <header class="top-header glass-card">
+                <div class="header-search">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input type="text" id="pharma-search-input" placeholder="Search drug name, CYP2D6 variant, patient ID, or batch..." aria-label="Search pharmacy supply telemetry">
+                </div>
+
+                <div class="header-actions">
+                    <div class="filter-dropdown">
+                        <select id="interaction-risk-select" class="styled-select">
+                            <option value="all">All Interaction Risk Levels</option>
+                            <option value="high-toxicity">High Risk Toxicity (CYP2D6 / TPMT)</option>
+                            <option value="moderate-alert">Moderate Risk (Dosage Adjustment Required)</option>
+                            <option value="safe">Verified Safe (Standard Metabolizer)</option>
+                        </select>
+                    </div>
+
+                    <button class="btn btn-secondary" id="btn-sync-pharma-streams">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                        <span>Sync Streams</span>
+                    </button>
+
+                    <button class="btn btn-primary" id="btn-verify-prescription">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.5 20.5l10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7z"></path></svg>
+                        <span>Verify CPIC Pharmacogenomics</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Dashboard Body -->
+            <div class="dashboard-body">
+                <!-- Summary Metrics Banner -->
+                <section class="metrics-grid">
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon purple-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.5 20.5l10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7z"></path></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">CPIC Drug-Gene Verifications</span>
+                            <span class="metric-value" id="val-verification-count">3,420 Orders</span>
+                            <span class="metric-trend positive">100% CPIC Level A</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon red-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Toxicity Risk Interceptions</span>
+                            <span class="metric-value" id="val-toxicity-flags">19 Active Flags</span>
+                            <span class="metric-trend negative">High Alert</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon blue-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Cold-Chain Storage Parity</span>
+                            <span class="metric-value" id="val-cold-chain-temp">4.2°C Stable</span>
+                            <span class="metric-trend positive">Sensors Verified</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon green-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Dispensing Parity Rate</span>
+                            <span class="metric-value" id="val-dispense-rate">99.8%</span>
+                            <span class="metric-trend positive">FDA Approved</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Analytics Section Grid -->
+                <section class="analytics-section-grid">
+                    <!-- Drug-Gene Interaction Risk Distribution Graph -->
+                    <div class="analytics-card glass-card span-col-2">
+                        <div class="card-header">
+                            <div class="title-group">
+                                <h3>Pharmacogenomic Variant & Cold-Chain Anomaly Graph</h3>
+                                <p class="card-subtitle">Real-time distribution of CYP2D6, CYP2C19, TPMT, and DPYD metabolizer phenotypes</p>
+                            </div>
+                            <div class="card-actions">
+                                <span class="badge badge-purple" id="badge-top-gene-risk">Top Variant: CYP2D6 Poor Metabolizer</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="vector-graph-container" id="pharma-graph-visual">
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar purple" style="height: 90%;"></div>
+                                    <span class="graph-label">CYP2D6 Poor</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar red" style="height: 82%;"></div>
+                                    <span class="graph-label">TPMT Risk</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar yellow" style="height: 64%;"></div>
+                                    <span class="graph-label">CYP2C19 Rapid</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar blue" style="height: 52%;"></div>
+                                    <span class="graph-label">DPYD Deficiency</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar purple" style="height: 74%;"></div>
+                                    <span class="graph-label">VKORC1 Sensitivity</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pharmacy Supply Controls Console -->
+                    <div class="analytics-card glass-card">
+                        <div class="card-header">
+                            <h3>CPIC Risk Cutoff Console</h3>
+                        </div>
+                        <div class="card-body controls-form">
+                            <div class="form-group">
+                                <label for="range-cold-chain-temp">Max Cold-Chain Limit: <span id="lbl-temp-limit">8.0°C</span></label>
+                                <input type="range" id="range-cold-chain-temp" min="20" max="120" value="80" class="styled-range">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="range-cyp2d6-sensitivity">CYP2D6 Risk Cutoff: <span id="lbl-cyp-sens">90%</span></label>
+                                <input type="range" id="range-cyp2d6-sensitivity" min="50" max="100" value="90" class="styled-range">
+                            </div>
+
+                            <div class="form-group toggle-group">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="chk-auto-block-dispense" checked>
+                                    <span class="slider round"></span>
+                                </label>
+                                <span class="toggle-label">Auto-Block High-Toxicity Dispensing</span>
+                            </div>
+
+                            <button class="btn btn-primary btn-full" id="btn-recalibrate-pharma">
+                                <span>Recalibrate CPIC Engine</span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Pharmacy Telemetry Data Table -->
+                <section class="table-section glass-card">
+                    <div class="card-header">
+                        <div class="title-group">
+                            <h3>Real-Time Pharmacogenomics & Supply Chain Telemetry</h3>
+                            <p class="card-subtitle">Rx ID, target drug, genomic phenotype, cold-chain temp, risk category, and dispensing status</p>
+                        </div>
+                        <div class="table-actions">
+                            <button class="btn btn-sm btn-secondary" id="btn-export-pharma-csv">Export CPIC CSV</button>
+                        </div>
+                    </div>
+
+                    <div class="table-wrapper">
+                        <table class="data-table" id="pharma-telemetry-table">
+                            <thead>
+                                <tr>
+                                    <th>Rx ID</th>
+                                    <th>Patient ID</th>
+                                    <th>Prescribed Drug</th>
+                                    <th>Genomic Phenotype</th>
+                                    <th>Storage Temp</th>
+                                    <th>Risk Category</th>
+                                    <th>Dispensing Action</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pharma-table-body">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script src="src/services/pharmacogenomics_supply_chain_engine.js"></script>
+</body>
+</html>

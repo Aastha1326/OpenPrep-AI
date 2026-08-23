@@ -559,8 +559,19 @@ exports.createFlashcard = async (req, res, next) => {
 exports.getFlashcards = async (req, res, next) => {
   try {
     const { subjectId, dueOnly, search } = req.query;
+    
+    if (req.query.page !== undefined && parseInt(req.query.page, 10) < 0) {
+      return res.status(400).json({ success: false, error: 'Page cannot be negative' });
+    }
+    if (req.query.limit !== undefined && parseInt(req.query.limit, 10) <= 0) {
+      return res.status(400).json({ success: false, error: 'Limit cannot be zero or negative' });
+    }
+    if (req.query.pageSize !== undefined && parseInt(req.query.pageSize, 10) <= 0) {
+      return res.status(400).json({ success: false, error: 'Page size cannot be zero or negative' });
+    }
+
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit || req.query.pageSize, 10) || 20));
     const offset = (page - 1) * limit;
 
     const filter = { user: req.user.id };
@@ -729,13 +740,14 @@ exports.reviewFlashcard = async (req, res, next) => {
     const gamificationService = require('../services/gamificationService');
     const progression = await gamificationService.awardXP(req.user.id, 30, 'flashcard_review');
 
-    const timezoneOffset = Number(req.headers['x-timezone-offset']) || 0;
-    await gamificationService.updateStreak(req.user.id, timezoneOffset);
+    const timeZoneParam = req.headers['x-timezone'] || (req.headers['x-timezone-offset'] !== undefined ? Number(req.headers['x-timezone-offset']) : null);
+    await gamificationService.updateStreak(req.user.id, timeZoneParam);
 
     const user = await User.findByPk(req.user.id);
-    const newBadges = await gamificationService.checkAndUnlockBadges(user, 'flashcard_review', {
-      timezoneOffsetMinutes: timezoneOffset,
-    });
+    const badgeDetails = req.headers['x-timezone']
+      ? { timeZone: req.headers['x-timezone'] }
+      : { timezoneOffsetMinutes: Number(req.headers['x-timezone-offset']) || 0 };
+    const newBadges = await gamificationService.checkAndUnlockBadges(user, 'flashcard_review', badgeDetails);
     progression.newBadges = newBadges;
 
     res.status(200).json({ success: true, data: card, progression });
@@ -1143,8 +1155,19 @@ exports.shareFlashcardDeck = async (req, res, next) => {
 exports.getCommunityDecks = async (req, res, next) => {
   try {
     const { search, subject, subjectId, exam, rating, sort } = req.query;
+
+    if (req.query.page !== undefined && parseInt(req.query.page, 10) < 0) {
+      return res.status(400).json({ success: false, error: 'Page cannot be negative' });
+    }
+    if (req.query.limit !== undefined && parseInt(req.query.limit, 10) <= 0) {
+      return res.status(400).json({ success: false, error: 'Limit cannot be zero or negative' });
+    }
+    if (req.query.pageSize !== undefined && parseInt(req.query.pageSize, 10) <= 0) {
+      return res.status(400).json({ success: false, error: 'Page size cannot be zero or negative' });
+    }
+
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit || req.query.pageSize, 10) || 20));
     const offset = (page - 1) * limit;
 
     const filter = { isPublic: true };
@@ -1464,7 +1487,7 @@ exports.starCommunityDeck = async (req, res, next) => {
 // @access  Private
 exports.batchSyncOfflineReviews = async (req, res, next) => {
   try {
-    const { reviews } = req.body;
+    const reviews = req.body.reviews || req.body.batch || req.body;
 
     if (!Array.isArray(reviews) || reviews.length === 0) {
       return res.status(400).json({
@@ -1493,9 +1516,11 @@ exports.batchSyncOfflineReviews = async (req, res, next) => {
     // card must compose in order, otherwise the second overwrites the first's
     // SM-2 state instead of building on it.
     for (const review of reviews) {
-      const { cardId, score, reviewedAt } = review || {};
+      const cardId = review.cardId || review.flashcardId;
+      const rawScore = review.score ?? review.quality;
+      const reviewedAt = review.reviewedAt || review.timestamp;
 
-      const quality = Number(score);
+      const quality = Number(rawScore);
       if (!Number.isInteger(quality) || quality < 0 || quality > 5) {
         skipped += 1;
         errors.push({ cardId: cardId || null, error: 'Score must be an integer between 0 and 5' });

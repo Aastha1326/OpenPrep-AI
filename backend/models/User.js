@@ -63,6 +63,10 @@ const User = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
+    currentLearningPathId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
     authProvider: {
       type: DataTypes.ENUM('local', 'google', 'github'),
       defaultValue: 'local',
@@ -79,6 +83,10 @@ const User = sequelize.define(
       type: DataTypes.INTEGER,
       defaultValue: 0,
     },
+    xp: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
     studyHours: {
       type: DataTypes.FLOAT,
       defaultValue: 0,
@@ -86,6 +94,10 @@ const User = sequelize.define(
     avatar: {
       type: DataTypes.STRING,
       defaultValue: '',
+    },
+    locale: {
+      type: DataTypes.STRING,
+      defaultValue: 'en',
     },
     leaderboardVisible: {
       type: DataTypes.BOOLEAN,
@@ -167,9 +179,21 @@ const User = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
-syncGoogleCalendar: {
+    syncGoogleCalendar: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
+    },
+    googleCalendarWebhookChannelId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    googleCalendarWebhookResourceId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    googleCalendarWebhookExpiration: {
+      type: DataTypes.DATE,
+      allowNull: true,
     },
     hideActivityFromSquad: {
       type: DataTypes.BOOLEAN,
@@ -241,6 +265,19 @@ examCountdownPreferences: {
     streakFreezesAvailable: {
       type: DataTypes.INTEGER,
       defaultValue: 0,
+    },
+    skillScore: {
+      type: DataTypes.FLOAT,
+      defaultValue: 1000.0,
+    },
+    recentAnswerHistory: {
+      type: DataTypes.JSONB,
+      defaultValue: [],
+    },
+    dashboardLayout: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      defaultValue: null,
     },
   },
   {

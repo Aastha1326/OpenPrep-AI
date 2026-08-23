@@ -17,10 +17,11 @@ export default function () {
       // Authorization would be added here normally. We just want to hit the endpoint to measure load/handling of auth failures
       'Authorization': 'Bearer dummy_token',
     },
+    // Dummy token/quizId intentionally return 400/401/404 — expected, not real errors.
+    responseCallback: http.expectedStatuses(200, 201, 400, 401, 404),
   };
 
   const res = http.post(`${BASE_URL}/api/quizzes/${quizId}/submit`, payload, params);
-
   check(res, {
     'quiz submission is status 200, 401, or 404': (r) => [200, 201, 400, 401, 404].includes(r.status),
   });

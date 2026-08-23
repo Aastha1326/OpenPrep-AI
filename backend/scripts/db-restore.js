@@ -7,9 +7,13 @@ const { pipeline } = require('stream/promises');
 // Load environment variables from backend .env
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
-const getDbUrl = () =>
-  process.env.DATABASE_URL ||
-  'postgresql://postgres:NISHIT382424@db.eymuyrdtbinvexvaynxw.supabase.co:5432/postgres';
+const getDbUrl = () => {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error('DATABASE_URL environment variable is required');
+  }
+  return url;
+};
 
 const obfuscateUrl = (url) => url.replace(/:([^:@]+)@/, ':****@');
 

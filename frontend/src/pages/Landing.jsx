@@ -554,6 +554,14 @@ const Landing = () => {
           </div>
           <p>© {new Date().getFullYear()} OpenPrep AI. Built with ❤️ for students worldwide.</p>
           <div className="flex gap-4">
+            <a
+              href="/api/docs"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-amber-800 dark:hover:text-amber-400"
+            >
+              API Docs
+            </a>
             <Link to="/login" className="hover:text-amber-800 dark:hover:text-amber-400">
               Login
             </Link>

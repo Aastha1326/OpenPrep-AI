@@ -14,6 +14,8 @@ const User = require('../models/User');
 const Achievement = require('../models/Achievement');
 const sendEmail = require('../services/emailService');
 
+const MAX_ACTIVE_SESSIONS = parseInt(process.env.MAX_ACTIVE_SESSIONS, 10) || 10;
+
 const getAuthCookieOptions = () => ({
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
@@ -31,7 +33,7 @@ const getAccessTokenCookieOptions = () => ({
 });
 
 const generateAccessToken = (id) => {
-  return jwt.sign({ id, type: 'access' }, process.env.JWT_SECRET || 'supersecret_openprep_key', {
+  return jwt.sign({ id, type: 'access' }, jwtSecret, {
     expiresIn: process.env.JWT_EXPIRE || '15m',
   });
 };
@@ -48,13 +50,13 @@ const PENDING_OAUTH_TTL = '15m';
 const generatePendingOAuthToken = (payload) =>
   jwt.sign(
     { ...payload, type: 'oauth_pending' },
-    process.env.JWT_SECRET || 'supersecret_openprep_key',
+    jwtSecret,
     { expiresIn: PENDING_OAUTH_TTL }
   );
 
 const verifyPendingOAuthToken = (token) => {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'supersecret_openprep_key');
+    const decoded = jwt.verify(token, jwtSecret);
     if (decoded.type !== 'oauth_pending' || !decoded.githubId) return null;
     return decoded;
   } catch {
@@ -239,7 +241,7 @@ const sendPasswordResetOtp = async (user) => {
  */
 exports.register = async (req, res, next) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password } = req.body;
 
     let user = await User.findOne({ where: { email } });
     if (user) {
@@ -250,7 +252,7 @@ exports.register = async (req, res, next) => {
       name,
       email,
       password,
-      role: role || 'student',
+      role: 'student',
     });
 
     const accessToken = generateAccessToken(user.id);
@@ -622,7 +624,7 @@ exports.getMe = async (req, res, next) => {
  */
 exports.updateSettings = async (req, res, next) => {
   try {
-    const { leaderboardVisible, hideActivityFromSquad, syncGoogleCalendar } = req.body;
+    const { leaderboardVisible, hideActivityFromSquad, locale } = req.body;
 
     if (typeof leaderboardVisible === 'boolean') {
       req.user.leaderboardVisible = leaderboardVisible;
@@ -630,8 +632,8 @@ exports.updateSettings = async (req, res, next) => {
     if (typeof hideActivityFromSquad === 'boolean') {
       req.user.hideActivityFromSquad = hideActivityFromSquad;
     }
-    if (typeof syncGoogleCalendar === 'boolean') {
-      req.user.syncGoogleCalendar = syncGoogleCalendar;
+    if (locale && typeof locale === 'string') {
+      req.user.locale = locale;
     }
     await req.user.save();
 
@@ -642,6 +644,7 @@ exports.updateSettings = async (req, res, next) => {
         name: req.user.name,
         email: req.user.email,
         role: req.user.role,
+        locale: req.user.locale || 'en',
         streak: {
           count: req.user.streakCount,
           lastActive: req.user.streakLastActive,
@@ -928,7 +931,7 @@ exports.refreshToken = async (req, res, next) => {
 };
 
 const { OAuth2Client } = require('google-auth-library');
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID || '179369126060-lq7unpt173rt6aog2nt93s6m895d6b2i.apps.googleusercontent.com');
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // ---------------------------------------------------------------------------
 // @desc    Google OAuth Login / Register via credential token
@@ -953,15 +956,10 @@ exports.googleLogin = async (req, res, next) => {
         googleId = payload.sub;
         picture = payload.picture;
       } catch (verifyErr) {
-        // Fallback: decode JWT token
-        const payload = jwt.decode(credential);
-        if (!payload || !payload.email) {
-          return res.status(400).json({ success: false, error: 'Invalid Google credential' });
-        }
-        email = payload.email;
-        name = payload.name || payload.given_name;
-        googleId = payload.sub;
-        picture = payload.picture;
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid Google credential - token verification failed',
+        });
       }
     } else if (access_token) {
       // Access token flow via Google UserInfo API
@@ -1559,3 +1557,28 @@ exports.verifyEmail = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Keepalive session update - refreshes access token and extends session timestamp
+// @route   POST /api/session/keepalive or POST /api/auth/session/keepalive
+// @access  Private
+exports.keepalive = async (req, res, next) => {
+  try {
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    const token = generateAccessToken(user.id);
+    res.cookie('token', token, getAccessTokenCookieOptions());
+
+    res.status(200).json({
+      success: true,
+      message: 'Session expiration extended successfully',
+      token,
+      expiresAt: Date.now() + 15 * 60 * 1000,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

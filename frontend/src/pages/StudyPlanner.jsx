@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import API from '../services/api';
 import SyllabusUploaderModal from '../components/planner/SyllabusUploaderModal';
 import SyllabusCoverageMatrix from '../components/planner/SyllabusCoverageMatrix';
+import AdaptiveLearningPath from '../components/dashboard/AdaptiveLearningPath';
 import { FaBookOpen, FaPlus, FaCheckCircle, FaExclamationCircle } from 'react-icons/fa';
 import { Loader2 } from 'lucide-react';
 
@@ -89,6 +90,8 @@ export default function StudyPlanner() {
             <span>{error}</span>
           </div>
         )}
+
+        <AdaptiveLearningPath />
 
         {loading ? (
           <div className="flex flex-col items-center justify-center py-16">

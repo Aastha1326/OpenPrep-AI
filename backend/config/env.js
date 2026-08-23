@@ -177,6 +177,7 @@ const schema = z.object({
   OCR_TIMEOUT_MS: intFromString(60000, { min: 1000 }),
   // ── File upload limits ────────────────────────────────────────────────────
   MAX_AUDIO_UPLOAD_SIZE_MB: intFromString(25, { min: 1, max: 500 }),
+  NOTE_EXPORT_LIMIT: intFromString(100, { min: 1 }),
 
   // ── Test-only switches ───────────────────────────────────────────────────
   ENABLE_RATE_LIMIT_TESTS: booleanFromString(false),

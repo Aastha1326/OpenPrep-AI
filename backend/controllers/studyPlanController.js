@@ -286,13 +286,14 @@ exports.toggleTaskCompletion = async (req, res, next) => {
       const gamificationService = require('../services/gamificationService');
       progression = await gamificationService.awardXP(req.user.id, 50, 'task_complete');
 
-      const timezoneOffset = Number(req.headers['x-timezone-offset']) || 0;
-      await gamificationService.updateStreak(req.user.id, timezoneOffset);
+      const timeZoneParam = req.headers['x-timezone'] || (req.headers['x-timezone-offset'] !== undefined ? Number(req.headers['x-timezone-offset']) : null);
+      await gamificationService.updateStreak(req.user.id, timeZoneParam);
 
       const user = await User.findByPk(req.user.id);
-      const newBadges = await gamificationService.checkAndUnlockBadges(user, 'task_complete', {
-        timezoneOffsetMinutes: timezoneOffset
-      });
+      const badgeDetails = req.headers['x-timezone']
+        ? { timeZone: req.headers['x-timezone'] }
+        : { timezoneOffsetMinutes: Number(req.headers['x-timezone-offset']) || 0 };
+      const newBadges = await gamificationService.checkAndUnlockBadges(user, 'task_complete', badgeDetails);
       progression.newBadges = newBadges;
     }
 

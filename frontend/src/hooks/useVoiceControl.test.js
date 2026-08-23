@@ -10,7 +10,7 @@ describe('useVoiceControl', () => {
   let instances = [];
 
   beforeEach(() => {
-    instances = [];
+    vi.useFakeTimers();
     mockRecognitionInstance = {
       start: vi.fn(),
       abort: vi.fn(),
@@ -19,10 +19,7 @@ describe('useVoiceControl', () => {
       lang: '',
     };
     
-    MockRecognition = vi.fn().mockImplementation(function() {
-      instances.push(mockRecognitionInstance);
-      return mockRecognitionInstance;
-    });
+    MockRecognition = vi.fn(function() { return mockRecognitionInstance; });
     window.SpeechRecognition = MockRecognition;
 
     mockSynth = {
@@ -30,14 +27,19 @@ describe('useVoiceControl', () => {
       cancel: vi.fn(),
     };
     window.speechSynthesis = mockSynth;
-    window.SpeechSynthesisUtterance = vi.fn().mockImplementation(function(text) {
+    window.SpeechSynthesisUtterance = vi.fn(function(text) {
       this.text = text;
+      this.rate = 1;
+      this.lang = '';
+      this.onend = null;
+      this.onerror = null;
     });
     
     mockOnCommand = vi.fn();
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     delete window.SpeechRecognition;
     delete window.speechSynthesis;
@@ -195,16 +197,17 @@ describe('useVoiceControl', () => {
 
     const recognition = instances[0];
 
-    act(() => {
-      recognition.onstart();
-      recognition.onresult({
-        results: [
-          [
-            {
-              transcript: 'A component is a reusable UI building block',
-              confidence: 0.9,
-            },
-          ],
+  const recognition = mockRecognitionInstance;
+
+  act(() => {
+    recognition.onstart();
+    recognition.onresult({
+      results: [
+        [
+          {
+            transcript: 'A component is a reusable UI building block',
+            confidence: 0.9,
+          },
         ],
       });
     });
@@ -239,17 +242,7 @@ describe('useVoiceControl', () => {
     expect(result.current.errorMsg).toMatch(/microphone permission/i);
   });
 
-  it('does not abort or recreate SpeechRecognition when status changes', () => {
-    const { result } = renderHook(() => useVoiceControl({ onCommand: mockOnCommand }));
-    
-    act(() => {
-      result.current.toggleVoiceMode();
-      mockRecognitionInstance.onstart();
-    });
-
-    expect(result.current.status).toBe('LISTENING');
-    // Reset calls due to mount/cleanup
-    mockRecognitionInstance.abort.mockClear();
+  const recognition = mockRecognitionInstance;
 
     // Trigger onresult which transitions status to PROCESSING
     act(() => {

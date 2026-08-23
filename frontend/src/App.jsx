@@ -16,6 +16,7 @@ import PwaInstallPrompt from './components/common/PwaInstallPrompt';
 import OfflineIndicator from './components/common/OfflineIndicator';
 import Walkthrough from './components/tutorial/Walkthrough';
 import MobileBottomNav from './components/common/MobileBottomNav';
+import PomodoroWidget from './components/timer/PomodoroWidget';
 import './App.css';
 
 
@@ -48,6 +49,7 @@ const CollaborativeNoteView = lazy(() => import('./pages/CollaborativeNoteView')
 const SquadsPage = lazy(() => import('./pages/SquadsPage'));
 const StudySquadDashboard = lazy(() => import('./pages/SquadsPage'));
 const CollabNote = lazy(() => import('./pages/CollaborativeNoteView'));
+const LiveQuizSession = lazy(() => import('./pages/LiveQuizSession'));
 
 function App() {
 
@@ -153,6 +155,7 @@ function App() {
       <SessionTimeoutModal />
       <Walkthrough />
       <CommandPalette isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+      {localStorage.getItem('token') && <PomodoroWidget />}
       <main id="main-content" tabIndex="-1" role="main" className="focus:outline-none min-h-screen">
         <Suspense fallback={<PageSkeleton />}>
         <Routes>
@@ -306,13 +309,53 @@ function App() {
                 <QuizSession />
               </ProtectedRoute>
             }
-          />
-
-          <Route
-            path="/mind-map"
+          />          <Route path="/mind-map"
             element={
               <ProtectedRoute>
                 <MindMapViewer />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/quiz/live"
+            element={
+              <ProtectedRoute>
+                <LiveQuizSession />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/quiz/live/:roomId"
+            element={
+              <ProtectedRoute>
+                <LiveQuizSession />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/analytics"
+            element={
+              <ProtectedRoute>
+                <StudyAnalytics />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/analytics"
+            element={
+              <ProtectedRoute>
+                <StudyAnalytics />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/tools/calculator"
+            element={
+              <ProtectedRoute>
+                <FormulaScratchpad />
               </ProtectedRoute>
             }
           />
