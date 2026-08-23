@@ -115,7 +115,11 @@ describe('dashboardSlice - reviewFlashcard', () => {
 
 describe('dashboardSlice - theme persistence', () => {
   beforeEach(() => {
-    localStorage.clear();
+    try {
+      if (typeof localStorage !== 'undefined' && typeof localStorage.clear === 'function') {
+        localStorage.clear();
+      }
+    } catch (_e) {}
     vi.clearAllMocks();
   });
 

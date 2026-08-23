@@ -168,9 +168,41 @@ const showBackgroundErrorToast = (message) => {
   }, 4000);
 };
 
-// Response interceptor: on 401, attempt silent token refresh before failing
+// ── Offline Response Cache Helpers ──
+const API_OFFLINE_CACHE_KEY = 'openprep_api_get_cache';
+
+const saveResponseToOfflineCache = (url, data) => {
+  try {
+    if (typeof localStorage === 'undefined' || !localStorage) return;
+    const existingStr = localStorage.getItem(API_OFFLINE_CACHE_KEY);
+    const cache = existingStr ? JSON.parse(existingStr) : {};
+    cache[url] = { data, cachedAt: Date.now() };
+    localStorage.setItem(API_OFFLINE_CACHE_KEY, JSON.stringify(cache));
+  } catch (_e) {
+    // ignore quota/storage errors
+  }
+};
+
+const getResponseFromOfflineCache = (url) => {
+  try {
+    if (typeof localStorage === 'undefined' || !localStorage) return null;
+    const existingStr = localStorage.getItem(API_OFFLINE_CACHE_KEY);
+    if (!existingStr) return null;
+    const cache = JSON.parse(existingStr);
+    return cache[url]?.data || null;
+  } catch (_e) {
+    return null;
+  }
+};
+
+// Response interceptor: cache GET responses & attempt offline fallback
 API.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (response.config && response.config.method && response.config.method.toLowerCase() === 'get') {
+      saveResponseToOfflineCache(response.config.url, response.data);
+    }
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
 
@@ -188,6 +220,22 @@ API.interceptors.response.use(
           detail: { retryInSeconds, message: errorMsg },
         })
       );
+    }
+
+    // ── Offline GET Cache Fallback ──
+    if (originalRequest && originalRequest.method && originalRequest.method.toLowerCase() === 'get' && (isNetworkError(error) || isTimeoutError(error) || !isOnline())) {
+      emitConnectivity(false);
+      const cachedData = getResponseFromOfflineCache(originalRequest.url);
+      if (cachedData) {
+        return Promise.resolve({
+          data: cachedData,
+          status: 200,
+          statusText: 'OK (Offline Cache)',
+          headers: {},
+          config: originalRequest,
+          isOfflineCached: true,
+        });
+      }
     }
 
     // ── Transient failure retry ──────────────────────────────────────────
