@@ -273,8 +273,16 @@ app.get('/uploads/:filename', protect, async (req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.post('/api/session/keepalive', protect, require('./controllers/authController').keepalive);
 app.use('/api/academic', academicRoutes);
+// 1. Mount the Previous Year Questions (PYQ) Router on the canonical plural path
 app.use('/api/pyqs', pyqRoutes);
-app.use('/api/pyq', pyqRoutes);
+
+// 2. Intercept legacy singular endpoint calls and redirect with proper HTTP semantics
+app.use('/api/pyq', (req, res) => {
+  // Construct the new path maintaining any nested sub-routes and query parameters
+  const canonicalPath = req.originalUrl.replace(/^\/api\/pyq/, '/api/pyqs');
+  
+  res.status(301).redirect(canonicalPath);
+});
 app.use('/api/community', communityRoutes);
 app.use('/api/squads', squadRoutes);
 app.use('/api/study', fatigueRoutes);
