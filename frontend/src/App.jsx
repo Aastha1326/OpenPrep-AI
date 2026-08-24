@@ -45,6 +45,7 @@ const QuizSession = lazy(() => import('./pages/QuizSession'));
 const MindMapViewer = lazy(() => import('./pages/MindMapViewer'));
 const StudyPlanner = lazy(() => import('./pages/StudyPlanner'));
 const VivaSimulator = lazy(() => import('./pages/VivaSimulator'));
+const AdaptiveStudyPlanner = lazy(() => import('./pages/AdaptiveStudyPlanner'));
 const CollaborativeNoteView = lazy(() => import('./pages/CollaborativeNoteView'));
 const SquadsPage = lazy(() => import('./pages/SquadsPage'));
 const StudySquadDashboard = lazy(() => import('./pages/SquadsPage'));
@@ -324,6 +325,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <Settings />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/adaptive-planner"
+            element={
+              <ProtectedRoute>
+                <AdaptiveStudyPlanner />
               </ProtectedRoute>
             }
           />
