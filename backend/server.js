@@ -314,7 +314,6 @@ app.use('/api/squads', squadRoutes);
 app.use('/api/badges', badgeRoutes);
 app.get('/user/badges', protect, require('./controllers/badgeController').getUserBadges);
 app.get('/api/user/badges', protect, require('./controllers/badgeController').getUserBadges);
-app.use('/api/community', communityRoutes);
 app.use('/api/visualizer', visualizerRoutes);
 app.use('/api/analytics-insights', analyticsInsightsRoutes);
 app.use('/api/learning-path', require('./routes/learningPathRoutes'));
