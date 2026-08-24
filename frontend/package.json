@@ -33,7 +33,7 @@
     "jszip": "^3.10.1",
     "katex": "^0.18.4",
     "lucide-react": "^1.30.0",
-    "mermaid": "^11.16.1",
+    "mermaid": "^11.17.0",
     "pdfjs-dist": "^4.7.76",
     "react": "^19.2.6",    "react-dom": "^19.2.6",
     "react-hook-form": "^7.85.0",
