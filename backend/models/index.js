@@ -47,6 +47,7 @@ const AuditLog = require('./AuditLog');
 const HandwrittenSubmission = require('./HandwrittenSubmission');
 const LearningPath = require('./LearningPath');
 const NotificationSettings = require('./NotificationSettings');
+const SecurityAuditLog = require('./SecurityAuditLog');
 
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -72,6 +73,7 @@ User.hasMany(Achievement, { foreignKey: 'userId', as: 'achievements', onDelete: 
 User.hasMany(UserBadge, { foreignKey: 'userId', as: 'badgesRef', onDelete: 'CASCADE' });
 User.hasMany(Folder, { foreignKey: 'userId', onDelete: 'CASCADE' });
 User.hasOne(NotificationSettings, { foreignKey: 'userId', as: 'notificationSettings', onDelete: 'CASCADE' });
+User.hasMany(SecurityAuditLog, { foreignKey: 'userId', as: 'securityLogs', onDelete: 'SET NULL' });
 
 // Exam associations
 Exam.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
@@ -307,4 +309,5 @@ module.exports = {  sequelize,  User,  Exam,
   AuditLog,
   HandwrittenSubmission,
   NotificationSettings,
+  SecurityAuditLog,
 };

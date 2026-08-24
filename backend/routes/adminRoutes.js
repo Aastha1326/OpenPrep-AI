@@ -2,6 +2,7 @@ const express = require('express');
 const {
   getStats,
   getUsers,
+  getQueueStatus,
   updateUserRole,
   deleteUser,
   getAdminBadges,
@@ -10,6 +11,11 @@ const {
   deleteAdminBadge,
 } = require('../controllers/adminController');
 const { protect, requireAdmin } = require('../middleware/auth');
+const {
+  getSecurityLogs,
+  exportSecurityLogs,
+  getThreatSummary,
+} = require('../controllers/securityController');
 
 const router = express.Router();
 
@@ -22,6 +28,11 @@ router.get('/users', getUsers);
 router.get('/queues/status', getQueueStatus);
 router.put('/users/:id/role', updateUserRole);
 router.delete('/users/:id', deleteUser);
+
+// Security Audit Logging
+router.get('/security/logs', getSecurityLogs);
+router.get('/security/export', exportSecurityLogs);
+router.get('/security/threat-summary', getThreatSummary);
 
 // Badge Criteria Management
 router.get('/badges', getAdminBadges);

@@ -253,3 +253,19 @@ exports.deleteAdminBadge = async (req, res, next) => {
   }
 };
 
+// @desc    Get task queue metrics
+// @route   GET /api/admin/queues/status
+// @access  Private/Admin
+exports.getQueueStatus = async (req, res, next) => {
+  try {
+    const queueService = require('../services/queueService');
+    const stats = await queueService.getQueueStats();
+    res.status(200).json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
