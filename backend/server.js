@@ -448,6 +448,7 @@ require('./sockets/squadHandler')(io);
 require('./sockets/flashcardCollaborationHandler')(io);
 require('./sockets/focusRoomHandler')(io);
 require('./sockets/studyRoomSocket')(io);
+require('./sockets/interviewSocket')(io);
 // Authenticate Socket.io connections
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
