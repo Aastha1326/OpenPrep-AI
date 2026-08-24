@@ -50,6 +50,7 @@ const SquadsPage = lazy(() => import('./pages/SquadsPage'));
 const StudySquadDashboard = lazy(() => import('./pages/SquadsPage'));
 const CollabNote = lazy(() => import('./pages/CollaborativeNoteView'));
 const LiveQuizSession = lazy(() => import('./pages/LiveQuizSession'));
+const LeaderboardPage = lazy(() => import('./pages/LeaderboardPage'));
 
 function App() {
 
@@ -374,6 +375,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <SquadsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/leaderboard"
+            element={
+              <ProtectedRoute>
+                <LeaderboardPage />
               </ProtectedRoute>
             }
           />
