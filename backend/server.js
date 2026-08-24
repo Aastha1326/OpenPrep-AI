@@ -80,6 +80,10 @@ const readinessRoutes = require('./routes/readinessRoutes');
 const squadRoutes = require('./routes/squadRoutes');
 const badgeRoutes = require('./routes/badgeRoutes');
 const visualizerRoutes = require('./routes/visualizerRoutes');
+const weaknessDetectionRoutes = require('./routes/weaknessDetectionRoutes');
+const pyqIntelligenceRoutes = require('./routes/pyqIntelligenceRoutes');
+const adaptivePlannerRoutes = require('./routes/adaptivePlannerRoutes');
+const communityResourceRoutes = require('./routes/communityResourceRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 
@@ -285,6 +289,10 @@ app.use('/api/squads', squadRoutes);
 app.use('/api/badges', badgeRoutes);
 app.use('/api/community', communityRoutes);
 app.use('/api/visualizer', visualizerRoutes);
+app.use('/api/weakness', weaknessDetectionRoutes);
+app.use('/api/pyq-intelligence', pyqIntelligenceRoutes);
+app.use('/api/adaptive-planner', adaptivePlannerRoutes);
+app.use('/api/community-resources', communityResourceRoutes);
 
 // Serve static assets from frontend build folder in production
 if (process.env.NODE_ENV === 'production') {
