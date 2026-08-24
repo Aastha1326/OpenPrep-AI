@@ -11,6 +11,7 @@ const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
 const { connectDB } = require('./config/db');
+const { Op } = require('sequelize');
 const errorHandler = require('./middleware/error');
 const logger = require('./utils/logger');
 const requestLogger = require('./middleware/requestLogger');
@@ -229,11 +230,24 @@ app.use('/uploads/avatars', express.static(path.join(__dirname, 'uploads/avatars
 // Set Static Folder for File Uploads (Protected)
 // protect, Note, PYQ already imported at top of file
 
+// Helper to extract filename from a stored URL (handles full URLs and different path formats)
+const extractFilename = (url) => {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    return path.basename(parsed.pathname);
+  } catch {
+    // Not a full URL, treat as path
+    return path.basename(url);
+  }
+};
+
 app.get('/uploads/:filename', protect, async (req, res, next) => {
   try {
     const filename = req.params.filename;
     const fileUrl = `/uploads/${filename}`;
 
+    // Direct match first (fast path for standard format)
     let record = await Note.findOne({ where: { fileUrl } });
     let isPublic = false;
     let owner = null;
@@ -250,6 +264,41 @@ app.get('/uploads/:filename', protect, async (req, res, next) => {
         record = await PodcastEpisode.findOne({ where: { audioUrl: fileUrl } });
         if (record) {
           owner = record.userId;
+        }
+      }
+    }
+
+    // Fallback: fuzzy match by extracting filename from stored URLs
+    // Handles cases where stored URL is a full URL or has different path format
+    if (!record) {
+      const allNotes = await Note.findAll({ where: { fileUrl: { [Op.ne]: null } } });
+      for (const note of allNotes) {
+        if (extractFilename(note.fileUrl) === filename) {
+          record = note;
+          isPublic = note.isPublic;
+          owner = note.user;
+          break;
+        }
+      }
+    }
+    if (!record) {
+      const allPyqs = await PYQ.findAll({ where: { fileUrl: { [Op.ne]: null } } });
+      for (const pyq of allPyqs) {
+        if (extractFilename(pyq.fileUrl) === filename) {
+          record = pyq;
+          owner = pyq.user;
+          break;
+        }
+      }
+    }
+    if (!record) {
+      const { PodcastEpisode } = require('./models');
+      const allEpisodes = await PodcastEpisode.findAll({ where: { audioUrl: { [Op.ne]: null } } });
+      for (const episode of allEpisodes) {
+        if (extractFilename(episode.audioUrl) === filename) {
+          record = episode;
+          owner = episode.userId;
+          break;
         }
       }
     }
