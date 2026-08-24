@@ -15,6 +15,7 @@ const Achievement = require('../models/Achievement');
 const sendEmail = require('../services/emailService');
 
 const MAX_ACTIVE_SESSIONS = parseInt(process.env.MAX_ACTIVE_SESSIONS, 10) || 10;
+const jwtSecret = process.env.JWT_SECRET;
 
 const getAuthCookieOptions = () => ({
   httpOnly: true,
