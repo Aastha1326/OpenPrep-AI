@@ -15,6 +15,7 @@ const Flashcard = require('./Flashcard');
 const FlashcardDeck = require('./FlashcardDeck');
 const DeckCollaborator = require('./DeckCollaborator');
 const Progress = require('./Progress');
+const SavedSession = require('./SavedSession');
 const Feedback = require('./Feedback');
 const ActivityLog = require('./ActivityLog');
 const UsageQuota = require('./UsageQuota');
@@ -301,4 +302,5 @@ module.exports = {  sequelize,  User,  Exam,
   PDFAnnotation,
   QuizRoom,
   AuditLog,
+  SavedSession,
 };

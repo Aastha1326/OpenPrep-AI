@@ -82,6 +82,7 @@ const squadRoutes = require('./routes/squadRoutes');
 const badgeRoutes = require('./routes/badgeRoutes');
 const visualizerRoutes = require('./routes/visualizerRoutes');
 const analyticsInsightsRoutes = require('./routes/analyticsInsightsRoutes');
+const sessionRoutes = require('./routes/sessionRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 const { initNightlyBadgeEvaluatorCron } = require('./services/badgeEvaluationService');
@@ -271,6 +272,8 @@ app.get('/uploads/:filename', protect, async (req, res, next) => {
 
 // Mount routes
 app.use('/api/auth', authRoutes);
+app.use('/api/session', sessionRoutes);
+app.use('/session', sessionRoutes);
 app.post('/api/session/keepalive', protect, require('./controllers/authController').keepalive);
 app.use('/api/academic', academicRoutes);
 // 1. Mount the Previous Year Questions (PYQ) Router on the canonical plural path
