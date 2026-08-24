@@ -50,6 +50,14 @@ export const WIDGET_REGISTRY = [
     defaultSize: { colSpan: 6 },
   },
   {
+    id: 'activity-feed',
+    name: 'Activity Feed',
+    componentName: 'ActivityFeed',
+    description: 'Real-time activity feed with filters, CSV export, and live updates.',
+    category: 'Activity',
+    defaultSize: { colSpan: 12 },
+  },
+  {
     id: 'readiness-widget',
     name: 'Exam Readiness',
     componentName: 'ReadinessWidget',
