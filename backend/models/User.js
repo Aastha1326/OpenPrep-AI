@@ -254,10 +254,6 @@ examCountdownPreferences: {
       type: DataTypes.DATEONLY,
       allowNull: true,
     },
-    streakFreezesAvailable: {
-      type: DataTypes.INTEGER,
-      defaultValue: 0,
-    },
     skillScore: {
       type: DataTypes.FLOAT,
       defaultValue: 1000.0,
