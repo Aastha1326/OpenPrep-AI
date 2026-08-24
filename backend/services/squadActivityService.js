@@ -4,6 +4,7 @@ const {
   SquadMember,
   User,
 } = require('../models');
+const { Op } = require('sequelize');
 const redisService = require('./redisService');
 
 /**
@@ -138,14 +139,27 @@ async function logSquadActivity(userId, type, message, metadata = {}, deps = {})
  * Ordered by `createdAt` — the column `timestamps: true` actually creates. The
  * caller is responsible for checking squad membership before calling.
  */
-async function getActivityFeed(squadId, requestingUserId, limit = 50, offset = 0, deps = {}) {
+async function getActivityFeed(squadId, requestingUserId, limit = 50, offset = 0, filters = {}, deps = {}) {
   const { squadActivityModel, reactionModel, userModel } = resolve(deps);
 
   const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 100);
   const safeOffset = Math.max(Number(offset) || 0, 0);
 
+  const where = { squadId };
+  if (filters.activityType) {
+    where.activityType = filters.activityType;
+  }
+  if (filters.userId) {
+    where.userId = filters.userId;
+  }
+  if (filters.dateFrom || filters.dateTo) {
+    where.createdAt = {};
+    if (filters.dateFrom) where.createdAt[Op.gte] = new Date(filters.dateFrom);
+    if (filters.dateTo) where.createdAt[Op.lte] = new Date(filters.dateTo);
+  }
+
   const activities = await squadActivityModel.findAll({
-    where: { squadId },
+    where,
     order: [['createdAt', 'DESC']],
     limit: safeLimit,
     offset: safeOffset,
