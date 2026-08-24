@@ -214,10 +214,6 @@ examCountdownPreferences: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
     },
-    xp: {
-      type: DataTypes.INTEGER,
-      defaultValue: 0,
-    },
     level: {
       type: DataTypes.INTEGER,
       defaultValue: 1,
