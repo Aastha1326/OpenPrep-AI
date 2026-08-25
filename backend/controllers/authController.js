@@ -135,8 +135,6 @@ const sendVerificationEmail = async (user) => {
     text: `Hi ${user.name || 'there'},\n\nConfirm your email address to activate your OpenPrep AI account:\n\n${verifyUrl}\n\nThis link expires in 24 hours. If you didn't create an account, you can ignore this message.`,
     html: `<p>Hi ${user.name || 'there'},</p><p>Confirm your email address to activate your OpenPrep AI account:</p><p><a href="${verifyUrl}">Verify my email</a></p><p>This link expires in 24 hours. If you didn't create an account, you can ignore this message.</p>`,
   });
-
-  return rawToken;
 };
 
 /**
@@ -158,8 +156,6 @@ const sendPasswordResetEmail = async (user) => {
     text: `Hi ${user.name || 'there'},\n\nUse the link below to choose a new password:\n\n${resetUrl}\n\nThis link expires in 1 hour. If you didn't request a reset, no action is needed.`,
     html: `<p>Hi ${user.name || 'there'},</p><p>Use the link below to choose a new password:</p><p><a href="${resetUrl}">Reset my password</a></p><p>This link expires in 1 hour. If you didn't request a reset, no action is needed.</p>`,
   });
-
-  return rawToken;
 };
 
 /**
