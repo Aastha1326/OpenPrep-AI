@@ -11,6 +11,7 @@
     "test:jest": "jest --config jest.config.js --runInBand --forceExit",
     "test:coverage": "vitest run --config vitest.config.unit.js --coverage",
     "seed": "node scripts/seed.js",
+    "seed:synthetic": "node scripts/seedSyntheticData.js",
     "db:migrate:test": "node scripts/migrate.js --force",
     "db:backup": "node scripts/db-backup.js",
     "db:restore": "node scripts/db-restore.js"
