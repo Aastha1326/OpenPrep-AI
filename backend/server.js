@@ -21,7 +21,12 @@ const PYQ = require('./models/PYQ');
 const Note = require('./models/Note');
 const Achievement = require('./models/Achievement');
 const swaggerSpec = require('./config/swagger');
-const { apiReference } = require('@scalar/express-api-reference');
+let apiReference;
+try {
+  apiReference = require('@scalar/express-api-reference').apiReference;
+} catch (e) {
+  apiReference = null;
+}
 const passport = require('./config/passport');
 const { getCorsMiddleware, getSocketCorsOrigin } = require('./middleware/corsHandler');
 const { metricsMiddleware, getMetrics } = require('./middleware/metricsMiddleware');
@@ -82,6 +87,9 @@ const squadRoutes = require('./routes/squadRoutes');
 const badgeRoutes = require('./routes/badgeRoutes');
 const visualizerRoutes = require('./routes/visualizerRoutes');
 const analyticsInsightsRoutes = require('./routes/analyticsInsightsRoutes');
+const adaptiveExamRoutes = require('./routes/adaptiveExamRoutes');
+const diagramQuestionRoutes = require('./routes/diagramQuestionRoutes');
+const classroomRoutes = require('./routes/classroomRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 const { initNightlyBadgeEvaluatorCron } = require('./services/badgeEvaluationService');
@@ -271,6 +279,8 @@ app.get('/uploads/:filename', protect, async (req, res, next) => {
 
 // Mount routes
 app.use('/api/auth', authRoutes);
+app.use('/api/session', sessionRoutes);
+app.use('/session', sessionRoutes);
 app.post('/api/session/keepalive', protect, require('./controllers/authController').keepalive);
 app.use('/api/academic', academicRoutes);
 // 1. Mount the Previous Year Questions (PYQ) Router on the canonical plural path
@@ -291,6 +301,8 @@ app.use('/api/sync', syncRoutes);
 app.use('/api/study-plans', studyPlanRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/quiz', quizRoutes);
+app.use('/api/recommendations', recommendationRoutes);
+app.use('/recommendations', recommendationRoutes);
 app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/flashcard-decks', flashcardDeckRoutes);
 app.use('/api/decks', require('./routes/publicDeckRoutes'));
@@ -305,8 +317,11 @@ app.put('/api/user/preferences/timezone', protect, require('./controllers/userCo
 app.get('/api/user/dashboard', protect, require('./controllers/userController').getDashboardLayout);
 app.post('/api/user/dashboard', protect, require('./controllers/userController').updateDashboardLayout);
 app.use('/api/ai', aiRoutes);
-app.use('/api/ai-editor', aiEditorRoutes);
 app.use('/api/quiz-battles', quizBattleRoutes);
+app.use('/api/adaptive-exams', adaptiveExamRoutes);
+app.use('/api/quizzes/diagram-hotspot', diagramQuestionRoutes);
+app.use('/api/diagram-hotspots', diagramQuestionRoutes);
+app.use('/api/classrooms', classroomRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/readiness', readinessRoutes);
 app.use('/api/analytics', analyticsRoutes);
@@ -314,6 +329,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/dashboard', analyticsRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/integrations/google-calendar', calendarRoutes);
+app.use('/api/deck-versioning', require('./routes/deckVersionRoutes'));
 app.use('/api/integrations', require('./routes/integrationRoutes'));
 app.use('/api/gamification', gamificationRoutes);
 app.use('/api/battles', battleRoutes);
@@ -450,6 +466,7 @@ require('./sockets/squadHandler')(io);
 require('./sockets/flashcardCollaborationHandler')(io);
 require('./sockets/focusRoomHandler')(io);
 require('./sockets/studyRoomSocket')(io);
+require('./sockets/interviewSocket')(io);
 // Authenticate Socket.io connections
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
