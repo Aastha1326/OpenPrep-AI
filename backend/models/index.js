@@ -257,6 +257,12 @@ SyllabusTopic.belongsTo(Syllabus, { foreignKey: 'syllabusId', as: 'syllabusRef' 
 // PDFAnnotation associations
 User.hasMany(PDFAnnotation, { foreignKey: 'userId', onDelete: 'CASCADE' });
 PDFAnnotation.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+// WeaknessReport associations
+User.hasMany(WeaknessReport, { foreignKey: 'user', onDelete: 'CASCADE' });
+WeaknessReport.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+Subject.hasMany(WeaknessReport, { foreignKey: 'subject', onDelete: 'SET NULL' });
+WeaknessReport.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef' });
 // DeckRating associations
 DeckRating.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 User.hasMany(DeckRating, { foreignKey: 'userId', as: 'ratings', onDelete: 'CASCADE' });
@@ -303,4 +309,5 @@ module.exports = {  sequelize,  User,  Exam,
   PDFAnnotation,
   QuizRoom,
   AuditLog,
+  Question,
 };

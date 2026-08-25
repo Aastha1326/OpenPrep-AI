@@ -7,6 +7,7 @@ const {
   shareDeck,
   getPublicDeckById,
   updateDeckVisibility,
+  getLeitnerStats,
 } = require('../controllers/flashcardDeckController');
 const {
   inviteCollaborator,
@@ -29,6 +30,7 @@ router.route('/:id')
   .get(protect, getDeckById)
   .delete(protect, deleteDeck);
 
+router.get('/:id/leitner-stats', protect, getLeitnerStats);
 router.post('/:id/share', protect, shareDeck);
 router.patch('/:id/visibility', protect, updateDeckVisibility);
 
