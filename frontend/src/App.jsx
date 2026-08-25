@@ -41,6 +41,7 @@ const StudyGroupChat = lazy(() => import('./pages/StudyGroupChat'));
 const AiAssistant = lazy(() => import('./pages/AiAssistant'));
 const OAuthCallback = lazy(() => import('./pages/OAuthCallback'));
 const PYQAnalytics = lazy(() => import('./pages/PYQAnalytics'));
+const PYQIntelligenceDashboard = lazy(() => import('./pages/PYQIntelligenceDashboard'));
 const QuizSession = lazy(() => import('./pages/QuizSession'));
 const MindMapViewer = lazy(() => import('./pages/MindMapViewer'));
 const StudyPlanner = lazy(() => import('./pages/StudyPlanner'));
@@ -272,6 +273,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <PYQAnalytics />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/pyq-intelligence"
+            element={
+              <ProtectedRoute>
+                <PYQIntelligenceDashboard />
               </ProtectedRoute>
             }
           />
