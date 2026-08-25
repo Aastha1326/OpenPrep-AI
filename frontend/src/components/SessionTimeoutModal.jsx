@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AlertTriangle, Clock, RefreshCw, Save, LogOut } from 'lucide-react';
+import { AlertTriangle, Clock, RefreshCw, Save, LogOut, CheckCircle2 } from 'lucide-react';
 import { useSessionTimer } from '../context/SessionTimerContext';
 
 const formatTime = (totalSeconds) => {
@@ -14,9 +14,11 @@ const SessionTimeoutModal = () => {
     remainingSeconds,
     showWarningModal,
     isExtending,
+    isSaving,
+    saveSuccessMessage,
     extendSession,
+    autoSaveNow,
     saveAndExit,
-    handleLogout,
   } = useSessionTimer();
 
   if (!showWarningModal) return null;
@@ -48,11 +50,11 @@ const SessionTimeoutModal = () => {
           </h2>
 
           <p className="text-center text-sm text-neutral-600 dark:text-neutral-300 mb-5 leading-relaxed">
-            Your login session will expire in 2 minutes due to inactivity. Extend your session now to keep studying or save progress before logging out.
+            Your login session will expire soon due to inactivity. Save your current progress now to resume on your next login or extend your session.
           </p>
 
           {/* Formatted Countdown Badge */}
-          <div className="flex items-center justify-center gap-2 mb-6 px-4 py-3 bg-amber-500/15 dark:bg-amber-950/40 border border-amber-600/30 rounded-xl">
+          <div className="flex items-center justify-center gap-2 mb-4 px-4 py-3 bg-amber-500/15 dark:bg-amber-950/40 border border-amber-600/30 rounded-xl">
             <Clock className="w-5 h-5 text-amber-700 dark:text-amber-400 animate-pulse" />
             <span className="text-xs text-neutral-700 dark:text-neutral-300 font-medium">Time remaining:</span>
             <span className="text-lg font-mono font-bold text-amber-800 dark:text-amber-300 tracking-wider">
@@ -60,21 +62,48 @@ const SessionTimeoutModal = () => {
             </span>
           </div>
 
-          {/* Action Buttons: Extend vs Save & Exit */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            <button
-              type="button"
-              onClick={saveAndExit}
-              className="flex-1 px-4 py-2.5 bg-neutral-200 dark:bg-neutral-800 hover:bg-neutral-300 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 rounded-xl font-semibold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Save className="w-4 h-4" /> Save &amp; Exit
-            </button>
+          {/* Save Status Alert */}
+          {saveSuccessMessage && (
+            <div className="flex items-center justify-center gap-2 mb-4 px-3 py-2 bg-emerald-500/15 border border-emerald-500/30 rounded-lg text-emerald-700 dark:text-emerald-400 text-xs font-medium">
+              <CheckCircle2 className="w-4 h-4" />
+              <span>{saveSuccessMessage}</span>
+            </div>
+          )}
+
+          {/* Action Buttons: Save Now vs Save & Exit vs Extend Session */}
+          <div className="flex flex-col gap-2.5">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={autoSaveNow}
+                disabled={isSaving}
+                className="flex-1 px-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-md disabled:opacity-50"
+              >
+                {isSaving ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-3.5 h-3.5" /> Save now
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={saveAndExit}
+                className="flex-1 px-3 py-2.5 bg-neutral-200 dark:bg-neutral-800 hover:bg-neutral-300 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 rounded-xl font-semibold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" /> Save &amp; Exit
+              </button>
+            </div>
 
             <button
               type="button"
               onClick={extendSession}
               disabled={isExtending}
-              className="flex-1 px-4 py-2.5 bg-amber-700 hover:bg-amber-800 text-white rounded-xl font-semibold text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="w-full px-4 py-2.5 bg-amber-700 hover:bg-amber-800 text-white rounded-xl font-semibold text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               {isExtending ? (
                 <>
