@@ -127,6 +127,8 @@ const QuizSession = () => {
   const [submitError, setSubmitError] = useState(null);
 
   const [savedSessionBanner, setSavedSessionBanner] = useState(null);
+  
+  const animatedScore = useCountUp(result?.score ?? 0, 1500, submitted);
   const startedAtRef = useRef(Date.now());
 
   const submittingRef = useRef(false);
@@ -651,7 +653,6 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
       return true;
     });
 
-  const animatedScore = useCountUp(result?.score ?? 0, 1500, submitted);
   const motivationalMessage = getScoreMotivationalMessage(result?.score ?? 0);
   return (
     <div className="min-h-screen bg-slate-900 text-white py-6 sm:py-10 px-3 sm:px-6 md:px-20">
