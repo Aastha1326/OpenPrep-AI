@@ -40,6 +40,26 @@ npm test
 
 ---
 
+## ✅ Module Integrity Check
+
+`npm run test:integrity` parses every module under the server's boot path -
+`controllers/`, `services/`, `routes/`, `models/`, `middleware/`, `sockets/`,
+`utils/` and `jobs/` - without executing any of it. It needs no PostgreSQL, no
+Redis and no network, so it runs on its own and stays useful when the
+database-backed suites cannot.
+
+It reports three things:
+
+| Check | Catches |
+| --- | --- |
+| Parse | A module that is not valid JavaScript - a truncated function, a stray token, an unbalanced brace |
+| Duplicate declarations | The same top-level `const`/`let` declared twice, the signature of two modules concatenated by a bad merge |
+| Unbound router identifiers | `express.Router()` with no `express` import, `router.get(...)` with no `router` |
+
+The check runs in CI as the `backend-module-integrity` job and gates `build`.
+Add a new listener or module and the sweep picks it up automatically; if you add
+a socket event, list it in `ROOM_EVENTS` so cleanup still tears it down.
+
 ## 📚 API Documentation (Swagger UI)
 
 Standardized API documentation is powered by `swagger-ui-express` and `swagger-jsdoc`.
