@@ -50,6 +50,7 @@ const HandwrittenSubmission = require('./HandwrittenSubmission');
 const LearningPath = require('./LearningPath');
 const NotificationSettings = require('./NotificationSettings');
 const WeaknessReport = require('./WeaknessReport');
+const SecurityAuditLog = require('./SecurityAuditLog');
 
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -316,4 +317,12 @@ module.exports = {  sequelize,  User,  Exam,
   QuizRoom,
   AuditLog,
   Question,
+  Folder,
+  UserProgress,
+  Syllabus,
+  SyllabusTopic,
+  HandwrittenSubmission,
+  NotificationSettings,
+  WeaknessReport,
+  SecurityAuditLog,
 };

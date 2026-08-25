@@ -170,7 +170,7 @@ const initializeStudyRoomSockets = (io) => {
             });
 
             console.log(`[Socket] User ${username} joined room ${roomId}`);
-        };
+        });
 
         const handleLeaveRoom = () => {
             const roomId = socket.data.roomId;
@@ -282,4 +282,4 @@ const initializeStudyRoomSockets = (io) => {
 };
 
 module.exports = initializeStudyRoomSockets;
-module.exports.activeRooms = activeRooms;
+module.exports.activeRooms = localRooms;
