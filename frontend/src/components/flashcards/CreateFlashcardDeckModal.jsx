@@ -6,6 +6,7 @@ import Modal from '../common/Modal';
 const CreateFlashcardDeckModal = ({ isOpen, onClose, onCreated, subjects }) => {
   const [name, setName] = useState('');
   const [subjectId, setSubjectId] = useState('');
+  const [tags, setTags] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -22,6 +23,7 @@ const CreateFlashcardDeckModal = ({ isOpen, onClose, onCreated, subjects }) => {
       await API.post('/flashcard-decks', {
         name: name.trim(),
         subject: subjectId || null,
+        tags: tags.split(',').map(t => t.trim()).filter(Boolean),
       });
       onCreated?.();
       onClose();
@@ -73,6 +75,20 @@ const CreateFlashcardDeckModal = ({ isOpen, onClose, onCreated, subjects }) => {
               </option>
             ))}
           </select>
+        </div>
+
+        <div>
+          <label htmlFor="deck-tags" className="block text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">
+            Tags (Optional, comma-separated)
+          </label>
+          <input
+            id="deck-tags"
+            type="text"
+            placeholder="e.g. basics, mid-term, difficult"
+            value={tags}
+            onChange={(e) => setTags(e.target.value)}
+            className="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 rounded-xl text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-amber-500 focus:outline-none text-sm transition"
+          />
         </div>
 
         <button
