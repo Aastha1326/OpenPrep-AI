@@ -14,6 +14,7 @@ import API from './services/api';
 import QuotaExceededModal from './components/dashboard/QuotaExceededModal';
 import CommandPalette from './components/search/CommandPalette';
 import OfflineBanner from './components/common/OfflineBanner';
+import OfflineStatusBanner from './components/common/OfflineStatusBanner';
 import PwaInstallPrompt from './components/common/PwaInstallPrompt';
 import OfflineIndicator from './components/common/OfflineIndicator';
 import Walkthrough from './components/tutorial/Walkthrough';
