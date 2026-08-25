@@ -25,7 +25,7 @@
     "axios": "^1.19.0",
     "canvas-confetti": "^1.9.3",
     "dexie": "^4.4.5",
-    "dompurify": "^3.4.13",
+    "dompurify": "^3.4.14",
     "framer-motion": "^13.1.0",
     "html2pdf.js": "^0.14.0",
     "i18next": "^26.4.0",
