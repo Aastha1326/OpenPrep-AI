@@ -1,0 +1,11 @@
+groups:
+  - name: openprep_alerts
+    rules:
+      - alert: HighHTTP5xxErrorRate
+        expr: (sum(rate(http_request_duration_seconds_count{status_code=~"5.."}[5m])) / sum(rate(http_request_duration_seconds_count[5m]))) * 100 > 5
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High HTTP 5xx error rate detected (>5%)"
+          description: "Over 5% of all HTTP requests in the past 5 minutes resulted in 5xx server errors."

@@ -45,11 +45,12 @@ const QuizSession = lazy(() => import('./pages/QuizSession'));
 const MindMapViewer = lazy(() => import('./pages/MindMapViewer'));
 const StudyPlanner = lazy(() => import('./pages/StudyPlanner'));
 const VivaSimulator = lazy(() => import('./pages/VivaSimulator'));
-const AdaptiveStudyPlanner = lazy(() => import('./pages/AdaptiveStudyPlanner'));
+const AttemptHistoryDashboard = lazy(() => import('./pages/AttemptHistoryDashboard'));
 const CollaborativeNoteView = lazy(() => import('./pages/CollaborativeNoteView'));
 const SquadsPage = lazy(() => import('./pages/SquadsPage'));
 const StudySquadDashboard = lazy(() => import('./pages/SquadsPage'));
 const CollabNote = lazy(() => import('./pages/CollaborativeNoteView'));
+const LiveQuizSession = lazy(() => import('./pages/LiveQuizSession'));
 
 function App() {
 
@@ -309,13 +310,53 @@ function App() {
                 <QuizSession />
               </ProtectedRoute>
             }
-          />
-
-          <Route
-            path="/mind-map"
+          />          <Route path="/mind-map"
             element={
               <ProtectedRoute>
                 <MindMapViewer />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/quiz/live"
+            element={
+              <ProtectedRoute>
+                <LiveQuizSession />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/quiz/live/:roomId"
+            element={
+              <ProtectedRoute>
+                <LiveQuizSession />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/analytics"
+            element={
+              <ProtectedRoute>
+                <StudyAnalytics />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/analytics"
+            element={
+              <ProtectedRoute>
+                <StudyAnalytics />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/tools/calculator"
+            element={
+              <ProtectedRoute>
+                <FormulaScratchpad />
               </ProtectedRoute>
             }
           />
@@ -330,10 +371,10 @@ function App() {
           />
 
           <Route
-            path="/adaptive-planner"
+            path="/attempt-history"
             element={
               <ProtectedRoute>
-                <AdaptiveStudyPlanner />
+                <AttemptHistoryDashboard />
               </ProtectedRoute>
             }
           />

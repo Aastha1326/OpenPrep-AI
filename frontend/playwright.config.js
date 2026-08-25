@@ -1,37 +1,49 @@
-import { defineConfig, devices } from '@playwright/test';
+const { defineConfig, devices } = require('@playwright/test');
 
-export default defineConfig({
+module.exports = defineConfig({
   testDir: './e2e',
-  timeout: 45000,
-  fullyParallel: false,
+  fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: 1,
-  reporter: [['html', { outputFolder: 'playwright-report' }]],
+  retries: process.env.CI ? 2 : 1,
+  workers: process.env.CI ? 1 : undefined,
+  reporter: [
+    ['html', { outputFolder: 'playwright-report', open: 'never' }],
+    ['list'],
+  ],
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
+    actionTimeout: 10000,
+    navigationTimeout: 15000,
   },
   projects: [
     {
-      name: 'chromium',
+      name: 'Desktop Chromium',
       use: { ...devices['Desktop Chrome'] },
     },
-  ],
-  webServer: [
     {
-      command: 'npm run dev --prefix ../backend',
-      url: 'http://localhost:5000/api/v1/health',
-      reuseExistingServer: !process.env.CI,
-      timeout: 120000,
+      name: 'Desktop Firefox',
+      use: { ...devices['Desktop Firefox'] },
     },
     {
-      command: 'npm run dev',
-      url: 'http://localhost:5173',
-      reuseExistingServer: !process.env.CI,
-      timeout: 120000,
+      name: 'Desktop Safari',
+      use: { ...devices['Desktop Safari'] },
+    },
+    {
+      name: 'Mobile Pixel 5',
+      use: { ...devices['Pixel 5'] },
+    },
+    {
+      name: 'Mobile iPhone 13',
+      use: { ...devices['iPhone 13'] },
     },
   ],
+  webServer: {
+    command: 'npm run dev',
+    url: 'http://localhost:5173',
+    reuseExistingServer: !process.env.CI,
+    timeout: 120000,
+  },
 });
