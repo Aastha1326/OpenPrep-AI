@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { FaArrowLeft, FaExclamationTriangle } from 'react-icons/fa';
-import { Loader2, Download } from 'lucide-react';
+import { Loader2, Download, Sparkles } from 'lucide-react';
 import API from '../services/api';
 import CollaborativeEditor from '../components/notes/CollaborativeEditor';
 import { buildSingleNoteDocument, exportHTMLToPDF } from '../utils/exportDocs';
 import AudioReader from '../components/AudioReader';
+import GenerateQuestionsModal from '../components/notes/GenerateQuestionsModal';
 
 export default function CollaborativeNoteView() {
   const { noteId } = useParams();
@@ -17,6 +18,7 @@ export default function CollaborativeNoteView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [isGenerateQuestionsOpen, setIsGenerateQuestionsOpen] = useState(false);
 
   const fetchNoteDetails = async () => {
     setLoading(true);
@@ -117,7 +119,15 @@ export default function CollaborativeNoteView() {
                 <h1 className="text-2xl font-black font-playfair tracking-tight text-white flex items-center gap-2">
                   📝 {note.title}
                 </h1>
-                <AudioReader text={note.content || note.title} />
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setIsGenerateQuestionsOpen(true)}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow transition"
+                  >
+                    <Sparkles className="w-4 h-4" /> Generate Questions
+                  </button>
+                  <AudioReader text={note.content || note.title} />
+                </div>
               </div>
               <p className="text-stone-400 text-xs">
                 Real-time conflict resolution powered by CRDT algorithms.
@@ -126,6 +136,14 @@ export default function CollaborativeNoteView() {
 
             {/* Collaborative Editor Panel */}
             <CollaborativeEditor noteId={noteId} currentUser={user || {}} />
+
+            <GenerateQuestionsModal
+              isOpen={isGenerateQuestionsOpen}
+              onClose={() => setIsGenerateQuestionsOpen(false)}
+              noteId={noteId}
+              noteContent={note.content || note.title}
+              noteTitle={note.title}
+            />
           </div>
         ) : null}
 

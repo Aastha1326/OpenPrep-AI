@@ -12,6 +12,7 @@ const {
   exportPDF,
   logFocusSession,
   getWeeklyFocusEfficiency,
+  getInteractiveAnalytics,
 } = require('../controllers/progressController');
 const { getXPStatus, awardXP, unlockSkillNode, equipStreakFreeze } = require('../controllers/xpController');
 const { protect } = require('../middleware/auth');
@@ -570,5 +571,7 @@ router.get('/xp/status', protect, getXPStatus);
 router.post('/xp/award', protect, awardXP);
 router.post('/xp/unlock', protect, unlockSkillNode);
 router.post('/streak-freeze/equip', protect, equipStreakFreeze);
+
+router.get('/analytics', protect, getInteractiveAnalytics);
 
 module.exports = router;

@@ -1,7 +1,28 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import MobileNavDrawer from './MobileNavDrawer';
+
+vi.mock('./notifications/NotificationBell', () => ({
+  default: () => <div data-testid="notification-bell">Bell</div>,
+}));
+
+vi.mock('./ThemeToggle', () => ({
+  default: () => <button data-testid="theme-toggle">Theme</button>,
+}));
+
+beforeAll(() => {
+  const localStorageMock = {
+    getItem: vi.fn(() => null),
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
+    clear: vi.fn(),
+  };
+  Object.defineProperty(window, 'localStorage', {
+    value: localStorageMock,
+    writable: true,
+  });
+});
 
 const renderWithRouter = () =>
   render(
@@ -20,16 +41,18 @@ describe('MobileNavDrawer', () => {
     renderWithRouter();
 
     const toggleButton = screen.getByRole('button', { name: /open menu/i });
+    expect(toggleButton).toHaveAttribute('aria-expanded', 'false');
+
     await user.click(toggleButton);
 
-    // Drawer should now be open
-    expect(screen.getByRole('button', { name: /close menu/i })).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toBeInTheDocument();
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
 
     const settingsLink = screen.getByRole('link', { name: /settings/i });
     await user.click(settingsLink);
 
-    // Drawer should have closed automatically after navigation
-    expect(screen.getByRole('button', { name: /open menu/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /open menu/i })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByText('Settings Page')).toBeInTheDocument();
   });
 
@@ -41,10 +64,39 @@ describe('MobileNavDrawer', () => {
     await user.click(toggleButton);
 
     const dashboardLink = screen.getByRole('link', { name: /dashboard/i });
-    
-    // Trigger hover/mouseEnter
     await user.hover(dashboardLink);
-    // Since dynamic import returns a promise, we can just assert no errors are thrown during hover
     expect(dashboardLink).toBeInTheDocument();
+  });
+
+  test('closes menu when Escape key is pressed', async () => {
+    const user = userEvent.setup();
+    renderWithRouter();
+
+    const toggleButton = screen.getByRole('button', { name: /open menu/i });
+    await user.click(toggleButton);
+
+    expect(screen.getByRole('button', { name: /close menu/i })).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: 'Escape', code: 'Escape' });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /open menu/i })).toBeInTheDocument();
+    });
+  });
+
+  test('has proper ARIA attributes for screen reader accessibility', async () => {
+    const user = userEvent.setup();
+    renderWithRouter();
+
+    const toggleButton = screen.getByRole('button', { name: /open menu/i });
+    expect(toggleButton).toHaveAttribute('aria-controls', 'mobile-drawer-panel');
+    expect(toggleButton).toHaveAttribute('aria-expanded', 'false');
+
+    await user.click(toggleButton);
+
+    expect(toggleButton).toHaveAttribute('aria-expanded', 'true');
+    const drawerDialog = screen.getByRole('dialog', { name: /mobile navigation menu/i });
+    expect(drawerDialog).toHaveAttribute('id', 'mobile-drawer-panel');
+    expect(drawerDialog).toHaveAttribute('aria-modal', 'true');
   });
 });
