@@ -279,6 +279,8 @@ app.get('/uploads/:filename', protect, async (req, res, next) => {
 
 // Mount routes
 app.use('/api/auth', authRoutes);
+app.use('/api/session', sessionRoutes);
+app.use('/session', sessionRoutes);
 app.post('/api/session/keepalive', protect, require('./controllers/authController').keepalive);
 app.use('/api/academic', academicRoutes);
 // 1. Mount the Previous Year Questions (PYQ) Router on the canonical plural path

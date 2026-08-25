@@ -9,6 +9,8 @@ import ScrollToTop from './components/ScrollToTop';
 import MobileNavDrawer from './components/MobileNavDrawer';
 import PageSkeleton from './components/PageSkeleton';
 import SessionTimeoutModal from './components/SessionTimeoutModal';
+import SessionRestoreModal from './components/SessionRestoreModal';
+import API from './services/api';
 import QuotaExceededModal from './components/dashboard/QuotaExceededModal';
 import CommandPalette from './components/search/CommandPalette';
 import OfflineBanner from './components/common/OfflineBanner';
@@ -59,8 +61,9 @@ const InterviewRoomPage = lazy(() => import('./pages/InterviewRoomPage'));
 function App() {
 
   const dispatch = useDispatch();
-  const { sessionExpired, aiQuotaExceededUntil } = useSelector((state) => state.auth);
+  const { sessionExpired, aiQuotaExceededUntil, isAuthenticated, user } = useSelector((state) => state.auth);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [savedSessionPrompt, setSavedSessionPrompt] = useState(null);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -78,6 +81,21 @@ function App() {
       dispatch(loadUser());
     }
   }, [dispatch]);
+
+  // Check for unsaved session after login
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      API.get('/session/saved')
+        .then((res) => {
+          if (res.data?.success && res.data?.hasSavedSession && res.data?.session) {
+            setSavedSessionPrompt(res.data.session);
+          }
+        })
+        .catch(() => {});
+    } else {
+      setSavedSessionPrompt(null);
+    }
+  }, [isAuthenticated, user]);
 
   useEffect(() => {
     const checkQuota = () => {
@@ -428,6 +446,12 @@ function App() {
       </Suspense>
       </main>
       <MobileBottomNav />
+      {savedSessionPrompt && (
+        <SessionRestoreModal
+          savedSession={savedSessionPrompt}
+          onClose={() => setSavedSessionPrompt(null)}
+        />
+      )}
     </>
   );
 
