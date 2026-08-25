@@ -21,7 +21,12 @@ const PYQ = require('./models/PYQ');
 const Note = require('./models/Note');
 const Achievement = require('./models/Achievement');
 const swaggerSpec = require('./config/swagger');
-const { apiReference } = require('@scalar/express-api-reference');
+let apiReference;
+try {
+  apiReference = require('@scalar/express-api-reference').apiReference;
+} catch (e) {
+  apiReference = null;
+}
 const passport = require('./config/passport');
 const { getCorsMiddleware, getSocketCorsOrigin } = require('./middleware/corsHandler');
 const { metricsMiddleware, getMetrics } = require('./middleware/metricsMiddleware');

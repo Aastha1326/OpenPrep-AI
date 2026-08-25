@@ -37,6 +37,7 @@ const Flashcards = lazy(() => import('./pages/Flashcards'));
 const CommunityDecks = lazy(() => import('./pages/CommunityDecks'));
 const PublicShare = lazy(() => import('./pages/PublicShare'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const AdminAnalytics = lazy(() => import('./pages/AdminAnalytics'));
 const StudyGroupChat = lazy(() => import('./pages/StudyGroupChat'));
 const AiAssistant = lazy(() => import('./pages/AiAssistant'));
 const OAuthCallback = lazy(() => import('./pages/OAuthCallback'));
@@ -401,6 +402,7 @@ function App() {
 
           <Route element={<AdminRoute />}>
             <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/analytics" element={<AdminAnalytics />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />

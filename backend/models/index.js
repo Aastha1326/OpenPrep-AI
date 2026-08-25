@@ -309,4 +309,5 @@ module.exports = {  sequelize,  User,  Exam,
   PDFAnnotation,
   QuizRoom,
   AuditLog,
+  Question,
 };
