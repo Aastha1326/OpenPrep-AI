@@ -240,3 +240,84 @@ exports.updateExamCountdownPreferences = async (req, res, next) => {
     next(error);
   }
 };
+
+// ---------------------------------------------------------------------------
+// @desc    Update user timezone preference (IANA)
+// @route   PUT /api/users/preferences/timezone
+// @access  Private
+// ---------------------------------------------------------------------------
+exports.updateTimezone = async (req, res, next) => {
+  try {
+    const { timezone } = req.body;
+    if (!timezone || typeof timezone !== 'string') {
+      return res.status(400).json({ success: false, error: 'timezone is required' });
+    }
+    try {
+      Intl.DateTimeFormat(undefined, { timeZone: timezone });
+    } catch {
+      return res.status(400).json({ success: false, error: 'Invalid IANA timezone' });
+    }
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    user.timezone = timezone;
+    await user.save();
+    res.status(200).json({ success: true, data: { timezone: user.timezone } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// @desc    Get user dashboard layout
+// @route   GET /api/user/dashboard
+// @access  Private
+// ---------------------------------------------------------------------------
+exports.getDashboardLayout = async (req, res, next) => {
+  try {
+    const user = await User.findByPk(req.user.id, {
+      attributes: ['dashboardLayout'],
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: { layout: user.dashboardLayout || null },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// @desc    Update user dashboard layout
+// @route   POST /api/user/dashboard
+// @access  Private
+// ---------------------------------------------------------------------------
+exports.updateDashboardLayout = async (req, res, next) => {
+  try {
+    const { layout } = req.body;
+    if (!layout || !Array.isArray(layout)) {
+      return res.status(400).json({ success: false, error: 'Layout must be an array' });
+    }
+
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    user.dashboardLayout = layout;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      data: { layout: user.dashboardLayout },
+    });
+  } catch (error) {
+    next(error);
+  }
+};

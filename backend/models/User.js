@@ -63,6 +63,10 @@ const User = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
+    currentLearningPathId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
     authProvider: {
       type: DataTypes.ENUM('local', 'google', 'github'),
       defaultValue: 'local',
@@ -76,6 +80,10 @@ const User = sequelize.define(
       defaultValue: DataTypes.NOW,
     },
     streakFreezes: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+    xp: {
       type: DataTypes.INTEGER,
       defaultValue: 0,
     },
@@ -159,21 +167,25 @@ const User = sequelize.define(
       type: DataTypes.INTEGER,
       defaultValue: 6,
     },
-    leaderboardVisible: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: true,
-    },
-    receiveWeeklyDigest: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: true,
-    },
     googleCalendarRefreshToken: {
       type: DataTypes.STRING,
       allowNull: true,
     },
-syncGoogleCalendar: {
+    syncGoogleCalendar: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
+    },
+    googleCalendarWebhookChannelId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    googleCalendarWebhookResourceId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    googleCalendarWebhookExpiration: {
+      type: DataTypes.DATE,
+      allowNull: true,
     },
     hideActivityFromSquad: {
       type: DataTypes.BOOLEAN,
@@ -201,10 +213,6 @@ examCountdownPreferences: {
     lastAiUsageReset: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
-    },
-    xp: {
-      type: DataTypes.INTEGER,
-      defaultValue: 0,
     },
     level: {
       type: DataTypes.INTEGER,
@@ -242,9 +250,18 @@ examCountdownPreferences: {
       type: DataTypes.DATEONLY,
       allowNull: true,
     },
-    streakFreezesAvailable: {
-      type: DataTypes.INTEGER,
-      defaultValue: 0,
+    skillScore: {
+      type: DataTypes.FLOAT,
+      defaultValue: 1000.0,
+    },
+    recentAnswerHistory: {
+      type: DataTypes.JSONB,
+      defaultValue: [],
+    },
+    dashboardLayout: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      defaultValue: null,
     },
   },
   {

@@ -21,6 +21,7 @@ const {
   resetSM2Settings,
   oauthSuccessCallback,
   registerOAuthEmail,
+  keepalive,
 } = require('../controllers/authController');
 
 const { protect } = require('../middleware/auth');
@@ -279,9 +280,8 @@ router.get(
 // Finalize OAuth registration (e.g. if email was private/missing)
 router.post('/oauth/register-email', registerOAuthEmail);
 
-// User settings routes
-router.patch('/settings', protect, updateSettings);
-router.put('/sm2-settings', protect, updateSM2Settings);
-router.post('/sm2-settings/reset', protect, resetSM2Settings);
+// Session keepalive routes
+router.post('/session/keepalive', protect, keepalive);
+router.post('/keepalive', protect, keepalive);
 
 module.exports = router;

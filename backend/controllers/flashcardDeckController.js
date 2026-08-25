@@ -370,3 +370,23 @@ exports.updateDeckVisibility = async (req, res) => {
     res.status(500).json({ success: false, error: 'Server error' });
   }
 };
+
+// @desc    Get Leitner Box & Ebbinghaus Retention Decay Analytics for a deck
+// @route   GET /api/flashcard-decks/:id/leitner-stats
+// @access  Private
+exports.getLeitnerStats = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { getLeitnerAnalytics } = require('../services/leitnerAnalyticsService');
+    const analytics = await getLeitnerAnalytics(id, req.user.id);
+
+    res.status(200).json({
+      success: true,
+      data: analytics,
+    });
+  } catch (error) {
+    console.error('[flashcardDeckController.getLeitnerStats] Error:', error);
+    res.status(500).json({ success: false, error: 'Server error fetching Leitner analytics' });
+  }
+};
+
