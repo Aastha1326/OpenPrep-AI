@@ -82,6 +82,7 @@ const squadRoutes = require('./routes/squadRoutes');
 const badgeRoutes = require('./routes/badgeRoutes');
 const visualizerRoutes = require('./routes/visualizerRoutes');
 const analyticsInsightsRoutes = require('./routes/analyticsInsightsRoutes');
+const adaptiveExamRoutes = require('./routes/adaptiveExamRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 const { initNightlyBadgeEvaluatorCron } = require('./services/badgeEvaluationService');
@@ -307,6 +308,7 @@ app.post('/api/user/dashboard', protect, require('./controllers/userController')
 app.use('/api/ai', aiRoutes);
 app.use('/api/ai-editor', aiEditorRoutes);
 app.use('/api/quiz-battles', quizBattleRoutes);
+app.use('/api/adaptive-exams', adaptiveExamRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/readiness', readinessRoutes);
 app.use('/api/analytics', analyticsRoutes);
