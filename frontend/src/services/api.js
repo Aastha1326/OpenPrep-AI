@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { store } from '../store';
+import { store } from '../store/index.js';
 import { logout } from '../store/slices/authSlice';
 import {
   DEFAULT_TIMEOUT_MS,

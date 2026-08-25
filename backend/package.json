@@ -9,6 +9,7 @@
     "test": "vitest run --config vitest.config.unit.js",
     "test:unit": "vitest run --config vitest.config.unit.js",
     "test:jest": "jest --config jest.config.js --runInBand --forceExit",
+    "test:integration": "jest --config jest.config.js --runInBand --forceExit",
     "test:coverage": "vitest run --config vitest.config.unit.js --coverage",
     "seed": "node scripts/seed.js",
     "seed:synthetic": "node scripts/seedSyntheticData.js",

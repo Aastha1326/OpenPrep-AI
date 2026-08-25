@@ -95,6 +95,9 @@ describe('QuizRecommendations Component', () => {
       recommendationScore: 94,
       topic: 'Data Structures',
     });
-    expect(handleSelect).toHaveBeenCalledWith(mockRecommendationResponse.data.recommendations[0]);
+    
+    await waitFor(() => {
+      expect(handleSelect).toHaveBeenCalledWith(mockRecommendationResponse.data.recommendations[0]);
+    });
   });
 });
