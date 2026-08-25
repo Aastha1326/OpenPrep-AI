@@ -796,6 +796,13 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
               <MathRenderer text={currentQuestion.questionText} />
             </h2>
 
+            <button 
+              onClick={() => alert("Socratic Hint: Remember the core principles and try eliminating options that don't fit the pattern.")}
+              className="mb-4 text-sm text-indigo-400 hover:text-indigo-300 underline"
+            >
+              Get a Hint
+            </button>
+
             <div className="space-y-3 mb-8">
               {(currentQuestion.options || []).map((option, index) => {
                 const isSelected = answers[currentQuestion._id] === option;
