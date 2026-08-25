@@ -4,7 +4,7 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
 });
-const { explainQuestion, chatWithAssistant, solveImageQuestion } = require('../controllers/aiController');
+const { explainQuestion, chatWithAssistant, solveImageQuestion, generateQuestions } = require('../controllers/aiController');
 const { generateMindMap, getMindMapById, getUserMindMaps } = require('../controllers/mindMapController');
 const { protect } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
@@ -205,6 +205,15 @@ router.post(
   checkAiQuota,
   upload.single('image'),
   solveImageQuestion
+);
+
+router.post(
+  '/generate-questions',
+  protect,
+  aiLimiter,
+  checkAiQuota,
+  aiSanitizer,
+  generateQuestions
 );
 
 module.exports = router;

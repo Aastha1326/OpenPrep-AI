@@ -1,5 +1,8 @@
 const geminiService = require('../services/geminiService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
+const llmService = require('../utils/llmService');
+const Question = require('../models/Question');
+const Note = require('../models/Note');
 
 // @desc    Generate AI hint / step-by-step explanation for a quiz question
 // @route   POST /api/ai/explain-question
@@ -123,4 +126,68 @@ exports.solveImageQuestion = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Generate AI questions from source document/note and persist to database
+// @route   POST /api/ai/generate-questions
+// @access  Private
+exports.generateQuestions = async (req, res, next) => {
+  try {
+    let { noteId, content, title, numQuestions = 5, type = 'multiple_choice', difficulty = 'medium' } = req.body;
+
+    if (!content && noteId) {
+      const note = await Note.findByPk(noteId);
+      if (!note) {
+        return res.status(404).json({ success: false, error: 'Source note not found' });
+      }
+      content = note.content || note.summary || note.title;
+      title = title || note.title;
+    }
+
+    if (!content || typeof content !== 'string' || content.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Document content or a valid noteId is required for question generation',
+      });
+    }
+
+    // Call LLM service utility wrapper
+    const generatedRawList = await llmService.generateQuestionsFromContent({
+      content,
+      title: title || 'Document Note',
+      numQuestions: Number(numQuestions) || 5,
+      type,
+      difficulty,
+    });
+
+    // Format & bulk create questions in database
+    const questionsToCreate = generatedRawList.map((item) => ({
+      user: req.user.id,
+      noteId: noteId || null,
+      question: item.question,
+      answer: item.answer,
+      options: item.options || [],
+      type: item.type || type,
+      difficulty: item.difficulty || difficulty,
+      sourceTitle: title || 'AI Document',
+    }));
+
+    const savedQuestions = await Question.bulkCreate(questionsToCreate);
+
+    res.status(201).json({
+      success: true,
+      data: savedQuestions,
+      count: savedQuestions.length,
+    });
+  } catch (error) {
+    if (error instanceof GeminiRateLimitError) {
+      return res.status(429).json({
+        success: false,
+        error: error.message,
+        retryAfter: error.retryAfter,
+      });
+    }
+    next(error);
+  }
+};
+
 
