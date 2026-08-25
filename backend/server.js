@@ -299,6 +299,8 @@ app.use('/api/sync', syncRoutes);
 app.use('/api/study-plans', studyPlanRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/quiz', quizRoutes);
+app.use('/api/recommendations', recommendationRoutes);
+app.use('/recommendations', recommendationRoutes);
 app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/flashcard-decks', flashcardDeckRoutes);
 app.use('/api/decks', require('./routes/publicDeckRoutes'));

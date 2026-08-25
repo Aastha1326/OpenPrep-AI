@@ -16,6 +16,7 @@ const Flashcard = require('./Flashcard');
 const FlashcardDeck = require('./FlashcardDeck');
 const DeckCollaborator = require('./DeckCollaborator');
 const Progress = require('./Progress');
+const UserProgress = require('./UserProgress');
 const Feedback = require('./Feedback');
 const ActivityLog = require('./ActivityLog');
 const AuditLog = require('./AuditLog');
