@@ -6,6 +6,7 @@ import MetricCard from '../components/admin/MetricCard';
 import UsageChart from '../components/admin/UsageChart';
 import UserTable from '../components/admin/UserTable';
 import AdminBadgeManager from '../components/admin/AdminBadgeManager';
+import AdminAnalytics from './AdminAnalytics';
 
 const AdminDashboard = () => {
   const { user } = useSelector((state) => state.auth);
@@ -162,6 +163,16 @@ const AdminDashboard = () => {
             System Overview
           </button>
           <button
+            onClick={() => setActiveTab('analytics')}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition ${
+              activeTab === 'analytics'
+                ? 'bg-amber-600 text-white shadow'
+                : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+            }`}
+          >
+            Usage Analytics
+          </button>
+          <button
             onClick={() => setActiveTab('badges')}
             className={`px-4 py-2 text-xs font-bold rounded-lg transition ${
               activeTab === 'badges'
@@ -179,7 +190,9 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {activeTab === 'badges' ? (
+        {activeTab === 'analytics' ? (
+          <AdminAnalytics />
+        ) : activeTab === 'badges' ? (
           <AdminBadgeManager />
         ) : (
           <>
