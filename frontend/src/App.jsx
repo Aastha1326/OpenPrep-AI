@@ -37,19 +37,24 @@ const Flashcards = lazy(() => import('./pages/Flashcards'));
 const CommunityDecks = lazy(() => import('./pages/CommunityDecks'));
 const PublicShare = lazy(() => import('./pages/PublicShare'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const AdminAnalytics = lazy(() => import('./pages/AdminAnalytics'));
 const StudyGroupChat = lazy(() => import('./pages/StudyGroupChat'));
 const AiAssistant = lazy(() => import('./pages/AiAssistant'));
 const OAuthCallback = lazy(() => import('./pages/OAuthCallback'));
 const PYQAnalytics = lazy(() => import('./pages/PYQAnalytics'));
+const PYQIntelligenceDashboard = lazy(() => import('./pages/PYQIntelligenceDashboard'));
 const QuizSession = lazy(() => import('./pages/QuizSession'));
 const MindMapViewer = lazy(() => import('./pages/MindMapViewer'));
+const WeaknessDetectionDashboard = lazy(() => import('./pages/WeaknessDetectionDashboard'));
 const StudyPlanner = lazy(() => import('./pages/StudyPlanner'));
 const VivaSimulator = lazy(() => import('./pages/VivaSimulator'));
+const AttemptHistoryDashboard = lazy(() => import('./pages/AttemptHistoryDashboard'));
 const CollaborativeNoteView = lazy(() => import('./pages/CollaborativeNoteView'));
 const SquadsPage = lazy(() => import('./pages/SquadsPage'));
 const StudySquadDashboard = lazy(() => import('./pages/SquadsPage'));
 const CollabNote = lazy(() => import('./pages/CollaborativeNoteView'));
 const LiveQuizSession = lazy(() => import('./pages/LiveQuizSession'));
+const InterviewRoomPage = lazy(() => import('./pages/InterviewRoomPage'));
 
 function App() {
 
@@ -276,6 +281,15 @@ function App() {
           />
 
           <Route
+            path="/pyq-intelligence"
+            element={
+              <ProtectedRoute>
+                <PYQIntelligenceDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/study-planner"
             element={
               <ProtectedRoute>
@@ -370,6 +384,15 @@ function App() {
           />
 
           <Route
+            path="/attempt-history"
+            element={
+              <ProtectedRoute>
+                <AttemptHistoryDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/squads"
             element={
               <ProtectedRoute>
@@ -378,8 +401,26 @@ function App() {
             }
           />
 
+          <Route
+            path="/interview"
+            element={
+              <ProtectedRoute>
+                <InterviewRoomPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/interview/:roomId"
+            element={
+              <ProtectedRoute>
+                <InterviewRoomPage />
+              </ProtectedRoute>
+            }
+          />
+
           <Route element={<AdminRoute />}>
             <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/analytics" element={<AdminAnalytics />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />
