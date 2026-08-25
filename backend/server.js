@@ -320,6 +320,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/dashboard', analyticsRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/integrations/google-calendar', calendarRoutes);
+app.use('/api/deck-versioning', require('./routes/deckVersionRoutes'));
 app.use('/api/integrations', require('./routes/integrationRoutes'));
 app.use('/api/gamification', gamificationRoutes);
 app.use('/api/battles', battleRoutes);
