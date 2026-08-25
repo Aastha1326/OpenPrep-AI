@@ -54,6 +54,7 @@ const SquadsPage = lazy(() => import('./pages/SquadsPage'));
 const StudySquadDashboard = lazy(() => import('./pages/SquadsPage'));
 const CollabNote = lazy(() => import('./pages/CollaborativeNoteView'));
 const LiveQuizSession = lazy(() => import('./pages/LiveQuizSession'));
+const InterviewRoomPage = lazy(() => import('./pages/InterviewRoomPage'));
 
 function App() {
 
@@ -396,6 +397,23 @@ function App() {
             element={
               <ProtectedRoute>
                 <SquadsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/interview"
+            element={
+              <ProtectedRoute>
+                <InterviewRoomPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/interview/:roomId"
+            element={
+              <ProtectedRoute>
+                <InterviewRoomPage />
               </ProtectedRoute>
             }
           />
