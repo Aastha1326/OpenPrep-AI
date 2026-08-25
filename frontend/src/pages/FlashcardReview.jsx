@@ -1031,6 +1031,11 @@ useEffect(() => {
         title="SM-2 Algorithm Settings"
       >
         <div className="flex flex-col gap-4 py-2">
+          {/* Note about Audio Pitch */}
+          <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-lg text-xs text-amber-800 dark:text-amber-300">
+            <strong>Audio Review Mode:</strong> Voice speed controls are available during review. Pitch and voice selection are handled natively by your device's OS (no custom controls needed).
+          </div>
+          
           {/* Easy Factor Modifier */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold text-neutral-600 dark:text-neutral-300 uppercase tracking-wider">

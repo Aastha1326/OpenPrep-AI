@@ -1,6 +1,7 @@
 const express = require('express');
 const {
   getStats,
+  getAnalytics,
   getUsers,
   getQueueStatus,
   updateUserRole,
@@ -24,8 +25,8 @@ router.use(protect);
 router.use(requireAdmin);
 
 router.get('/stats', getStats);
+router.get('/analytics', getAnalytics);
 router.get('/users', getUsers);
-router.get('/queues/status', getQueueStatus);
 router.put('/users/:id/role', updateUserRole);
 router.delete('/users/:id', deleteUser);
 

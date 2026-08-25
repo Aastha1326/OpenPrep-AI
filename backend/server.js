@@ -11,6 +11,7 @@ const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
 const { connectDB } = require('./config/db');
+const { Op } = require('sequelize');
 const errorHandler = require('./middleware/error');
 const logger = require('./utils/logger');
 const requestLogger = require('./middleware/requestLogger');
@@ -21,7 +22,12 @@ const PYQ = require('./models/PYQ');
 const Note = require('./models/Note');
 const Achievement = require('./models/Achievement');
 const swaggerSpec = require('./config/swagger');
-const { apiReference } = require('@scalar/express-api-reference');
+let apiReference;
+try {
+  apiReference = require('@scalar/express-api-reference').apiReference;
+} catch (e) {
+  apiReference = null;
+}
 const passport = require('./config/passport');
 const { getCorsMiddleware, getSocketCorsOrigin } = require('./middleware/corsHandler');
 const { metricsMiddleware, getMetrics } = require('./middleware/metricsMiddleware');
@@ -83,6 +89,9 @@ const squadRoutes = require('./routes/squadRoutes');
 const badgeRoutes = require('./routes/badgeRoutes');
 const visualizerRoutes = require('./routes/visualizerRoutes');
 const analyticsInsightsRoutes = require('./routes/analyticsInsightsRoutes');
+const adaptiveExamRoutes = require('./routes/adaptiveExamRoutes');
+const diagramQuestionRoutes = require('./routes/diagramQuestionRoutes');
+const classroomRoutes = require('./routes/classroomRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 const { initNightlyBadgeEvaluatorCron } = require('./services/badgeEvaluationService');
@@ -232,11 +241,24 @@ app.use('/uploads/avatars', express.static(path.join(__dirname, 'uploads/avatars
 // Set Static Folder for File Uploads (Protected)
 // protect, Note, PYQ already imported at top of file
 
+// Helper to extract filename from a stored URL (handles full URLs and different path formats)
+const extractFilename = (url) => {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    return path.basename(parsed.pathname);
+  } catch {
+    // Not a full URL, treat as path
+    return path.basename(url);
+  }
+};
+
 app.get('/uploads/:filename', protect, async (req, res, next) => {
   try {
     const filename = req.params.filename;
     const fileUrl = `/uploads/${filename}`;
 
+    // Direct match first (fast path for standard format)
     let record = await Note.findOne({ where: { fileUrl } });
     let isPublic = false;
     let owner = null;
@@ -253,6 +275,41 @@ app.get('/uploads/:filename', protect, async (req, res, next) => {
         record = await PodcastEpisode.findOne({ where: { audioUrl: fileUrl } });
         if (record) {
           owner = record.userId;
+        }
+      }
+    }
+
+    // Fallback: fuzzy match by extracting filename from stored URLs
+    // Handles cases where stored URL is a full URL or has different path format
+    if (!record) {
+      const allNotes = await Note.findAll({ where: { fileUrl: { [Op.ne]: null } } });
+      for (const note of allNotes) {
+        if (extractFilename(note.fileUrl) === filename) {
+          record = note;
+          isPublic = note.isPublic;
+          owner = note.user;
+          break;
+        }
+      }
+    }
+    if (!record) {
+      const allPyqs = await PYQ.findAll({ where: { fileUrl: { [Op.ne]: null } } });
+      for (const pyq of allPyqs) {
+        if (extractFilename(pyq.fileUrl) === filename) {
+          record = pyq;
+          owner = pyq.user;
+          break;
+        }
+      }
+    }
+    if (!record) {
+      const { PodcastEpisode } = require('./models');
+      const allEpisodes = await PodcastEpisode.findAll({ where: { audioUrl: { [Op.ne]: null } } });
+      for (const episode of allEpisodes) {
+        if (extractFilename(episode.audioUrl) === filename) {
+          record = episode;
+          owner = episode.userId;
+          break;
         }
       }
     }
@@ -274,6 +331,8 @@ app.get('/uploads/:filename', protect, async (req, res, next) => {
 
 // Mount routes
 app.use('/api/auth', authRoutes);
+app.use('/api/session', sessionRoutes);
+app.use('/session', sessionRoutes);
 app.post('/api/session/keepalive', protect, require('./controllers/authController').keepalive);
 app.use('/api/academic', academicRoutes);
 // 1. Mount the Previous Year Questions (PYQ) Router on the canonical plural path
@@ -294,6 +353,8 @@ app.use('/api/sync', syncRoutes);
 app.use('/api/study-plans', studyPlanRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/quiz', quizRoutes);
+app.use('/api/recommendations', recommendationRoutes);
+app.use('/recommendations', recommendationRoutes);
 app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/flashcard-decks', flashcardDeckRoutes);
 app.use('/api/decks', require('./routes/publicDeckRoutes'));
@@ -311,8 +372,11 @@ app.put('/api/user/notifications/settings', protect, require('./controllers/user
 app.get('/api/user/dashboard', protect, require('./controllers/userController').getDashboardLayout);
 app.post('/api/user/dashboard', protect, require('./controllers/userController').updateDashboardLayout);
 app.use('/api/ai', aiRoutes);
-app.use('/api/ai-editor', aiEditorRoutes);
 app.use('/api/quiz-battles', quizBattleRoutes);
+app.use('/api/adaptive-exams', adaptiveExamRoutes);
+app.use('/api/quizzes/diagram-hotspot', diagramQuestionRoutes);
+app.use('/api/diagram-hotspots', diagramQuestionRoutes);
+app.use('/api/classrooms', classroomRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/readiness', readinessRoutes);
 app.use('/api/analytics', analyticsRoutes);
@@ -320,6 +384,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/dashboard', analyticsRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/integrations/google-calendar', calendarRoutes);
+app.use('/api/deck-versioning', require('./routes/deckVersionRoutes'));
 app.use('/api/integrations', require('./routes/integrationRoutes'));
 app.use('/api/gamification', gamificationRoutes);
 app.use('/api/battles', battleRoutes);
@@ -327,6 +392,8 @@ app.use('/api/folders', folderRoutes);
 app.use('/api/badges', badgeRoutes);
 app.get('/user/badges', protect, require('./controllers/badgeController').getUserBadges);
 app.get('/api/user/badges', protect, require('./controllers/badgeController').getUserBadges);
+app.get('/api/leaderboard', protect, require('./controllers/badgeController').getLeaderboardData);
+app.get('/leaderboard', protect, require('./controllers/badgeController').getLeaderboardData);
 app.use('/api/visualizer', visualizerRoutes);
 app.use('/api/analytics-insights', analyticsInsightsRoutes);
 app.use('/api/learning-path', require('./routes/learningPathRoutes'));
@@ -454,6 +521,7 @@ require('./sockets/squadHandler')(io);
 require('./sockets/flashcardCollaborationHandler')(io);
 require('./sockets/focusRoomHandler')(io);
 require('./sockets/studyRoomSocket')(io);
+require('./sockets/interviewSocket')(io);
 // Authenticate Socket.io connections
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
