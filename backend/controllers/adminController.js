@@ -246,6 +246,14 @@ exports.deleteAdminBadge = async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'Badge not found' });
     }
 
+    await badge.destroy();
+
+    res.status(200).json({ success: true, message: 'Badge deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Get comprehensive usage analytics & system health
 // @route   GET /api/admin/analytics
 // @access  Private/Admin
