@@ -49,6 +49,7 @@ const QuizRoom = require('./QuizRoom');
 const AuditLog = require('./AuditLog');
 const HandwrittenSubmission = require('./HandwrittenSubmission');
 const LearningPath = require('./LearningPath');
+const NotificationSettings = require('./NotificationSettings');
 
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -73,6 +74,7 @@ User.hasMany(ActivityLog, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Achievement, { foreignKey: 'userId', as: 'achievements', onDelete: 'CASCADE' });
 User.hasMany(UserBadge, { foreignKey: 'userId', as: 'badgesRef', onDelete: 'CASCADE' });
 User.hasMany(Folder, { foreignKey: 'userId', onDelete: 'CASCADE' });
+User.hasOne(NotificationSettings, { foreignKey: 'userId', as: 'notificationSettings', onDelete: 'CASCADE' });
 
 // Exam associations
 Exam.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
