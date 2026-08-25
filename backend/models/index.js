@@ -46,11 +46,10 @@ const Syllabus = require('./Syllabus');
 const SyllabusTopic = require('./SyllabusTopic');
 const PDFAnnotation = require('./PDFAnnotation');
 const QuizRoom = require('./QuizRoom');
-const AuditLog = require('./AuditLog');
 const HandwrittenSubmission = require('./HandwrittenSubmission');
 const LearningPath = require('./LearningPath');
 const NotificationSettings = require('./NotificationSettings');
-const SecurityAuditLog = require('./SecurityAuditLog');
+const WeaknessReport = require('./WeaknessReport');
 
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });

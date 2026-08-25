@@ -465,20 +465,20 @@ describe('QuizSession', () => {
   });
 
   describe('Score Tier Motivational Messages & Confetti', () => {
-    test('returns correct motivational message for score >= 90%', () => {
-      const { getScoreMotivationalMessage } = require('./QuizSession');
+    test('returns correct motivational message for score >= 90%', async () => {
+      const { getScoreMotivationalMessage } = await import('./QuizSession.jsx');
       expect(getScoreMotivationalMessage(95)).toBe("Outstanding! 🏆 You've mastered this topic!");
       expect(getScoreMotivationalMessage(90)).toBe("Outstanding! 🏆 You've mastered this topic!");
     });
 
-    test('returns correct motivational message for score between 70% and 89%', () => {
-      const { getScoreMotivationalMessage } = require('./QuizSession');
+    test('returns correct motivational message for score between 70% and 89%', async () => {
+      const { getScoreMotivationalMessage } = await import('./QuizSession.jsx');
       expect(getScoreMotivationalMessage(85)).toBe("Great work! 🎯 Keep sharpening those edges.");
       expect(getScoreMotivationalMessage(70)).toBe("Great work! 🎯 Keep sharpening those edges.");
     });
 
-    test('returns correct motivational message for score < 70%', () => {
-      const { getScoreMotivationalMessage } = require('./QuizSession');
+    test('returns correct motivational message for score < 70%', async () => {
+      const { getScoreMotivationalMessage } = await import('./QuizSession.jsx');
       expect(getScoreMotivationalMessage(65)).toBe("Keep pushing! 💪 Review the weak topics below.");
       expect(getScoreMotivationalMessage(0)).toBe("Keep pushing! 💪 Review the weak topics below.");
     });
