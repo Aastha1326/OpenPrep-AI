@@ -46,6 +46,8 @@ const Syllabus = require('./Syllabus');
 const SyllabusTopic = require('./SyllabusTopic');
 const PDFAnnotation = require('./PDFAnnotation');
 const QuizRoom = require('./QuizRoom');
+const AuditLog = require('./AuditLog');
+const HandwrittenSubmission = require('./HandwrittenSubmission');
 const LearningPath = require('./LearningPath');
 
 // User associations
