@@ -3,7 +3,6 @@ const {
   getStats,
   getAnalytics,
   getUsers,
-  getQueueStatus,
   updateUserRole,
   deleteUser,
   getAdminBadges,
