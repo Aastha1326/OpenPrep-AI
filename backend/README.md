@@ -44,7 +44,7 @@ npm test
 
 `npm run test:integrity` parses every module under the server's boot path -
 `controllers/`, `services/`, `routes/`, `models/`, `middleware/`, `sockets/`,
-`utils/` and `jobs/` - without executing any of it. It needs no PostgreSQL, no
+`utils/` and `jobs/`, plus `server.js` itself - without executing any of it. It needs no PostgreSQL, no
 Redis and no network, so it runs on its own and stays useful when the
 database-backed suites cannot.
 
@@ -55,6 +55,7 @@ It reports three things:
 | Parse | A module that is not valid JavaScript - a truncated function, a stray token, an unbalanced brace |
 | Duplicate declarations | The same top-level `const`/`let` declared twice, the signature of two modules concatenated by a bad merge |
 | Unbound router identifiers | `express.Router()` with no `express` import, `router.get(...)` with no `router` |
+| Unmountable routers | `server.js` mounting a router it never required - valid syntax that only fails at boot |
 
 The check runs in CI as the `backend-module-integrity` job and gates `build`.
 Add a new listener or module and the sweep picks it up automatically; if you add

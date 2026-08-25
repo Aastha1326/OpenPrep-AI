@@ -12,6 +12,8 @@ const {
   findUnparseableFiles,
   findDuplicateDeclarations,
   findUnboundRouterIdentifiers,
+  findUnmountableRouters,
+  boundIdentifiers,
 } = require('./moduleParser');
 
 const SOURCE_FILES = collectSourceFiles();
@@ -44,6 +46,18 @@ describe('backend module discovery', () => {
 
   it('excludes test files from the boot-path sweep', () => {
     expect(SOURCE_FILES.filter((file) => /\.(test|spec)\.js$/.test(file))).toEqual([]);
+  });
+
+  it('includes the boot entrypoint itself', () => {
+    // server.js sits outside every source directory but is the one module that
+    // definitely runs at boot, and it hand-mounts around eighty routers.
+    expect(SOURCE_FILES).toContain('server.js');
+  });
+});
+
+describe('every router server.js mounts is bound', () => {
+  it('reports no unmountable routers', () => {
+    expect(findUnmountableRouters('server.js')).toEqual([]);
   });
 });
 
@@ -175,6 +189,40 @@ describe('the guard itself', () => {
       expect(findDuplicateDeclarations('routes/healthy.js', root)).toEqual([]);
       expect(findUnboundRouterIdentifiers('routes/healthy.js', root)).toEqual([]);
     });
+  });
+
+  it('rejects a router mounted in server.js that was never required', () => {
+    const missingRequire = [
+      "const express = require('express');",
+      "const authRoutes = require('./routes/authRoutes');",
+      'const app = express();',
+      "app.use('/api/auth', authRoutes);",
+      "app.use('/api/session', sessionRoutes);",
+      '',
+    ].join('\n');
+
+    withFixture('server.js', missingRequire, (root) => {
+      // Valid syntax; it only fails when the process actually boots.
+      expect(parseFile('server.js', root).ok).toBe(true);
+      expect(findUnmountableRouters('server.js', root)).toEqual(['sessionRoutes']);
+    });
+  });
+
+  it('counts destructured requires as bound', () => {
+    const bound = boundIdentifiers(
+      [
+        "const express = require('express');",
+        "const { protect, requireAdmin } = require('./middleware/auth');",
+        "const { getSummary: summary } = require('./controllers/thing');",
+        'function helper() {}',
+      ].join('\n')
+    );
+
+    // A destructured import is a binding; treating it otherwise would make the
+    // mount and router checks fire on healthy files.
+    expect([...bound].sort()).toEqual(
+      ['express', 'helper', 'protect', 'requireAdmin', 'summary'].sort()
+    );
   });
 
   it('accepts a module written with ESM syntax', () => {

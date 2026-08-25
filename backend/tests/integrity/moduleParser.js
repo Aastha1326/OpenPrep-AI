@@ -24,6 +24,9 @@ const SOURCE_DIRS = [
   'jobs',
 ];
 
+/** Modules outside those directories that the server still loads at boot. */
+const ROOT_FILES = ['server.js'];
+
 /** Test fixtures and generated output are not part of the boot path. */
 const IGNORED_SEGMENTS = ['node_modules', 'tests', '__tests__', 'coverage', 'uploads'];
 
@@ -59,7 +62,39 @@ function collectSourceFiles(root = BACKEND_ROOT, dirs = SOURCE_DIRS) {
     walk(path.join(root, dir));
   }
 
+  for (const file of ROOT_FILES) {
+    if (fs.existsSync(path.join(root, file))) found.push(file);
+  }
+
   return found.sort();
+}
+
+/**
+ * Every name a module binds at the top level, including destructured requires.
+ *
+ * `const { protect } = require('./auth')` binds `protect`, and
+ * `const { a: b } = ...` binds `b`, so both forms have to be recognised or the
+ * checks below report false positives.
+ */
+function boundIdentifiers(source) {
+  const bound = new Set();
+
+  for (const match of source.matchAll(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=/g)) {
+    bound.add(match[1]);
+  }
+
+  for (const match of source.matchAll(/(?:const|let|var)\s*\{([^}]*)\}\s*=/g)) {
+    for (const part of match[1].split(',')) {
+      const name = part.split(':').pop().trim().replace(/\s*=.*$/, '');
+      if (name) bound.add(name);
+    }
+  }
+
+  for (const match of source.matchAll(/function\s+([A-Za-z_$][\w$]*)/g)) {
+    bound.add(match[1]);
+  }
+
+  return bound;
 }
 
 /**
@@ -127,24 +162,43 @@ function findUnboundRouterIdentifiers(relativePath, root = BACKEND_ROOT) {
   const source = fs.readFileSync(path.join(root, relativePath), 'utf8');
   const unbound = [];
 
-  const binds = (name) =>
-    new RegExp(`(?:const|let|var)\\s+${name}\\b`).test(source) ||
-    new RegExp(`\\b${name}\\s*[,}]`).test(source.split('\n').filter((l) => l.includes('require(')).join('\n'));
+  const bound = boundIdentifiers(source);
 
-  if (/\bexpress\.Router\s*\(/.test(source) && !binds('express')) {
+  if (/\bexpress\.Router\s*\(/.test(source) && !bound.has('express')) {
     unbound.push('express');
   }
 
-  if (/^\s*router\.(get|post|put|patch|delete|use|all)\s*\(/m.test(source) && !binds('router')) {
+  if (/^\s*router\.(get|post|put|patch|delete|use|all)\s*\(/m.test(source) && !bound.has('router')) {
     unbound.push('router');
   }
 
   return unbound;
 }
 
+/**
+ * Router identifiers mounted with `app.use('/path', name)` but never bound.
+ *
+ * server.js mounts around eighty routers by hand. A lost require line there
+ * parses cleanly and only fails when the process actually boots, which is how
+ * sessionRoutes and recommendationRoutes reached main.
+ */
+function findUnmountableRouters(relativePath, root = BACKEND_ROOT) {
+  const source = fs.readFileSync(path.join(root, relativePath), 'utf8');
+  const bound = boundIdentifiers(source);
+
+  const mounted = [...source.matchAll(/app\.use\(\s*'[^']*',\s*([A-Za-z_$][\w$]*)/g)].map(
+    (match) => match[1]
+  );
+
+  return [...new Set(mounted)].filter((name) => !bound.has(name) && name !== 'require');
+}
+
 module.exports = {
   BACKEND_ROOT,
   SOURCE_DIRS,
+  ROOT_FILES,
+  boundIdentifiers,
+  findUnmountableRouters,
   collectSourceFiles,
   parseFile,
   findUnparseableFiles,
