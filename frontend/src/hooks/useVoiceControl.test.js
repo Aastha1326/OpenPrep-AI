@@ -208,9 +208,10 @@ describe('useVoiceControl', () => {
             transcript: 'A component is a reusable UI building block',
             confidence: 0.9,
           },
-        ],
-      });
+        ]
+      ]
     });
+  });
 
     expect(onTranscript).toHaveBeenCalledWith(
       'A component is a reusable UI building block',
