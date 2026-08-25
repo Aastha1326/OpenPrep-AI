@@ -44,6 +44,7 @@ const PYQAnalytics = lazy(() => import('./pages/PYQAnalytics'));
 const PYQIntelligenceDashboard = lazy(() => import('./pages/PYQIntelligenceDashboard'));
 const QuizSession = lazy(() => import('./pages/QuizSession'));
 const MindMapViewer = lazy(() => import('./pages/MindMapViewer'));
+const WeaknessDetectionDashboard = lazy(() => import('./pages/WeaknessDetectionDashboard'));
 const StudyPlanner = lazy(() => import('./pages/StudyPlanner'));
 const VivaSimulator = lazy(() => import('./pages/VivaSimulator'));
 const AttemptHistoryDashboard = lazy(() => import('./pages/AttemptHistoryDashboard'));
