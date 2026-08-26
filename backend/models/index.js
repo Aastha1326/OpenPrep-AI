@@ -36,7 +36,8 @@ const Notification = require('./Notification');
 const PushSubscription = require('./PushSubscription');
 const ReadinessSnapshot = require('./ReadinessSnapshot');
 const SubjectGoal = require('./SubjectGoal');
-const StudySquad = require('./StudySquad');const SquadMember = require('./SquadMember');
+const StudySquad = require('./StudySquad');
+const SquadMember = require('./SquadMember');
 const SquadChallenge = require('./SquadChallenge');
 const SquadChallengeContribution = require('./SquadChallengeContribution');
 const SquadAchievement = require('./SquadAchievement');
@@ -51,12 +52,29 @@ const LearningPath = require('./LearningPath');
 const NotificationSettings = require('./NotificationSettings');
 const WeaknessReport = require('./WeaknessReport');
 const SecurityAuditLog = require('./SecurityAuditLog');
+const { Bounty, initBounty } = require('./Bounty');
+const { BountySolution, initBountySolution } = require('./BountySolution');
+const { BountySolutionVote, initBountySolutionVote } = require('./BountySolutionVote');
+
+initBounty(sequelize);
+initBountySolution(sequelize);
+initBountySolutionVote(sequelize);
 
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Topic, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(PYQ, { foreignKey: 'user', onDelete: 'CASCADE' });
+User.hasMany(Bounty, { foreignKey: 'authorId', as: 'bounties', onDelete: 'CASCADE' });
+Bounty.belongsTo(User, { foreignKey: 'authorId', as: 'author' });
+Bounty.belongsTo(User, { foreignKey: 'winnerId', as: 'winner' });
+
+Bounty.hasMany(BountySolution, { foreignKey: 'bountyId', as: 'solutions', onDelete: 'CASCADE' });
+BountySolution.belongsTo(Bounty, { foreignKey: 'bountyId', as: 'bounty' });
+BountySolution.belongsTo(User, { foreignKey: 'authorId', as: 'author' });
+
+BountySolution.hasMany(BountySolutionVote, { foreignKey: 'solutionId', as: 'votes', onDelete: 'CASCADE' });
+BountySolutionVote.belongsTo(BountySolution, { foreignKey: 'solutionId', as: 'solution' });
 User.hasMany(StudyPlan, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(LearningPath, { foreignKey: 'userId', onDelete: 'CASCADE' });
 LearningPath.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
@@ -276,7 +294,11 @@ User.hasMany(DeckRating, { foreignKey: 'userId', as: 'ratings', onDelete: 'CASCA
 DeckRating.belongsTo(Subject, { foreignKey: 'deckId', as: 'deckRef', onDelete: 'CASCADE' });
 Subject.hasMany(DeckRating, { foreignKey: 'deckId', as: 'ratings', onDelete: 'CASCADE' });
 
-module.exports = {  sequelize,  User,  Exam,
+module.exports = {
+  sequelize,
+  User,
+  Folder,
+  Exam,
   Subject,
   Topic,
   PYQ,
@@ -284,10 +306,15 @@ module.exports = {  sequelize,  User,  Exam,
   Quiz,
   QuizAttempt,
   Note,
+  Question,
   Flashcard,
+  FlashcardDeck,
+  DeckCollaborator,
   Progress,
+  UserProgress,
   Feedback,
   ActivityLog,
+  AuditLog,
   UsageQuota,
   Achievement,
   FocusSession,
@@ -304,25 +331,23 @@ module.exports = {  sequelize,  User,  Exam,
   PushSubscription,
   ReadinessSnapshot,
   SubjectGoal,
-  StudySquad,  SquadMember,
+  StudySquad,
+  SquadMember,
   SquadChallenge,
   SquadChallengeContribution,
   SquadAchievement,
   SquadActivity,
   SquadActivityReaction,
-  FlashcardDeck,
-  DeckCollaborator,
-  LearningPath,
-  PDFAnnotation,
-  QuizRoom,
-  AuditLog,
-  Question,
-  Folder,
-  UserProgress,
   Syllabus,
   SyllabusTopic,
+  PDFAnnotation,
+  QuizRoom,
   HandwrittenSubmission,
+  LearningPath,
   NotificationSettings,
   WeaknessReport,
   SecurityAuditLog,
+  Bounty,
+  BountySolution,
+  BountySolutionVote,
 };

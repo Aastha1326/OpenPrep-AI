@@ -385,6 +385,17 @@ function App() {
           />
 
           <Route
+            
+          <Route
+            path="/exam-planner"
+            element={
+              <ProtectedRoute>
+                <ExamCountdownPlanner />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/tools/calculator"
             element={
               <ProtectedRoute>

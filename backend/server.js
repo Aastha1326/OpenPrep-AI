@@ -92,6 +92,8 @@ const analyticsInsightsRoutes = require('./routes/analyticsInsightsRoutes');
 const adaptiveExamRoutes = require('./routes/adaptiveExamRoutes');
 const diagramQuestionRoutes = require('./routes/diagramQuestionRoutes');
 const classroomRoutes = require('./routes/classroomRoutes');
+const sessionRoutes = require('./routes/sessionRoutes');
+const recommendationRoutes = require('./routes/recommendationRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 const { initNightlyBadgeEvaluatorCron } = require('./services/badgeEvaluationService');
@@ -253,10 +255,10 @@ const extractFilename = (url) => {
   }
 };
 
-app.get('/uploads/:filename', protect, async (req, res, next) => {
+app.get(['/uploads/:filename', '/uploads/podcasts/:filename'], protect, async (req, res, next) => {
   try {
     const filename = req.params.filename;
-    const fileUrl = `/uploads/${filename}`;
+    const fileUrl = req.path;
 
     // Direct match first (fast path for standard format)
     let record = await Note.findOne({ where: { fileUrl } });
@@ -323,7 +325,14 @@ app.get('/uploads/:filename', protect, async (req, res, next) => {
     }
 
     res.set('Cache-Control', 'private, max-age=86400'); // 1 day cache for protected assets
-    res.sendFile(path.join(__dirname, 'uploads', filename));
+    let filePath = path.join(__dirname, 'uploads', filename);
+    if (!fs.existsSync(filePath)) {
+      const podcastPath = path.join(__dirname, 'uploads', 'podcasts', filename);
+      if (fs.existsSync(podcastPath)) {
+        filePath = podcastPath;
+      }
+    }
+    res.sendFile(filePath);
   } catch (error) {
     next(error);
   }
@@ -346,6 +355,7 @@ app.use('/api/pyq', (req, res) => {
   res.status(301).redirect(canonicalPath);
 });
 app.use('/api/community', communityRoutes);
+app.use('/api/bounties', require('./routes/bountyRoutes'));
 app.use('/api/squads', squadRoutes);
 app.use('/api/study', fatigueRoutes);
 app.use('/api/documents', pdfAnnotationRoutes);
@@ -522,6 +532,7 @@ require('./sockets/flashcardCollaborationHandler')(io);
 require('./sockets/focusRoomHandler')(io);
 require('./sockets/studyRoomSocket')(io);
 require('./sockets/interviewSocket')(io);
+require('./services/webrtcSignalingService')(io);
 // Authenticate Socket.io connections
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;

@@ -15,7 +15,11 @@ const PodcastEpisode = sequelize.define(
     },
     subjectId: {
       type: DataTypes.UUID,
-      allowNull: false,
+      allowNull: true,
+    },
+    deckId: {
+      type: DataTypes.UUID,
+      allowNull: true,
     },
     title: {
       type: DataTypes.STRING,
@@ -23,11 +27,23 @@ const PodcastEpisode = sequelize.define(
     },
     audioUrl: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     durationSeconds: {
       type: DataTypes.INTEGER,
       defaultValue: 0,
+    },
+    transcript: {
+      type: DataTypes.JSON,
+      defaultValue: [],
+    },
+    ambientTrack: {
+      type: DataTypes.STRING,
+      defaultValue: 'lofi',
+    },
+    status: {
+      type: DataTypes.STRING,
+      defaultValue: 'completed',
     },
   },
   {
