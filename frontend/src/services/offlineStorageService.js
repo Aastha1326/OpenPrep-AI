@@ -77,8 +77,4 @@ async function remove(storeName, id) {
   });
 }
 
-module.exports = {
-  getAll,
-  put,
-  remove,
-};
+export { getAll, put, remove };
