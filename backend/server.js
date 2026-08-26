@@ -86,6 +86,7 @@ const adaptivePlannerRoutes = require('./routes/adaptivePlannerRoutes');
 const communityResourceRoutes = require('./routes/communityResourceRoutes');
 const attemptHistoryRoutes = require('./routes/attemptHistoryRoutes');
 const learningInsightsRoutes = require('./routes/learningInsightsRoutes');
+const studyGoalSchedulerRoutes = require('./routes/studyGoalSchedulerRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 
@@ -297,6 +298,7 @@ app.use('/api/adaptive-planner', adaptivePlannerRoutes);
 app.use('/api/community-resources', communityResourceRoutes);
 app.use('/api/attempt-history', attemptHistoryRoutes);
 app.use('/api/learning-insights', learningInsightsRoutes);
+app.use('/api/study-scheduler', studyGoalSchedulerRoutes);
 
 // Serve static assets from frontend build folder in production
 if (process.env.NODE_ENV === 'production') {
