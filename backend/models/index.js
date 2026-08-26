@@ -52,6 +52,12 @@ const LearningPath = require('./LearningPath');
 const NotificationSettings = require('./NotificationSettings');
 const WeaknessReport = require('./WeaknessReport');
 const SecurityAuditLog = require('./SecurityAuditLog');
+// Career-track models. These sat outside the registry because they could not
+// be required at all — see #1808 — so sequelize.sync() never walked them.
+const AlumniMentorProfile = require('./AlumniMentorProfile');
+const ResumeParseSession = require('./ResumeParseSession');
+const MockInterview = require('./MockInterview');
+const SalaryNegotiation = require('./SalaryNegotiation');
 const { Bounty, initBounty } = require('./Bounty');
 const { BountySolution, initBountySolution } = require('./BountySolution');
 const { BountySolutionVote, initBountySolutionVote } = require('./BountySolutionVote');
@@ -349,4 +355,8 @@ module.exports = {
   Bounty,
   BountySolution,
   BountySolutionVote,
+  AlumniMentorProfile,
+  ResumeParseSession,
+  MockInterview,
+  SalaryNegotiation,
 };
