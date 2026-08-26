@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import SquadLeaderboard from './SquadLeaderboard';
 import SquadActivityFeed from './SquadActivityFeed';
-import { Share2, LogOut, Award, Target } from 'lucide-react';
+import SquadAudioLounge from './SquadAudioLounge';
+import { Share2, LogOut, Award, Target, Radio } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { io } from 'socket.io-client';
 
 export default function StudySquadDashboard({ squadData, currentUserRole, onLeaveSquad, onRefresh }) {
   const [localChallenge, setLocalChallenge] = useState(null);
+  const [isAudioLoungeOpen, setIsAudioLoungeOpen] = useState(false);
   
   const squad = squadData.squad;
   const activeChallenge = localChallenge || squad.SquadChallenges?.[0];
@@ -66,7 +68,7 @@ export default function StudySquadDashboard({ squadData, currentUserRole, onLeav
   return (
     <div className="w-full max-w-4xl mx-auto text-slate-100">
       
-      <div className="flex items-center justify-between mb-8 bg-slate-800 p-6 rounded-lg shadow-md border border-slate-700">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 bg-slate-800 p-6 rounded-lg shadow-md border border-slate-700 gap-4">
         <div>
           <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400">
             {squad.name}
@@ -74,7 +76,19 @@ export default function StudySquadDashboard({ squadData, currentUserRole, onLeav
           <p className="text-slate-400 mt-1">Study Squad</p>
         </div>
         
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => setIsAudioLoungeOpen(!isAudioLoungeOpen)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition ${
+              isAudioLoungeOpen
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30'
+                : 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:from-indigo-600 hover:to-purple-700 shadow-md'
+            }`}
+          >
+            <Radio className="w-4 h-4 animate-pulse" />
+            <span>{isAudioLoungeOpen ? 'Hide Audio Lounge' : 'Join Live Audio Lounge'}</span>
+          </button>
+
           <div className="bg-slate-700 px-4 py-2 rounded-lg flex items-center gap-3">
             <span className="text-slate-400 text-sm">Invite Code:</span>
             <code className="text-indigo-300 font-mono text-lg font-bold tracking-wider">{squad.inviteCode}</code>
@@ -92,6 +106,17 @@ export default function StudySquadDashboard({ squadData, currentUserRole, onLeav
           </button>
         </div>
       </div>
+
+      {isAudioLoungeOpen && (
+        <div className="mb-8">
+          <SquadAudioLounge
+            squadId={squad.id}
+            squadName={squad.name}
+            currentUser={squadData.user}
+            onClose={() => setIsAudioLoungeOpen(false)}
+          />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2">
