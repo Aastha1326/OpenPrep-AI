@@ -435,6 +435,17 @@ const ExamCountdownWidget = ({ examDate, examName }) => {
             Launch 7-Day Sprint Revision
           </motion.button>
         )}
+        
+        {showSettings && (
+          <div role="dialog" aria-label="Exam countdown settings" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-neutral-900 p-4 rounded-lg shadow-xl">
+              <h2 className="text-white text-lg font-bold mb-4">Exam Countdown Settings</h2>
+              <button onClick={() => setShowSettings(false)} className="px-4 py-2 bg-indigo-600 text-white rounded">
+                Close
+              </button>
+            </div>
+          </div>
+        )}
       </motion.div>
     </AnimatePresence>
   );

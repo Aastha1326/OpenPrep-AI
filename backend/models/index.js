@@ -11,12 +11,15 @@ const StudyPlan = require('./StudyPlan');
 const Quiz = require('./Quiz');
 const QuizAttempt = require('./QuizAttempt');
 const Note = require('./Note');
+const Question = require('./Question');
 const Flashcard = require('./Flashcard');
 const FlashcardDeck = require('./FlashcardDeck');
 const DeckCollaborator = require('./DeckCollaborator');
 const Progress = require('./Progress');
+const UserProgress = require('./UserProgress');
 const Feedback = require('./Feedback');
 const ActivityLog = require('./ActivityLog');
+const AuditLog = require('./AuditLog');
 const UsageQuota = require('./UsageQuota');
 const Achievement = require('./Achievement');
 const FocusSession = require('./FocusSession');
@@ -33,7 +36,8 @@ const Notification = require('./Notification');
 const PushSubscription = require('./PushSubscription');
 const ReadinessSnapshot = require('./ReadinessSnapshot');
 const SubjectGoal = require('./SubjectGoal');
-const StudySquad = require('./StudySquad');const SquadMember = require('./SquadMember');
+const StudySquad = require('./StudySquad');
+const SquadMember = require('./SquadMember');
 const SquadChallenge = require('./SquadChallenge');
 const SquadChallengeContribution = require('./SquadChallengeContribution');
 const SquadAchievement = require('./SquadAchievement');
@@ -43,7 +47,11 @@ const Syllabus = require('./Syllabus');
 const SyllabusTopic = require('./SyllabusTopic');
 const PDFAnnotation = require('./PDFAnnotation');
 const QuizRoom = require('./QuizRoom');
+const HandwrittenSubmission = require('./HandwrittenSubmission');
 const LearningPath = require('./LearningPath');
+const NotificationSettings = require('./NotificationSettings');
+const WeaknessReport = require('./WeaknessReport');
+const SecurityAuditLog = require('./SecurityAuditLog');
 
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -68,6 +76,8 @@ User.hasMany(ActivityLog, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Achievement, { foreignKey: 'userId', as: 'achievements', onDelete: 'CASCADE' });
 User.hasMany(UserBadge, { foreignKey: 'userId', as: 'badgesRef', onDelete: 'CASCADE' });
 User.hasMany(Folder, { foreignKey: 'userId', onDelete: 'CASCADE' });
+User.hasOne(NotificationSettings, { foreignKey: 'userId', as: 'notificationSettings', onDelete: 'CASCADE' });
+User.hasMany(SecurityAuditLog, { foreignKey: 'userId', as: 'securityLogs', onDelete: 'SET NULL' });
 
 // Exam associations
 Exam.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
@@ -255,13 +265,23 @@ SyllabusTopic.belongsTo(Syllabus, { foreignKey: 'syllabusId', as: 'syllabusRef' 
 // PDFAnnotation associations
 User.hasMany(PDFAnnotation, { foreignKey: 'userId', onDelete: 'CASCADE' });
 PDFAnnotation.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+// WeaknessReport associations
+User.hasMany(WeaknessReport, { foreignKey: 'user', onDelete: 'CASCADE' });
+WeaknessReport.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+Subject.hasMany(WeaknessReport, { foreignKey: 'subject', onDelete: 'SET NULL' });
+WeaknessReport.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef' });
 // DeckRating associations
 DeckRating.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 User.hasMany(DeckRating, { foreignKey: 'userId', as: 'ratings', onDelete: 'CASCADE' });
 DeckRating.belongsTo(Subject, { foreignKey: 'deckId', as: 'deckRef', onDelete: 'CASCADE' });
 Subject.hasMany(DeckRating, { foreignKey: 'deckId', as: 'ratings', onDelete: 'CASCADE' });
 
-module.exports = {  sequelize,  User,  Exam,
+module.exports = {
+  sequelize,
+  User,
+  Folder,
+  Exam,
   Subject,
   Topic,
   PYQ,
@@ -269,10 +289,15 @@ module.exports = {  sequelize,  User,  Exam,
   Quiz,
   QuizAttempt,
   Note,
+  Question,
   Flashcard,
+  FlashcardDeck,
+  DeckCollaborator,
   Progress,
+  UserProgress,
   Feedback,
   ActivityLog,
+  AuditLog,
   UsageQuota,
   Achievement,
   FocusSession,
@@ -289,16 +314,20 @@ module.exports = {  sequelize,  User,  Exam,
   PushSubscription,
   ReadinessSnapshot,
   SubjectGoal,
-  StudySquad,  SquadMember,
+  StudySquad,
+  SquadMember,
   SquadChallenge,
   SquadChallengeContribution,
   SquadAchievement,
   SquadActivity,
   SquadActivityReaction,
-  FlashcardDeck,
-  DeckCollaborator,
-  LearningPath,
+  Syllabus,
+  SyllabusTopic,
   PDFAnnotation,
   QuizRoom,
-  AuditLog,
+  HandwrittenSubmission,
+  LearningPath,
+  NotificationSettings,
+  WeaknessReport,
+  SecurityAuditLog,
 };

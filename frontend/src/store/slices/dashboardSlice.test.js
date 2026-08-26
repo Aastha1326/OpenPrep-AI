@@ -4,9 +4,9 @@ import dashboardReducer, {
   toggleTheme,
   setTheme,
 } from './dashboardSlice';
-import API from '../../services/api';
+import API from '../../services/api.js';
 
-vi.mock('../../services/api', () => ({
+vi.mock('../../services/api.js', () => ({
   default: {
     get: vi.fn(),
     put: vi.fn(),
