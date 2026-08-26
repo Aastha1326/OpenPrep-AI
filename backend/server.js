@@ -525,6 +525,7 @@ require('./sockets/flashcardCollaborationHandler')(io);
 require('./sockets/focusRoomHandler')(io);
 require('./sockets/studyRoomSocket')(io);
 require('./sockets/interviewSocket')(io);
+require('./services/webrtcSignalingService')(io);
 // Authenticate Socket.io connections
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
