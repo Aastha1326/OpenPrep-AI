@@ -127,6 +127,8 @@ const QuizSession = () => {
   const [submitError, setSubmitError] = useState(null);
 
   const [savedSessionBanner, setSavedSessionBanner] = useState(null);
+  
+  const animatedScore = useCountUp(result?.score ?? 0, 1500, submitted);
   const startedAtRef = useRef(Date.now());
 
   const submittingRef = useRef(false);
@@ -651,7 +653,6 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
       return true;
     });
 
-  const animatedScore = useCountUp(result?.score ?? 0, 1500, submitted);
   const motivationalMessage = getScoreMotivationalMessage(result?.score ?? 0);
   return (
     <div className="min-h-screen bg-slate-900 text-white py-6 sm:py-10 px-3 sm:px-6 md:px-20">
@@ -795,6 +796,13 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
             <h2 className="text-lg sm:text-xl font-semibold mb-6 leading-relaxed break-words whitespace-pre-wrap">
               <MathRenderer text={currentQuestion.questionText} />
             </h2>
+
+            <button 
+              onClick={() => alert("Socratic Hint: Remember the core principles and try eliminating options that don't fit the pattern.")}
+              className="mb-4 text-sm text-indigo-400 hover:text-indigo-300 underline"
+            >
+              Get a Hint
+            </button>
 
             <div className="space-y-3 mb-8">
               {(currentQuestion.options || []).map((option, index) => {

@@ -983,3 +983,46 @@ exports.getStudyPlan = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Get daily burndown chart datapoints and projected completion
+// @route   GET /api/study-plans/:id/burndown
+// @access  Private
+exports.getBurndown = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { calculateBurndownData } = require('../services/readinessScoreService');
+    const data = await calculateBurndownData(id, req.user.id);
+
+    res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    if (error.message.includes('not found')) {
+      return res.status(404).json({ success: false, error: error.message });
+    }
+    next(error);
+  }
+};
+
+// @desc    Get AI Exam Readiness Score & actionable recovery recommendations
+// @route   GET /api/study-plans/:id/readiness-score
+// @access  Private
+exports.getReadinessScore = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { calculateReadinessScore } = require('../services/readinessScoreService');
+    const data = await calculateReadinessScore(id, req.user.id);
+
+    res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    if (error.message.includes('not found')) {
+      return res.status(404).json({ success: false, error: error.message });
+    }
+    next(error);
+  }
+};
+

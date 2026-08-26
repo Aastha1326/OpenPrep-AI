@@ -20,7 +20,8 @@ import {
   CalendarDays,
   Volume2,
   Palette,
-} from 'lucide-react';import LeatherBoard from '../components/dashboard/LeatherBoard';
+} from 'lucide-react';
+import LeatherBoard from '../components/dashboard/LeatherBoard.jsx';
 import VintagePaper from '../components/dashboard/VintagePaper';
 import ThemeToggle from '../components/ThemeToggle';
 import API from '../services/api';

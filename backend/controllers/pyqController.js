@@ -72,14 +72,35 @@ exports.uploadAndAnalyzePYQ = async (req, res, next) => {
         await pdfParseSemaphore.acquire();
         try {
           const dataBuffer = await fs.promises.readFile(req.file.path);
+          if (!dataBuffer || dataBuffer.length === 0) {
+            return res.status(400).json({
+              success: false,
+              error: "PARSE_ERROR",
+              message: "The uploaded file buffer is empty or corrupt."
+            });
+          }
+
           const pdfData = await pdfParse(dataBuffer);
           extractedText = pdfData.text;
+
+          if (!extractedText || extractedText.trim().length === 0) {
+            return res.status(422).json({
+              success: false,
+              error: "SCANNED_PDF_NO_TEXT",
+              message: "PDF parsing yielded no readable text segments. The document might be an un-scanned image."
+            });
+          }
         } finally {
           pdfParseSemaphore.release();
         }
       } catch (parseError) {
-        console.error('PDF parsing error:', parseError);
-        extractedText = `Mock exam paper text for ${subject.name} - Year ${year}. Dynamic Program, caching, time complexity analysis.`;
+        console.error(`[PYQ_PARSE_FAILURE] Year: ${year}, Subject: ${subject?.name}:`, parseError);
+        return res.status(500).json({
+          success: false,
+          error: "CORRUPTED_STRUCTURE",
+          message: "Failed to parse the PDF document structure. Please ensure the file is not corrupted.",
+          details: process.env.NODE_ENV === "development" ? parseError.message : undefined
+        });
       }
     }
 

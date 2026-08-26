@@ -214,10 +214,6 @@ examCountdownPreferences: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
     },
-    xp: {
-      type: DataTypes.INTEGER,
-      defaultValue: 0,
-    },
     level: {
       type: DataTypes.INTEGER,
       defaultValue: 1,
@@ -253,10 +249,6 @@ examCountdownPreferences: {
     lastActivityDate: {
       type: DataTypes.DATEONLY,
       allowNull: true,
-    },
-    streakFreezesAvailable: {
-      type: DataTypes.INTEGER,
-      defaultValue: 0,
     },
     skillScore: {
       type: DataTypes.FLOAT,
