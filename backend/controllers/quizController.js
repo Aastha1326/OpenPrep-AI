@@ -1483,3 +1483,35 @@ exports.getNextAdaptiveQuestionEndpoint = async (req, res, next) => {
   }
 };
 
+// @desc    Evaluate question distractors quality & plausibility metrics
+// @route   POST /api/quiz/evaluate-distractors
+// @access  Private
+exports.evaluateDistractors = async (req, res, next) => {
+  try {
+    const { evaluateDistractors } = require('../services/distractorScorerService');
+    const { question, options, correctAnswerIndex = 0, context } = req.body;
+
+    if (!question || !Array.isArray(options) || options.length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid input. "question" string and "options" array (min 2 choices) are required.',
+      });
+    }
+
+    const result = await evaluateDistractors({
+      question,
+      options,
+      correctAnswerIndex: parseInt(correctAnswerIndex, 10) || 0,
+      context,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+

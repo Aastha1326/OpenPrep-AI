@@ -19,8 +19,7 @@ const {
   rateCommunityDeck,
   starCommunityDeck,
   batchSyncOfflineReviews,
-  generateDeckPodcast,
-  getPodcastEpisodeById,
+  generateClozeFlashcards,
 } = require('../controllers/flashcardController');
 const { protect } = require('../middleware/auth');
 const cacheMiddleware = require('../middleware/cacheMiddleware');
@@ -125,6 +124,14 @@ router.post(
   checkQuota,
   validateGenerateAIFlashcards,
   generateAIFlashcards
+);
+
+router.post(
+  '/generate-cloze',
+  protect,
+  aiLimiter,
+  checkQuota,
+  generateClozeFlashcards
 );
 
 /**
