@@ -9,7 +9,7 @@ const logger = require('../utils/logger');
 
 /**
  * Calculates total gamification points for a given user metrics object.
- */.
+ */
 exports.calculateUserPoints = (user, userBadgesCount = 0, quizAttemptsCount = 0) => {
   const xp = user.xp || 0;
   const streakBonus = (user.currentStreak || 0) * 15;

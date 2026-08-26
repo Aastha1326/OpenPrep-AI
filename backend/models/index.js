@@ -36,7 +36,8 @@ const Notification = require('./Notification');
 const PushSubscription = require('./PushSubscription');
 const ReadinessSnapshot = require('./ReadinessSnapshot');
 const SubjectGoal = require('./SubjectGoal');
-const StudySquad = require('./StudySquad');const SquadMember = require('./SquadMember');
+const StudySquad = require('./StudySquad');
+const SquadMember = require('./SquadMember');
 const SquadChallenge = require('./SquadChallenge');
 const SquadChallengeContribution = require('./SquadChallengeContribution');
 const SquadAchievement = require('./SquadAchievement');
@@ -50,6 +51,7 @@ const HandwrittenSubmission = require('./HandwrittenSubmission');
 const LearningPath = require('./LearningPath');
 const NotificationSettings = require('./NotificationSettings');
 const WeaknessReport = require('./WeaknessReport');
+const SecurityAuditLog = require('./SecurityAuditLog');
 
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -275,7 +277,11 @@ User.hasMany(DeckRating, { foreignKey: 'userId', as: 'ratings', onDelete: 'CASCA
 DeckRating.belongsTo(Subject, { foreignKey: 'deckId', as: 'deckRef', onDelete: 'CASCADE' });
 Subject.hasMany(DeckRating, { foreignKey: 'deckId', as: 'ratings', onDelete: 'CASCADE' });
 
-module.exports = {  sequelize,  User,  Exam,
+module.exports = {
+  sequelize,
+  User,
+  Folder,
+  Exam,
   Subject,
   Topic,
   PYQ,
@@ -283,10 +289,15 @@ module.exports = {  sequelize,  User,  Exam,
   Quiz,
   QuizAttempt,
   Note,
+  Question,
   Flashcard,
+  FlashcardDeck,
+  DeckCollaborator,
   Progress,
+  UserProgress,
   Feedback,
   ActivityLog,
+  AuditLog,
   UsageQuota,
   Achievement,
   FocusSession,
@@ -303,17 +314,20 @@ module.exports = {  sequelize,  User,  Exam,
   PushSubscription,
   ReadinessSnapshot,
   SubjectGoal,
-  StudySquad,  SquadMember,
+  StudySquad,
+  SquadMember,
   SquadChallenge,
   SquadChallengeContribution,
   SquadAchievement,
   SquadActivity,
   SquadActivityReaction,
-  FlashcardDeck,
-  DeckCollaborator,
-  LearningPath,
+  Syllabus,
+  SyllabusTopic,
   PDFAnnotation,
   QuizRoom,
-  AuditLog,
-  Question,
+  HandwrittenSubmission,
+  LearningPath,
+  NotificationSettings,
+  WeaknessReport,
+  SecurityAuditLog,
 };

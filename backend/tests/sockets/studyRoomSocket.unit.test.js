@@ -27,6 +27,11 @@ describe('Collaborative Study Room Socket Handlers', () => {
       on: vi.fn().mockImplementation((event, callback) => {
         registeredEvents[event] = callback;
       }),
+      // A real Socket.IO socket always has this; cleanupSocket() uses it to
+      // drop the room listeners when a client leaves or disconnects.
+      removeAllListeners: vi.fn().mockImplementation((event) => {
+        delete registeredEvents[event];
+      }),
     };
 
     ioMock = {
