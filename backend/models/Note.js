@@ -78,6 +78,10 @@ const Note = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
+    embedding: {
+      type: DataTypes.ARRAY(DataTypes.FLOAT),
+      allowNull: true,
+    },
   },
   {
     timestamps: true,
