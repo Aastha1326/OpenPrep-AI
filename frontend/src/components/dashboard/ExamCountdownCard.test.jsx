@@ -2,7 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import ExamCountdownCard from './ExamCountdownCard';
 import API from '../../services/api';
 
-vi.mock('../../services/api', () => ({
+vi.mock('../../services/api.js', () => ({
   default: {
     get: vi.fn(),
     put: vi.fn(),
@@ -55,3 +55,4 @@ describe('ExamCountdownCard Component tests', () => {
     expect(screen.getByText('Log Study Session')).toBeInTheDocument();
   });
 });
+

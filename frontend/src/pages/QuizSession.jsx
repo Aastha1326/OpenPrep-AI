@@ -524,7 +524,7 @@ const submitQuiz = useCallback(async () => {
     const loadBookmarks = async () => {
       try {
         const res = await API.get(`/quizzes/${id}/bookmarks`);
-        setBookmarkedIds(new Set(res.data?.data || []));
+        setBookmarkedIds(new Set(Array.isArray(res.data?.data) ? res.data.data : []));
       } catch (err) {
         console.error('Failed to load bookmarks:', err);
       }

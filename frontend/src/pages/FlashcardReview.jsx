@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import MathRenderer from '../components/common/MathRenderer';
 import API from '../services/api';
+import { db } from '../services/db.js';
 import useVoiceControl from '../hooks/useVoiceControl';
 import VoiceModeToggle from '../components/VoiceModeToggle';
 import AudioWaveform from '../components/AudioWaveform';

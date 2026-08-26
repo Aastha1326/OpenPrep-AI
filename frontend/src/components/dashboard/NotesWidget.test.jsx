@@ -1,9 +1,9 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
-import API from '../../services/api';
+import API from '../../services/api.js';
 import NotesWidget from './NotesWidget';
 
-vi.mock('../../services/api', () => ({
+vi.mock('../../services/api.js', () => ({
   default: {
     get: vi.fn(),
     post: vi.fn(),
@@ -11,7 +11,7 @@ vi.mock('../../services/api', () => ({
   },
 }));
 
-vi.mock('./VoiceNoteRecorderModal', () => ({
+vi.mock('../notes/VoiceNoteRecorderModal', () => ({
   default: ({ isOpen, onClose }) => isOpen ? (
     <div data-testid="record-voice-note-modal">
       RecordVoiceNoteModal
@@ -104,12 +104,12 @@ describe('NotesWidget', () => {
     const recordBtn = await screen.findByText('Record Voice Note');
     fireEvent.click(recordBtn);
 
-    expect(screen.getByTestId('record-voice-note-modal')).toBeInTheDocument();
+    expect(await screen.findByTestId('record-voice-note-modal')).toBeInTheDocument();
 
     const closeBtn = screen.getByText('Close');
     fireEvent.click(closeBtn);
 
-    expect(screen.queryByTestId('record-voice-note-modal')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByTestId('record-voice-note-modal')).not.toBeInTheDocument());
   });
 
   it('renders a custom audio waveform visualizer player for audio notes', async () => {

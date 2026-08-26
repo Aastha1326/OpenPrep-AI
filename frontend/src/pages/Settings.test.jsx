@@ -6,7 +6,7 @@ import authReducer from '../store/slices/authSlice';
 import Settings from './Settings';
 import API from '../services/api';
 
-vi.mock('../services/api', () => ({
+vi.mock('../services/api.js', () => ({
   default: {
     defaults: { baseURL: '' },
     get: vi.fn(() => Promise.resolve({ data: { user: {} } })),
@@ -115,3 +115,4 @@ describe('Settings Page', () => {
     });
   });
 });
+
