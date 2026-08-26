@@ -532,6 +532,7 @@ require('./sockets/flashcardCollaborationHandler')(io);
 require('./sockets/focusRoomHandler')(io);
 require('./sockets/studyRoomSocket')(io);
 require('./sockets/interviewSocket')(io);
+require('./sockets/interviewSignalling')(io);
 require('./services/webrtcSignalingService')(io);
 // Authenticate Socket.io connections
 io.use((socket, next) => {
