@@ -63,7 +63,7 @@ describe('Settings Page', () => {
 
     expect(screen.getByRole('heading', { name: /Settings/i })).toBeInTheDocument();
     expect(screen.getByText('Public Leaderboard Name')).toBeInTheDocument();
-    const toggleBtn = screen.getByRole('switch');
+    const toggleBtn = screen.getAllByRole('switch')[0];
     expect(toggleBtn).toHaveAttribute('aria-checked', 'true');
   });
 
@@ -73,7 +73,7 @@ describe('Settings Page', () => {
 
     renderSettings({ leaderboardVisible: true });
 
-    const toggleBtn = screen.getByRole('switch');
+    const toggleBtn = screen.getAllByRole('switch')[0];
     fireEvent.click(toggleBtn);
 
     await waitFor(() => {
@@ -91,7 +91,7 @@ describe('Settings Page', () => {
 
     renderSettings({ leaderboardVisible: true });
 
-    const toggleBtn = screen.getByRole('switch');
+    const toggleBtn = screen.getAllByRole('switch')[0];
     fireEvent.click(toggleBtn);
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Failed to save settings');
@@ -115,4 +115,5 @@ describe('Settings Page', () => {
     });
   });
 });
+
 

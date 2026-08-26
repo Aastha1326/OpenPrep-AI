@@ -14,8 +14,8 @@ import {
 } from '../utils/retry.js';
 
 const getBaseUrl = () => {
-  if (import.meta.env.VITE_API_URL) {
-    const url = import.meta.env.VITE_API_URL.replace(/\/$/, '');
+  if ((import.meta && import.meta.env && import.meta.env.VITE_API_URL)) {
+    const url = (import.meta && import.meta.env && import.meta.env.VITE_API_URL).replace(/\/$/, '');
     return url.endsWith('/api') ? url : `${url}/api`;
   }
   if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
@@ -376,4 +376,5 @@ export const logRecommendationHit = (userId, payload) =>
   API.post(`/recommendations/${userId}/hit`, payload);
 
 export default API;
+
 
