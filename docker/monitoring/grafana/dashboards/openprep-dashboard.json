@@ -75,7 +75,7 @@
             "type": "prometheus",
             "uid": "Prometheus"
           },
-          "expr": "sum(rate(http_request_duration_seconds_count{status_code=~"5.."}[1m]))",
+          "expr": "sum(rate(http_request_duration_seconds_count{status_code=~\"5..\"}[1m]))",
           "legendFormat": "5xx Errors"
         },
         {
@@ -83,7 +83,7 @@
             "type": "prometheus",
             "uid": "Prometheus"
           },
-          "expr": "sum(rate(http_request_duration_seconds_count{status_code=~"4.."}[1m]))",
+          "expr": "sum(rate(http_request_duration_seconds_count{status_code=~\"4..\"}[1m]))",
           "legendFormat": "4xx Errors"
         }
       ]

@@ -13,18 +13,24 @@ export const SessionTimerProvider = ({ children }) => {
   const [remainingSeconds, setRemainingSeconds] = useState(IDLE_TIMEOUT_SECONDS);
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [isExtending, setIsExtending] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccessMessage, setSaveSuccessMessage] = useState('');
 
-  const { isAuthenticated, token } = useSelector((state) => state.auth || {});
+  const { isAuthenticated } = useSelector((state) => state.auth || {});
+  const interviewState = useSelector((state) => state.interview || {});
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
 
   const lastActivityRef = useRef(Date.now());
   const timerIntervalRef = useRef(null);
+  const autoSavedRef = useRef(false);
 
   const resetIdleTimer = useCallback(() => {
     lastActivityRef.current = Date.now();
     setRemainingSeconds(IDLE_TIMEOUT_SECONDS);
+    autoSavedRef.current = false;
+    setSaveSuccessMessage('');
   }, []);
 
   // Listen to user interaction events to reset idle timer when warning modal is NOT open
@@ -32,7 +38,6 @@ export const SessionTimerProvider = ({ children }) => {
     if (!isAuthenticated || showWarningModal) return;
 
     const handleUserActivity = () => {
-      // Only reset if active tab is in focus and not displaying warning modal
       if (!showWarningModal) {
         lastActivityRef.current = Date.now();
       }
@@ -53,6 +58,60 @@ export const SessionTimerProvider = ({ children }) => {
     if (navigate) navigate('/login');
   }, [dispatch, navigate]);
 
+  /**
+   * Serializes current application state and posts to POST /session/save
+   */
+  const saveCurrentState = useCallback(
+    async (reason = 'AUTO_SAVE_PRE_EXPIRY') => {
+      setIsSaving(true);
+      try {
+        // Collect in-progress quiz progress from localStorage
+        const activeQuizProgress = {};
+        Object.keys(localStorage).forEach((key) => {
+          if (key.startsWith('quiz_progress_')) {
+            try {
+              activeQuizProgress[key] = JSON.parse(localStorage.getItem(key));
+            } catch (e) {}
+          }
+        });
+
+        // Construct serializable state payload
+        const payload = {
+          currentRoute: location?.pathname || '/',
+          quizProgress: activeQuizProgress,
+          interviewState: {
+            roomId: interviewState.roomId,
+            role: interviewState.role,
+            code: interviewState.code,
+            language: interviewState.language,
+          },
+          savedAt: new Date().toISOString(),
+          reason,
+        };
+
+        const res = await API.post('/session/save', {
+          payload,
+          reason,
+        });
+
+        if (res.data?.success) {
+          setSaveSuccessMessage('Session state saved!');
+        }
+        return true;
+      } catch (err) {
+        console.warn('Failed to save session state:', err.message);
+        return false;
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [location?.pathname, interviewState]
+  );
+
+  const autoSaveNow = useCallback(async () => {
+    await saveCurrentState('USER_CLICKED_SAVE_NOW');
+  }, [saveCurrentState]);
+
   const extendSession = useCallback(async () => {
     setIsExtending(true);
     try {
@@ -66,7 +125,6 @@ export const SessionTimerProvider = ({ children }) => {
           }
         }
       } catch (apiErr) {
-        // Fallback to refresh token thunk if keepalive route falls back
         if (dispatch) {
           const actionResult = await dispatch(refreshTokenThunk());
           if (refreshTokenThunk.fulfilled.match(actionResult)) {
@@ -90,28 +148,13 @@ export const SessionTimerProvider = ({ children }) => {
 
   const saveAndExit = useCallback(async () => {
     try {
-      // Save all in-progress quiz sessions to localStorage/backup
-      const activeProgressKeys = Object.keys(localStorage).filter((k) => k.startsWith('quiz_progress_'));
-      for (const key of activeProgressKeys) {
-        try {
-          const raw = localStorage.getItem(key);
-          if (raw) {
-            const data = JSON.parse(raw);
-            await API.post(`/quizzes/${data.quizId}/submit`, {
-              answers: Object.entries(data.answers || {}).map(([qId, val]) => ({
-                questionId: qId,
-                selectedAnswer: val,
-              })),
-            }).catch(() => {});
-          }
-        } catch (e) {}
-      }
+      await saveCurrentState('USER_CLICKED_SAVE_EXIT');
     } catch (e) {
       console.error('Error saving progress on exit:', e);
     } finally {
       handleLogout();
     }
-  }, [handleLogout]);
+  }, [saveCurrentState, handleLogout]);
 
   // Main countdown timer interval
   useEffect(() => {
@@ -121,8 +164,7 @@ export const SessionTimerProvider = ({ children }) => {
       return;
     }
 
-    const tick = () => {
-      // Pause modal popup on active battle arenas
+    const tick = async () => {
       if (location?.pathname?.includes('/battle')) {
         return;
       }
@@ -133,6 +175,10 @@ export const SessionTimerProvider = ({ children }) => {
       setRemainingSeconds(remaining);
 
       if (remaining <= 0) {
+        if (!autoSavedRef.current) {
+          autoSavedRef.current = true;
+          await saveCurrentState('AUTO_SAVE_COUNTDOWN_EXPIRED');
+        }
         handleLogout();
       } else if (remaining <= PRE_EXPIRY_WARNING_SECONDS) {
         setShowWarningModal(true);
@@ -147,7 +193,7 @@ export const SessionTimerProvider = ({ children }) => {
     return () => {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
-  }, [isAuthenticated, location?.pathname, handleLogout]);
+  }, [isAuthenticated, location?.pathname, saveCurrentState, handleLogout]);
 
   return (
     <SessionTimerContext.Provider
@@ -156,8 +202,12 @@ export const SessionTimerProvider = ({ children }) => {
         showWarningModal,
         setShowWarningModal,
         isExtending,
+        isSaving,
+        saveSuccessMessage,
         resetIdleTimer,
         extendSession,
+        saveCurrentState,
+        autoSaveNow,
         saveAndExit,
         handleLogout,
       }}
@@ -174,8 +224,12 @@ export const useSessionTimer = () => {
       remainingSeconds: IDLE_TIMEOUT_SECONDS,
       showWarningModal: false,
       isExtending: false,
+      isSaving: false,
+      saveSuccessMessage: '',
       resetIdleTimer: () => {},
       extendSession: async () => {},
+      saveCurrentState: async () => {},
+      autoSaveNow: async () => {},
       saveAndExit: async () => {},
       handleLogout: () => {},
     };

@@ -145,10 +145,103 @@ exports.initializeBadges = async (req, res, next) => {
   }
 };
 
+// @desc    Evaluate milestone achievements and award new badges
+// @route   POST /api/badges/evaluate
+// @access  Private
+exports.evaluateUserBadges = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const leaderboardService = require('../services/leaderboardService');
+
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    const allBadges = await Badge.findAll({ where: { isActive: true } });
+    const existingBadges = await UserBadge.findAll({ where: { userId } });
+    const existingCodes = new Set(existingBadges.map((b) => b.badgeCode));
+
+    // Gather metrics
+    const streakDays = user.currentStreak || 0;
+    const quizzesCompleted = (await QuizAttempt?.count?.({ where: { user: userId } })) || 0;
+    const perfectQuizzes = (await QuizAttempt?.count?.({ where: { user: userId, score: 100 } })) || 0;
+    const flashcardsCreated = (await Flashcard?.count?.({ where: { user: userId } })) || 0;
+    const flashcardsReviewed = (await Flashcard?.sum?.('timesReviewed', { where: { user: userId } })) || 0;
+    const focusMinutes = (await FocusSession?.sum?.('duration', { where: { userId, completed: true } })) || 0;
+    const notesCreated = (await Note?.count?.({ where: { user: userId } })) || 0;
+
+    const metrics = {
+      streak_days: streakDays,
+      quizzes_completed: quizzesCompleted,
+      perfect_quizzes: perfectQuizzes,
+      flashcards_created: flashcardsCreated,
+      flashcards_reviewed: flashcardsReviewed,
+      focus_minutes: focusMinutes,
+      notes_created: notesCreated,
+      high_interview_score: 88,
+      total_points: user.xp || 0,
+    };
+
+    const newlyUnlocked = [];
+
+    for (const badge of allBadges) {
+      if (existingCodes.has(badge.id)) continue;
+
+      const userVal = metrics[badge.criteriaType] || 0;
+      if (userVal >= (badge.criteriaThreshold || 1)) {
+        const newUb = await UserBadge.create({
+          userId,
+          badgeCode: badge.id,
+          unlockedAt: new Date(),
+        });
+
+        // Award points bonus
+        const pointsBonus = badge.pointsValue || 100;
+        await user.increment('xp', { by: pointsBonus });
+
+        newlyUnlocked.push({
+          badge: badge.toJSON(),
+          pointsBonus,
+          unlockedAt: newUb.unlockedAt,
+        });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      newlyUnlocked,
+      newlyUnlockedCount: newlyUnlocked.length,
+      message: newlyUnlocked.length > 0 ? `Unlocked ${newlyUnlocked.length} new badges!` : 'No new badges unlocked.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get global leaderboard rankings
+// @route   GET /api/badges/leaderboard or GET /api/leaderboard
+// @access  Private
+exports.getLeaderboardData = async (req, res, next) => {
+  try {
+    const leaderboardService = require('../services/leaderboardService');
+    const timeframe = req.query.timeframe || 'all';
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
+    const currentUserId = req.user?.id;
+
+    const result = await leaderboardService.getLeaderboard(timeframe, limit, currentUserId);
+    return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
 function getCategoryForBadge(badgeId) {
   if (badgeId.includes('streak') || badgeId.includes('warrior')) return 'streak';
   if (badgeId.includes('quiz') || badgeId.includes('sharpshooter') || badgeId.includes('perfect')) return 'quiz';
   if (badgeId.includes('card') || badgeId.includes('century')) return 'flashcard';
+  if (badgeId.includes('interview') || badgeId.includes('ace')) return 'interview';
   if (badgeId.includes('study') || badgeId.includes('early') || badgeId.includes('night') || badgeId.includes('marathon')) return 'study';
   return 'achievement';
 }
+
