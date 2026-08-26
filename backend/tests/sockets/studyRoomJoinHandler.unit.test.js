@@ -2,12 +2,26 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 const MODULE_PATH = path.join(__dirname, '..', '..', 'sockets', 'studyRoomSocket.js');
 const MODULE_SOURCE = fs.readFileSync(MODULE_PATH, 'utf8');
 
-const initializeStudyRoomSockets = require('../../sockets/studyRoomSocket');
 const redisService = require('../../services/redisService');
+
+/**
+ * Loaded on demand rather than at import time.
+ *
+ * When the module has a syntax error, a top-level `require` turns this whole
+ * file into a collection error: vitest reports "1 failed suite, no tests" and
+ * every source-level check below — the ones written specifically to name that
+ * error — never runs. Deferring the require keeps the integrity assertions
+ * alive to do their job, and the behavioural suites still fail loudly because
+ * the first call throws.
+ */
+function loadModule() {
+  return require('../../sockets/studyRoomSocket');
+}
 
 /**
  * Drives the module the way Socket.IO does and hands back the socket double
@@ -36,7 +50,7 @@ function connectSocket(overrides = {}) {
     ...overrides,
   };
 
-  initializeStudyRoomSockets({
+  loadModule()({
     on: (event, handler) => {
       if (event === 'connection') handler(socket);
     },
@@ -47,16 +61,66 @@ function connectSocket(overrides = {}) {
 
 describe('studyRoomSocket module integrity', () => {
   it('parses and loads', () => {
-    expect(() => require('../../sockets/studyRoomSocket')).not.toThrow();
+    expect(() => loadModule()).not.toThrow();
+  });
+
+  it('compiles, and says where if it does not', () => {
+    // `require` throwing a SyntaxError takes the whole suite down as a
+    // collection error, which reads like an unrelated infrastructure problem.
+    // Compiling the source on its own keeps the parser's message — file, line
+    // and token — attached to a single named assertion.
+    let syntaxError = null;
+    try {
+      new vm.Script(MODULE_SOURCE, { filename: MODULE_PATH });
+    } catch (error) {
+      syntaxError = `${error.name}: ${error.message}`;
+    }
+
+    expect(syntaxError).toBeNull();
+  });
+
+  it('closes every named connection handler as a statement', () => {
+    // #1806: `const handleJoinRoom = async ({...}) => { ... });` — the trailing
+    // `)` was left behind when an inline `socket.on(...)` listener was lifted
+    // into a named handler, and a later merge chose that side. The file stops
+    // parsing, so `server.js` dies on boot before it can listen.
+    //
+    // Walk each `const <name> = async (…) => {` and match brackets forward to
+    // its closing brace. The character after it must not be `)`.
+    const declaration = /const (handle[A-Za-z]+|cleanupSocket) = (?:async )?\(?[^)]*\)? *=> *\{/g;
+    const offenders = [];
+
+    let match;
+    while ((match = declaration.exec(MODULE_SOURCE)) !== null) {
+      let depth = 0;
+      // The match ends on the body's opening brace. Starting the walk from
+      // indexOf('{') instead would land on the destructured parameter list.
+      let index = match.index + match[0].length - 1;
+
+      for (; index < MODULE_SOURCE.length; index += 1) {
+        const character = MODULE_SOURCE[index];
+        if (character === '{') depth += 1;
+        else if (character === '}') {
+          depth -= 1;
+          if (depth === 0) break;
+        }
+      }
+
+      if (MODULE_SOURCE[index + 1] === ')') {
+        offenders.push(`${match[1]} is closed with '});' instead of '};'`);
+      }
+    }
+
+    expect(offenders).toEqual([]);
   });
 
   it('exports the initializer as a function', () => {
-    expect(typeof initializeStudyRoomSockets).toBe('function');
+    expect(typeof loadModule()).toBe('function');
   });
 
   it('exposes the in-memory room map as activeRooms', () => {
     // The map was renamed to localRooms; the export still has to resolve.
-    expect(initializeStudyRoomSockets.activeRooms).toBeInstanceOf(Map);
+    expect(loadModule().activeRooms).toBeInstanceOf(Map);
   });
 
   it('declares handleJoinRoom before the lines that register it', () => {
@@ -86,7 +150,7 @@ describe('join handling', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     redisService.isReady = false;
-    initializeStudyRoomSockets.activeRooms.clear();
+    loadModule().activeRooms.clear();
   });
 
   it('registers both the legacy and namespaced join events', () => {
@@ -111,7 +175,7 @@ describe('join handling', () => {
     expect(socket.data.roomId).toBe('room-1');
     expect(socket.data.username).toBe('Ada');
 
-    const room = initializeStudyRoomSockets.activeRooms.get('room-1');
+    const room = loadModule().activeRooms.get('room-1');
     expect(room.participants['socket-1']).toEqual({ id: 'socket-1', username: 'Ada' });
   });
 
@@ -143,7 +207,7 @@ describe('join handling', () => {
 
     await registered['join_room']({ roomId: 'room-1' });
 
-    const room = initializeStudyRoomSockets.activeRooms.get('room-1');
+    const room = loadModule().activeRooms.get('room-1');
     expect(room.participants['socket-1'].username).toBe('Anonymous');
   });
 
@@ -154,7 +218,7 @@ describe('join handling', () => {
 
     expect(socket.join).toHaveBeenCalledWith('room-2');
     expect(
-      initializeStudyRoomSockets.activeRooms.get('room-2').participants['socket-1'].username
+      loadModule().activeRooms.get('room-2').participants['socket-1'].username
     ).toBe('Grace');
   });
 });
@@ -163,20 +227,20 @@ describe('leave and cleanup', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     redisService.isReady = false;
-    initializeStudyRoomSockets.activeRooms.clear();
+    loadModule().activeRooms.clear();
   });
 
   it('releases the participant on an explicit leave', async () => {
     const { registered } = connectSocket();
 
     await registered['join_room']({ roomId: 'room-1', username: 'Ada' });
-    expect(initializeStudyRoomSockets.activeRooms.has('room-1')).toBe(true);
+    expect(loadModule().activeRooms.has('room-1')).toBe(true);
 
     await registered['study:room:leave']();
 
     // The room is dropped once its last participant is removed, so a ghost
     // participant would keep the entry alive here.
-    expect(initializeStudyRoomSockets.activeRooms.has('room-1')).toBe(false);
+    expect(loadModule().activeRooms.has('room-1')).toBe(false);
   });
 
   it('announces the departure to the room', async () => {
@@ -237,6 +301,6 @@ describe('leave and cleanup', () => {
     await registered['join_room']({ roomId: 'room-1', username: 'Ada' });
     await registered['disconnect']();
 
-    expect(initializeStudyRoomSockets.activeRooms.has('room-1')).toBe(false);
+    expect(loadModule().activeRooms.has('room-1')).toBe(false);
   });
 });
