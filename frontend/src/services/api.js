@@ -11,7 +11,7 @@ import {
   shouldRetry,
   wait,
   waitForOnline,
-} from '../utils/retry';
+} from '../utils/retry.js';
 
 const getBaseUrl = () => {
   if (import.meta.env.VITE_API_URL) {
