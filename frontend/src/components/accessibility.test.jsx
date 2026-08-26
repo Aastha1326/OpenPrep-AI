@@ -7,7 +7,7 @@ import { GlassCard } from './GlassCard';
 import FlashcardWidget from './dashboard/FlashcardWidget';
 import PomodoroTimer from './dashboard/PomodoroTimer';
 
-vi.mock('../services/api', () => ({
+vi.mock('../services/api.js', () => ({
   default: {
     get: vi.fn(() => Promise.resolve({ data: { data: {} } })),
     post: vi.fn(() => Promise.resolve({ data: {} })),
@@ -249,4 +249,5 @@ describe('Modal Dialogs accessibility and ARIA roles', () => {
     expect(document.getElementById('confirm-delete-modal-title')).toBeInTheDocument();
   });
 });
+
 

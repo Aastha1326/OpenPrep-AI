@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import CommandPalette from './CommandPalette';
 import API from '../../services/api';
 
-vi.mock('../../services/api', () => ({
+vi.mock('../../services/api.js', () => ({
   default: {
     get: vi.fn(),
   },
@@ -106,3 +106,4 @@ describe('CommandPalette Component', () => {
     expect(mockOnClose).toHaveBeenCalled();
   });
 });
+

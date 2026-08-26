@@ -5,7 +5,7 @@ import AiAssistant from './AiAssistant';
 import API from '../services/api';
 
 // Mock the API client
-vi.mock('../services/api', () => ({
+vi.mock('../services/api.js', () => ({
   default: {
     post: vi.fn(),
   },
@@ -135,3 +135,4 @@ describe('AiAssistant Component', () => {
     expect(screen.getByTitle('Enable AI read-aloud')).toBeInTheDocument();
   });
 });
+

@@ -1,0 +1,129 @@
+import { describe, it, expect } from 'vitest';
+
+const fs = require('fs');
+const path = require('path');
+
+const REGISTRY_PATH = path.join(__dirname, '..', '..', 'models', 'index.js');
+const REGISTRY_SOURCE = fs.readFileSync(REGISTRY_PATH, 'utf8');
+
+/**
+ * Names imported by the registry, in source order.
+ *
+ * The export list in models/index.js is maintained by hand, so it can drift out
+ * of sync with the import list every time a model is added. Deriving the
+ * expected set from the source is what makes that drift a test failure rather
+ * than an `undefined` at request time.
+ */
+function importedModelNames(source) {
+  return [...source.matchAll(/^const\s+(\w+)\s*=\s*require\('\.\/(\w+)'\);$/gm)].map(
+    (match) => match[1]
+  );
+}
+
+/**
+ * Model names listed inside the trailing `module.exports = { ... }` literal.
+ * `sequelize` is exported alongside the models but is not one of them.
+ */
+function exportedNames(source) {
+  const start = source.indexOf('module.exports');
+  expect(start).toBeGreaterThan(-1);
+  return [...source.slice(start).matchAll(/^\s{2}(\w+),$/gm)]
+    .map((match) => match[1])
+    .filter((name) => name !== 'sequelize');
+}
+
+describe('model registry', () => {
+  it('loads without throwing', () => {
+    expect(() => require('../../models')).not.toThrow();
+  });
+
+  it('exports the sequelize instance', () => {
+    const models = require('../../models');
+    expect(models.sequelize).toBeDefined();
+    expect(typeof models.sequelize.define).toBe('function');
+  });
+
+  it('exports every model it imports', () => {
+    const imported = importedModelNames(REGISTRY_SOURCE);
+    const exported = exportedNames(REGISTRY_SOURCE);
+
+    expect(imported.length).toBeGreaterThan(0);
+    expect(exported).toEqual(imported);
+  });
+
+  it('resolves every imported model to a Sequelize model at runtime', () => {
+    const models = require('../../models');
+
+    for (const name of importedModelNames(REGISTRY_SOURCE)) {
+      expect(models[name], `${name} is missing from the registry exports`).toBeDefined();
+      expect(typeof models[name].findAll, `${name} is not a Sequelize model`).toBe('function');
+    }
+  });
+
+  it('declares each model on its own line', () => {
+    // Two require statements collapsed onto one line is how the missing exports
+    // stayed invisible during review.
+    const collapsed = REGISTRY_SOURCE.split('\n').filter(
+      (line) => (line.match(/require\('\.\//g) || []).length > 1
+    );
+
+    expect(collapsed).toEqual([]);
+  });
+
+  it('never imports the same model twice', () => {
+    const imported = importedModelNames(REGISTRY_SOURCE);
+    const duplicates = imported.filter((name, index) => imported.indexOf(name) !== index);
+
+    expect(duplicates).toEqual([]);
+  });
+});
+
+describe('models that were imported but never exported', () => {
+  // Regression cover for the eight names that resolved to `undefined` before
+  // this fix. Each had at least one consumer destructuring it from the barrel.
+  const previouslyMissing = [
+    'SecurityAuditLog',
+    'Folder',
+    'UserProgress',
+    'Syllabus',
+    'SyllabusTopic',
+    'HandwrittenSubmission',
+    'NotificationSettings',
+    'WeaknessReport',
+  ];
+
+  it.each(previouslyMissing)('exports %s', (name) => {
+    const models = require('../../models');
+    expect(models[name]).toBeDefined();
+    expect(typeof models[name].findAll).toBe('function');
+  });
+});
+
+describe('SecurityAuditLog wiring', () => {
+  it('is imported by the registry', () => {
+    expect(REGISTRY_SOURCE).toMatch(/const SecurityAuditLog = require\('\.\/SecurityAuditLog'\);/);
+  });
+
+  it('is associated to User as securityLogs', () => {
+    const { User } = require('../../models');
+    expect(User.associations.securityLogs).toBeDefined();
+    expect(User.associations.securityLogs.associationType).toBe('HasMany');
+  });
+
+  it('keeps the audit row when its user is deleted', () => {
+    const { User } = require('../../models');
+    // Audit trails must outlive the account they describe.
+    expect(User.associations.securityLogs.options.onDelete).toBe('SET NULL');
+  });
+
+  it('is the model auditLogMiddleware writes through', () => {
+    const middlewareSource = fs.readFileSync(
+      path.join(__dirname, '..', '..', 'middleware', 'auditLogMiddleware.js'),
+      'utf8'
+    );
+    expect(middlewareSource).toMatch(/const \{ SecurityAuditLog \} = require\('\.\.\/models'\)/);
+
+    const { SecurityAuditLog } = require('../../models');
+    expect(typeof SecurityAuditLog.create).toBe('function');
+  });
+});

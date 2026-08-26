@@ -1,12 +1,12 @@
 import { configureStore } from '@reduxjs/toolkit';
-import authReducer from './slices/authSlice';
-import dashboardReducer from './slices/dashboardSlice';
-import flashcardsReducer from './slices/flashcardSlice';
-import weaknessReducer from './slices/weaknessSlice';
-import pyqIntelligenceReducer from './slices/pyqIntelligenceSlice';
-import adaptivePlannerReducer from './slices/adaptivePlannerSlice';
-import communityResourceReducer from './slices/communityResourceSlice';
-import attemptHistoryReducer from './slices/attemptHistorySlice';
+import authReducer from './slices/authSlice.js';
+import dashboardReducer from './slices/dashboardSlice.js';
+import flashcardsReducer from './slices/flashcardSlice.js';
+import weaknessReducer from './slices/weaknessSlice.js';
+import pyqIntelligenceReducer from './slices/pyqIntelligenceSlice.js';
+import adaptivePlannerReducer from './slices/adaptivePlannerSlice.js';
+import communityResourceReducer from './slices/communityResourceSlice.js';
+import attemptHistoryReducer from './slices/attemptHistorySlice.js';
 
 export const store = configureStore({
   reducer: {
