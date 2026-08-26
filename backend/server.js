@@ -348,6 +348,7 @@ app.use('/api/pyq', (req, res) => {
   res.status(301).redirect(canonicalPath);
 });
 app.use('/api/community', communityRoutes);
+app.use('/api/bounties', require('./routes/bountyRoutes'));
 app.use('/api/squads', squadRoutes);
 app.use('/api/study', fatigueRoutes);
 app.use('/api/documents', pdfAnnotationRoutes);
