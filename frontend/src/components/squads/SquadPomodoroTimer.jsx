@@ -6,8 +6,7 @@ import React, { useState, useEffect, useRef } from 'react';
 const SquadPomodoroTimer = ({ socket, squadId }) => {
   const [timerState, setTimerState] = useState({ mode: 'focus', timeLeft: 25 * 60, isRunning: false });
   const audioRef = useRef(null);
-  const [timerState, setTimerState] = useState({ mode: 'focus', timeLeft: 25 * 60, isRunning: false });
-  const audioRef = useRef(null);
+
 
   useEffect(() => {
     if (!socket || !squadId) return;

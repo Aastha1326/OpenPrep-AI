@@ -3,7 +3,7 @@ import React from 'react';
 import SpacedRepetitionHeatmap from './SpacedRepetitionHeatmap';
 import API from '../../services/api';
 
-vi.mock('../../services/api', () => ({
+vi.mock('../../services/api.js', () => ({
   default: {
     get: vi.fn(),
   },
@@ -75,3 +75,4 @@ describe('SpacedRepetitionHeatmap Component', () => {
 });
 
 const weekdaysList = () => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+

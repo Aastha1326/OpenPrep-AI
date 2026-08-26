@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import MathRenderer from '../components/common/MathRenderer';
 import API from '../services/api';
+import { db } from '../services/db.js';
 import useVoiceControl from '../hooks/useVoiceControl';
 import VoiceModeToggle from '../components/VoiceModeToggle';
 import AudioWaveform from '../components/AudioWaveform';
@@ -555,6 +556,21 @@ useEffect(() => {
       clearSession();
     }
   }, [isSessionComplete, noCardsDue]);
+  const bind = useDrag(({ down, movement: [mx], cancel }) => {
+    if (down && Math.abs(mx) > 120) {
+      cancel();
+      if (mx < 0) {
+        // Swipe Left
+        if (!isFlipped) handleCardFlip();
+        else handleReview(1); // Mark as Wrong
+      } else {
+        // Swipe Right
+        if (!isFlipped) handleCardFlip();
+        else handleReview(5); // Mark as Easy
+      }
+    }
+  });
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center">
@@ -1341,3 +1357,4 @@ useEffect(() => {
 };
 
 export default FlashcardReview;
+

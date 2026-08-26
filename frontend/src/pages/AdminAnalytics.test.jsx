@@ -6,7 +6,7 @@ import authReducer from '../store/slices/authSlice';
 import { AdminAnalytics } from './AdminAnalytics';
 import * as api from '../services/api';
 
-vi.mock('../services/api', () => ({
+vi.mock('../services/api.js', () => ({
   default: {
     get: vi.fn(),
   },
@@ -98,3 +98,4 @@ describe('AdminAnalytics Component Page', () => {
     expect(await screen.findByText('Quiz Performance & Difficulty')).toBeInTheDocument();
   });
 });
+

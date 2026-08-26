@@ -1,6 +1,6 @@
 import axios from 'axios';
-import { store } from '../store/index.js';
-import { logout } from '../store/slices/authSlice';
+
+
 import {
   DEFAULT_TIMEOUT_MS,
   getRetryDelay,
@@ -11,11 +11,11 @@ import {
   shouldRetry,
   wait,
   waitForOnline,
-} from '../utils/retry';
+} from '../utils/retry.js';
 
 const getBaseUrl = () => {
-  if (import.meta.env.VITE_API_URL) {
-    const url = import.meta.env.VITE_API_URL.replace(/\/$/, '');
+  if ((import.meta && import.meta.env && import.meta.env.VITE_API_URL)) {
+    const url = (import.meta && import.meta.env && import.meta.env.VITE_API_URL).replace(/\/$/, '');
     return url.endsWith('/api') ? url : `${url}/api`;
   }
   if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
@@ -326,6 +326,7 @@ API.interceptors.response.use(
       localStorage.setItem('token', newToken);
       localStorage.setItem('refreshToken', newRefreshToken);
 
+      const { store } = await import('../store/index.js');
       store.dispatch({ type: 'auth/refreshToken/fulfilled', payload: response.data });
 
       API.defaults.headers.common.Authorization = `Bearer ${newToken}`;
@@ -335,6 +336,8 @@ API.interceptors.response.use(
       return API(originalRequest);
     } catch (refreshError) {
       processQueue(refreshError, null);
+      const { store } = await import('../store/index.js');
+      const { logout } = await import('../store/slices/authSlice.js');
       store.dispatch(logout());
       if (originalRequest?.isBackground) {
         showBackgroundErrorToast('Session expired. Auto-save disabled.');
@@ -373,3 +376,5 @@ export const logRecommendationHit = (userId, payload) =>
   API.post(`/recommendations/${userId}/hit`, payload);
 
 export default API;
+
+

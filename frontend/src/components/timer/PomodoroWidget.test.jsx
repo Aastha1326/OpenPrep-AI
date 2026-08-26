@@ -9,7 +9,7 @@ vi.mock('../../utils/audio', () => ({
 }));
 
 // Mock the API service
-vi.mock('../../services/api', () => ({
+vi.mock('../../services/api.js', () => ({
   default: { post: vi.fn().mockResolvedValue({ data: {} }) },
 }));
 
@@ -89,3 +89,4 @@ describe('PomodoroWidget', () => {
     expect(screen.getByRole('dialog', { name: /timer settings/i })).toBeInTheDocument();
   });
 });
+

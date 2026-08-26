@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import BadgeCarousel from './BadgeCarousel';
 import API from '../../services/api';
 
-vi.mock('../../services/api', () => ({
+vi.mock('../../services/api.js', () => ({
   default: {
     get: vi.fn(),
   },
@@ -95,3 +95,4 @@ describe('BadgeCarousel UI Component', () => {
     expect(screen.queryByText('Week Warrior')).not.toBeInTheDocument();
   });
 });
+
