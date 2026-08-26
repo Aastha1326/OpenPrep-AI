@@ -296,9 +296,9 @@ User.hasMany(DeckRating, { foreignKey: 'userId', as: 'ratings', onDelete: 'CASCA
 DeckRating.belongsTo(Subject, { foreignKey: 'deckId', as: 'deckRef', onDelete: 'CASCADE' });
 Subject.hasMany(DeckRating, { foreignKey: 'deckId', as: 'ratings', onDelete: 'CASCADE' });
 
-const embeddingService = require('../services/embeddingService');
-embeddingService.attachHooks({ Note, Quiz });
-embeddingService.registerWorkerHandler({ Note, Quiz });
+const embeddingsProcessor = require('../services/embeddingsProcessor');
+embeddingsProcessor.attachHooks({ Note, Quiz });
+embeddingsProcessor.registerWorkerHandler({ Note, Quiz });
 
 module.exports = {
   sequelize,

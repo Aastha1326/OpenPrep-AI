@@ -110,7 +110,7 @@ exports.globalSearch = async (req, res, next) => {
   }
 };
 
-// @desc    Semantic Hybrid search using pgvector and lexical scores
+// @desc    Semantic Hybrid search using pgvector and lexical scores with Reciprocal Rank Fusion (RRF)
 // @route   GET /api/search/semantic
 // @access  Private
 exports.semanticSearch = async (req, res, next) => {
@@ -121,7 +121,7 @@ exports.semanticSearch = async (req, res, next) => {
     }
 
     const userId = req.user.id;
-    const { generateVector } = require('../services/embeddingService');
+    const { generateVector } = require('../services/embeddingsProcessor');
     const { Note, Quiz } = require('../models');
 
     let queryVector;
@@ -133,40 +133,101 @@ exports.semanticSearch = async (req, res, next) => {
 
     let notes = [];
     let quizzes = [];
+    const k = 60; // RRF parameter
 
     if (queryVector) {
       try {
         const vectorStr = `[${queryVector.join(',')}]`;
-        
-        notes = await db.query(
-          `SELECT id, title, content, "fileUrl", "fileType",
-           (CASE WHEN embedding IS NOT NULL THEN (1 - (embedding <=> :vector::vector)) ELSE 0 END) as similarity,
-           (CASE WHEN LOWER(title) LIKE LOWER(:query) OR LOWER(content) LIKE LOWER(:query) THEN 1.0 ELSE 0.0 END) as lexicalScore
-           FROM "Notes"
-           WHERE "user" = :userId
-           ORDER BY (similarity * 0.7 + (CASE WHEN LOWER(title) LIKE LOWER(:query) OR LOWER(content) LIKE LOWER(:query) THEN 1.0 ELSE 0.0 END) * 0.3) DESC
-           LIMIT 10`,
-          {
-            replacements: { vector: vectorStr, query: `%${q}%`, userId },
-            type: db.QueryTypes.SELECT,
-          }
-        );
+        const queryLike = `%${q}%`;
 
-        quizzes = await db.query(
-          `SELECT id, title, questions,
-           (CASE WHEN embedding IS NOT NULL THEN (1 - (embedding <=> :vector::vector)) ELSE 0 END) as similarity,
-           (CASE WHEN LOWER(title) LIKE LOWER(:query) THEN 1.0 ELSE 0.0 END) as lexicalScore
-           FROM "Quizzes"
-           WHERE "createdBy" = :userId
-           ORDER BY (similarity * 0.7 + (CASE WHEN LOWER(title) LIKE LOWER(:query) THEN 1.0 ELSE 0.0 END) * 0.3) DESC
-           LIMIT 10`,
-          {
-            replacements: { vector: vectorStr, query: `%${q}%`, userId },
-            type: db.QueryTypes.SELECT,
+        // 1. NOTES HYBRID SEARCH WITH RRF
+        const [lexicalNotes, vectorNotes] = await Promise.all([
+          db.query(
+            `SELECT id, title, content, "fileUrl", "fileType"
+             FROM "Notes"
+             WHERE "user" = :userId AND (LOWER(title) LIKE LOWER(:query) OR LOWER(content) LIKE LOWER(:query))
+             LIMIT 50`,
+            { replacements: { query: queryLike, userId }, type: db.QueryTypes.SELECT }
+          ),
+          db.query(
+            `SELECT id, title, content, "fileUrl", "fileType",
+             (1 - (embedding <=> :vector::vector)) as similarity
+             FROM "Notes"
+             WHERE "user" = :userId AND "embedding" IS NOT NULL
+             ORDER BY similarity DESC
+             LIMIT 50`,
+            { replacements: { vector: vectorStr, userId }, type: db.QueryTypes.SELECT }
+          )
+        ]);
+
+        const rrfNotesMap = new Map();
+        lexicalNotes.forEach((item, idx) => {
+          rrfNotesMap.set(item.id, { item, score: 1 / (k + (idx + 1)) });
+        });
+        vectorNotes.forEach((item, idx) => {
+          if (rrfNotesMap.has(item.id)) {
+            rrfNotesMap.get(item.id).score += 1 / (k + (idx + 1));
+          } else {
+            rrfNotesMap.set(item.id, { item, score: 1 / (k + (idx + 1)) });
           }
-        );
+        });
+
+        notes = Array.from(rrfNotesMap.values())
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 10)
+          .map(entry => ({
+            id: entry.item.id,
+            title: entry.item.title,
+            content: entry.item.content,
+            fileUrl: entry.item.fileUrl,
+            fileType: entry.item.fileType,
+            score: parseFloat(entry.score.toFixed(6)),
+          }));
+
+        // 2. QUIZZES HYBRID SEARCH WITH RRF
+        const [lexicalQuizzes, vectorQuizzes] = await Promise.all([
+          db.query(
+            `SELECT id, title, questions
+             FROM "Quizzes"
+             WHERE "createdBy" = :userId AND LOWER(title) LIKE LOWER(:query)
+             LIMIT 50`,
+            { replacements: { query: queryLike, userId }, type: db.QueryTypes.SELECT }
+          ),
+          db.query(
+            `SELECT id, title, questions,
+             (1 - (embedding <=> :vector::vector)) as similarity
+             FROM "Quizzes"
+             WHERE "createdBy" = :userId AND "embedding" IS NOT NULL
+             ORDER BY similarity DESC
+             LIMIT 50`,
+            { replacements: { vector: vectorStr, userId }, type: db.QueryTypes.SELECT }
+          )
+        ]);
+
+        const rrfQuizzesMap = new Map();
+        lexicalQuizzes.forEach((item, idx) => {
+          rrfQuizzesMap.set(item.id, { item, score: 1 / (k + (idx + 1)) });
+        });
+        vectorQuizzes.forEach((item, idx) => {
+          if (rrfQuizzesMap.has(item.id)) {
+            rrfQuizzesMap.get(item.id).score += 1 / (k + (idx + 1));
+          } else {
+            rrfQuizzesMap.set(item.id, { item, score: 1 / (k + (idx + 1)) });
+          }
+        });
+
+        quizzes = Array.from(rrfQuizzesMap.values())
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 10)
+          .map(entry => ({
+            id: entry.item.id,
+            title: entry.item.title,
+            questionsCount: Array.isArray(entry.item.questions) ? entry.item.questions.length : 0,
+            score: parseFloat(entry.score.toFixed(6)),
+          }));
+
       } catch (dbErr) {
-        logger.warn('[SearchController] pgvector query failed, running lexical fallback:', dbErr.message);
+        logger.warn('[SearchController] pgvector RRF query failed, running lexical fallback:', dbErr.message);
         queryVector = null; // trigger fallback
       }
     }
@@ -174,7 +235,7 @@ exports.semanticSearch = async (req, res, next) => {
     // Lexical fallback if vector generation failed or pgvector query failed
     if (!queryVector) {
       const queryLike = `%${q}%`;
-      notes = await Note.findAll({
+      const fallbackNotes = await Note.findAll({
         where: {
           user: userId,
           [Op.or]: [
@@ -185,32 +246,36 @@ exports.semanticSearch = async (req, res, next) => {
         limit: 10,
       });
 
-      quizzes = await Quiz.findAll({
+      const fallbackQuizzes = await Quiz.findAll({
         where: {
           createdBy: userId,
           title: { [Op.iLike]: queryLike },
         },
         limit: 10,
       });
+
+      notes = fallbackNotes.map(n => ({
+        id: n.id,
+        title: n.title,
+        content: n.content,
+        fileUrl: n.fileUrl,
+        fileType: n.fileType,
+        score: 0,
+      }));
+
+      quizzes = fallbackQuizzes.map(q => ({
+        id: q.id,
+        title: q.title,
+        questionsCount: Array.isArray(q.questions) ? q.questions.length : 0,
+        score: 0,
+      }));
     }
 
     res.status(200).json({
       success: true,
       data: {
-        notes: notes.map(n => ({
-          id: n.id,
-          title: n.title,
-          content: n.content,
-          fileUrl: n.fileUrl,
-          fileType: n.fileType,
-          score: parseFloat((n.similarity * 0.7 + n.lexicalScore * 0.3 || 0).toFixed(4)),
-        })),
-        quizzes: quizzes.map(q => ({
-          id: q.id,
-          title: q.title,
-          questionsCount: Array.isArray(q.questions) ? q.questions.length : 0,
-          score: parseFloat((q.similarity * 0.7 + q.lexicalScore * 0.3 || 0).toFixed(4)),
-        })),
+        notes,
+        quizzes,
       },
     });
   } catch (error) {

@@ -1,9 +1,9 @@
 const { semanticSearch } = require('../../controllers/searchController');
 const { Note, Quiz } = require('../../models');
-const embeddingService = require('../../services/embeddingService');
+const embeddingsProcessor = require('../../services/embeddingsProcessor');
 const { sequelize: db } = require('../../config/db');
 
-describe('Search Controller - Semantic Hybrid Queries', () => {
+describe('Search Controller - Semantic Hybrid Queries using RRF', () => {
   let req, res, next;
 
   beforeEach(() => {
@@ -22,18 +22,19 @@ describe('Search Controller - Semantic Hybrid Queries', () => {
     next = vi.fn();
   });
 
-  test('semanticSearch calls vector generator, runs DB queries and returns sorted list', async () => {
-    vi.spyOn(embeddingService, 'generateVector').mockResolvedValue(Array(768).fill(0.15));
+  test('semanticSearch calls vector generator, runs DB queries and returns RRF sorted list', async () => {
+    vi.spyOn(embeddingsProcessor, 'generateVector').mockResolvedValue(Array(768).fill(0.15));
 
     vi.spyOn(db, 'query').mockImplementation(async (sql) => {
       if (sql.includes('"Notes"')) {
+        // Return 1 match for lexical and 1 match for vector
         return [
-          { id: 'note-1', title: 'Calculus Limits', similarity: 0.85, lexicalScore: 1.0 }
+          { id: 'note-1', title: 'Calculus Limits', content: 'Formulas' }
         ];
       }
       if (sql.includes('"Quizzes"')) {
         return [
-          { id: 'quiz-1', title: 'JEE Calculus Test', questions: [{}], similarity: 0.72, lexicalScore: 0.0 }
+          { id: 'quiz-1', title: 'JEE Calculus Test', questions: [{}] }
         ];
       }
       return [];
@@ -41,18 +42,18 @@ describe('Search Controller - Semantic Hybrid Queries', () => {
 
     await semanticSearch(req, res, next);
 
-    expect(embeddingService.generateVector).toHaveBeenCalledWith('Calculus proofs');
-    expect(db.query).toHaveBeenCalledTimes(2);
+    expect(embeddingsProcessor.generateVector).toHaveBeenCalledWith('Calculus proofs');
+    expect(db.query).toHaveBeenCalledTimes(4); // 2 notes queries + 2 quizzes queries
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
         success: true,
         data: expect.objectContaining({
           notes: expect.arrayContaining([
-            expect.objectContaining({ id: 'note-1', score: 0.895 }) // (0.85 * 0.7) + (1.0 * 0.3) = 0.595 + 0.3 = 0.895
+            expect.objectContaining({ id: 'note-1', score: 0.032787 }) // 1/61 + 1/61 = 0.032787
           ]),
           quizzes: expect.arrayContaining([
-            expect.objectContaining({ id: 'quiz-1', score: 0.504 }) // (0.72 * 0.7) + (0.0 * 0.3) = 0.504
+            expect.objectContaining({ id: 'quiz-1', score: 0.032787 }) // 1/61 + 1/61 = 0.032787
           ])
         })
       })
@@ -60,7 +61,7 @@ describe('Search Controller - Semantic Hybrid Queries', () => {
   });
 
   test('semanticSearch runs lexical fallback if vector generation or DB queries fail', async () => {
-    vi.spyOn(embeddingService, 'generateVector').mockRejectedValue(new Error('API quota limit'));
+    vi.spyOn(embeddingsProcessor, 'generateVector').mockRejectedValue(new Error('API quota limit'));
 
     vi.spyOn(Note, 'findAll').mockResolvedValue([
       { id: 'note-9', title: 'Calculus Notes', content: 'Limit functions.' }
