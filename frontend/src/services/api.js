@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { store } from '../store';
+import { store } from '../store/index.js';
 import { logout } from '../store/slices/authSlice';
 import {
   DEFAULT_TIMEOUT_MS,
@@ -365,5 +365,11 @@ export const generateRemediationQuiz = (payload) =>
  */
 export const evaluateSubjectiveAnswer = (payload) =>
   API.post('/quizzes/evaluate-subjective', payload);
+
+export const getQuizRecommendations = (userId, params) =>
+  API.get(`/recommendations/${userId}`, { params });
+
+export const logRecommendationHit = (userId, payload) =>
+  API.post(`/recommendations/${userId}/hit`, payload);
 
 export default API;

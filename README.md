@@ -35,6 +35,7 @@ Most students waste critical preparation hours trying to figure out:
 - **📅 Smart Study Planner**: Input your exam date, syllabus scope, and study hours to generate a customized, calendarized study schedule.
 - **🎯 Weakness Detection**: Tracks performance across quiz attempts to dynamically highlight weak subjects and adapt study goals.
 - **📚 Spaced Repetition Flashcards**: Memorize complex concepts using flashcards backed by the SuperMemo SM-2 adaptation algorithm.
+- **💻 Live Collaborative Coding Interview Room**: Real-time pair-programming space with Monaco editor, multi-cursor presence, instant code execution sandbox, chat, and WebRTC video. [Read Guide](./docs/collaborative-interview.md)
 
 ---
 

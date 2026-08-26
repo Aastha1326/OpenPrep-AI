@@ -1,4 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
+import { BrowserRouter } from 'react-router-dom';
 import API from '../../services/api';
 import NotesWidget from './NotesWidget';
 
@@ -10,7 +11,7 @@ vi.mock('../../services/api', () => ({
   },
 }));
 
-vi.mock('./RecordVoiceNoteModal', () => ({
+vi.mock('./VoiceNoteRecorderModal', () => ({
   default: ({ isOpen, onClose }) => isOpen ? (
     <div data-testid="record-voice-note-modal">
       RecordVoiceNoteModal
@@ -56,13 +57,13 @@ afterEach(() => {
 describe('NotesWidget', () => {
   it('shows an empty state when there are no notes', async () => {
     API.get.mockResolvedValue({ data: { data: [] } });
-    render(<NotesWidget />);
+    render(<BrowserRouter><NotesWidget /></BrowserRouter>);
     expect(await screen.findByText(/No notes yet/)).toBeInTheDocument();
   });
 
   it('renders the list of notes with summarize buttons', async () => {
     API.get.mockResolvedValue({ data: { data: mockNotes } });
-    render(<NotesWidget />);
+    render(<BrowserRouter><NotesWidget /></BrowserRouter>);
 
     expect(await screen.findByText('Data Structures')).toBeInTheDocument();
     expect(screen.getByText('Calculus')).toBeInTheDocument();
@@ -74,7 +75,7 @@ describe('NotesWidget', () => {
     API.get.mockResolvedValue({ data: { data: mockNotes } });
     API.post.mockResolvedValue({ data: { data: mockSummary } });
     setupSpeech();
-    render(<NotesWidget />);
+    render(<BrowserRouter><NotesWidget /></BrowserRouter>);
 
     fireEvent.click((await screen.findAllByText('Summarize'))[0]);
 
@@ -87,7 +88,7 @@ describe('NotesWidget', () => {
 
   it('shows an error when loading notes fails and can retry', async () => {
     API.get.mockRejectedValue({ response: { data: { error: 'Server error' } } });
-    render(<NotesWidget />);
+    render(<BrowserRouter><NotesWidget /></BrowserRouter>);
 
     expect(await screen.findByText('Server error')).toBeInTheDocument();
 
@@ -98,7 +99,7 @@ describe('NotesWidget', () => {
 
   it('opens and closes RecordVoiceNoteModal when the record button is clicked', async () => {
     API.get.mockResolvedValue({ data: { data: [] } });
-    render(<NotesWidget />);
+    render(<BrowserRouter><NotesWidget /></BrowserRouter>);
 
     const recordBtn = await screen.findByText('Record Voice Note');
     fireEvent.click(recordBtn);
@@ -124,7 +125,7 @@ describe('NotesWidget', () => {
     ];
 
     API.get.mockResolvedValue({ data: { data: audioNotes } });
-    render(<NotesWidget />);
+    render(<BrowserRouter><NotesWidget /></BrowserRouter>);
 
     expect(await screen.findByText('Voice Lecture 1')).toBeInTheDocument();
     
