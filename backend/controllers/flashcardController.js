@@ -10,6 +10,8 @@ const User = require('../models/User');
 const Exam = require('../models/Exam');
 const FlashcardDeck = require('../models/FlashcardDeck');
 const DeckCollaborator = require('../models/DeckCollaborator');
+const PodcastEpisode = require('../models/PodcastEpisode');
+const audioPodcastService = require('../services/audioPodcastService');
 const { calculateTopicProficiency, getDifficultyLevel } = require('../services/proficiencyService');
 const remediationService = require('../services/remediationService');
 const { checkAndAwardBadges } = require('../services/achievementService');
@@ -1567,3 +1569,85 @@ exports.batchSyncOfflineReviews = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Queue/generate audio podcast episode for a flashcard deck
+// @route   POST /api/flashcards/:deckId/generate-podcast
+// @access  Private
+exports.generateDeckPodcast = async (req, res, next) => {
+  try {
+    const { deckId } = req.params;
+    const { ambientTrack = 'lofi' } = req.body;
+
+    let deck = await FlashcardDeck.findByPk(deckId);
+    let cards = [];
+    if (deck) {
+      if (deck.user !== req.user.id && !deck.isPublic) {
+        return res.status(403).json({ success: false, error: 'Not authorized to access this deck' });
+      }
+      cards = await Flashcard.findAll({ where: { deckId: deck.id } });
+    } else {
+      deck = await Subject.findByPk(deckId);
+      if (deck) {
+        if (deck.user !== req.user.id && !deck.isPublic) {
+          return res.status(403).json({ success: false, error: 'Not authorized to access this subject/deck' });
+        }
+        cards = await Flashcard.findAll({ where: { subject: deck.id } });
+      }
+    }
+
+    if (!deck) {
+      return res.status(404).json({ success: false, error: 'Flashcard deck not found' });
+    }
+
+    if (!cards || cards.length === 0) {
+      return res.status(400).json({ success: false, error: 'Flashcard deck has no flashcards to process' });
+    }
+
+    const episode = await audioPodcastService.generatePodcastForDeck(deck, cards, {
+      userId: req.user.id,
+      ambientTrack,
+    });
+
+    return res.status(201).json({
+      success: true,
+      data: episode,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get podcast episode details with timestamped transcript
+// @route   GET /api/flashcards/podcasts/:id
+// @access  Private
+exports.getPodcastEpisodeById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const episode = await PodcastEpisode.findByPk(id);
+
+    if (!episode) {
+      return res.status(404).json({ success: false, error: 'Podcast episode not found' });
+    }
+
+    if (episode.userId !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'Not authorized to access this podcast episode' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        id: episode.id,
+        title: episode.title,
+        audioUrl: episode.audioUrl,
+        durationSeconds: episode.durationSeconds,
+        ambientTrack: episode.ambientTrack,
+        status: episode.status,
+        transcript: episode.transcript || [],
+        createdAt: episode.createdAt,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

@@ -255,10 +255,10 @@ const extractFilename = (url) => {
   }
 };
 
-app.get('/uploads/:filename', protect, async (req, res, next) => {
+app.get(['/uploads/:filename', '/uploads/podcasts/:filename'], protect, async (req, res, next) => {
   try {
     const filename = req.params.filename;
-    const fileUrl = `/uploads/${filename}`;
+    const fileUrl = req.path;
 
     // Direct match first (fast path for standard format)
     let record = await Note.findOne({ where: { fileUrl } });
@@ -325,7 +325,14 @@ app.get('/uploads/:filename', protect, async (req, res, next) => {
     }
 
     res.set('Cache-Control', 'private, max-age=86400'); // 1 day cache for protected assets
-    res.sendFile(path.join(__dirname, 'uploads', filename));
+    let filePath = path.join(__dirname, 'uploads', filename);
+    if (!fs.existsSync(filePath)) {
+      const podcastPath = path.join(__dirname, 'uploads', 'podcasts', filename);
+      if (fs.existsSync(podcastPath)) {
+        filePath = podcastPath;
+      }
+    }
+    res.sendFile(filePath);
   } catch (error) {
     next(error);
   }
