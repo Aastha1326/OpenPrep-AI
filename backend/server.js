@@ -533,6 +533,7 @@ require('./sockets/focusRoomHandler')(io);
 require('./sockets/studyRoomSocket')(io);
 require('./sockets/interviewSocket')(io);
 require('./sockets/interviewSignalling')(io);
+require('./sockets/noteSyncHandler')(io);
 require('./services/webrtcSignalingService')(io);
 // Authenticate Socket.io connections
 io.use((socket, next) => {
@@ -562,6 +563,9 @@ io.on('connection', (socket) => {
 // Start background schedulers
 const { startScheduler } = require('./services/weeklyDigestService');
 startScheduler();
+
+const { startReconciliationScheduler } = require('./services/otSyncService');
+startReconciliationScheduler();
 
 const { initStudyReminderCron } = require('./jobs/studyReminderCron');
 const { initStreakReminderCron } = require('./jobs/streakReminderCron');
@@ -603,6 +607,14 @@ const gracefulShutdown = (signal) => {
   server.close(async () => {
     logger.info('HTTP connections drained, closing resource pools');
     clearTimeout(forceExitTimeout);
+
+    try {
+      const { stopReconciliationScheduler } = require('./services/otSyncService');
+      stopReconciliationScheduler();
+      logger.info('OT reconciliation scheduler stopped');
+    } catch (otErr) {
+      logger.error('error stopping OT reconciliation scheduler', { err: otErr });
+    }
 
     try {
       const { stopWorker } = require('./workers/squadActivityWorker');
