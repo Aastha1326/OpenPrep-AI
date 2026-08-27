@@ -639,6 +639,17 @@ const gracefulShutdown = (signal) => {
     }
 
     try {
+      // Drain queued search-index writes before the pools close, so an
+      // in-flight embedding does not fire against a shutting-down process.
+      const searchIndex = require('./services/searchIndexService');
+      await searchIndex.drain();
+      searchIndex.shutdown();
+      logger.info('search index queue drained');
+    } catch (indexErr) {
+      logger.error('error draining search index queue', { err: indexErr });
+    }
+
+    try {
       const { sequelize } = require('./config/db');
       await sequelize.close();
       logger.info('postgres connection pool closed');
