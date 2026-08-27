@@ -44,6 +44,7 @@ const PYQAnalytics = lazy(() => import('./pages/PYQAnalytics'));
 const QuizSession = lazy(() => import('./pages/QuizSession'));
 const MindMapViewer = lazy(() => import('./pages/MindMapViewer'));
 const StudyPlanner = lazy(() => import('./pages/StudyPlanner'));
+const StudyGoals = lazy(() => import('./pages/StudyGoals'));
 const VivaSimulator = lazy(() => import('./pages/VivaSimulator'));
 const CollaborativeNoteView = lazy(() => import('./pages/CollaborativeNoteView'));
 const SquadsPage = lazy(() => import('./pages/SquadsPage'));
@@ -315,6 +316,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <MindMapViewer />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/study-goals"
+            element={
+              <ProtectedRoute>
+                <StudyGoals />
               </ProtectedRoute>
             }
           />

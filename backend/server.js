@@ -285,6 +285,8 @@ app.use('/api/squads', squadRoutes);
 app.use('/api/badges', badgeRoutes);
 app.use('/api/community', communityRoutes);
 app.use('/api/visualizer', visualizerRoutes);
+const studyGoalRoutes = require('./routes/studyGoalRoutes');
+app.use('/api/study-goals', studyGoalRoutes);
 
 // Serve static assets from frontend build folder in production
 if (process.env.NODE_ENV === 'production') {
