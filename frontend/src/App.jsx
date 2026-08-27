@@ -12,7 +12,7 @@ import SessionTimeoutModal from './components/SessionTimeoutModal';
 import SessionRestoreModal from './components/SessionRestoreModal';
 import API from './services/api';
 import QuotaExceededModal from './components/dashboard/QuotaExceededModal';
-import CommandPalette from './components/search/CommandPalette';
+import GlobalSearchModal from './components/search/GlobalSearchModal';
 import OfflineBanner from './components/common/OfflineBanner';
 import OfflineStatusBanner from './components/common/OfflineStatusBanner';
 import PwaInstallPrompt from './components/common/PwaInstallPrompt';
@@ -178,7 +178,7 @@ function App() {
       <QuotaExceededModal />
       <SessionTimeoutModal />
       <Walkthrough />
-      <CommandPalette isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+      <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
       {localStorage.getItem('token') && <PomodoroWidget />}
       <main id="main-content" tabIndex="-1" role="main" className="focus:outline-none min-h-screen">
         <Suspense fallback={<PageSkeleton />}>

@@ -1,6 +1,7 @@
 const { Topic, FlashcardDeck, Quiz, StudyPlan } = require('../models');
 const { Op } = require('sequelize');
 const { sequelize: db } = require('../config/db');
+const hybridSearchService = require('../services/hybridSearchService');
 
 // @desc    Global search across topics, decks, quizzes, and study plan tasks
 // @route   GET /api/search
@@ -12,6 +13,7 @@ exports.globalSearch = async (req, res, next) => {
       return res.status(200).json({
         success: true,
         data: {
+          results: [],
           topics: [],
           decks: [],
           quizzes: [],
@@ -21,6 +23,12 @@ exports.globalSearch = async (req, res, next) => {
     }
 
     const userId = req.user.id;
+    const results = await hybridSearchService.search({
+      userId,
+      query: q,
+      type: req.query.type || 'all',
+      subject: req.query.subject,
+    });
     const queryLike = `%${q}%`;
 
     // 1. Search Topics
@@ -98,6 +106,7 @@ exports.globalSearch = async (req, res, next) => {
     res.status(200).json({
       success: true,
       data: {
+        results,
         topics,
         decks,
         quizzes,
