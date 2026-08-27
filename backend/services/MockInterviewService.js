@@ -201,10 +201,16 @@ const feedback = {
             session.transcript || []
         );
 
-        await session.save();
+await session.save(); // Triggers beforeSave hook for duration calculation
 
-        return session;
-    }
+// Update only the ranking partitions affected by this evaluation.
+const {
+    updateCandidateRanking,
+} = require('./candidateRankingService');
+
+await updateCandidateRanking(session);
+
+return session;    }
 
     static async getEvaluationMetadata(sessionId, userId) {
         const session = await MockInterview.findOne({

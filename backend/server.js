@@ -401,7 +401,9 @@ app.use('/api/gamification', gamificationRoutes);
 app.use('/api/battles', battleRoutes);
 app.use('/api/folders', folderRoutes);
 app.use('/api/badges', badgeRoutes);
-app.get('/user/badges', protect, require('./controllers/badgeController').getUserBadges);
+
+const leaderboardRoutes = require('./routes/leaderboardRoutes');
+app.use('/api/leaderboard', leaderboardRoutes);app.get('/user/badges', protect, require('./controllers/badgeController').getUserBadges);
 app.get('/api/user/badges', protect, require('./controllers/badgeController').getUserBadges);
 app.get('/api/leaderboard', protect, require('./controllers/badgeController').getLeaderboardData);
 app.get('/leaderboard', protect, require('./controllers/badgeController').getLeaderboardData);
@@ -599,7 +601,32 @@ if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
 }
 
 module.exports = app;
+const {
+  validatePartition,
+} = require('./services/candidateRankingService');
 
+// Validate the global candidate ranking cache once every night.
+// This does not run for every interview.
+cron.schedule('0 2 * * *', async () => {
+  try {
+    const result = await validatePartition(
+      'global',
+      'all'
+    );
+
+    logger.info(
+      'candidate ranking consistency check completed',
+      result
+    );
+  } catch (error) {
+    logger.error(
+      'candidate ranking consistency check failed',
+      {
+        error: error.message,
+      }
+    );
+  }
+});
 
 // Graceful Shutdown Logic
 const gracefulShutdown = (signal) => {

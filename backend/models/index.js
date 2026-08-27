@@ -52,6 +52,7 @@ const LearningPath = require('./LearningPath');
 const NotificationSettings = require('./NotificationSettings');
 const WeaknessReport = require('./WeaknessReport');
 const SkillDependency = require('./SkillDependency');const SecurityAuditLog = require('./SecurityAuditLog');
+const CandidateRanking = require('./CandidateRanking');
 const MockInterview = require('./MockInterview');
 const InterviewProcessingJob = require('./InterviewProcessingJob');const MockInterview = require('./MockInterview');
 const EvaluationVersion = require('./EvaluationVersion');const { Bounty, initBounty } = require('./Bounty');
@@ -387,6 +388,7 @@ module.exports = {
   NotificationSettings,
 WeaknessReport,
 SkillDependency,  SecurityAuditLog,
+CandidateRanking,
   MockInterview,
   InterviewProcessingJob,  MockInterview,
   EvaluationVersion,  Bounty,
