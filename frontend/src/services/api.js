@@ -375,6 +375,30 @@ export const getQuizRecommendations = (userId, params) =>
 export const logRecommendationHit = (userId, payload) =>
   API.post(`/recommendations/${userId}/hit`, payload);
 
+// ── Doubt Session (Socratic Hint) APIs ──────────────────────────────
+/**
+ * Start a new doubt-solving session.
+ * POST /api/doubts/start
+ * @param {FormData} formData – must include "question"; optionally "image" file.
+ */
+export const startDoubtSession = (formData) =>
+  API.post('/doubts/start', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 60000,
+  });
+
+/**
+ * Send a follow-up message in an existing doubt session.
+ * POST /api/doubts/:id/message
+ */
+export const sendDoubtMessage = (sessionId, message) =>
+  API.post(`/doubts/${sessionId}/message`, { message });
+
+/**
+ * Reveal the next progressive hint for a doubt session.
+ * POST /api/doubts/:id/reveal-step
+ */
+export const revealDoubtStep = (sessionId) =>
+  API.post(`/doubts/${sessionId}/reveal-step`);
+
 export default API;
-
-
