@@ -55,6 +55,7 @@ const LearningPath = require('./LearningPath');
 const NotificationSettings = require('./NotificationSettings');
 const WeaknessReport = require('./WeaknessReport');
 const SecurityAuditLog = require('./SecurityAuditLog');
+const MilestoneReward = require('./MilestoneReward');
 const { Bounty, initBounty } = require('./Bounty');
 const { BountySolution, initBountySolution } = require('./BountySolution');
 const { BountySolutionVote, initBountySolutionVote } = require('./BountySolutionVote');
@@ -305,6 +306,10 @@ User.hasMany(DeckRating, { foreignKey: 'userId', as: 'ratings', onDelete: 'CASCA
 DeckRating.belongsTo(Subject, { foreignKey: 'deckId', as: 'deckRef', onDelete: 'CASCADE' });
 Subject.hasMany(DeckRating, { foreignKey: 'deckId', as: 'ratings', onDelete: 'CASCADE' });
 
+// MilestoneReward associations
+User.hasMany(MilestoneReward, { foreignKey: 'user', onDelete: 'CASCADE' });
+MilestoneReward.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
 module.exports = {
   sequelize,
   User,
@@ -364,4 +369,5 @@ module.exports = {
   Bounty,
   BountySolution,
   BountySolutionVote,
+  MilestoneReward,
 };
