@@ -410,6 +410,8 @@ app.use('/api/learning-path', require('./routes/learningPathRoutes'));
 app.use('/user/learning-path', require('./routes/learningPathRoutes'));
 const studyGoalRoutes = require('./routes/studyGoalRoutes');
 app.use('/api/study-goals', studyGoalRoutes);
+const focusSessionAnalyticsRoutes = require('./routes/focusSessionAnalyticsRoutes');
+app.use('/api/focus-analytics', focusSessionAnalyticsRoutes);
 
 // Serve static assets from frontend build folder in production
 if (process.env.NODE_ENV === 'production') {

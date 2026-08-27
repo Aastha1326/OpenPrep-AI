@@ -59,6 +59,7 @@ const StudySquadDashboard = lazy(() => import('./pages/SquadsPage'));
 const CollabNote = lazy(() => import('./pages/CollaborativeNoteView'));
 const LiveQuizSession = lazy(() => import('./pages/LiveQuizSession'));
 const InterviewRoomPage = lazy(() => import('./pages/InterviewRoomPage'));
+const FocusSessionAnalyticsPage = lazy(() => import('./pages/FocusSessionAnalyticsPage'));
 
 function App() {
 
@@ -437,6 +438,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <SquadsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/focus-analytics"
+            element={
+              <ProtectedRoute>
+                <FocusSessionAnalyticsPage />
               </ProtectedRoute>
             }
           />

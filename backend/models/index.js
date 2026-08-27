@@ -58,6 +58,7 @@ const { BountySolutionVote, initBountySolutionVote } = require('./BountySolution
 const StudyGoal = require('./StudyGoal');
 const StudyGoalProgress = require('./StudyGoalProgress');
 const WeeklyStudyReport = require('./WeeklyStudyReport');
+const FocusSessionLog = require('./FocusSessionLog');
 
 initBounty(sequelize);
 initBountySolution(sequelize);
@@ -190,6 +191,9 @@ UserBadge.belongsTo(Badge, { foreignKey: 'badgeCode', targetKey: 'id', as: 'badg
 
 // FocusSession associations
 FocusSession.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
+// FocusSessionLog associations
+FocusSessionLog.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 
 // QuizTelemetryEvent associations
 QuizTelemetryEvent.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
@@ -341,6 +345,7 @@ module.exports = {
   StudyGoal,
   StudyGoalProgress,
   WeeklyStudyReport,
+  FocusSessionLog,
   UserBadge,
   Badge,
   BattleSession,
