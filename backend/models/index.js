@@ -55,11 +55,13 @@ const SecurityAuditLog = require('./SecurityAuditLog');
 const { Bounty, initBounty } = require('./Bounty');
 const { BountySolution, initBountySolution } = require('./BountySolution');
 const { BountySolutionVote, initBountySolutionVote } = require('./BountySolutionVote');
+const StudyGoal = require('./StudyGoal');
+const StudyGoalProgress = require('./StudyGoalProgress');
+const WeeklyStudyReport = require('./WeeklyStudyReport');
 
 initBounty(sequelize);
 initBountySolution(sequelize);
 initBountySolutionVote(sequelize);
-
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -287,6 +289,22 @@ User.hasMany(WeaknessReport, { foreignKey: 'user', onDelete: 'CASCADE' });
 WeaknessReport.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 Subject.hasMany(WeaknessReport, { foreignKey: 'subject', onDelete: 'SET NULL' });
 WeaknessReport.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef' });
+
+// StudyGoal associations
+User.hasMany(StudyGoal, { foreignKey: 'user', onDelete: 'CASCADE' });
+StudyGoal.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+StudyGoal.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'SET NULL' });
+Subject.hasMany(StudyGoal, { foreignKey: 'subject', onDelete: 'SET NULL' });
+
+// StudyGoalProgress associations
+StudyGoal.hasMany(StudyGoalProgress, { foreignKey: 'goalId', onDelete: 'CASCADE' });
+StudyGoalProgress.belongsTo(StudyGoal, { foreignKey: 'goalId', as: 'goalRef' });
+User.hasMany(StudyGoalProgress, { foreignKey: 'user', onDelete: 'CASCADE' });
+StudyGoalProgress.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
+// WeeklyStudyReport associations
+User.hasMany(WeeklyStudyReport, { foreignKey: 'user', onDelete: 'CASCADE' });
+WeeklyStudyReport.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 // DeckRating associations
 DeckRating.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 User.hasMany(DeckRating, { foreignKey: 'userId', as: 'ratings', onDelete: 'CASCADE' });
@@ -320,6 +338,9 @@ module.exports = {
   QuizTelemetryEvent,
   QuizBookmark,
   DeckRating,
+  StudyGoal,
+  StudyGoalProgress,
+  WeeklyStudyReport,
   UserBadge,
   Badge,
   BattleSession,
