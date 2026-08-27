@@ -369,6 +369,9 @@ export const generateRemediationQuiz = (payload) =>
 export const evaluateSubjectiveAnswer = (payload) =>
   API.post('/quizzes/evaluate-subjective', payload);
 
+export const generateDistractors = (payload) =>
+  API.post('/quizzes/generate-distractors', payload);
+
 export const getQuizRecommendations = (userId, params) =>
   API.get(`/recommendations/${userId}`, { params });
 
