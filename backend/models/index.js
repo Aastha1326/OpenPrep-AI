@@ -50,6 +50,7 @@ const HandwrittenSubmission = require('./HandwrittenSubmission');
 const LearningPath = require('./LearningPath');
 const NotificationSettings = require('./NotificationSettings');
 const WeaknessReport = require('./WeaknessReport');
+const ExamStrategy = require('./ExamStrategy');
 
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -269,6 +270,12 @@ User.hasMany(WeaknessReport, { foreignKey: 'user', onDelete: 'CASCADE' });
 WeaknessReport.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 Subject.hasMany(WeaknessReport, { foreignKey: 'subject', onDelete: 'SET NULL' });
 WeaknessReport.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef' });
+
+// ExamStrategy associations
+User.hasMany(ExamStrategy, { foreignKey: 'user', onDelete: 'CASCADE' });
+ExamStrategy.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+Exam.hasMany(ExamStrategy, { foreignKey: 'exam', onDelete: 'CASCADE' });
+ExamStrategy.belongsTo(Exam, { foreignKey: 'exam', as: 'examRef' });
 // DeckRating associations
 DeckRating.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 User.hasMany(DeckRating, { foreignKey: 'userId', as: 'ratings', onDelete: 'CASCADE' });
@@ -316,4 +323,5 @@ module.exports = {  sequelize,  User,  Exam,
   QuizRoom,
   AuditLog,
   Question,
+  ExamStrategy,
 };

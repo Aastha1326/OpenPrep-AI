@@ -92,6 +92,7 @@ const analyticsInsightsRoutes = require('./routes/analyticsInsightsRoutes');
 const adaptiveExamRoutes = require('./routes/adaptiveExamRoutes');
 const diagramQuestionRoutes = require('./routes/diagramQuestionRoutes');
 const classroomRoutes = require('./routes/classroomRoutes');
+const examStrategyRoutes = require('./routes/examStrategyRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 const { initNightlyBadgeEvaluatorCron } = require('./services/badgeEvaluationService');
@@ -396,6 +397,7 @@ app.get('/api/leaderboard', protect, require('./controllers/badgeController').ge
 app.get('/leaderboard', protect, require('./controllers/badgeController').getLeaderboardData);
 app.use('/api/visualizer', visualizerRoutes);
 app.use('/api/analytics-insights', analyticsInsightsRoutes);
+app.use('/api/exam-strategies', examStrategyRoutes);
 app.use('/api/learning-path', require('./routes/learningPathRoutes'));
 app.use('/user/learning-path', require('./routes/learningPathRoutes'));
 
