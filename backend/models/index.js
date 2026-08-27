@@ -53,6 +53,7 @@ const NotificationSettings = require('./NotificationSettings');
 const WeaknessReport = require('./WeaknessReport');
 const SecurityAuditLog = require('./SecurityAuditLog');
 const MockInterview = require('./MockInterview');
+const InterviewProcessingJob = require('./InterviewProcessingJob');const MockInterview = require('./MockInterview');
 const EvaluationVersion = require('./EvaluationVersion');const { Bounty, initBounty } = require('./Bounty');
 const { BountySolution, initBountySolution } = require('./BountySolution');
 const { BountySolutionVote, initBountySolutionVote } = require('./BountySolutionVote');
@@ -302,6 +303,15 @@ MockInterview.belongsTo(EvaluationVersion, {
   foreignKey: 'evaluationVersionId',
   as: 'evaluationVersion',
 });
+MockInterview.hasOne(InterviewProcessingJob, {
+  foreignKey: 'interviewId',
+  as: 'processingJob',
+});
+
+InterviewProcessingJob.belongsTo(MockInterview, {
+  foreignKey: 'interviewId',
+  as: 'interview',
+});
 module.exports = {
   sequelize,
   User,
@@ -356,6 +366,7 @@ module.exports = {
   WeaknessReport,
   SecurityAuditLog,
   MockInterview,
+  InterviewProcessingJob,  MockInterview,
   EvaluationVersion,  Bounty,
   BountySolution,
   BountySolutionVote,

@@ -71,7 +71,19 @@ MockInterview.init(
             comment: 'Evidence, AI model, prompt version, and confidence metadata for interview feedback',
         },        startedAt: { type: DataTypes.DATE, allowNull: true },
         completedAt: { type: DataTypes.DATE, allowNull: true },
-        evaluationVersionId: {
+        processingState: {
+            type: DataTypes.STRING(30),
+            allowNull: false,
+            defaultValue: 'IDLE',
+        },
+        processingError: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+        },
+        processingUpdatedAt: {
+            type: DataTypes.DATE,
+            allowNull: true,
+        },        evaluationVersionId: {
             type: DataTypes.UUID,
             allowNull: true,
         },

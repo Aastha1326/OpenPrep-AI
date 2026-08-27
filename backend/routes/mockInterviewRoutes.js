@@ -46,5 +46,20 @@ router.post('/:id/reply', MockInterviewController.submitReply);
  * @desc    End session and generate final telemetry scoring
  */
 router.post('/:id/conclude', MockInterviewController.conclude);
+/**
+ * @route   GET /api/interviews/:id/processing-status
+ * @desc    Get asynchronous interview processing status
+ */
+router.get(
+  '/:id/processing-status',
+  MockInterviewController.processingStatus
+);
 
+/**
+ * @route   POST /api/interviews/:id/processing-retry/:jobId
+ * @desc    Retry a failed interview processing job
+ */
+router.post(
+  '/:id/processing-retry/:jobId',  MockInterviewController.retryProcessing
+);
 module.exports = router;

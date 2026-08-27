@@ -142,14 +142,99 @@ class MockInterviewController {
     static async conclude(req, res) {
         try {
             const userId = req.user?.id || req.body.userId;
-            const finalSession = await MockInterviewService.concludeSession(req.params.id, userId);
 
-            return res.status(200).json({ success: true, data: finalSession });
+            const session = await MockInterviewService.concludeSession(
+                req.params.id,
+                userId
+            );
+
+            const {
+                enqueueProcessing,
+            } = require('../services/interviewProcessingService');
+
+            const processing = await enqueueProcessing(
+                session.id,
+                userId
+            );
+
+            return res.status(202).json({
+                success: true,
+                data: {
+                    interviewId: session.id,
+                    processingJobId: processing.job.id,
+                    status: processing.job.status,
+                    processingState: session.processingState,
+                    duplicate: processing.duplicate,
+                },
+            });
         } catch (error) {
             console.error('[conclude error]', error);
-            res.status(400).json({ error: error.message || 'Failed to conclude session' });
+            res.status(400).json({
+                error:
+                    error.message ||
+                    'Failed to queue interview processing',
+            });
         }
     }
-}
+
+    // GET /api/interviews/:id/processing-status
+    static async processingStatus(req, res) {
+        try {
+            const userId = req.user?.id || req.body.userId;
+
+            const {
+                getJobStatus,
+            } = require('../services/interviewProcessingService');
+
+            const status = await getJobStatus(
+                req.params.id,
+                userId
+            );
+
+            return res.status(200).json({
+                success: true,
+                data: status,
+            });
+        } catch (error) {
+            console.error('[processingStatus error]', error);
+            res.status(400).json({
+                error:
+                    error.message ||
+                    'Failed to get processing status',
+            });
+        }
+    }
+
+    // POST /api/interviews/:id/processing-retry
+    static async retryProcessing(req, res) {
+        try {
+            const userId = req.user?.id || req.body.userId;
+
+            const {
+                retryInterviewJob,
+            } = require('../services/interviewProcessingService');
+
+            const job = await retryInterviewJob(
+                req.params.jobId,
+                userId
+            );
+
+            return res.status(202).json({
+                success: true,
+                data: {
+                    jobId: job.id,
+                    status: job.status,
+                    currentStage: job.currentStage,
+                },
+            });
+        } catch (error) {
+            console.error('[retryProcessing error]', error);
+            res.status(400).json({
+                error:
+                    error.message ||
+                    'Failed to retry interview processing',
+            });
+        }
+    }}
 
 module.exports = MockInterviewController;

@@ -576,7 +576,18 @@ startWorker();
 const { startWorker: startTaskWorker } = require('./workers/taskQueueWorker');
 startTaskWorker();
 
+const {
+  registerWorker: registerInterviewProcessingWorker,
+  recoverStaleJobs,
+} = require('./services/interviewProcessingService');
 
+registerInterviewProcessingWorker();
+
+recoverStaleJobs().catch((error) => {
+  logger.error('failed to recover stale interview processing jobs', {
+    err: error,
+  });
+});
 if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   server.listen(PORT, () => {
     logger.info('server started', {
