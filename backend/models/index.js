@@ -59,10 +59,15 @@ const MockInterviewSession = require('./MockInterviewSession');
 const { Bounty, initBounty } = require('./Bounty');
 const { BountySolution, initBountySolution } = require('./BountySolution');
 const { BountySolutionVote, initBountySolutionVote } = require('./BountySolutionVote');
+const { ModeratorAuditLog, initModeratorAuditLog } = require('./ModeratorAuditLog');
 
 initBounty(sequelize);
 initBountySolution(sequelize);
 initBountySolutionVote(sequelize);
+// AnalyticsService already destructures ModeratorAuditLog out of this module.
+// Without the init and the export below it resolved to undefined, so every
+// moderation-log read and write in that service threw on first call.
+initModeratorAuditLog(sequelize);
 
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -328,6 +333,7 @@ module.exports = {
   QuestionComment,
   CommentVote,
   CommentFlag,
+  ModeratorAuditLog,
   Flashcard,
   FlashcardDeck,
   DeckCollaborator,
