@@ -15,6 +15,7 @@ const Achievement = require('../models/Achievement');
 const sendEmail = require('../services/emailService');
 
 const MAX_ACTIVE_SESSIONS = parseInt(process.env.MAX_ACTIVE_SESSIONS, 10) || 10;
+const jwtSecret = process.env.JWT_SECRET;
 
 const getAuthCookieOptions = () => ({
   httpOnly: true,
@@ -134,8 +135,6 @@ const sendVerificationEmail = async (user) => {
     text: `Hi ${user.name || 'there'},\n\nConfirm your email address to activate your OpenPrep AI account:\n\n${verifyUrl}\n\nThis link expires in 24 hours. If you didn't create an account, you can ignore this message.`,
     html: `<p>Hi ${user.name || 'there'},</p><p>Confirm your email address to activate your OpenPrep AI account:</p><p><a href="${verifyUrl}">Verify my email</a></p><p>This link expires in 24 hours. If you didn't create an account, you can ignore this message.</p>`,
   });
-
-  return rawToken;
 };
 
 /**
@@ -157,8 +156,6 @@ const sendPasswordResetEmail = async (user) => {
     text: `Hi ${user.name || 'there'},\n\nUse the link below to choose a new password:\n\n${resetUrl}\n\nThis link expires in 1 hour. If you didn't request a reset, no action is needed.`,
     html: `<p>Hi ${user.name || 'there'},</p><p>Use the link below to choose a new password:</p><p><a href="${resetUrl}">Reset my password</a></p><p>This link expires in 1 hour. If you didn't request a reset, no action is needed.</p>`,
   });
-
-  return rawToken;
 };
 
 /**
@@ -241,7 +238,7 @@ const sendPasswordResetOtp = async (user) => {
  */
 exports.register = async (req, res, next) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password } = req.body;
 
     let user = await User.findOne({ where: { email } });
     if (user) {
@@ -252,7 +249,7 @@ exports.register = async (req, res, next) => {
       name,
       email,
       password,
-      role: role || 'student',
+      role: 'student',
     });
 
     const accessToken = generateAccessToken(user.id);
@@ -931,7 +928,7 @@ exports.refreshToken = async (req, res, next) => {
 };
 
 const { OAuth2Client } = require('google-auth-library');
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID || '179369126060-lq7unpt173rt6aog2nt93s6m895d6b2i.apps.googleusercontent.com');
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // ---------------------------------------------------------------------------
 // @desc    Google OAuth Login / Register via credential token
@@ -956,15 +953,10 @@ exports.googleLogin = async (req, res, next) => {
         googleId = payload.sub;
         picture = payload.picture;
       } catch (verifyErr) {
-        // Fallback: decode JWT token
-        const payload = jwt.decode(credential);
-        if (!payload || !payload.email) {
-          return res.status(400).json({ success: false, error: 'Invalid Google credential' });
-        }
-        email = payload.email;
-        name = payload.name || payload.given_name;
-        googleId = payload.sub;
-        picture = payload.picture;
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid Google credential - token verification failed',
+        });
       }
     } else if (access_token) {
       // Access token flow via Google UserInfo API
@@ -1562,3 +1554,28 @@ exports.verifyEmail = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Keepalive session update - refreshes access token and extends session timestamp
+// @route   POST /api/session/keepalive or POST /api/auth/session/keepalive
+// @access  Private
+exports.keepalive = async (req, res, next) => {
+  try {
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    const token = generateAccessToken(user.id);
+    res.cookie('token', token, getAccessTokenCookieOptions());
+
+    res.status(200).json({
+      success: true,
+      message: 'Session expiration extended successfully',
+      token,
+      expiresAt: Date.now() + 15 * 60 * 1000,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

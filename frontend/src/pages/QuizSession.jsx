@@ -127,6 +127,8 @@ const QuizSession = () => {
   const [submitError, setSubmitError] = useState(null);
 
   const [savedSessionBanner, setSavedSessionBanner] = useState(null);
+  
+  const animatedScore = useCountUp(result?.score ?? 0, 1500, submitted);
   const startedAtRef = useRef(Date.now());
 
   const submittingRef = useRef(false);
@@ -211,8 +213,41 @@ const QuizSession = () => {
     }
   };
 
-const fetchQuiz = useCallback(async () => {
+  const [adaptiveInfo, setAdaptiveInfo] = useState(null);
+
+  const fetchNextAdaptiveQuestion = useCallback(async () => {
     try {
+      const res = await API.get('/quiz/next');
+      const data = res.data;
+      if (data?.success && data?.question) {
+        setAdaptiveInfo({
+          difficulty: data.difficulty,
+          skillScore: data.skillScore,
+        });
+        const dynamicQuiz = {
+          id: 'adaptive',
+          title: `Adaptive Quiz (${data.difficulty} Level - Rating ${Math.round(data.skillScore || 1000)})`,
+          timeLimit: 15,
+          questions: [data.question],
+        };
+        setQuiz(dynamicQuiz);
+        const totalSeconds = 15 * SECONDS_PER_QUESTION;
+        setTimeLeft(totalSeconds);
+        endTimeRef.current = Date.now() + totalSeconds * 1000;
+        setLoading(false);
+      }
+    } catch (err) {
+      console.error('Failed to fetch adaptive question:', err);
+    }
+  }, []);
+
+  const fetchQuiz = useCallback(async () => {
+    try {
+      if (id === 'adaptive' || id === 'next') {
+        await fetchNextAdaptiveQuestion();
+        return;
+      }
+
       const res = await API.get(`/quizzes/${id}`);
       const loadedQuiz = res.data.data;
       setQuiz(loadedQuiz);
@@ -231,7 +266,7 @@ const fetchQuiz = useCallback(async () => {
       setError('Failed to load quiz details.');
       setLoading(false);
     }
-  }, [id]);
+  }, [id, fetchNextAdaptiveQuestion]);
 
   useEffect(() => {
     fetchQuiz();
@@ -489,7 +524,7 @@ const submitQuiz = useCallback(async () => {
     const loadBookmarks = async () => {
       try {
         const res = await API.get(`/quizzes/${id}/bookmarks`);
-        setBookmarkedIds(new Set(res.data?.data || []));
+        setBookmarkedIds(new Set(Array.isArray(res.data?.data) ? res.data.data : []));
       } catch (err) {
         console.error('Failed to load bookmarks:', err);
       }
@@ -618,7 +653,6 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
       return true;
     });
 
-  const animatedScore = useCountUp(result?.score ?? 0, 1500, submitted);
   const motivationalMessage = getScoreMotivationalMessage(result?.score ?? 0);
   return (
     <div className="min-h-screen bg-slate-900 text-white py-6 sm:py-10 px-3 sm:px-6 md:px-20">
@@ -693,7 +727,14 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
 
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8 border-b border-slate-700 pb-4">
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-100">{quiz.title}</h1>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-100">{quiz.title}</h1>
+            {adaptiveInfo && (
+              <span className="inline-flex items-center gap-1.5 mt-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                <FaBrain className="w-3 h-3" /> Adaptive Tier: {adaptiveInfo.difficulty} ({Math.round(adaptiveInfo.skillScore || 1000)})
+              </span>
+            )}
+          </div>
           {!submitted && (
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <AudioWaveform status={status} />
@@ -755,6 +796,13 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
             <h2 className="text-lg sm:text-xl font-semibold mb-6 leading-relaxed break-words whitespace-pre-wrap">
               <MathRenderer text={currentQuestion.questionText} />
             </h2>
+
+            <button 
+              onClick={() => alert("Socratic Hint: Remember the core principles and try eliminating options that don't fit the pattern.")}
+              className="mb-4 text-sm text-indigo-400 hover:text-indigo-300 underline"
+            >
+              Get a Hint
+            </button>
 
             <div className="space-y-3 mb-8">
               {(currentQuestion.options || []).map((option, index) => {

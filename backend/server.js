@@ -11,6 +11,7 @@ const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
 const { connectDB } = require('./config/db');
+const { Op } = require('sequelize');
 const errorHandler = require('./middleware/error');
 const logger = require('./utils/logger');
 const requestLogger = require('./middleware/requestLogger');
@@ -21,9 +22,15 @@ const PYQ = require('./models/PYQ');
 const Note = require('./models/Note');
 const Achievement = require('./models/Achievement');
 const swaggerSpec = require('./config/swagger');
-const { apiReference } = require('@scalar/express-api-reference');
+let apiReference;
+try {
+  apiReference = require('@scalar/express-api-reference').apiReference;
+} catch (e) {
+  apiReference = null;
+}
 const passport = require('./config/passport');
 const { getCorsMiddleware, getSocketCorsOrigin } = require('./middleware/corsHandler');
+const { metricsMiddleware, getMetrics } = require('./middleware/metricsMiddleware');
 
 // Validate the whole environment against the schema in config/env.js before
 // anything else loads. Reports every problem at once and exits in production;
@@ -60,6 +67,7 @@ const noteRoutes = require('./routes/noteRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const searchRoutes = require('./routes/searchRoutes');
 const progressRoutes = require('./routes/progressRoutes');
+const handwrittenSubmissionRoutes = require('./routes/handwrittenSubmissionRoutes');
 const communityRoutes = require('./routes/communityRoutes');
 const userRoutes = require('./routes/userRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
@@ -80,10 +88,32 @@ const readinessRoutes = require('./routes/readinessRoutes');
 const squadRoutes = require('./routes/squadRoutes');
 const badgeRoutes = require('./routes/badgeRoutes');
 const visualizerRoutes = require('./routes/visualizerRoutes');
+const analyticsInsightsRoutes = require('./routes/analyticsInsightsRoutes');
+const adaptiveExamRoutes = require('./routes/adaptiveExamRoutes');
+const diagramQuestionRoutes = require('./routes/diagramQuestionRoutes');
+const classroomRoutes = require('./routes/classroomRoutes');
+const sessionRoutes = require('./routes/sessionRoutes');
+const recommendationRoutes = require('./routes/recommendationRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
-
+const { initNightlyBadgeEvaluatorCron } = require('./services/badgeEvaluationService');
+const { initNotificationScheduler } = require('./services/notificationSchedulerService');
 initDifficultyCalibratorCron();
+initNightlyBadgeEvaluatorCron();
+initNotificationScheduler();
+
+const cron = require('node-cron');
+const calendarService = require('./services/calendarService');
+
+// Run webhook channel renewal daily at midnight
+cron.schedule('0 0 * * *', async () => {
+  try {
+    await calendarService.renewExpiringWebhookChannels();
+    logger.info('Google Calendar Webhook Channels renewed successfully.');
+  } catch (err) {
+    logger.error('Failed to renew Google Calendar Webhook Channels:', err);
+  }
+});
 
 // Connect to Database
 connectDB();
@@ -165,17 +195,24 @@ app.use(passport.initialize());
 // Cookie parser (required for csurf cookie-based tokens)
 app.use(cookieParser());
 
+// Prometheus metrics middleware
+app.use(metricsMiddleware);
+
 // CSRF protection middleware
 // The batched quiz-telemetry endpoint is flushed via navigator.sendBeacon()
 // on tab close/navigation, which cannot attach a CSRF header. It's already
 // protected by its own JWT-based auth (see middleware/telemetryAuth.js), so
-// CSRF protection is skipped only for this one route.
+// CSRF protection is skipped only for this one route and /metrics.
 app.use((req, res, next) => {
-  if (req.path === '/api/quiz/telemetry/batch' || req.path === '/api/quizzes/telemetry/batch') {
+  if (req.path === '/api/quiz/telemetry/batch' || req.path === '/api/quizzes/telemetry/batch' || req.path === '/metrics') {
     return next();
   }
   return doubleCsrfProtection(req, res, next);
 });
+
+// Prometheus Metrics Exporter Endpoint
+app.get('/metrics', getMetrics);
+
 // CSRF Token Endpoint for frontend clients
 app.get('/api/csrf-token', (req, res) => {
   const token = generateCsrfToken(req, res);
@@ -206,11 +243,24 @@ app.use('/uploads/avatars', express.static(path.join(__dirname, 'uploads/avatars
 // Set Static Folder for File Uploads (Protected)
 // protect, Note, PYQ already imported at top of file
 
-app.get('/uploads/:filename', protect, async (req, res, next) => {
+// Helper to extract filename from a stored URL (handles full URLs and different path formats)
+const extractFilename = (url) => {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    return path.basename(parsed.pathname);
+  } catch {
+    // Not a full URL, treat as path
+    return path.basename(url);
+  }
+};
+
+app.get(['/uploads/:filename', '/uploads/podcasts/:filename'], protect, async (req, res, next) => {
   try {
     const filename = req.params.filename;
-    const fileUrl = `/uploads/${filename}`;
+    const fileUrl = req.path;
 
+    // Direct match first (fast path for standard format)
     let record = await Note.findOne({ where: { fileUrl } });
     let isPublic = false;
     let owner = null;
@@ -231,6 +281,41 @@ app.get('/uploads/:filename', protect, async (req, res, next) => {
       }
     }
 
+    // Fallback: fuzzy match by extracting filename from stored URLs
+    // Handles cases where stored URL is a full URL or has different path format
+    if (!record) {
+      const allNotes = await Note.findAll({ where: { fileUrl: { [Op.ne]: null } } });
+      for (const note of allNotes) {
+        if (extractFilename(note.fileUrl) === filename) {
+          record = note;
+          isPublic = note.isPublic;
+          owner = note.user;
+          break;
+        }
+      }
+    }
+    if (!record) {
+      const allPyqs = await PYQ.findAll({ where: { fileUrl: { [Op.ne]: null } } });
+      for (const pyq of allPyqs) {
+        if (extractFilename(pyq.fileUrl) === filename) {
+          record = pyq;
+          owner = pyq.user;
+          break;
+        }
+      }
+    }
+    if (!record) {
+      const { PodcastEpisode } = require('./models');
+      const allEpisodes = await PodcastEpisode.findAll({ where: { audioUrl: { [Op.ne]: null } } });
+      for (const episode of allEpisodes) {
+        if (extractFilename(episode.audioUrl) === filename) {
+          record = episode;
+          owner = episode.userId;
+          break;
+        }
+      }
+    }
+
     if (!record) {
       return res.status(404).json({ success: false, error: 'File not found' });
     }
@@ -240,7 +325,14 @@ app.get('/uploads/:filename', protect, async (req, res, next) => {
     }
 
     res.set('Cache-Control', 'private, max-age=86400'); // 1 day cache for protected assets
-    res.sendFile(path.join(__dirname, 'uploads', filename));
+    let filePath = path.join(__dirname, 'uploads', filename);
+    if (!fs.existsSync(filePath)) {
+      const podcastPath = path.join(__dirname, 'uploads', 'podcasts', filename);
+      if (fs.existsSync(podcastPath)) {
+        filePath = podcastPath;
+      }
+    }
+    res.sendFile(filePath);
   } catch (error) {
     next(error);
   }
@@ -248,10 +340,22 @@ app.get('/uploads/:filename', protect, async (req, res, next) => {
 
 // Mount routes
 app.use('/api/auth', authRoutes);
+app.use('/api/session', sessionRoutes);
+app.use('/session', sessionRoutes);
+app.post('/api/session/keepalive', protect, require('./controllers/authController').keepalive);
 app.use('/api/academic', academicRoutes);
+// 1. Mount the Previous Year Questions (PYQ) Router on the canonical plural path
 app.use('/api/pyqs', pyqRoutes);
-app.use('/api/pyq', pyqRoutes);
+
+// 2. Intercept legacy singular endpoint calls and redirect with proper HTTP semantics
+app.use('/api/pyq', (req, res) => {
+  // Construct the new path maintaining any nested sub-routes and query parameters
+  const canonicalPath = req.originalUrl.replace(/^\/api\/pyq/, '/api/pyqs');
+  
+  res.status(301).redirect(canonicalPath);
+});
 app.use('/api/community', communityRoutes);
+app.use('/api/bounties', require('./routes/bountyRoutes'));
 app.use('/api/squads', squadRoutes);
 app.use('/api/study', fatigueRoutes);
 app.use('/api/documents', pdfAnnotationRoutes);
@@ -259,6 +363,8 @@ app.use('/api/sync', syncRoutes);
 app.use('/api/study-plans', studyPlanRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/quiz', quizRoutes);
+app.use('/api/recommendations', recommendationRoutes);
+app.use('/recommendations', recommendationRoutes);
 app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/flashcard-decks', flashcardDeckRoutes);
 app.use('/api/decks', require('./routes/publicDeckRoutes'));
@@ -266,27 +372,44 @@ app.use('/api/share', shareRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/submissions', handwrittenSubmissionRoutes);
 app.use('/api/progress', progressRoutes);
 app.use('/api/users', userRoutes);
 app.get('/api/user/quota', protect, require('./controllers/userController').getQuota);
+app.put('/api/user/preferences/timezone', protect, require('./controllers/userController').updateTimezone);
+app.get('/api/user/notifications/settings', protect, require('./controllers/userController').getNotificationSettings);
+app.put('/api/user/notifications/settings', protect, require('./controllers/userController').updateNotificationSettings);
+app.get('/api/user/dashboard', protect, require('./controllers/userController').getDashboardLayout);
+app.post('/api/user/dashboard', protect, require('./controllers/userController').updateDashboardLayout);
 app.use('/api/ai', aiRoutes);
-app.use('/api/ai-editor', aiEditorRoutes);
 app.use('/api/quiz-battles', quizBattleRoutes);
+app.use('/api/adaptive-exams', adaptiveExamRoutes);
+app.use('/api/quizzes/diagram-hotspot', diagramQuestionRoutes);
+app.use('/api/diagram-hotspots', diagramQuestionRoutes);
+app.use('/api/classrooms', classroomRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/readiness', readinessRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/dashboard', analyticsRoutes);
 app.use('/api/calendar', calendarRoutes);
+app.use('/api/integrations/google-calendar', calendarRoutes);
+app.use('/api/deck-versioning', require('./routes/deckVersionRoutes'));
+app.use('/api/integrations', require('./routes/integrationRoutes'));
 app.use('/api/gamification', gamificationRoutes);
 app.use('/api/battles', battleRoutes);
 app.use('/api/folders', folderRoutes);
-app.use('/api/squads', squadRoutes);
 app.use('/api/badges', badgeRoutes);
-app.use('/api/community', communityRoutes);
+app.get('/user/badges', protect, require('./controllers/badgeController').getUserBadges);
+app.get('/api/user/badges', protect, require('./controllers/badgeController').getUserBadges);
+app.get('/api/leaderboard', protect, require('./controllers/badgeController').getLeaderboardData);
+app.get('/leaderboard', protect, require('./controllers/badgeController').getLeaderboardData);
 app.use('/api/visualizer', visualizerRoutes);
 const studyGoalRoutes = require('./routes/studyGoalRoutes');
 app.use('/api/study-goals', studyGoalRoutes);
+app.use('/api/analytics-insights', analyticsInsightsRoutes);
+app.use('/api/learning-path', require('./routes/learningPathRoutes'));
+app.use('/user/learning-path', require('./routes/learningPathRoutes'));
 
 // Serve static assets from frontend build folder in production
 if (process.env.NODE_ENV === 'production') {
@@ -382,7 +505,25 @@ const io = new Server(server, {
   // tabs, so active lobby players aren't disconnected on a missed heartbeat.
   pingTimeout: 60000,
   pingInterval: 25000,
+  connectionStateRecovery: {
+    maxDisruption: 120000,
+    restoreSession: true,
+  },
 });
+
+// Configure Redis adapter for multi-instance pub/sub if available
+try {
+  const { createAdapter } = require('@socket.io/redis-adapter');
+  if (redisService.client) {
+    const pubClient = redisService.client;
+    const subClient = pubClient.duplicate();
+    io.adapter(createAdapter(pubClient, subClient));
+    logger.info('Socket.io Redis adapter configured successfully');
+  }
+} catch (adapterErr) {
+  logger.warn('Socket.io Redis adapter skipped or failed to initialize, using memory adapter instead:', { err: adapterErr.message });
+}
+
 global.io = io;
 // Initialize socket handlers
 require('./sockets/battleHandler')(io);
@@ -391,6 +532,9 @@ require('./sockets/crdtHandler')(io);
 require('./sockets/squadHandler')(io);
 require('./sockets/flashcardCollaborationHandler')(io);
 require('./sockets/focusRoomHandler')(io);
+require('./sockets/studyRoomSocket')(io);
+require('./sockets/interviewSocket')(io);
+require('./services/webrtcSignalingService')(io);
 // Authenticate Socket.io connections
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
@@ -427,6 +571,12 @@ initStudyReminderCron(io);
 initStreakReminderCron(io);
 initBackupScheduler();
 
+const { startWorker } = require('./workers/squadActivityWorker');
+startWorker();
+
+const { startWorker: startTaskWorker } = require('./workers/taskQueueWorker');
+startTaskWorker();
+
 
 if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   server.listen(PORT, () => {
@@ -454,6 +604,22 @@ const gracefulShutdown = (signal) => {
   server.close(async () => {
     logger.info('HTTP connections drained, closing resource pools');
     clearTimeout(forceExitTimeout);
+
+    try {
+      const { stopWorker } = require('./workers/squadActivityWorker');
+      stopWorker();
+      logger.info('squad activity worker stopped');
+    } catch (workerErr) {
+      logger.error('error stopping squad activity worker', { err: workerErr });
+    }
+
+    try {
+      const { stopWorker: stopTaskWorker } = require('./workers/taskQueueWorker');
+      stopTaskWorker();
+      logger.info('task queue worker stopped');
+    } catch (taskWorkerErr) {
+      logger.error('error stopping task queue worker', { err: taskWorkerErr });
+    }
 
     try {
       const { sequelize } = require('./config/db');

@@ -51,6 +51,7 @@ const FlashcardCard = ({ flashcard, style, rowIndex, columnIndex, cardIndex }) =
         onKeyDown={handleKeyDown}
         aria-label={isFlipped ? 'Show front of card' : 'Show back of card'}
         className="w-full h-full relative cursor-pointer select-none perspective-1000"
+        style={{
           touchAction: 'manipulation',
         }}
       >

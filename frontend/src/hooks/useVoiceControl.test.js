@@ -1,11 +1,13 @@
 import { renderHook, act } from '@testing-library/react';
 import useVoiceControl from './useVoiceControl';
+import { describe, it, expect, vi, beforeEach, afterEach, test } from 'vitest';
 
 describe('useVoiceControl', () => {
   let MockRecognition;
   let mockRecognitionInstance;
   let mockSynth;
   let mockOnCommand;
+  let instances = [];
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -94,10 +96,6 @@ describe('useVoiceControl', () => {
 
     expect(result.current.status).toBe('PROCESSING');
     expect(mockOnCommand).toHaveBeenCalledWith('FLIP');
-
-    act(() => {
-      vi.advanceTimersByTime?.(500);
-    });
   });
 
   it('ignores commands below confidence threshold', () => {
@@ -182,19 +180,22 @@ describe('useVoiceControl', () => {
     expect(mockRecognitionInstance.abort).toHaveBeenCalled();
     expect(mockSynth.cancel).toHaveBeenCalled();
   });
+
   test('passes recognized transcript to the answer handler', async () => {
-  const onTranscript = vi.fn();
+    const onTranscript = vi.fn();
 
-  const { result } = renderHook(() =>
-    useVoiceControl({
-      onCommand: vi.fn(),
-      onTranscript,
-    })
-  );
+    const { result } = renderHook(() =>
+      useVoiceControl({
+        onCommand: vi.fn(),
+        onTranscript,
+      })
+    );
 
-  act(() => {
-    result.current.toggleVoiceMode();
-  });
+    act(() => {
+      result.current.toggleVoiceMode();
+    });
+
+    const recognition = instances[0];
 
   const recognition = mockRecognitionInstance;
 
@@ -207,38 +208,52 @@ describe('useVoiceControl', () => {
             transcript: 'A component is a reusable UI building block',
             confidence: 0.9,
           },
-        ],
-      ],
+        ]
+      ]
     });
   });
 
-  expect(onTranscript).toHaveBeenCalledWith(
-    'A component is a reusable UI building block',
-    0.9
-  );
-});
+    expect(onTranscript).toHaveBeenCalledWith(
+      'A component is a reusable UI building block',
+      0.9
+    );
+  });
 
-test('reports microphone permission errors without trapping the user in voice mode', async () => {
-  const { result } = renderHook(() =>
-    useVoiceControl({
-      onCommand: vi.fn(),
-      onTranscript: vi.fn(),
-    })
-  );
+  test('reports microphone permission errors without trapping the user in voice mode', async () => {
+    const { result } = renderHook(() =>
+      useVoiceControl({
+        onCommand: vi.fn(),
+        onTranscript: vi.fn(),
+      })
+    );
 
-  act(() => {
-    result.current.toggleVoiceMode();
+    act(() => {
+      result.current.toggleVoiceMode();
+    });
+
+    const recognition = instances[0];
+
+    act(() => {
+      recognition.onerror({
+        error: 'not-allowed',
+      });
+    });
+
+    expect(result.current.isEnabled).toBe(false);
+    expect(result.current.errorMsg).toMatch(/microphone permission/i);
   });
 
   const recognition = mockRecognitionInstance;
 
-  act(() => {
-    recognition.onerror({
-      error: 'not-allowed',
+    // Trigger onresult which transitions status to PROCESSING
+    act(() => {
+      mockRecognitionInstance.onresult({
+        results: [[{ transcript: 'flip', confidence: 0.9 }]]
+      });
     });
-  });
 
-  expect(result.current.isEnabled).toBe(false);
-  expect(result.current.errorMsg).toMatch(/microphone permission/i);
-});
+    expect(result.current.status).toBe('PROCESSING');
+    // Ensure it was not aborted during the status transition
+    expect(mockRecognitionInstance.abort).not.toHaveBeenCalled();
+  });
 });
