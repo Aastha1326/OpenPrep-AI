@@ -538,6 +538,8 @@ require('./sockets/flashcardCollaborationHandler')(io);
 require('./sockets/focusRoomHandler')(io);
 require('./sockets/studyRoomSocket')(io);
 require('./sockets/interviewSocket')(io);
+require('./sockets/interviewSignalling')(io);
+require('./sockets/noteSyncHandler')(io);
 require('./services/webrtcSignalingService')(io);
 // Authenticate Socket.io connections
 io.use((socket, next) => {
@@ -567,6 +569,9 @@ io.on('connection', (socket) => {
 // Start background schedulers
 const { startScheduler } = require('./services/weeklyDigestService');
 startScheduler();
+
+const { startReconciliationScheduler } = require('./services/otSyncService');
+startReconciliationScheduler();
 
 const { initStudyReminderCron } = require('./jobs/studyReminderCron');
 const { initStreakReminderCron } = require('./jobs/streakReminderCron');
@@ -610,6 +615,14 @@ const gracefulShutdown = (signal) => {
     clearTimeout(forceExitTimeout);
 
     try {
+      const { stopReconciliationScheduler } = require('./services/otSyncService');
+      stopReconciliationScheduler();
+      logger.info('OT reconciliation scheduler stopped');
+    } catch (otErr) {
+      logger.error('error stopping OT reconciliation scheduler', { err: otErr });
+    }
+
+    try {
       const { stopWorker } = require('./workers/squadActivityWorker');
       stopWorker();
       logger.info('squad activity worker stopped');
@@ -623,6 +636,17 @@ const gracefulShutdown = (signal) => {
       logger.info('task queue worker stopped');
     } catch (taskWorkerErr) {
       logger.error('error stopping task queue worker', { err: taskWorkerErr });
+    }
+
+    try {
+      // Drain queued search-index writes before the pools close, so an
+      // in-flight embedding does not fire against a shutting-down process.
+      const searchIndex = require('./services/searchIndexService');
+      await searchIndex.drain();
+      searchIndex.shutdown();
+      logger.info('search index queue drained');
+    } catch (indexErr) {
+      logger.error('error draining search index queue', { err: indexErr });
     }
 
     try {

@@ -55,6 +55,7 @@ const LearningPath = require('./LearningPath');
 const NotificationSettings = require('./NotificationSettings');
 const WeaknessReport = require('./WeaknessReport');
 const SecurityAuditLog = require('./SecurityAuditLog');
+const MockInterviewSession = require('./MockInterviewSession');
 const { Bounty, initBounty } = require('./Bounty');
 const { BountySolution, initBountySolution } = require('./BountySolution');
 const { BountySolutionVote, initBountySolutionVote } = require('./BountySolutionVote');
@@ -109,6 +110,8 @@ User.hasMany(Feedback, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(ActivityLog, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Achievement, { foreignKey: 'userId', as: 'achievements', onDelete: 'CASCADE' });
 User.hasMany(UserBadge, { foreignKey: 'userId', as: 'badgesRef', onDelete: 'CASCADE' });
+User.hasMany(SecurityAuditLog, { foreignKey: 'userId', as: 'securityLogs', onDelete: 'SET NULL' });
+User.hasMany(MockInterviewSession, { foreignKey: 'userId', as: 'mockInterviews', onDelete: 'CASCADE' });
 User.hasMany(Folder, { foreignKey: 'userId', onDelete: 'CASCADE' });
 User.hasOne(NotificationSettings, { foreignKey: 'userId', as: 'notificationSettings', onDelete: 'CASCADE' });
 
@@ -310,15 +313,9 @@ User.hasMany(DeckRating, { foreignKey: 'userId', as: 'ratings', onDelete: 'CASCA
 DeckRating.belongsTo(Subject, { foreignKey: 'deckId', as: 'deckRef', onDelete: 'CASCADE' });
 Subject.hasMany(DeckRating, { foreignKey: 'deckId', as: 'ratings', onDelete: 'CASCADE' });
 
-// Audit log associations.
-// Audit trails outlive the accounts they describe, so neither of these
-// cascades. modelRegistry.unit.test.js has asserted the SecurityAuditLog half
-// since it was written; the association it was looking for was never declared.
-User.hasMany(SecurityAuditLog, { foreignKey: 'userId', as: 'securityLogs', onDelete: 'SET NULL' });
-SecurityAuditLog.belongsTo(User, { foreignKey: 'userId', as: 'user' });
-ModeratorAuditLog.belongsTo(User, { foreignKey: 'moderatorId', as: 'moderator', onDelete: 'RESTRICT' });
-ModeratorAuditLog.belongsTo(User, { foreignKey: 'targetUserId', as: 'targetUser', onDelete: 'RESTRICT' });
-User.hasMany(ModeratorAuditLog, { foreignKey: 'targetUserId', as: 'moderationHistory' });
+const embeddingsProcessor = require('../services/embeddingsProcessor');
+embeddingsProcessor.attachHooks({ Note, Quiz });
+embeddingsProcessor.registerWorkerHandler({ Note, Quiz });
 
 module.exports = {
   sequelize,
@@ -377,6 +374,7 @@ module.exports = {
   NotificationSettings,
   WeaknessReport,
   SecurityAuditLog,
+  MockInterviewSession,
   Bounty,
   BountySolution,
   BountySolutionVote,
