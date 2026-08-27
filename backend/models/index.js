@@ -101,14 +101,6 @@ CommentVote.belongsTo(QuestionComment, { foreignKey: 'commentId', as: 'comment' 
 QuestionComment.hasMany(CommentFlag, { foreignKey: 'commentId', onDelete: 'CASCADE' });
 CommentFlag.belongsTo(QuestionComment, { foreignKey: 'commentId', as: 'comment' });
 CommentFlag.belongsTo(User, { foreignKey: 'reporterId', as: 'reporter' });
-// Audit trails outlive the accounts they describe, so neither of these
-// cascades. modelRegistry.unit.test.js has asserted the SecurityAuditLog half
-// since it was written; the association it was looking for was never declared.
-User.hasMany(SecurityAuditLog, { foreignKey: 'userId', as: 'securityLogs', onDelete: 'SET NULL' });
-SecurityAuditLog.belongsTo(User, { foreignKey: 'userId', as: 'user' });
-ModeratorAuditLog.belongsTo(User, { foreignKey: 'moderatorId', as: 'moderator', onDelete: 'RESTRICT' });
-ModeratorAuditLog.belongsTo(User, { foreignKey: 'targetUserId', as: 'targetUser', onDelete: 'RESTRICT' });
-User.hasMany(ModeratorAuditLog, { foreignKey: 'targetUserId', as: 'moderationHistory' });
 Note.hasMany(Question, { foreignKey: 'noteId', onDelete: 'CASCADE' });
 Question.belongsTo(Note, { foreignKey: 'noteId', as: 'noteRef' });
 User.hasMany(FlashcardDeck, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -317,6 +309,16 @@ DeckRating.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 User.hasMany(DeckRating, { foreignKey: 'userId', as: 'ratings', onDelete: 'CASCADE' });
 DeckRating.belongsTo(Subject, { foreignKey: 'deckId', as: 'deckRef', onDelete: 'CASCADE' });
 Subject.hasMany(DeckRating, { foreignKey: 'deckId', as: 'ratings', onDelete: 'CASCADE' });
+
+// Audit log associations.
+// Audit trails outlive the accounts they describe, so neither of these
+// cascades. modelRegistry.unit.test.js has asserted the SecurityAuditLog half
+// since it was written; the association it was looking for was never declared.
+User.hasMany(SecurityAuditLog, { foreignKey: 'userId', as: 'securityLogs', onDelete: 'SET NULL' });
+SecurityAuditLog.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+ModeratorAuditLog.belongsTo(User, { foreignKey: 'moderatorId', as: 'moderator', onDelete: 'RESTRICT' });
+ModeratorAuditLog.belongsTo(User, { foreignKey: 'targetUserId', as: 'targetUser', onDelete: 'RESTRICT' });
+User.hasMany(ModeratorAuditLog, { foreignKey: 'targetUserId', as: 'moderationHistory' });
 
 module.exports = {
   sequelize,
