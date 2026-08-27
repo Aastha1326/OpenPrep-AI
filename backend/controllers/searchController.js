@@ -23,12 +23,24 @@ exports.globalSearch = async (req, res, next) => {
     }
 
     const userId = req.user.id;
-    const results = await hybridSearchService.search({
-      userId,
-      query: q,
-      type: req.query.type || 'all',
-      subject: req.query.subject,
-    });
+
+    // Hybrid search is best-effort. It depends on an embedding provider, and
+    // before this guard a single rate-limit response from that provider failed
+    // the whole endpoint - including the topic, deck, quiz and task results
+    // below, which are plain SQL and never needed AI at all. This endpoint
+    // should never be less reliable than it was before the engine existed.
+    let results = [];
+    try {
+      results = await hybridSearchService.search({
+        userId,
+        query: q,
+        type: req.query.type || 'all',
+        subject: req.query.subject,
+      });
+    } catch (searchError) {
+      console.warn('[Search] Hybrid search unavailable, returning SQL results only:', searchError.message);
+    }
+
     const queryLike = `%${q}%`;
 
     // 1. Search Topics
