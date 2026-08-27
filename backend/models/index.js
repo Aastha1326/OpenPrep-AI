@@ -12,6 +12,9 @@ const Quiz = require('./Quiz');
 const QuizAttempt = require('./QuizAttempt');
 const Note = require('./Note');
 const Question = require('./Question');
+const QuestionComment = require('./QuestionComment');
+const CommentVote = require('./CommentVote');
+const CommentFlag = require('./CommentFlag');
 const Flashcard = require('./Flashcard');
 const FlashcardDeck = require('./FlashcardDeck');
 const DeckCollaborator = require('./DeckCollaborator');
@@ -84,6 +87,15 @@ User.hasMany(Note, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Flashcard, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Question, { foreignKey: 'user', onDelete: 'CASCADE' });
 Question.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+User.hasMany(QuestionComment, { foreignKey: 'authorId', onDelete: 'CASCADE' });
+QuestionComment.belongsTo(User, { foreignKey: 'authorId', as: 'author' });
+QuestionComment.hasMany(QuestionComment, { foreignKey: 'parentCommentId', as: 'replies', onDelete: 'CASCADE' });
+QuestionComment.belongsTo(QuestionComment, { foreignKey: 'parentCommentId', as: 'parent' });
+QuestionComment.hasMany(CommentVote, { foreignKey: 'commentId', onDelete: 'CASCADE' });
+CommentVote.belongsTo(QuestionComment, { foreignKey: 'commentId', as: 'comment' });
+QuestionComment.hasMany(CommentFlag, { foreignKey: 'commentId', onDelete: 'CASCADE' });
+CommentFlag.belongsTo(QuestionComment, { foreignKey: 'commentId', as: 'comment' });
+CommentFlag.belongsTo(User, { foreignKey: 'reporterId', as: 'reporter' });
 Note.hasMany(Question, { foreignKey: 'noteId', onDelete: 'CASCADE' });
 Question.belongsTo(Note, { foreignKey: 'noteId', as: 'noteRef' });
 User.hasMany(FlashcardDeck, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -306,6 +318,9 @@ module.exports = {
   QuizAttempt,
   Note,
   Question,
+  QuestionComment,
+  CommentVote,
+  CommentFlag,
   Flashcard,
   FlashcardDeck,
   DeckCollaborator,
