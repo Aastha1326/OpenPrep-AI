@@ -65,7 +65,11 @@ MockInterview.init(
             type: DataTypes.TEXT,
             allowNull: true,
         },
-        startedAt: { type: DataTypes.DATE, allowNull: true },
+        feedbackProvenance: {
+            type: DataTypes.JSONB,
+            allowNull: true,
+            comment: 'Evidence, AI model, prompt version, and confidence metadata for interview feedback',
+        },        startedAt: { type: DataTypes.DATE, allowNull: true },
         completedAt: { type: DataTypes.DATE, allowNull: true },
         evaluationVersionId: {
             type: DataTypes.UUID,

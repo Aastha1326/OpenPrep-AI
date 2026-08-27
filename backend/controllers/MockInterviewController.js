@@ -59,6 +59,54 @@ class MockInterviewController {
                 success: true,
                 data: evaluation,
             });
+                // GET /api/interviews/:id/feedback-provenance
+    static async getFeedbackProvenance(req, res) {
+        try {
+            const userId = req.user?.id || req.body.userId;
+
+            const session = await require('../models/MockInterview').findOne({
+                where: {
+                    id: req.params.id,
+                    userId,
+                },
+                attributes: [
+                    'id',
+                    'overallScore',
+                    'technicalScore',
+                    'communicationScore',
+                    'feedbackSummary',
+                    'feedbackProvenance',
+                ],
+            });
+
+            if (!session) {
+                return res.status(404).json({
+                    error: 'Interview session not found',
+                });
+            }
+
+            return res.status(200).json({
+                success: true,
+                data: {
+                    interviewId: session.id,
+                    scores: {
+                        overallScore: session.overallScore,
+                        technicalScore: session.technicalScore,
+                        communicationScore: session.communicationScore,
+                    },
+                    feedbackSummary: session.feedbackSummary,
+                    provenance: session.feedbackProvenance,
+                },
+            });
+        } catch (error) {
+            console.error('[getFeedbackProvenance error]', error);
+            return res.status(400).json({
+                error:
+                    error.message ||
+                    'Failed to get feedback provenance',
+            });
+        }
+    }
         } catch (error) {
             console.error('[getEvaluation error]', error);
             return res.status(400).json({

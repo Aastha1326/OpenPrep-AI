@@ -25,6 +25,14 @@ router.get(
  * @route   POST /api/interviews/:id/start
  * @desc    Launch an interview and receive first AI question
  */
+/**
+ * @route   GET /api/interviews/:id/feedback-provenance
+ * @desc    Get AI feedback evidence and provenance metadata
+ */
+router.get(
+    '/:id/feedback-provenance',
+    MockInterviewController.getFeedbackProvenance
+);
 router.post('/:id/start', MockInterviewController.start);
 
 /**
