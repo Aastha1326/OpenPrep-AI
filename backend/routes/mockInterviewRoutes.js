@@ -7,7 +7,20 @@ const MockInterviewController = require('../controllers/MockInterviewController'
  * @desc    Configure and schedule a new AI interview
  */
 router.post('/init', MockInterviewController.initiate);
+/**
+ * @route   GET /api/interviews/:id/evaluation
+ * @desc    Get the evaluation version and historical evaluation metadata
+ */
+router.get('/:id/evaluation', MockInterviewController.getEvaluation);
 
+/**
+ * @route   GET /api/interviews/:id/compare/:version
+ * @desc    Compare the interview against another evaluation version
+ */
+router.get(
+  '/:id/compare/:version',
+  MockInterviewController.compareEvaluation
+);
 /**
  * @route   POST /api/interviews/:id/start
  * @desc    Launch an interview and receive first AI question

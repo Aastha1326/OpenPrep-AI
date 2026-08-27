@@ -44,7 +44,52 @@ class MockInterviewController {
             res.status(400).json({ error: error.message || 'Failed to process reply' });
         }
     }
+    // GET /api/interviews/:id/evaluation
+    static async getEvaluation(req, res) {
+        try {
+            const userId = req.user?.id || req.body.userId;
 
+            const evaluation =
+                await MockInterviewService.getEvaluationMetadata(
+                    req.params.id,
+                    userId
+                );
+
+            return res.status(200).json({
+                success: true,
+                data: evaluation,
+            });
+        } catch (error) {
+            console.error('[getEvaluation error]', error);
+            return res.status(400).json({
+                error: error.message || 'Failed to get evaluation metadata',
+            });
+        }
+    }
+
+    // GET /api/interviews/:id/compare/:version
+    static async compareEvaluation(req, res) {
+        try {
+            const userId = req.user?.id || req.body.userId;
+
+            const comparison =
+                await MockInterviewService.compareEvaluationVersions(
+                    req.params.id,
+                    userId,
+                    req.params.version
+                );
+
+            return res.status(200).json({
+                success: true,
+                data: comparison,
+            });
+        } catch (error) {
+            console.error('[compareEvaluation error]', error);
+            return res.status(400).json({
+                error: error.message || 'Failed to compare evaluation versions',
+            });
+        }
+    }
     // POST /api/interviews/:id/conclude
     static async conclude(req, res) {
         try {

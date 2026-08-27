@@ -22,6 +22,7 @@ const PYQ = require('./models/PYQ');
 const Note = require('./models/Note');
 const Achievement = require('./models/Achievement');
 const swaggerSpec = require('./config/swagger');
+const mockInterviewRoutes = require('./routes/mockInterviewRoutes');
 let apiReference;
 try {
   apiReference = require('@scalar/express-api-reference').apiReference;
@@ -408,7 +409,7 @@ app.use('/api/visualizer', visualizerRoutes);
 app.use('/api/analytics-insights', analyticsInsightsRoutes);
 app.use('/api/learning-path', require('./routes/learningPathRoutes'));
 app.use('/user/learning-path', require('./routes/learningPathRoutes'));
-
+app.use('/api/interviews', mockInterviewRoutes);
 // Serve static assets from frontend build folder in production
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../frontend/dist')));

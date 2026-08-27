@@ -52,7 +52,8 @@ const LearningPath = require('./LearningPath');
 const NotificationSettings = require('./NotificationSettings');
 const WeaknessReport = require('./WeaknessReport');
 const SecurityAuditLog = require('./SecurityAuditLog');
-const { Bounty, initBounty } = require('./Bounty');
+const MockInterview = require('./MockInterview');
+const EvaluationVersion = require('./EvaluationVersion');const { Bounty, initBounty } = require('./Bounty');
 const { BountySolution, initBountySolution } = require('./BountySolution');
 const { BountySolutionVote, initBountySolutionVote } = require('./BountySolutionVote');
 
@@ -292,7 +293,15 @@ DeckRating.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 User.hasMany(DeckRating, { foreignKey: 'userId', as: 'ratings', onDelete: 'CASCADE' });
 DeckRating.belongsTo(Subject, { foreignKey: 'deckId', as: 'deckRef', onDelete: 'CASCADE' });
 Subject.hasMany(DeckRating, { foreignKey: 'deckId', as: 'ratings', onDelete: 'CASCADE' });
+EvaluationVersion.hasMany(MockInterview, {
+  foreignKey: 'evaluationVersionId',
+  as: 'interviews',
+});
 
+MockInterview.belongsTo(EvaluationVersion, {
+  foreignKey: 'evaluationVersionId',
+  as: 'evaluationVersion',
+});
 module.exports = {
   sequelize,
   User,
@@ -346,7 +355,8 @@ module.exports = {
   NotificationSettings,
   WeaknessReport,
   SecurityAuditLog,
-  Bounty,
+  MockInterview,
+  EvaluationVersion,  Bounty,
   BountySolution,
   BountySolutionVote,
 };
