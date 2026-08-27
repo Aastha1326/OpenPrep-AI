@@ -51,6 +51,7 @@ const LearningPath = require('./LearningPath');
 const NotificationSettings = require('./NotificationSettings');
 const WeaknessReport = require('./WeaknessReport');
 const ExamStrategy = require('./ExamStrategy');
+const StudyTip = require('./StudyTip');
 
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -274,8 +275,12 @@ WeaknessReport.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef' });
 // ExamStrategy associations
 User.hasMany(ExamStrategy, { foreignKey: 'user', onDelete: 'CASCADE' });
 ExamStrategy.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
-Exam.hasMany(ExamStrategy, { foreignKey: 'exam', onDelete: 'CASCADE' });
-ExamStrategy.belongsTo(Exam, { foreignKey: 'exam', as: 'examRef' });
+Exam.hasMany(ExamStrategy, { foreignKey: 'exam', onDelete: 'CASCADE' });ExamStrategy.belongsTo(Exam, { foreignKey: 'exam', as: 'examRef' });
+
+// StudyTip associations
+User.hasMany(StudyTip, { foreignKey: 'user', onDelete: 'CASCADE' });
+StudyTip.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
 // DeckRating associations
 DeckRating.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 User.hasMany(DeckRating, { foreignKey: 'userId', as: 'ratings', onDelete: 'CASCADE' });
@@ -324,4 +329,5 @@ module.exports = {  sequelize,  User,  Exam,
   AuditLog,
   Question,
   ExamStrategy,
+  StudyTip,
 };

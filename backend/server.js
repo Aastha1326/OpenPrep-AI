@@ -93,6 +93,7 @@ const adaptiveExamRoutes = require('./routes/adaptiveExamRoutes');
 const diagramQuestionRoutes = require('./routes/diagramQuestionRoutes');
 const classroomRoutes = require('./routes/classroomRoutes');
 const examStrategyRoutes = require('./routes/examStrategyRoutes');
+const studyTipRoutes = require('./routes/studyTipRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 const { initNightlyBadgeEvaluatorCron } = require('./services/badgeEvaluationService');
@@ -398,6 +399,7 @@ app.get('/leaderboard', protect, require('./controllers/badgeController').getLea
 app.use('/api/visualizer', visualizerRoutes);
 app.use('/api/analytics-insights', analyticsInsightsRoutes);
 app.use('/api/exam-strategies', examStrategyRoutes);
+app.use('/api/study-tips', studyTipRoutes);
 app.use('/api/learning-path', require('./routes/learningPathRoutes'));
 app.use('/user/learning-path', require('./routes/learningPathRoutes'));
 
