@@ -25,8 +25,22 @@ const Badge = sequelize.define(
       allowNull: true,
     },
     category: {
-      type: DataTypes.ENUM('streak', 'quiz', 'flashcard', 'study', 'achievement'),
+      type: DataTypes.ENUM('streak', 'quiz', 'flashcard', 'interview', 'study', 'achievement'),
       defaultValue: 'achievement',
+    },
+    criteriaType: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      defaultValue: 'streak_days',
+    },
+    criteriaThreshold: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 1,
+    },
+    pointsValue: {
+      type: DataTypes.INTEGER,
+      defaultValue: 100,
     },
     isActive: {
       type: DataTypes.BOOLEAN,

@@ -31,13 +31,13 @@ describe('ExamCountdownWidget', () => {
 
   // ── Renders nothing when no date provided ─────────────────────────────────
 
-  it('renders nothing when examDate is not provided', () => {
-    const { container } = render(
+  it('renders a set target exam button when examDate is not provided', () => {
+    render(
       <MemoryRouter>
         <ExamCountdownWidget examDate={null} examName="No Exam" />
       </MemoryRouter>
     );
-    expect(container.firstChild).toBeNull();
+    expect(screen.getByRole('button', { name: /Set your target exam/i })).toBeInTheDocument();
   });
 
   // ── Exam name is displayed ─────────────────────────────────────────────────

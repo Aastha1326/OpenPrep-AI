@@ -286,13 +286,14 @@ exports.toggleTaskCompletion = async (req, res, next) => {
       const gamificationService = require('../services/gamificationService');
       progression = await gamificationService.awardXP(req.user.id, 50, 'task_complete');
 
-      const timezoneOffset = Number(req.headers['x-timezone-offset']) || 0;
-      await gamificationService.updateStreak(req.user.id, timezoneOffset);
+      const timeZoneParam = req.headers['x-timezone'] || (req.headers['x-timezone-offset'] !== undefined ? Number(req.headers['x-timezone-offset']) : null);
+      await gamificationService.updateStreak(req.user.id, timeZoneParam);
 
       const user = await User.findByPk(req.user.id);
-      const newBadges = await gamificationService.checkAndUnlockBadges(user, 'task_complete', {
-        timezoneOffsetMinutes: timezoneOffset
-      });
+      const badgeDetails = req.headers['x-timezone']
+        ? { timeZone: req.headers['x-timezone'] }
+        : { timezoneOffsetMinutes: Number(req.headers['x-timezone-offset']) || 0 };
+      const newBadges = await gamificationService.checkAndUnlockBadges(user, 'task_complete', badgeDetails);
       progression.newBadges = newBadges;
     }
 
@@ -982,3 +983,46 @@ exports.getStudyPlan = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Get daily burndown chart datapoints and projected completion
+// @route   GET /api/study-plans/:id/burndown
+// @access  Private
+exports.getBurndown = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { calculateBurndownData } = require('../services/readinessScoreService');
+    const data = await calculateBurndownData(id, req.user.id);
+
+    res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    if (error.message.includes('not found')) {
+      return res.status(404).json({ success: false, error: error.message });
+    }
+    next(error);
+  }
+};
+
+// @desc    Get AI Exam Readiness Score & actionable recovery recommendations
+// @route   GET /api/study-plans/:id/readiness-score
+// @access  Private
+exports.getReadinessScore = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { calculateReadinessScore } = require('../services/readinessScoreService');
+    const data = await calculateReadinessScore(id, req.user.id);
+
+    res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    if (error.message.includes('not found')) {
+      return res.status(404).json({ success: false, error: error.message });
+    }
+    next(error);
+  }
+};
+

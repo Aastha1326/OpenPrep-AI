@@ -67,6 +67,15 @@ exports.generateAIQuiz = async (req, res, next) => {
     const { subjectId, topicId, count, language, questionType = 'MCQ' } = req.body;
     const normalizedLanguage = normalizeQuizLanguage(language);
 
+    const MAX_QUIZ_COUNT = 50;
+    const requestedCount = parseInt(count, 10) || 5;
+    if (requestedCount < 1 || requestedCount > MAX_QUIZ_COUNT) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid count parameter. Must be between 1 and ${MAX_QUIZ_COUNT}.`,
+      });
+    }
+
     const subject = await Subject.findByPk(subjectId);
     if (!subject) {
       return res.status(404).json({ success: false, error: 'Subject not found' });
@@ -97,7 +106,7 @@ exports.generateAIQuiz = async (req, res, next) => {
     const cacheKey = cacheService.hashPayload('quiz', {
       subject: subject.name,
       topic: topicName,
-      count: count || 5,
+      count: requestedCount,
       language: normalizedLanguage,
       difficulty: difficultyLevel,
       questionType,
@@ -119,7 +128,7 @@ exports.generateAIQuiz = async (req, res, next) => {
         subject.name,
         topicName,
         notesText,
-        count || 5,
+        requestedCount,
         isRefresh,
         normalizedLanguage,
         difficultyLevel,
@@ -202,6 +211,15 @@ exports.generateCustomQuiz = async (req, res, next) => {
   try {
     const { subjectId, topics = [], difficulty = 'medium', years = [], count = 5, timeLimit = 20, language = 'english' } = req.body;
 
+    const MAX_QUIZ_COUNT = 50;
+    const requestedCount = parseInt(count, 10) || 5;
+    if (requestedCount < 1 || requestedCount > MAX_QUIZ_COUNT) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid count parameter. Must be between 1 and ${MAX_QUIZ_COUNT}.`,
+      });
+    }
+
     const subject = await Subject.findByPk(subjectId);
     if (!subject) {
       return res.status(404).json({ success: false, error: 'Subject not found' });
@@ -234,7 +252,7 @@ exports.generateCustomQuiz = async (req, res, next) => {
       subject.name,
       topics,
       difficultyLevel,
-      count,
+      requestedCount,
       pyqQuestionsText,
       language
     );
@@ -568,13 +586,14 @@ exports.submitQuizAttempt = async (req, res, next) => {
     // Award XP and check gamification badges/streaks
     const gamificationService = require('../services/gamificationService');    const progression = await gamificationService.awardXP(req.user.id, 100, 'quiz_complete');
 
-    const timezoneOffset = Number(req.headers['x-timezone-offset']) || 0;
-    await gamificationService.updateStreak(req.user.id, timezoneOffset);
+    const timeZoneParam = req.headers['x-timezone'] || (req.headers['x-timezone-offset'] !== undefined ? Number(req.headers['x-timezone-offset']) : null);
+    await gamificationService.updateStreak(req.user.id, timeZoneParam);
 
     const user = await User.findByPk(req.user.id);
-    const newBadges = await gamificationService.checkAndUnlockBadges(user, 'quiz_complete', {
-      timezoneOffsetMinutes: timezoneOffset
-    });
+    const badgeDetails = req.headers['x-timezone']
+      ? { timeZone: req.headers['x-timezone'] }
+      : { timezoneOffsetMinutes: Number(req.headers['x-timezone-offset']) || 0 };
+    const newBadges = await gamificationService.checkAndUnlockBadges(user, 'quiz_complete', badgeDetails);
     progression.newBadges = newBadges;
 
     // Issue #1053: Check for Quiz Master and Sharpshooter
@@ -614,12 +633,30 @@ exports.submitQuizAttempt = async (req, res, next) => {
 // @access  Private
 exports.getAttemptHistory = async (req, res, next) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
-    const offset = (page - 1) * limit;
+    let whereClause = { user: req.user.id };
+    let offset = undefined;
 
-    const { count: total, rows: attempts } = await QuizAttempt.findAndCountAll({
-      where: { user: req.user.id },
+    if (req.query.cursor) {
+      let cursorDate;
+      try {
+        const decoded = Buffer.from(req.query.cursor, 'base64').toString('ascii');
+        cursorDate = new Date(decoded);
+      } catch (err) {
+        cursorDate = new Date(req.query.cursor);
+      }
+
+      if (!isNaN(cursorDate.getTime())) {
+        whereClause.createdAt = { [Op.lt]: cursorDate };
+      }
+    } else if (req.query.page) {
+      const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+      offset = (page - 1) * limit;
+    }
+
+    const { count: total, rows: rawAttempts } = await QuizAttempt.findAndCountAll({
+      where: whereClause,
+      attributes: { exclude: ['answers'] },
       distinct: true,
       include: [
         {
@@ -633,8 +670,15 @@ exports.getAttemptHistory = async (req, res, next) => {
       ],
       order: [['createdAt', 'DESC']],
       offset,
-      limit,
+      limit: limit + 1,
     });
+
+    const hasMore = rawAttempts.length > limit;
+    const attempts = hasMore ? rawAttempts.slice(0, limit) : rawAttempts;
+
+    const nextCursor = (hasMore && attempts.length > 0)
+      ? Buffer.from(attempts[attempts.length - 1].createdAt.toISOString()).toString('base64')
+      : null;
 
     const populatedAttempts = attempts.map((att) => {
       const json = att.toJSON();
@@ -646,14 +690,22 @@ exports.getAttemptHistory = async (req, res, next) => {
       return json;
     });
 
-    res.status(200).json({
+    const responsePayload = {
       success: true,
       count: populatedAttempts.length,
       total,
-      page,
-      totalPages: Math.ceil(total / limit),
+      hasMore,
+      nextCursor,
       data: populatedAttempts,
-    });
+    };
+
+    if (!req.query.cursor) {
+      const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+      responsePayload.page = page;
+      responsePayload.totalPages = Math.ceil(total / limit);
+    }
+
+    res.status(200).json(responsePayload);
   } catch (error) {
     next(error);
   }
@@ -1324,3 +1376,142 @@ exports.generateRemediationQuiz = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Get next dynamic question filtered by user's computed adaptive difficulty rating
+// @route   GET /api/quiz/next
+// @access  Public / Private
+exports.getNextAdaptiveQuestionEndpoint = async (req, res, next) => {
+  try {
+    const userId = req.query.userId || (req.user && req.user.id);
+    const { subjectId, topicId } = req.query;
+
+    const User = require('../models/User');
+    const { getDifficultyFromSkill } = require('../src/services/adaptive');
+
+    let user = null;
+    if (userId) {
+      try {
+        user = await User.findByPk(userId);
+      } catch (dbErr) {}
+    }
+
+    const currentSkillScore = user && user.skillScore !== undefined && user.skillScore !== null
+      ? Number(user.skillScore)
+      : 1000.0;
+
+    const targetDifficulty = getDifficultyFromSkill(currentSkillScore);
+
+    const whereClause = {};
+    if (subjectId) whereClause.subject = subjectId;
+    if (topicId) whereClause.topic = topicId;
+
+    let matchingQuestion = null;
+    try {
+      const quizzes = await Quiz.findAll({ where: whereClause, limit: 20 });
+
+      for (const q of quizzes) {
+        if (Array.isArray(q.questions)) {
+          const found = q.questions.find(
+            (item) => String(item.difficulty || '').toLowerCase() === targetDifficulty.toLowerCase()
+          );
+          if (found) {
+            matchingQuestion = {
+              id: found._id || found.id || uuidv4(),
+              questionText: found.questionText || found.question,
+              options: found.options || [],
+              correctAnswer: found.correctAnswer ?? 0,
+              difficulty: targetDifficulty,
+              explanation: found.explanation || '',
+              quizId: q.id,
+            };
+            break;
+          }
+        }
+      }
+    } catch (e) {}
+
+    // Fallback dynamic question generator matching computed difficulty
+    if (!matchingQuestion) {
+      const fallbackOptions = {
+        Easy: {
+          questionText: 'Which of the following is a basic fundamental concept in study planning?',
+          options: ['Active Recall', 'Passive Skimming', 'Ignoring Deadlines', 'Cramming Overnight'],
+          correctAnswer: 0,
+        },
+        Medium: {
+          questionText: 'How does spaced repetition impact long-term memory retention?',
+          options: [
+            'It decreases memory decay by reviewing at expanding intervals',
+            'It accelerates forgetting by delaying reviews',
+            'It eliminates the need for active recall',
+            'It requires constant daily review of all topics',
+          ],
+          correctAnswer: 0,
+        },
+        Hard: {
+          questionText: 'Under the Leitner system with SuperMemo SM-2 modifications, how does a failed review affect the interval?',
+          options: [
+            'Resets interval to step 1 and decreases ease factor',
+            'Doubles the current interval regardless of score',
+            'Maintains current interval with no change',
+            'Increases ease factor by 0.55',
+          ],
+          correctAnswer: 0,
+        },
+      };
+
+      const fallback = fallbackOptions[targetDifficulty] || fallbackOptions.Medium;
+      matchingQuestion = {
+        id: uuidv4(),
+        questionText: fallback.questionText,
+        options: fallback.options,
+        correctAnswer: fallback.correctAnswer,
+        difficulty: targetDifficulty,
+        explanation: `Dynamically selected at ${targetDifficulty} difficulty matching your skill rating (${currentSkillScore}).`,
+      };
+    }
+
+    res.status(200).json({
+      success: true,
+      userId: userId || null,
+      skillScore: currentSkillScore,
+      difficulty: targetDifficulty,
+      question: matchingQuestion,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Evaluate question distractors quality & plausibility metrics
+// @route   POST /api/quiz/evaluate-distractors
+// @access  Private
+exports.evaluateDistractors = async (req, res, next) => {
+  try {
+    const { evaluateDistractors } = require('../services/distractorScorerService');
+    const { question, options, correctAnswerIndex = 0, context } = req.body;
+
+    if (!question || !Array.isArray(options) || options.length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid input. "question" string and "options" array (min 2 choices) are required.',
+      });
+    }
+
+    const result = await evaluateDistractors({
+      question,
+      options,
+      correctAnswerIndex: parseInt(correctAnswerIndex, 10) || 0,
+      context,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+

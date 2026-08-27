@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import PyqDashboard from './PyqDashboard';
 import API from '../services/api';
 
-vi.mock('../services/api', () => ({
+vi.mock('../services/api.js', () => ({
   default: {
     get: vi.fn(),
     post: vi.fn(),
@@ -112,3 +112,4 @@ describe('PyqDashboard Component', () => {
     expect(screen.getByText('95%')).toBeInTheDocument();
   });
 });
+
