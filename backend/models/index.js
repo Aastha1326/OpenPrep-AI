@@ -58,10 +58,15 @@ const SecurityAuditLog = require('./SecurityAuditLog');
 const { Bounty, initBounty } = require('./Bounty');
 const { BountySolution, initBountySolution } = require('./BountySolution');
 const { BountySolutionVote, initBountySolutionVote } = require('./BountySolutionVote');
+const { ModeratorAuditLog, initModeratorAuditLog } = require('./ModeratorAuditLog');
 
 initBounty(sequelize);
 initBountySolution(sequelize);
 initBountySolutionVote(sequelize);
+// AnalyticsService already destructures ModeratorAuditLog out of this module.
+// Without the init and the export below it resolved to undefined, so every
+// moderation-log read and write in that service threw on first call.
+initModeratorAuditLog(sequelize);
 
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -96,6 +101,14 @@ CommentVote.belongsTo(QuestionComment, { foreignKey: 'commentId', as: 'comment' 
 QuestionComment.hasMany(CommentFlag, { foreignKey: 'commentId', onDelete: 'CASCADE' });
 CommentFlag.belongsTo(QuestionComment, { foreignKey: 'commentId', as: 'comment' });
 CommentFlag.belongsTo(User, { foreignKey: 'reporterId', as: 'reporter' });
+// Audit trails outlive the accounts they describe, so neither of these
+// cascades. modelRegistry.unit.test.js has asserted the SecurityAuditLog half
+// since it was written; the association it was looking for was never declared.
+User.hasMany(SecurityAuditLog, { foreignKey: 'userId', as: 'securityLogs', onDelete: 'SET NULL' });
+SecurityAuditLog.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+ModeratorAuditLog.belongsTo(User, { foreignKey: 'moderatorId', as: 'moderator', onDelete: 'RESTRICT' });
+ModeratorAuditLog.belongsTo(User, { foreignKey: 'targetUserId', as: 'targetUser', onDelete: 'RESTRICT' });
+User.hasMany(ModeratorAuditLog, { foreignKey: 'targetUserId', as: 'moderationHistory' });
 Note.hasMany(Question, { foreignKey: 'noteId', onDelete: 'CASCADE' });
 Question.belongsTo(Note, { foreignKey: 'noteId', as: 'noteRef' });
 User.hasMany(FlashcardDeck, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -321,6 +334,7 @@ module.exports = {
   QuestionComment,
   CommentVote,
   CommentFlag,
+  ModeratorAuditLog,
   Flashcard,
   FlashcardDeck,
   DeckCollaborator,
