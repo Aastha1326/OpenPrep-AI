@@ -2283,6 +2283,56 @@ Return only valid JSON with this exact shape:
   return parsed;
 };
 
+/**
+ * Generate three graded Socratic hints for a problem the solver has already
+ * worked out.
+ *
+ * Returns `{ hints: [{ level, content }] }` with exactly three entries - the
+ * caller appends the worked solution as the fourth rung. Throws rather than
+ * returning a partial ladder, because doubtSessionService has a deterministic
+ * fallback that derives hints from the solution text and would rather use it
+ * than store something half-formed.
+ */
+exports.generateSocraticHints = async ({ question, solution, subject = '' }) => {
+  if (!genAI) {
+    throw new Error('Gemini API key not configured for Socratic hint generation');
+  }
+
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const prompt = `
+You are tutoring a student who is stuck. You already know the full solution.
+Write exactly three hints that lead them to it without ever stating the answer.
+
+Question: ${JSON.stringify(question)}
+Subject: ${JSON.stringify(subject || 'General')}
+Full worked solution (for your reference only - never quote it back):
+${JSON.stringify(solution)}
+
+Hint 1 must name the underlying concept and nothing else.
+Hint 2 must point at the relationship, formula or rule that applies, without substituting any values.
+Hint 3 must describe the first concrete step and say how many steps remain.
+
+Each hint must refer to this specific problem. Generic advice such as
+"identify the core concept" or "recall relevant formulas" is not acceptable.
+No hint may contain the final answer.
+Return only valid JSON with this exact shape:
+{
+  "hints": [
+    { "level": 1, "content": "string" },
+    { "level": 2, "content": "string" },
+    { "level": 3, "content": "string" }
+  ]
+}`;
+
+  const result = await generateWithRetry(model, prompt);
+  const parsed = cleanJSON(result.response.text());
+  if (!parsed || !Array.isArray(parsed.hints) || parsed.hints.length < 3) {
+    throw new Error('Invalid JSON format from Gemini Socratic hint generator');
+  }
+
+  return parsed;
+};
+
 function getMockMindMap(subjectName = 'Computer Science', topicName = 'Data Structures') {
   return {
     title: `${topicName} - ${subjectName} Concept Mind Map`,
