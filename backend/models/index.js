@@ -51,7 +51,7 @@ const HandwrittenSubmission = require('./HandwrittenSubmission');
 const LearningPath = require('./LearningPath');
 const NotificationSettings = require('./NotificationSettings');
 const WeaknessReport = require('./WeaknessReport');
-const SecurityAuditLog = require('./SecurityAuditLog');
+const SkillDependency = require('./SkillDependency');const SecurityAuditLog = require('./SecurityAuditLog');
 const MockInterview = require('./MockInterview');
 const InterviewProcessingJob = require('./InterviewProcessingJob');const MockInterview = require('./MockInterview');
 const EvaluationVersion = require('./EvaluationVersion');const { Bounty, initBounty } = require('./Bounty');
@@ -136,6 +136,28 @@ Topic.hasMany(Quiz, { foreignKey: 'topic', onDelete: 'SET NULL' });
 Topic.hasMany(Note, { foreignKey: 'topic', onDelete: 'CASCADE' });
 Topic.hasMany(Flashcard, { foreignKey: 'topic', onDelete: 'CASCADE' });
 Topic.hasMany(Progress, { foreignKey: 'topic', onDelete: 'CASCADE' });
+
+Topic.hasMany(SkillDependency, {
+  foreignKey: 'skillId',
+  as: 'dependencies',
+  onDelete: 'CASCADE',
+});
+
+Topic.hasMany(SkillDependency, {
+  foreignKey: 'prerequisiteSkillId',
+  as: 'dependents',
+  onDelete: 'CASCADE',
+});
+
+SkillDependency.belongsTo(Topic, {
+  foreignKey: 'skillId',
+  as: 'skill',
+});
+
+SkillDependency.belongsTo(Topic, {
+  foreignKey: 'prerequisiteSkillId',
+  as: 'prerequisite',
+});
 
 // PYQ associations
 PYQ.belongsTo(Exam, { foreignKey: 'exam', as: 'examRef' });
@@ -363,8 +385,8 @@ module.exports = {
   HandwrittenSubmission,
   LearningPath,
   NotificationSettings,
-  WeaknessReport,
-  SecurityAuditLog,
+WeaknessReport,
+SkillDependency,  SecurityAuditLog,
   MockInterview,
   InterviewProcessingJob,  MockInterview,
   EvaluationVersion,  Bounty,

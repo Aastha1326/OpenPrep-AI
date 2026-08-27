@@ -1,5 +1,7 @@
 const { User, LearningPath, Topic, Subject, QuizAttempt, Note, PYQ } = require('../models');
-
+const {
+  resolveLearningOrder,
+} = require('./skillDependencyService');
 /**
  * Computes topic mastery and accuracy for a given user.
  *
@@ -142,8 +144,10 @@ async function detectGaps(userId, goal = 'General Exam Prep') {
  * @returns {Promise<Object>} Generated LearningPath record.
  */
 async function generatePath(userId, goal = 'General Mastery & Exam Prep') {
-  const rankedGaps = await detectGaps(userId, goal);
+const rankedGaps = await detectGaps(userId, goal);
 
+const dependencyOrderedGaps =
+  await resolveLearningOrder(userId, rankedGaps);
   // Fetch curated user notes / PYQs to attach as recommended resources
   let userNotes = [];
   try {
@@ -162,9 +166,8 @@ async function generatePath(userId, goal = 'General Mastery & Exam Prep') {
   const currentDate = new Date();
   const pathItems = [];
 
-  for (let i = 0; i < rankedGaps.length; i++) {
-    const gap = rankedGaps[i];
-
+for (let i = 0; i < dependencyOrderedGaps.length; i++) {
+  const gap = dependencyOrderedGaps[i];
     // Assign realistic target date: 2 days per topic sequentially
     const targetDate = new Date(currentDate);
     targetDate.setDate(targetDate.getDate() + (i + 1) * 2);
