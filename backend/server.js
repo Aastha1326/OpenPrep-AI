@@ -73,6 +73,7 @@ const handwrittenSubmissionRoutes = require('./routes/handwrittenSubmissionRoute
 const communityRoutes = require('./routes/communityRoutes');
 const userRoutes = require('./routes/userRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const doubtSessionRoutes = require('./routes/doubtSessionRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const aiEditorRoutes = require('./routes/aiEditorRoutes');
 const quizBattleRoutes = require('./routes/quizBattleRoutes');
@@ -392,6 +393,7 @@ app.use('/api/quizzes/diagram-hotspot', diagramQuestionRoutes);
 app.use('/api/diagram-hotspots', diagramQuestionRoutes);
 app.use('/api/classrooms', classroomRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/doubts', doubtSessionRoutes);
 app.use('/api/readiness', readinessRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/reports', reportRoutes);
