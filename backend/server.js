@@ -285,6 +285,8 @@ app.use('/api/squads', squadRoutes);
 app.use('/api/badges', badgeRoutes);
 app.use('/api/community', communityRoutes);
 app.use('/api/visualizer', visualizerRoutes);
+const revisionSchedulerRoutes = require('./routes/revisionSchedulerRoutes');
+app.use('/api/revision-schedules', revisionSchedulerRoutes);
 
 // Serve static assets from frontend build folder in production
 if (process.env.NODE_ENV === 'production') {

@@ -44,6 +44,7 @@ const PYQAnalytics = lazy(() => import('./pages/PYQAnalytics'));
 const QuizSession = lazy(() => import('./pages/QuizSession'));
 const MindMapViewer = lazy(() => import('./pages/MindMapViewer'));
 const StudyPlanner = lazy(() => import('./pages/StudyPlanner'));
+const RevisionScheduler = lazy(() => import('./pages/RevisionScheduler'));
 const VivaSimulator = lazy(() => import('./pages/VivaSimulator'));
 const CollaborativeNoteView = lazy(() => import('./pages/CollaborativeNoteView'));
 const SquadsPage = lazy(() => import('./pages/SquadsPage'));
@@ -279,6 +280,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <StudyPlanner />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/revision-scheduler"
+            element={
+              <ProtectedRoute>
+                <RevisionScheduler />
               </ProtectedRoute>
             }
           />

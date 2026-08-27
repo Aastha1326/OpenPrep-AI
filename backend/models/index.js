@@ -42,6 +42,8 @@ const SquadActivityReaction = require('./SquadActivityReaction');
 const Syllabus = require('./Syllabus');
 const SyllabusTopic = require('./SyllabusTopic');
 const PDFAnnotation = require('./PDFAnnotation');
+const RevisionSchedule = require('./RevisionSchedule');
+const RevisionSlot = require('./RevisionSlot');
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -252,6 +254,21 @@ User.hasMany(DeckRating, { foreignKey: 'userId', as: 'ratings', onDelete: 'CASCA
 DeckRating.belongsTo(Subject, { foreignKey: 'deckId', as: 'deckRef', onDelete: 'CASCADE' });
 Subject.hasMany(DeckRating, { foreignKey: 'deckId', as: 'ratings', onDelete: 'CASCADE' });
 
+// RevisionSchedule associations
+User.hasMany(RevisionSchedule, { foreignKey: 'user', onDelete: 'CASCADE' });
+RevisionSchedule.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+Subject.hasMany(RevisionSchedule, { foreignKey: 'subjectId', onDelete: 'SET NULL' });
+
+// RevisionSlot associations
+RevisionSchedule.hasMany(RevisionSlot, { foreignKey: 'scheduleId', onDelete: 'CASCADE' });
+RevisionSlot.belongsTo(RevisionSchedule, { foreignKey: 'scheduleId', as: 'scheduleRef' });
+User.hasMany(RevisionSlot, { foreignKey: 'user', onDelete: 'CASCADE' });
+RevisionSlot.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+Subject.hasMany(RevisionSlot, { foreignKey: 'subject', onDelete: 'CASCADE' });
+RevisionSlot.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef' });
+Topic.hasMany(RevisionSlot, { foreignKey: 'topic', onDelete: 'SET NULL' });
+RevisionSlot.belongsTo(Topic, { foreignKey: 'topic', as: 'topicRef' });
+
 module.exports = {  sequelize,  User,  Exam,
   Subject,
   Topic,
@@ -289,4 +306,6 @@ module.exports = {  sequelize,  User,  Exam,
   FlashcardDeck,
   DeckCollaborator,
   PDFAnnotation,
+  RevisionSchedule,
+  RevisionSlot,
 };
