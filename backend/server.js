@@ -418,6 +418,8 @@ app.get('/api/leaderboard', protect, require('./controllers/badgeController').ge
 app.get('/leaderboard', protect, require('./controllers/badgeController').getLeaderboardData);
 app.use('/api/visualizer', visualizerRoutes);
 app.use('/api/analytics-insights', analyticsInsightsRoutes);
+app.use('/api/exam-strategies', examStrategyRoutes);
+app.use('/api/study-tips', studyTipRoutes);
 app.use('/api/learning-path', require('./routes/learningPathRoutes'));
 app.use('/user/learning-path', require('./routes/learningPathRoutes'));
 
