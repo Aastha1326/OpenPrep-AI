@@ -15,9 +15,23 @@ const REGISTRY_SOURCE = fs.readFileSync(REGISTRY_PATH, 'utf8');
  * than an `undefined` at request time.
  */
 function importedModelNames(source) {
-  return [...source.matchAll(/^const\s+(\w+)\s*=\s*require\('\.\/(\w+)'\);$/gm)].map(
-    (match) => match[1]
-  );
+  // Two shapes are in use. Most models export the model directly:
+  //
+  //   const User = require('./User');
+  //
+  // The class-based ones export the model alongside an init function, and the
+  // registry destructures both:
+  //
+  //   const { Bounty, initBounty } = require('./Bounty');
+  //
+  // Matching only the first shape made this check fail on main: Bounty,
+  // BountySolution and BountySolutionVote were counted as exported-but-never-
+  // imported, so the assertion could not pass however tidy the registry was.
+  return [
+    ...source.matchAll(
+      /^const\s+(?:(\w+)|\{\s*(\w+)\s*(?:,[^}]*)?\})\s*=\s*require\('\.\/(\w+)'\);$/gm
+    ),
+  ].map((match) => match[1] || match[2]);
 }
 
 /**
@@ -48,7 +62,10 @@ describe('model registry', () => {
     const exported = exportedNames(REGISTRY_SOURCE);
 
     expect(imported.length).toBeGreaterThan(0);
-    expect(exported).toEqual(imported);
+    // Compared as sets: what matters is that nothing imported goes unexported
+    // and nothing exported is a name the registry never bound. The two lists
+    // are maintained separately and have never shared an order.
+    expect([...exported].sort()).toEqual([...imported].sort());
   });
 
   it('resolves every imported model to a Sequelize model at runtime', () => {

@@ -12,7 +12,7 @@ import SessionTimeoutModal from './components/SessionTimeoutModal';
 import SessionRestoreModal from './components/SessionRestoreModal';
 import API from './services/api';
 import QuotaExceededModal from './components/dashboard/QuotaExceededModal';
-import CommandPalette from './components/search/CommandPalette';
+import GlobalSearchModal from './components/search/GlobalSearchModal';
 import OfflineBanner from './components/common/OfflineBanner';
 import OfflineStatusBanner from './components/common/OfflineStatusBanner';
 import PwaInstallPrompt from './components/common/PwaInstallPrompt';
@@ -59,6 +59,7 @@ const StudySquadDashboard = lazy(() => import('./pages/SquadsPage'));
 const CollabNote = lazy(() => import('./pages/CollaborativeNoteView'));
 const LiveQuizSession = lazy(() => import('./pages/LiveQuizSession'));
 const InterviewRoomPage = lazy(() => import('./pages/InterviewRoomPage'));
+const StreakDashboard = lazy(() => import('./pages/StreakDashboard'));
 
 function App() {
 
@@ -179,7 +180,7 @@ function App() {
       <QuotaExceededModal />
       <SessionTimeoutModal />
       <Walkthrough />
-      <CommandPalette isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+      <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
       {localStorage.getItem('token') && <PomodoroWidget />}
       <main id="main-content" tabIndex="-1" role="main" className="focus:outline-none min-h-screen">
         <Suspense fallback={<PageSkeleton />}>
@@ -454,6 +455,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <InterviewRoomPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/streak-dashboard"
+            element={
+              <ProtectedRoute>
+                <StreakDashboard />
               </ProtectedRoute>
             }
           />

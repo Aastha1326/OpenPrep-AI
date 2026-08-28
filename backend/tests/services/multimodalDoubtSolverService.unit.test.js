@@ -1,7 +1,7 @@
 /**
  * Unit tests for Multimodal Doubt Solver & AI Prompt Sanitizer Service
  */
-import MultimodalDoubtSolverService from '../../../backend/services/multimodalDoubtSolverService.js';
+import MultimodalDoubtSolverService from '../../services/multimodalDoubtSolverService.js';
 
 describe('MultimodalDoubtSolverService Unit Tests', () => {
   test('should redact prompt injection vectors correctly', async () => {

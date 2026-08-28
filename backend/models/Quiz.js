@@ -60,6 +60,10 @@ const Quiz = sequelize.define(
       allowNull: true,
       defaultValue: null,
     },
+    embedding: {
+      type: DataTypes.ARRAY(DataTypes.FLOAT),
+      allowNull: true,
+    },
   },
   {
     timestamps: true,
