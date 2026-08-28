@@ -433,6 +433,8 @@ app.use('/api/visualizer', visualizerRoutes);
 const revisionSchedulerRoutes = require('./routes/revisionSchedulerRoutes');
 app.use('/api/revision-schedules', revisionSchedulerRoutes);
 app.use('/api/analytics-insights', analyticsInsightsRoutes);
+const examStrategyRoutes = require('./routes/examStrategyRoutes');
+const studyTipRoutes = require('./routes/studyTipRoutes');
 app.use('/api/exam-strategies', examStrategyRoutes);
 app.use('/api/study-tips', studyTipRoutes);
 app.use('/api/learning-path', require('./routes/learningPathRoutes'));

@@ -1,6 +1,6 @@
 const express = require('express');
 const { getMilestones, claimMilestone } = require('../controllers/milestoneController');
-const { protect } = require('../middleware/authMiddleware');
+const { protect } = require('../middleware/auth');
 
 const router = express.Router();
 
