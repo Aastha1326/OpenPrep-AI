@@ -161,6 +161,28 @@ Topic.hasMany(Note, { foreignKey: 'topic', onDelete: 'CASCADE' });
 Topic.hasMany(Flashcard, { foreignKey: 'topic', onDelete: 'CASCADE' });
 Topic.hasMany(Progress, { foreignKey: 'topic', onDelete: 'CASCADE' });
 
+Topic.hasMany(SkillDependency, {
+  foreignKey: 'skillId',
+  as: 'dependencies',
+  onDelete: 'CASCADE',
+});
+
+Topic.hasMany(SkillDependency, {
+  foreignKey: 'prerequisiteSkillId',
+  as: 'dependents',
+  onDelete: 'CASCADE',
+});
+
+SkillDependency.belongsTo(Topic, {
+  foreignKey: 'skillId',
+  as: 'skill',
+});
+
+SkillDependency.belongsTo(Topic, {
+  foreignKey: 'prerequisiteSkillId',
+  as: 'prerequisite',
+});
+
 // PYQ associations
 PYQ.belongsTo(Exam, { foreignKey: 'exam', as: 'examRef' });
 PYQ.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'CASCADE' });

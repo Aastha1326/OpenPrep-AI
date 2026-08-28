@@ -22,6 +22,7 @@ const PYQ = require('./models/PYQ');
 const Note = require('./models/Note');
 const Achievement = require('./models/Achievement');
 const swaggerSpec = require('./config/swagger');
+const mockInterviewRoutes = require('./routes/mockInterviewRoutes');
 let apiReference;
 try {
   apiReference = require('@scalar/express-api-reference').apiReference;
@@ -415,7 +416,9 @@ app.use('/api/gamification', gamificationRoutes);
 app.use('/api/battles', battleRoutes);
 app.use('/api/folders', folderRoutes);
 app.use('/api/badges', badgeRoutes);
-app.get('/user/badges', protect, require('./controllers/badgeController').getUserBadges);
+
+const leaderboardRoutes = require('./routes/leaderboardRoutes');
+app.use('/api/leaderboard', leaderboardRoutes);app.get('/user/badges', protect, require('./controllers/badgeController').getUserBadges);
 app.get('/api/user/badges', protect, require('./controllers/badgeController').getUserBadges);
 app.get('/api/leaderboard', protect, require('./controllers/badgeController').getLeaderboardData);
 app.get('/leaderboard', protect, require('./controllers/badgeController').getLeaderboardData);
@@ -425,7 +428,7 @@ app.use('/api/exam-strategies', examStrategyRoutes);
 app.use('/api/study-tips', studyTipRoutes);
 app.use('/api/learning-path', require('./routes/learningPathRoutes'));
 app.use('/user/learning-path', require('./routes/learningPathRoutes'));
-
+app.use('/api/interviews', mockInterviewRoutes);
 // Serve static assets from frontend build folder in production
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../frontend/dist')));
@@ -597,7 +600,18 @@ startWorker();
 const { startWorker: startTaskWorker } = require('./workers/taskQueueWorker');
 startTaskWorker();
 
+const {
+  registerWorker: registerInterviewProcessingWorker,
+  recoverStaleJobs,
+} = require('./services/interviewProcessingService');
 
+registerInterviewProcessingWorker();
+
+recoverStaleJobs().catch((error) => {
+  logger.error('failed to recover stale interview processing jobs', {
+    err: error,
+  });
+});
 if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   server.listen(PORT, () => {
     logger.info('server started', {
@@ -609,7 +623,32 @@ if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
 }
 
 module.exports = app;
+const {
+  validatePartition,
+} = require('./services/candidateRankingService');
 
+// Validate the global candidate ranking cache once every night.
+// This does not run for every interview.
+cron.schedule('0 2 * * *', async () => {
+  try {
+    const result = await validatePartition(
+      'global',
+      'all'
+    );
+
+    logger.info(
+      'candidate ranking consistency check completed',
+      result
+    );
+  } catch (error) {
+    logger.error(
+      'candidate ranking consistency check failed',
+      {
+        error: error.message,
+      }
+    );
+  }
+});
 
 // Graceful Shutdown Logic
 const gracefulShutdown = (signal) => {
