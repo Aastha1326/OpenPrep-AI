@@ -7,7 +7,7 @@ import pyqIntelligenceReducer from './slices/pyqIntelligenceSlice.js';
 import adaptivePlannerReducer from './slices/adaptivePlannerSlice.js';
 import communityResourceReducer from './slices/communityResourceSlice.js';
 import attemptHistoryReducer from './slices/attemptHistorySlice.js';
-import revisionSchedulerReducer from './slices/revisionSchedulerSlice.js';
+import studyGoalsReducer from './slices/studyGoalSlice.js';
 
 export const store = configureStore({
   reducer: {
@@ -19,7 +19,7 @@ export const store = configureStore({
     adaptivePlanner: adaptivePlannerReducer,
     communityResources: communityResourceReducer,
     attemptHistory: attemptHistoryReducer,
-    revisionScheduler: revisionSchedulerReducer,
+    studyGoals: studyGoalsReducer,
   },
 });
 
