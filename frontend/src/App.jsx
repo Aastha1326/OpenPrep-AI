@@ -61,6 +61,7 @@ const LiveQuizSession = lazy(() => import('./pages/LiveQuizSession'));
 const MedicalCaseSimulator = lazy(() => import('./pages/MedicalCaseSimulator'));
 const InterviewRoomPage = lazy(() => import('./pages/InterviewRoomPage'));
 const StreakDashboard = lazy(() => import('./pages/StreakDashboard'));
+const DrugInteractionChecker = lazy(() => import('./pages/DrugInteractionChecker'));
 
 function App() {
 
@@ -482,6 +483,7 @@ function App() {
           </Route>
 
           <Route path="/medical-cases" element={<MedicalCaseSimulator />} />
+          <Route path="/drug-interactions" element={<DrugInteractionChecker />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
