@@ -193,6 +193,219 @@ function findUnmountableRouters(relativePath, root = BACKEND_ROOT) {
   return [...new Set(mounted)].filter((name) => !bound.has(name) && name !== 'require');
 }
 
+/**
+ * Literal `require('...')` targets in a module.
+ *
+ * Only string literals are collected. A computed require - `require(name)` or
+ * a template literal - cannot be checked statically and is skipped rather than
+ * guessed at.
+ */
+function requiredSpecifiers(source) {
+  const specifiers = [];
+
+  for (const match of source.matchAll(/\brequire\(\s*(['"])([^'"\n]+)\1\s*\)/g)) {
+    const specifier = match[2];
+    if (specifier && !specifiers.includes(specifier)) specifiers.push(specifier);
+  }
+
+  return specifiers;
+}
+
+/** Node builtins, with or without the `node:` prefix. */
+function isBuiltinModule(specifier) {
+  const bare = specifier.startsWith('node:') ? specifier.slice(5) : specifier;
+  return require('module').builtinModules.includes(bare);
+}
+
+/**
+ * Every `require()` target in `relativePath` that cannot be resolved from it.
+ *
+ * This is the check that was missing when models/DoubtSessionModel.js reached
+ * main naming `mongoose`, a package listed in package.json but never
+ * installed and never connected to. The file parsed, the router it fed was
+ * bound in server.js, and both existing integrity checks passed - the module
+ * only failed when the process actually booted, with MODULE_NOT_FOUND.
+ *
+ * Resolution is done with `require.resolve` against the module's own
+ * directory, so relative paths, package entry points and subpath exports are
+ * all judged exactly as Node judges them at boot.
+ *
+ * @returns {Array<{ specifier: string, reason: string }>}
+ */
+function findUnresolvableRequires(relativePath, root = BACKEND_ROOT) {
+  const absolute = path.join(root, relativePath);
+  const source = fs.readFileSync(absolute, 'utf8');
+  const fromDirectory = path.dirname(absolute);
+  const unresolvable = [];
+
+  for (const specifier of requiredSpecifiers(source)) {
+    if (isBuiltinModule(specifier)) continue;
+
+    try {
+      require.resolve(specifier, { paths: [fromDirectory] });
+    } catch (error) {
+      unresolvable.push({ specifier, reason: error.code || error.message });
+    }
+  }
+
+  return unresolvable;
+}
+
+/** Every module with at least one unresolvable require, with the offenders. */
+function findModulesWithUnresolvableRequires(files, root = BACKEND_ROOT) {
+  return files
+    .map((file) => ({ file, unresolvable: findUnresolvableRequires(file, root) }))
+    .filter((entry) => entry.unresolvable.length > 0);
+}
+
+/**
+ * Specifiers required from inside a `try` block.
+ *
+ * An optional dependency is a real pattern here - quizController and
+ * pyqController both do:
+ *
+ *   let uploadFileToFirebase = null;
+ *   try {
+ *     const firebaseService = require('../services/firebaseStorageService');
+ *     uploadFileToFirebase = firebaseService.uploadFileToFirebase;
+ *   } catch (e) {}
+ *
+ * That module is genuinely absent and the controllers are written to cope. A
+ * boot check that cannot tell a guarded require from a bare one would report
+ * both, and a check that cries wolf gets skipped.
+ *
+ * Line-based brace tracking rather than a full parse: the guarded requires
+ * that matter are a require on its own line inside a `try {` block, and
+ * anything subtler is better caught by the module actually failing to load.
+ */
+function guardedSpecifiers(source) {
+  const guarded = new Set();
+  const exitDepths = [];
+  let depth = 0;
+
+  for (const line of source.split('\n')) {
+    const opensTry = /(?:^|[^\w$])try\s*\{/.test(line);
+    const insideTry = exitDepths.length > 0 || opensTry;
+
+    if (insideTry) {
+      for (const match of line.matchAll(/\brequire\(\s*(['"])([^'"\n]+)\1\s*\)/g)) {
+        guarded.add(match[2]);
+      }
+    }
+
+    for (const char of line) {
+      if (char === '{') depth += 1;
+      else if (char === '}') depth -= 1;
+    }
+
+    if (opensTry) exitDepths.push(depth - 1);
+    while (exitDepths.length && depth <= exitDepths[exitDepths.length - 1]) exitDepths.pop();
+  }
+
+  return guarded;
+}
+
+/**
+ * Every module reachable from an entrypoint by following relative requires.
+ *
+ * A repo-wide sweep is the wrong unit for a boot check: `models/` holds a
+ * handful of legacy Mongoose schemas that nothing imports, and failing on
+ * those says nothing about whether the server starts. What matters is the
+ * transitive closure of `server.js`, because that is exactly the set of
+ * modules Node will load before it binds a port.
+ *
+ * Only relative specifiers are traversed. Package specifiers terminate the
+ * walk - their internals are not ours to police.
+ */
+function collectBootReachableFiles(entry = 'server.js', root = BACKEND_ROOT) {
+  const seen = new Set();
+  const queue = [entry];
+
+  while (queue.length) {
+    const relativePath = queue.shift();
+    if (seen.has(relativePath)) continue;
+
+    const absolute = path.join(root, relativePath);
+    if (!fs.existsSync(absolute)) continue;
+    seen.add(relativePath);
+
+    let source;
+    try {
+      source = fs.readFileSync(absolute, 'utf8');
+    } catch {
+      continue;
+    }
+
+    for (const specifier of requiredSpecifiers(source)) {
+      if (!specifier.startsWith('.')) continue;
+
+      let resolved;
+      try {
+        resolved = require.resolve(specifier, { paths: [path.dirname(absolute)] });
+      } catch {
+        continue; // Reported by findBrokenRelativeRequires, not swallowed here.
+      }
+
+      if (resolved.includes(`${path.sep}node_modules${path.sep}`)) continue;
+      const next = path.relative(root, resolved);
+      if (!next.startsWith('..') && !seen.has(next)) queue.push(next);
+    }
+  }
+
+  return [...seen].sort();
+}
+
+/**
+ * Relative `require()` targets that do not resolve.
+ *
+ * Deterministic regardless of what is installed, so it holds equally on a
+ * developer machine with a stale node_modules and in CI after `npm ci`. This
+ * is the shape a deleted or renamed module leaves behind.
+ */
+function findBrokenRelativeRequires(files, root = BACKEND_ROOT) {
+  return files
+    .map((file) => {
+      const guarded = guardedSpecifiers(fs.readFileSync(path.join(root, file), 'utf8'));
+
+      return {
+        file,
+        unresolvable: findUnresolvableRequires(file, root).filter(
+          (entry) => entry.specifier.startsWith('.') && !guarded.has(entry.specifier)
+        ),
+      };
+    })
+    .filter((entry) => entry.unresolvable.length > 0);
+}
+
+/**
+ * Packages this stack has no runtime for, mapped to why.
+ *
+ * config/db.js builds a Sequelize instance and a pg pool, and there is no
+ * `mongoose.connect()` call anywhere in the repository. A boot-path module
+ * that requires mongoose therefore either fails to load - which is what
+ * models/DoubtSessionModel.js did, taking the whole API down - or loads and
+ * then buffers every query until Mongoose's timeout fires.
+ */
+const FORBIDDEN_BOOT_PACKAGES = {
+  mongoose: 'this backend is Postgres-only; use a Sequelize model in models/',
+};
+
+/** Boot-reachable modules that pull in a package the stack cannot serve. */
+function findForbiddenBootPackages(files, root = BACKEND_ROOT) {
+  const offenders = [];
+
+  for (const file of files) {
+    const source = fs.readFileSync(path.join(root, file), 'utf8');
+    const specifiers = requiredSpecifiers(source);
+
+    for (const [pkg, reason] of Object.entries(FORBIDDEN_BOOT_PACKAGES)) {
+      if (specifiers.includes(pkg)) offenders.push({ file, package: pkg, reason });
+    }
+  }
+
+  return offenders;
+}
+
 module.exports = {
   BACKEND_ROOT,
   SOURCE_DIRS,
@@ -204,4 +417,13 @@ module.exports = {
   findUnparseableFiles,
   findDuplicateDeclarations,
   findUnboundRouterIdentifiers,
+  requiredSpecifiers,
+  isBuiltinModule,
+  findUnresolvableRequires,
+  findModulesWithUnresolvableRequires,
+  collectBootReachableFiles,
+  guardedSpecifiers,
+  findBrokenRelativeRequires,
+  findForbiddenBootPackages,
+  FORBIDDEN_BOOT_PACKAGES,
 };

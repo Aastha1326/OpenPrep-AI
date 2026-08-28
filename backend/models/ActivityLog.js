@@ -44,6 +44,24 @@ const ActivityLog = sequelize.define(
         fields: ['user', 'timestamp'],
       },
     ],
+    hooks: {
+      afterCreate: async (activity) => {
+        try {
+          const io = global.io;
+          if (io) {
+            io.to(`activity:${activity.user}`).emit('activity:new', {
+              id: activity.id,
+              userId: activity.user,
+              activityType: activity.activityType,
+              description: activity.description,
+              timestamp: activity.timestamp,
+            });
+          }
+        } catch (err) {
+          console.error('Failed to emit activity:new socket event:', err);
+        }
+      },
+    },
   }
 );
 
