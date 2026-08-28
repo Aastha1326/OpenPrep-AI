@@ -365,7 +365,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/analytics"
             element={
@@ -374,18 +373,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
-          <Route
-            path="/analytics"
-            element={
-              <ProtectedRoute>
-                <StudyAnalytics />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            
           <Route
             path="/exam-planner"
             element={
@@ -418,15 +405,6 @@ function App() {
             element={
               <ProtectedRoute>
                 <AttemptHistoryDashboard />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/squads"
-            element={
-              <ProtectedRoute>
-                <SquadsPage />
               </ProtectedRoute>
             }
           />
