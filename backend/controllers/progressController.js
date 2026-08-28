@@ -759,11 +759,26 @@ exports.updateTopicProgress = async (req, res, next) => {
 exports.getActivityFeed = async (req, res, next) => {
   try {
     const userId = req.user.id;
+    const { activityType, dateFrom, dateTo, limit, offset } = req.query;
+
+    const where = { user: userId };
+    if (activityType) {
+      where.activityType = activityType;
+    }
+    if (dateFrom || dateTo) {
+      where.timestamp = {};
+      if (dateFrom) where.timestamp[Op.gte] = new Date(dateFrom);
+      if (dateTo) where.timestamp[Op.lte] = new Date(dateTo);
+    }
+
+    const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 100);
+    const safeOffset = Math.max(Number(offset) || 0, 0);
 
     const activities = await ActivityLog.findAll({
-      where: { user: userId },
-      order: [['createdAt', 'DESC']],
-      limit: 20,
+      where,
+      order: [['timestamp', 'DESC']],
+      limit: safeLimit,
+      offset: safeOffset,
     });
 
     res.status(200).json({ success: true, data: activities });

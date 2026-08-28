@@ -134,3 +134,52 @@ exports.getWeeklyLeaderboard = async (req, res, next) => {
     next(error);
   }
 };
+const {
+  getCandidateRanking,
+  PARTITIONS,
+} = require('../services/candidateRankingService');
+
+// @desc    Get incremental candidate ranking
+// @route   GET /api/leaderboard/candidates
+// @access  Private
+exports.getCandidateRanking = async (req, res, next) => {
+  try {
+    const limit = Math.min(
+      100,
+      Math.max(
+        1,
+        parseInt(req.query.limit, 10) || 50
+      )
+    );
+
+    let partitionType =
+      req.query.partition || PARTITIONS.GLOBAL;
+
+    let partitionKey =
+      req.query.key || 'all';
+
+    if (req.query.skill) {
+      partitionType = PARTITIONS.SKILL;
+      partitionKey = req.query.skill.toLowerCase();
+    }
+
+    if (req.query.role) {
+      partitionType = PARTITIONS.ROLE;
+      partitionKey = req.query.role.toLowerCase().trim();
+    }
+
+    const result = await getCandidateRanking({
+      partitionType,
+      partitionKey,
+      limit,
+      currentUserId: req.user?.id,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
