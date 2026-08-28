@@ -13,6 +13,12 @@ const ActivityLog = require('../models/ActivityLog');
 const Progress = require('../models/Progress');
 const QuizTelemetryEvent = require('../models/QuizTelemetryEvent');
 const QuizBookmark = require('../models/QuizBookmark');
+
+// Refactored Services
+const quizGenerationService = require('../services/quizGenerationService');
+const quizEvaluationService = require('../services/quizEvaluationService');
+const quizAnalyticsService = require('../services/quizAnalyticsService');
+
 const geminiService = require('../services/geminiService');
 const cacheService = require('../services/cacheService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
