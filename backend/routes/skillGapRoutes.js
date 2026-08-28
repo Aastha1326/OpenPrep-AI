@@ -32,5 +32,23 @@ router.post('/analyze', upload.single('resume'), skillGapController.analyzeResum
  * @access  Private
  */
 router.get('/history', skillGapController.getHistory);
+/**
+ * @route   GET /api/skill-gap/dependency-graph
+ * @desc    Get the user's skill dependency graph and root-cause gaps
+ * @access  Private
+ */
+router.get(
+    '/dependency-graph',
+    skillGapController.getDependencyGraph
+);
 
+/**
+ * @route   POST /api/skill-gap/dependency
+ * @desc    Create a prerequisite relationship between two skills
+ * @access  Private
+ */
+router.post(
+    '/dependency',
+    skillGapController.createDependency
+);
 module.exports = router;
