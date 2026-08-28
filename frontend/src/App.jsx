@@ -64,6 +64,7 @@ const StreakDashboard = lazy(() => import('./pages/StreakDashboard'));
 const DrugInteractionChecker = lazy(() => import('./pages/DrugInteractionChecker'));
 const ExamCountdownPlanner = lazy(() => import('./pages/ExamCountdownPlanner'));
 const ClinicalNotesSummarizer = lazy(() => import('./pages/ClinicalNotesSummarizer'));
+const PatientSimulator = lazy(() => import('./pages/PatientSimulator'));
 
 function App() {
 
@@ -488,6 +489,7 @@ function App() {
           <Route path="/drug-interactions" element={<DrugInteractionChecker />} />
           <Route path="/exam-countdown" element={<ExamCountdownPlanner />} />
           <Route path="/clinical-notes" element={<ClinicalNotesSummarizer />} />
+          <Route path="/patient-simulator" element={<PatientSimulator />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
