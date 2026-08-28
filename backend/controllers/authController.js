@@ -351,38 +351,6 @@ exports.login = async (req, res, next) => {
   }
 };
 
-/**
- * @swagger
- * /api/auth/logout:
- *   post:
- *     summary: Logout user and clear authentication cookies
- *     tags: [Authentication]
- *     responses:
- *       200:
- *         description: Logged out successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Logged out successfully"
- */
-exports.logout = async (req, res, next) => {
-  try {
-    const cookieOptions = getAuthCookieOptions();
-    res.clearCookie('token', cookieOptions);
-    res.clearCookie('refreshToken', cookieOptions);
-    res.status(200).json({ success: true, message: 'Logged out successfully' });
-  } catch (error) {
-    next(error);
-  }
-};
-
 // ---------------------------------------------------------------------------
 // @desc    Setup 2FA (Generate secret and backup codes)
 // @route   POST /api/auth/2fa/setup
@@ -1394,7 +1362,7 @@ exports.logout = async (req, res, next) => {
     }
 
     clearRefreshTokenCookie(res);
-    res.clearCookie('token', getAuthCookieOptions());
+    res.clearCookie('token', getAccessTokenCookieOptions());
 
     res.status(200).json({
       success: true,
