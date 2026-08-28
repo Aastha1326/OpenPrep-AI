@@ -50,6 +50,7 @@ const QuizSession = lazy(() => import('./pages/QuizSession'));
 const MindMapViewer = lazy(() => import('./pages/MindMapViewer'));
 const WeaknessDetectionDashboard = lazy(() => import('./pages/WeaknessDetectionDashboard'));
 const StudyPlanner = lazy(() => import('./pages/StudyPlanner'));
+const StudyGoals = lazy(() => import('./pages/StudyGoals'));
 const VivaSimulator = lazy(() => import('./pages/VivaSimulator'));
 const AttemptHistoryDashboard = lazy(() => import('./pages/AttemptHistoryDashboard'));
 const CollaborativeNoteView = lazy(() => import('./pages/CollaborativeNoteView'));
@@ -58,6 +59,7 @@ const StudySquadDashboard = lazy(() => import('./pages/SquadsPage'));
 const CollabNote = lazy(() => import('./pages/CollaborativeNoteView'));
 const LiveQuizSession = lazy(() => import('./pages/LiveQuizSession'));
 const InterviewRoomPage = lazy(() => import('./pages/InterviewRoomPage'));
+const StreakDashboard = lazy(() => import('./pages/StreakDashboard'));
 
 function App() {
 
@@ -318,6 +320,15 @@ function App() {
           />
 
           <Route
+            path="/revision-scheduler"
+            element={
+              <ProtectedRoute>
+                <RevisionScheduler />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/viva-simulator"
             element={
               <ProtectedRoute>
@@ -373,6 +384,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/exam-planner"
             element={
@@ -387,6 +399,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <FormulaScratchpad />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/study-goals"
+            element={
+              <ProtectedRoute>
+                <StudyGoals />
               </ProtectedRoute>
             }
           />
@@ -410,6 +431,24 @@ function App() {
           />
 
           <Route
+            path="/squads"
+            element={
+              <ProtectedRoute>
+                <SquadsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/focus-analytics"
+            element={
+              <ProtectedRoute>
+                <FocusSessionAnalyticsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/interview"
             element={
               <ProtectedRoute>
@@ -422,6 +461,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <InterviewRoomPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/streak-dashboard"
+            element={
+              <ProtectedRoute>
+                <StreakDashboard />
               </ProtectedRoute>
             }
           />

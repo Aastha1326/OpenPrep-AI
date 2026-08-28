@@ -71,5 +71,9 @@ const router = express.Router();
 
 // Weekly study leaderboard (protected)
 router.get('/', protect, getWeeklyLeaderboard);
-
+router.get(
+  '/candidates',
+  protect,
+  require('../controllers/leaderboardController').getCandidateRanking
+);
 module.exports = router;
