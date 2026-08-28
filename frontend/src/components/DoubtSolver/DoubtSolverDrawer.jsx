@@ -121,6 +121,10 @@ const DoubtSolverDrawer = ({ isOpen, onClose }) => {
       if (imageFile) formData.append('image', imageFile);
 
       const { data } = await startDoubtSession(formData);
+      // The ladder length comes from the server now, so the progress dots stay
+      // honest if the number of hints per session ever changes.
+      const ladderSize = data.data.totalHints || totalHints;
+      setTotalHints(ladderSize);
       setSessionId(data.data.sessionId);
       setHintLevel(1);
       setMessages((prev) => [
@@ -128,7 +132,7 @@ const DoubtSolverDrawer = ({ isOpen, onClose }) => {
         {
           role: 'assistant',
           content: data.data.hint.content,
-          hintLabel: `Hint 1/${totalHints}`,
+          hintLabel: `Hint 1/${ladderSize}`,
           timestamp: new Date(),
         },
       ]);
