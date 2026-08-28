@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import TargetExamOverviewWidget from './TargetExamOverviewWidget';
 import API from '../../services/api';
 
-vi.mock('../../services/api');
+vi.mock('../../services/api.js');
 
 describe('TargetExamOverviewWidget Component Tests', () => {
   beforeEach(() => {
@@ -53,3 +53,4 @@ describe('TargetExamOverviewWidget Component Tests', () => {
     });
   });
 });
+

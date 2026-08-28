@@ -3,7 +3,6 @@ const {
   getStats,
   getAnalytics,
   getUsers,
-  getQueueStatus,
   updateUserRole,
   deleteUser,
   getAdminBadges,
@@ -11,6 +10,7 @@ const {
   updateAdminBadge,
   deleteAdminBadge,
 } = require('../controllers/adminController');
+const { liftShadowBan } = require('../controllers/discussionController');
 const { protect, requireAdmin } = require('../middleware/auth');
 const {
   getSecurityLogs,
@@ -29,6 +29,10 @@ router.get('/analytics', getAnalytics);
 router.get('/users', getUsers);
 router.put('/users/:id/role', updateUserRole);
 router.delete('/users/:id', deleteUser);
+
+// Moderation. Nothing cleared isShadowBanned before, so once the column was
+// honoured an automatic ban would have been permanent with no appeal path.
+router.patch('/users/:id/shadow-ban', liftShadowBan);
 
 // Security Audit Logging
 router.get('/security/logs', getSecurityLogs);

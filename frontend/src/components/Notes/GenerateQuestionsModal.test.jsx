@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import GenerateQuestionsModal from './GenerateQuestionsModal';
 import API from '../../services/api';
 
-vi.mock('../../services/api', () => ({
+vi.mock('../../services/api.js', () => ({
   default: {
     post: vi.fn(),
   },
@@ -68,3 +68,4 @@ describe('GenerateQuestionsModal UI Component', () => {
     expect(screen.getByText('6')).toBeInTheDocument();
   });
 });
+

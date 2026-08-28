@@ -8,6 +8,7 @@
     "dev": "nodemon server.js",
     "test": "vitest run --config vitest.config.unit.js",
     "test:unit": "vitest run --config vitest.config.unit.js",
+    "test:integrity": "vitest run --config vitest.config.unit.js tests/integrity",
     "test:jest": "jest --config jest.config.js --runInBand --forceExit",
     "test:integration": "jest --config jest.config.js --runInBand --forceExit",
     "test:coverage": "vitest run --config vitest.config.unit.js --coverage",

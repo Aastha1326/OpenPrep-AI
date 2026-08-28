@@ -5,7 +5,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import dashboardReducer from '../../store/slices/dashboardSlice';
 import Dashboard from '../Dashboard';
 
-vi.mock('../../services/api', () => ({
+vi.mock('../../services/api.js', () => ({
   default: {
     get: vi.fn(() => Promise.resolve({ data: { data: { layout: null } } })),
     post: vi.fn(() => Promise.resolve({ data: { data: { layout: [] } } })),
@@ -84,3 +84,4 @@ describe('Customizable Dashboard Component', () => {
     expect(screen.getByText('Add Dashboard Widgets')).toBeInTheDocument();
   });
 });
+

@@ -109,7 +109,7 @@ const AdaptiveExamRunner = ({ subjectId = 'general', onExamFinish }) => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-neutral-950/60 border border-neutral-800 rounded-2xl p-4">
             <div className="text-stone-400 text-xs">Final Ability Estimate (θ)</div>
-            <div className="text-xl font-bold font-mono text-stone-100 mt-1">{scoreReport.finalTheta &gt; 0 ? `+${scoreReport.finalTheta}` : scoreReport.finalTheta}</div>
+            <div className="text-xl font-bold font-mono text-stone-100 mt-1">{scoreReport.finalTheta > 0 ? `+${scoreReport.finalTheta}` : scoreReport.finalTheta}</div>
           </div>
           <div className="bg-neutral-950/60 border border-neutral-800 rounded-2xl p-4">
             <div className="text-stone-400 text-xs">Overall Accuracy</div>
@@ -117,7 +117,7 @@ const AdaptiveExamRunner = ({ subjectId = 'general', onExamFinish }) => {
           </div>
           <div className="bg-neutral-950/60 border border-neutral-800 rounded-2xl p-4">
             <div className="text-stone-400 text-xs">Estimated Scaled Band</div>
-            <div className="text-xl font-bold font-mono text-amber-400 mt-1">{scoreReport.percentile &gt;= 80 ? 'Advanced / Exemplary' : scoreReport.percentile &gt;= 50 ? 'Proficient / Competitive' : 'Developing Mastery'}</div>
+            <div className="text-xl font-bold font-mono text-amber-400 mt-1">{scoreReport.percentile >= 80 ? 'Advanced / Exemplary' : scoreReport.percentile >= 50 ? 'Proficient / Competitive' : 'Developing Mastery'}</div>
           </div>
         </div>
 
@@ -128,11 +128,11 @@ const AdaptiveExamRunner = ({ subjectId = 'general', onExamFinish }) => {
 
   const currentQ = session?.currentQuestion;
   const difficultyBadge =
-    currentQ?.difficulty &gt;= 1.0
+    currentQ?.difficulty >= 1.0
       ? { label: 'High Difficulty', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20' }
-      : currentQ?.difficulty &gt;= -0.5
+      : currentQ?.difficulty >= -0.5
       ? { label: 'Medium Difficulty', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20' }
-      : { label: 'Foundational Difficulty', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' };
+      : { label: 'Low Difficulty', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' };
 
   return (
     <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 shadow-2xl space-y-6">

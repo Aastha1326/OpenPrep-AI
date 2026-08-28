@@ -11,14 +11,6 @@ const sounds = [
     { id: 'forest', name: 'Forest Breeze', icon: '🌲' },
 ];
 
-const sounds = [
-    { id: 'lofi', name: 'Lo-Fi Study Beats', icon: '🎵' },
-    { id: 'rain', name: 'Rain on Window', icon: '🌧️' },
-    { id: 'cafe', name: 'Coffee Shop Murmur', icon: '☕' },
-    { id: 'white', name: 'White Noise', icon: '🌊' },
-    { id: 'forest', name: 'Forest Breeze', icon: '🌲' },
-];
-
 const AmbientAudioLounge = () => {
     const [volumes, setVolumes] = useState({ lofi: 0, rain: 0, cafe: 0, white: 0, forest: 0 });
 

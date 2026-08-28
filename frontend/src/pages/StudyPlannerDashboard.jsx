@@ -43,7 +43,6 @@ import {
   DailyHeatmapChart,
 } from './StudyPlannerCharts';
 
-import { generateBurndownData } from './studyPlannerData';
 
 import {
   generateTasks,

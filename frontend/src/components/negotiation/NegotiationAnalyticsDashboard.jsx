@@ -57,7 +57,7 @@ const NegotiationAnalyticsDashboard = ({ pastSessions = [] }) => {
                         <TrendingUp className="w-4 h-4" /> Success Rate
                     </div>
                     <div className="text-2xl font-bold text-blue-400">{metrics.successRate}</div>
-                    <div className="text-xs text-gray-400 mt-1">Offers accepted > initial</div>
+                    <div className="text-xs text-gray-400 mt-1">Offers accepted {'>'} initial</div>
                 </div>
 
                 {/* Metric 4 */}

@@ -25,7 +25,7 @@ beforeAll(() => {
   });
 });
 
-vi.mock('../services/api', () => ({
+vi.mock('../services/api.js', () => ({
   default: {
     get: vi.fn(() => Promise.resolve({ data: { data: {} } })),
     put: vi.fn(() => Promise.resolve({ data: {} })),
@@ -364,3 +364,4 @@ describe('Dashboard', () => {
     expect(screen.getByText(/Start your first study session to track time!/i)).toBeInTheDocument();
   });
 });
+

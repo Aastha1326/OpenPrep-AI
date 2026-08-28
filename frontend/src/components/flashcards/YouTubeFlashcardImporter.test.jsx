@@ -4,7 +4,7 @@ import { describe, test, expect, vi } from 'vitest';
 import YouTubeFlashcardImporter from './YouTubeFlashcardImporter';
 import API from '../../services/api';
 
-vi.mock('../../services/api', () => ({
+vi.mock('../../services/api.js', () => ({
   default: {
     get: vi.fn().mockResolvedValue({ data: { success: true, data: [] } }),
     post: vi.fn(),
@@ -65,3 +65,4 @@ describe('YouTubeFlashcardImporter Component tests', () => {
     });
   });
 });
+

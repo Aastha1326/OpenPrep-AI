@@ -6,7 +6,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import PublicShare from './PublicShare';
 import API from '../services/api';
 
-vi.mock('../services/api', () => ({
+vi.mock('../services/api.js', () => ({
   default: {
     get: vi.fn(),
     post: vi.fn(),
@@ -102,3 +102,4 @@ describe('PublicShare Page', () => {
     });
   });
 });
+
