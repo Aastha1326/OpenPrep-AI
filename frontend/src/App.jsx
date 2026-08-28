@@ -58,6 +58,7 @@ const StudySquadDashboard = lazy(() => import('./pages/SquadsPage'));
 const CollabNote = lazy(() => import('./pages/CollaborativeNoteView'));
 const LiveQuizSession = lazy(() => import('./pages/LiveQuizSession'));
 const InterviewRoomPage = lazy(() => import('./pages/InterviewRoomPage'));
+const StreakDashboard = lazy(() => import('./pages/StreakDashboard'));
 
 function App() {
 
@@ -444,6 +445,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <InterviewRoomPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/streak-dashboard"
+            element={
+              <ProtectedRoute>
+                <StreakDashboard />
               </ProtectedRoute>
             }
           />

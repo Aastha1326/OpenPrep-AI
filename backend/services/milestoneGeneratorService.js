@@ -4,10 +4,20 @@ const { toDateOnlyString } = require('../utils/dateUtils');
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const MILESTONE_TYPES = {
+  FIRST_DAY_START: 'first_day_start',
   WEEKLY_CHECKPOINT: 'weekly_checkpoint',
+  MONTHLY_CHECKPOINT: 'monthly_checkpoint',
+  QUARTER_COURSE_REVIEW: 'quarter_course_review',
   MID_COURSE_REVIEW: 'mid_course_review',
+  THREE_QUARTER_REVIEW: 'three_quarter_review',
   FINAL_REVIEW: 'final_review',
   EXAM_DAY: 'exam_day',
+  FIRST_PRACTICE_TEST: 'first_practice_test',
+  SUBJECT_MASTERY_1: 'subject_mastery_1',
+  SUBJECT_MASTERY_2: 'subject_mastery_2',
+  LAST_WEEK_SPRINT: 'last_week_sprint',
+  DAY_BEFORE_EXAM: 'day_before_exam',
+  POST_EXAM_REFLECTION: 'post_exam_reflection',
 };
 
 const MILESTONE_STATUS = {
@@ -62,16 +72,7 @@ function buildMidCourseDescription(dateStr, topics) {
 
 /**
  * Deterministically generates an exam milestone schedule from a study plan's
- * date range and (optional) daily goals. Produces weekly checkpoints, a
- * mid-course review, a final full revision, and an exam-day milestone.
- *
- * @param {Object} params
- * @param {string|Date} params.startDate Plan start date
- * @param {string|Date} params.endDate   Plan end date (usually the exam date)
- * @param {Array}  [params.dailyGoals]   Plan daily goals used to enrich
- *                                       checkpoint descriptions with coverage
- * @param {string} [params.examName]     Exam name for milestone titles
- * @returns {Array} Sorted milestone objects (earliest first)
+ * date range and (optional) daily goals. Produces up to 14 milestone types.
  */
 function generateMilestones({ startDate, endDate, dailyGoals = [], examName = '' }) {
   const start = toDateOnlyString(startDate);
@@ -84,59 +85,107 @@ function generateMilestones({ startDate, endDate, dailyGoals = [], examName = ''
   const totalDays = Math.round((endDt - startDt) / DAY_MS) + 1;
 
   const reservedDates = new Set([end]);
-  if (totalDays >= 3) {
-    reservedDates.add(toDateOnlyString(addDays(endDt, -1)));
+  const byDate = {};
+  
+  // Helper to add milestone safely
+  const safelyAddMilestone = (targetDate, type, title, descGenerator) => {
+    if (reservedDates.has(targetDate) || byDate[targetDate] || targetDate > end) return false;
+    const topics = topicsCoveredUpTo(dailyGoals, targetDate);
+    byDate[targetDate] = makeMilestone({
+      date: targetDate,
+      type,
+      title,
+      description: descGenerator(topics),
+      topicCount: topics.length,
+    });
+    return true;
+  };
+
+  // 1. First Day Start
+  if (totalDays > 1) {
+    safelyAddMilestone(start, MILESTONE_TYPES.FIRST_DAY_START, 'First Day of Prep', () => `Your preparation for ${examName || 'the exam'} begins today! Stay focused and consistent.`);
   }
 
-  const byDate = {};
-
-  // Weekly checkpoints on day 7, 14, 21, ... of the plan
+  // 2. Weekly Checkpoints & 3. Monthly Checkpoints
   const weeklyCount = totalDays >= 7 ? Math.ceil(totalDays / 7) - 1 : 0;
   for (let i = 1; i <= weeklyCount; i += 1) {
     const date = toDateOnlyString(addDays(startDt, i * 7 - 1));
-    if (reservedDates.has(date) || date > end || byDate[date]) continue;
-    const topics = topicsCoveredUpTo(dailyGoals, date);
-    byDate[date] = makeMilestone({
-      date,
-      type: MILESTONE_TYPES.WEEKLY_CHECKPOINT,
-      title: `Week ${i} Checkpoint`,
-      description: buildWeeklyDescription(date, topics),
-      topicCount: topics.length,
-    });
-  }
-
-  // Mid-course review at roughly the halfway point
-  if (totalDays >= 10) {
-    const midDate = toDateOnlyString(addDays(startDt, Math.floor((totalDays - 1) / 2)));
-    if (!reservedDates.has(midDate) && !byDate[midDate]) {
-      const topics = topicsCoveredUpTo(dailyGoals, midDate);
-      byDate[midDate] = makeMilestone({
-        date: midDate,
-        type: MILESTONE_TYPES.MID_COURSE_REVIEW,
-        title: 'Mid-Course Review',
-        description: buildMidCourseDescription(midDate, topics),
-        topicCount: topics.length,
-      });
+    if (i % 4 === 0) {
+      safelyAddMilestone(date, MILESTONE_TYPES.MONTHLY_CHECKPOINT, `Month ${i/4} Checkpoint`, (t) => `Monthly review for ${date}. Consolidate your learning from the past 4 weeks.`);
+    } else {
+      safelyAddMilestone(date, MILESTONE_TYPES.WEEKLY_CHECKPOINT, `Week ${i} Checkpoint`, (t) => buildWeeklyDescription(date, t));
     }
   }
 
-  // Final full revision the day before the exam
+  // 4. Quarter Course Review
+  if (totalDays >= 14) {
+    const q1Date = toDateOnlyString(addDays(startDt, Math.floor(totalDays * 0.25)));
+    safelyAddMilestone(q1Date, MILESTONE_TYPES.QUARTER_COURSE_REVIEW, '25% Course Review', () => `You are 25% through your study plan! Great time to check if you are on pace.`);
+  }
+
+  // 5. Mid Course Review
+  if (totalDays >= 10) {
+    const midDate = toDateOnlyString(addDays(startDt, Math.floor(totalDays * 0.5)));
+    safelyAddMilestone(midDate, MILESTONE_TYPES.MID_COURSE_REVIEW, 'Mid-Course Review', (t) => buildMidCourseDescription(midDate, t));
+  }
+
+  // 6. Three Quarter Review
+  if (totalDays >= 14) {
+    const q3Date = toDateOnlyString(addDays(startDt, Math.floor(totalDays * 0.75)));
+    safelyAddMilestone(q3Date, MILESTONE_TYPES.THREE_QUARTER_REVIEW, '75% Course Review', () => `You are 75% through! The finish line is in sight, push hard.`);
+  }
+
+  // 7. First Practice Test (Approx Day 10 or 1/3)
+  if (totalDays >= 10) {
+    const ptDate = toDateOnlyString(addDays(startDt, Math.floor(totalDays * 0.33)));
+    safelyAddMilestone(ptDate, MILESTONE_TYPES.FIRST_PRACTICE_TEST, 'First Practice Test', () => `Take your first full-length practice test to establish a baseline score.`);
+  }
+
+  // 8 & 9. Subject Mastery Checkpoints (Arbitrarily placed in the middle)
+  if (totalDays >= 20) {
+    safelyAddMilestone(toDateOnlyString(addDays(startDt, Math.floor(totalDays * 0.4))), MILESTONE_TYPES.SUBJECT_MASTERY_1, 'Subject Mastery I', () => `Ensure you have fully mastered the first major subject area.`);
+    safelyAddMilestone(toDateOnlyString(addDays(startDt, Math.floor(totalDays * 0.6))), MILESTONE_TYPES.SUBJECT_MASTERY_2, 'Subject Mastery II', () => `Ensure you have fully mastered the second major subject area.`);
+  }
+
+  // 10. Last Week Sprint
+  if (totalDays >= 14) {
+    const sprintDate = toDateOnlyString(addDays(endDt, -7));
+    safelyAddMilestone(sprintDate, MILESTONE_TYPES.LAST_WEEK_SPRINT, 'Last Week Sprint', () => `One week left! Focus entirely on mock exams and active recall.`);
+  }
+
+  // 11. Final Review
+  if (totalDays >= 5) {
+    const finalDate = toDateOnlyString(addDays(endDt, -2));
+    safelyAddMilestone(finalDate, MILESTONE_TYPES.FINAL_REVIEW, 'Final Full Revision', () => `Final full revision on ${finalDate}.`);
+  }
+
+  // 12. Day Before Exam
   if (totalDays >= 3) {
-    const finalDate = toDateOnlyString(addDays(endDt, -1));
-    byDate[finalDate] = makeMilestone({
-      date: finalDate,
-      type: MILESTONE_TYPES.FINAL_REVIEW,
-      title: 'Final Full Revision',
-      description: `Final full revision on ${finalDate}${examName ? ` for ${examName}` : ''}. Revise quick notes, solve a practice paper, and rest well before the exam.`,
+    const dayBefore = toDateOnlyString(addDays(endDt, -1));
+    reservedDates.add(dayBefore); // Reserve it so it overrides others
+    byDate[dayBefore] = makeMilestone({
+      date: dayBefore,
+      type: MILESTONE_TYPES.DAY_BEFORE_EXAM,
+      title: 'Day Before Exam',
+      description: `Rest well, eat healthy, and organize your exam materials.`,
     });
   }
 
-  // Exam day
+  // 13. Exam Day
   byDate[end] = makeMilestone({
     date: end,
     type: MILESTONE_TYPES.EXAM_DAY,
     title: examName ? `${examName} — Exam Day` : 'Exam Day',
     description: `Exam day on ${end}. Stay calm, review key formulas and notes, and give it your best.`,
+  });
+
+  // 14. Post Exam Reflection (1 day after)
+  const postDate = toDateOnlyString(addDays(endDt, 1));
+  byDate[postDate] = makeMilestone({
+    date: postDate,
+    type: MILESTONE_TYPES.POST_EXAM_REFLECTION,
+    title: 'Post-Exam Reflection',
+    description: `Take a breath and reflect on your performance. You've earned a break!`,
   });
 
   return Object.keys(byDate)
