@@ -2,13 +2,41 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import FlashcardReview from './FlashcardReview';
 import API from '../services/api';
+import offlineSyncService from '../services/offlineSyncService';
 
-vi.mock('../services/api', () => ({
+vi.mock('../services/db.js', () => ({
+  db: {
+    cachedFlashcards: {
+      clear: vi.fn().mockResolvedValue(),
+      bulkPut: vi.fn().mockResolvedValue(),
+      toArray: vi.fn().mockResolvedValue([]),
+    },
+    offlineReviews: {
+      add: vi.fn().mockResolvedValue(),
+    }
+  }
+}));
+
+vi.mock('../services/api.js', () => ({
   default: {
     get: vi.fn(),
     put: vi.fn(),
   },
 }));
+
+// Ratings no longer go straight to the API. They are handed to
+// offlineSyncService.queueReview, which writes the review to IndexedDB first
+// and only then pushes it upstream, so that a rating survives a dropped
+// connection. Assert against that boundary rather than against API.put.
+vi.mock('../services/offlineSyncService', () => {
+  const queueReview = vi.fn();
+  return {
+    default: { queueReview },
+    offlineSyncService: { queueReview },
+  };
+});
+
+const queuedReview = () => offlineSyncService.queueReview;
 
 const sampleCards = [
   { id: 'c1', front: 'What is React?', back: 'A UI library', interval: 1, repetitions: 0, efactor: 2.5 },
@@ -118,7 +146,9 @@ test('allows speech speed and language controls when hands-free mode is enabled'
   test('shows error message when fetching due cards fails', async () => {
     API.get.mockRejectedValue(new Error('network error'));
     renderReview();
-    expect(await screen.findByText('Failed to fetch due flashcards.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Failed to fetch due flashcards and no offline cache available.')
+    ).toBeInTheDocument();
   });
 
   test('renders the first due card after loading', async () => {
@@ -127,23 +157,23 @@ test('allows speech speed and language controls when hands-free mode is enabled'
     expect(await screen.findByText('What is React?')).toBeInTheDocument();
   });
 
-  test('saves each rating via API.put and advances to the next card', async () => {
+  test('queues each rating for sync and advances to the next card', async () => {
     API.get.mockResolvedValue({ data: { data: sampleCards } });
-    API.put.mockResolvedValue({ data: { data: { id: 'c1' } } });
+    queuedReview().mockResolvedValue({ synced: 1, failed: 0 });
 
     renderReview();
     await flipCurrentCard('What is React?');
     fireEvent.click(screen.getByRole('button', { name: /^Good / }));
 
     await waitFor(() => {
-      expect(API.put).toHaveBeenCalledWith('/flashcards/c1/review', { quality: 4 });
+      expect(queuedReview()).toHaveBeenCalledWith('c1', 4);
     });
     expect(await screen.findByText('What is Redux?')).toBeInTheDocument();
   });
 
   test('does not advance to the next card when the rating fails to save', async () => {
     API.get.mockResolvedValue({ data: { data: sampleCards } });
-    API.put.mockRejectedValue(new Error('network error'));
+    queuedReview().mockRejectedValue(new Error('network error'));
 
     renderReview();
     await flipCurrentCard('What is React?');
@@ -151,12 +181,14 @@ test('allows speech speed and language controls when hands-free mode is enabled'
 
     expect(await screen.findByText(/Could not save this rating/, {}, { timeout: 4000 })).toBeInTheDocument();
     expect(screen.getByText('What is React?')).toBeInTheDocument();
-    expect(API.put).toHaveBeenCalledTimes(3);
+    // Retry and backoff moved into offlineSyncService, so the page makes a
+    // single call and lets the service decide how hard to try.
+    expect(queuedReview()).toHaveBeenCalledTimes(1);
   });
 
   test('keeps a dismissed save error but stays on the current card', async () => {
     API.get.mockResolvedValue({ data: { data: sampleCards } });
-    API.put.mockRejectedValue(new Error('network error'));
+    queuedReview().mockRejectedValue(new Error('network error'));
 
     renderReview();
     await flipCurrentCard('What is React?');
@@ -173,7 +205,7 @@ test('allows speech speed and language controls when hands-free mode is enabled'
 
   test('persists a session checkpoint after each rating', async () => {
     API.get.mockResolvedValue({ data: { data: sampleCards } });
-    API.put.mockResolvedValue({ data: { data: { id: 'c1' } } });
+    queuedReview().mockResolvedValue({ synced: 1, failed: 0 });
 
     renderReview();
     await flipCurrentCard('What is React?');
@@ -214,7 +246,7 @@ test('allows speech speed and language controls when hands-free mode is enabled'
         savedAt: Date.now(),
       })
     );
-    API.put.mockResolvedValue({ data: { data: { id: 'c3' } } });
+    queuedReview().mockResolvedValue({ synced: 1, failed: 0 });
 
     renderReview();
     await flipCurrentCard('What is JSX?');
@@ -244,7 +276,7 @@ test('allows speech speed and language controls when hands-free mode is enabled'
 
   test('supports flipping and rating via keyboard', async () => {
     API.get.mockResolvedValue({ data: { data: sampleCards } });
-    API.put.mockResolvedValue({ data: { data: { id: 'c1' } } });
+    queuedReview().mockResolvedValue({ synced: 1, failed: 0 });
 
     renderReview();
     await screen.findByText('What is React?');
@@ -253,7 +285,7 @@ test('allows speech speed and language controls when hands-free mode is enabled'
     fireEvent.keyDown(window, { key: '4' });
 
     await waitFor(() => {
-      expect(API.put).toHaveBeenCalledWith('/flashcards/c1/review', { quality: 4 });
+      expect(queuedReview()).toHaveBeenCalledWith('c1', 4);
     });
     expect(await screen.findByText('What is Redux?')).toBeInTheDocument();
   });
@@ -261,9 +293,9 @@ test('allows speech speed and language controls when hands-free mode is enabled'
   test('disables rating buttons and ignores rapid clicks while a review is pending', async () => {
     API.get.mockResolvedValue({ data: { data: sampleCards } });
 
-    // Keep the API.put request pending so we can observe the in-flight state.
+    // Keep the queued review pending so we can observe the in-flight state.
     let resolvePut;
-    API.put.mockImplementationOnce(() => new Promise((resolve) => { resolvePut = resolve; }));
+    queuedReview().mockImplementationOnce(() => new Promise((resolve) => { resolvePut = resolve; }));
 
     renderReview();
     await screen.findByText('What is React?');
@@ -279,11 +311,11 @@ test('allows speech speed and language controls when hands-free mode is enabled'
     // ...so rapid keyboard input is debounced and only one request fires.
     fireEvent.keyDown(window, { key: '4' });
     fireEvent.keyDown(window, { key: '5' });
-    await waitFor(() => expect(API.put).toHaveBeenCalledTimes(1));
-    expect(API.put).toHaveBeenCalledWith('/flashcards/c1/review', { quality: 4 });
+    await waitFor(() => expect(queuedReview()).toHaveBeenCalledTimes(1));
+    expect(queuedReview()).toHaveBeenCalledWith('c1', 4);
 
     // Resolving the request advances to the next card and re-enables buttons.
-    resolvePut({ data: { data: { id: 'c1' } } });
+    resolvePut({ synced: 1, failed: 0 });
     expect(await screen.findByText('What is Redux?')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Good / })).toBeEnabled();
   });
@@ -343,3 +375,5 @@ test('allows speech speed and language controls when hands-free mode is enabled'
     expect(await screen.findByText('Flip flashcard front or back')).toBeInTheDocument();
   });
 });
+
+

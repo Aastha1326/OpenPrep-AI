@@ -9,9 +9,12 @@ import ScrollToTop from './components/ScrollToTop';
 import MobileNavDrawer from './components/MobileNavDrawer';
 import PageSkeleton from './components/PageSkeleton';
 import SessionTimeoutModal from './components/SessionTimeoutModal';
+import SessionRestoreModal from './components/SessionRestoreModal';
+import API from './services/api';
 import QuotaExceededModal from './components/dashboard/QuotaExceededModal';
-import CommandPalette from './components/search/CommandPalette';
+import GlobalSearchModal from './components/search/GlobalSearchModal';
 import OfflineBanner from './components/common/OfflineBanner';
+import OfflineStatusBanner from './components/common/OfflineStatusBanner';
 import PwaInstallPrompt from './components/common/PwaInstallPrompt';
 import OfflineIndicator from './components/common/OfflineIndicator';
 import Walkthrough from './components/tutorial/Walkthrough';
@@ -37,26 +40,34 @@ const Flashcards = lazy(() => import('./pages/Flashcards'));
 const CommunityDecks = lazy(() => import('./pages/CommunityDecks'));
 const PublicShare = lazy(() => import('./pages/PublicShare'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const AdminAnalytics = lazy(() => import('./pages/AdminAnalytics'));
 const StudyGroupChat = lazy(() => import('./pages/StudyGroupChat'));
 const AiAssistant = lazy(() => import('./pages/AiAssistant'));
 const OAuthCallback = lazy(() => import('./pages/OAuthCallback'));
 const PYQAnalytics = lazy(() => import('./pages/PYQAnalytics'));
+const PYQIntelligenceDashboard = lazy(() => import('./pages/PYQIntelligenceDashboard'));
 const QuizSession = lazy(() => import('./pages/QuizSession'));
 const MindMapViewer = lazy(() => import('./pages/MindMapViewer'));
+const WeaknessDetectionDashboard = lazy(() => import('./pages/WeaknessDetectionDashboard'));
 const StudyPlanner = lazy(() => import('./pages/StudyPlanner'));
+const StudyGoals = lazy(() => import('./pages/StudyGoals'));
 const VivaSimulator = lazy(() => import('./pages/VivaSimulator'));
+const AttemptHistoryDashboard = lazy(() => import('./pages/AttemptHistoryDashboard'));
 const CollaborativeNoteView = lazy(() => import('./pages/CollaborativeNoteView'));
 const SquadsPage = lazy(() => import('./pages/SquadsPage'));
 const StudySquadDashboard = lazy(() => import('./pages/SquadsPage'));
 const CollabNote = lazy(() => import('./pages/CollaborativeNoteView'));
 const LiveQuizSession = lazy(() => import('./pages/LiveQuizSession'));
 const MedicalCaseSimulator = lazy(() => import('./pages/MedicalCaseSimulator'));
+const InterviewRoomPage = lazy(() => import('./pages/InterviewRoomPage'));
+const StreakDashboard = lazy(() => import('./pages/StreakDashboard'));
 
 function App() {
 
   const dispatch = useDispatch();
-  const { sessionExpired, aiQuotaExceededUntil } = useSelector((state) => state.auth);
+  const { sessionExpired, aiQuotaExceededUntil, isAuthenticated, user } = useSelector((state) => state.auth);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [savedSessionPrompt, setSavedSessionPrompt] = useState(null);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -74,6 +85,21 @@ function App() {
       dispatch(loadUser());
     }
   }, [dispatch]);
+
+  // Check for unsaved session after login
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      API.get('/session/saved')
+        .then((res) => {
+          if (res.data?.success && res.data?.hasSavedSession && res.data?.session) {
+            setSavedSessionPrompt(res.data.session);
+          }
+        })
+        .catch(() => {});
+    } else {
+      setSavedSessionPrompt(null);
+    }
+  }, [isAuthenticated, user]);
 
   useEffect(() => {
     const checkQuota = () => {
@@ -155,7 +181,7 @@ function App() {
       <QuotaExceededModal />
       <SessionTimeoutModal />
       <Walkthrough />
-      <CommandPalette isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+      <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
       {localStorage.getItem('token') && <PomodoroWidget />}
       <main id="main-content" tabIndex="-1" role="main" className="focus:outline-none min-h-screen">
         <Suspense fallback={<PageSkeleton />}>
@@ -277,10 +303,28 @@ function App() {
           />
 
           <Route
+            path="/pyq-intelligence"
+            element={
+              <ProtectedRoute>
+                <PYQIntelligenceDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/study-planner"
             element={
               <ProtectedRoute>
                 <StudyPlanner />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/revision-scheduler"
+            element={
+              <ProtectedRoute>
+                <RevisionScheduler />
               </ProtectedRoute>
             }
           />
@@ -344,10 +388,10 @@ function App() {
           />
 
           <Route
-            path="/analytics"
+            path="/exam-planner"
             element={
               <ProtectedRoute>
-                <StudyAnalytics />
+                <ExamCountdownPlanner />
               </ProtectedRoute>
             }
           />
@@ -362,10 +406,28 @@ function App() {
           />
 
           <Route
+            path="/study-goals"
+            element={
+              <ProtectedRoute>
+                <StudyGoals />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/settings"
             element={
               <ProtectedRoute>
                 <Settings />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/attempt-history"
+            element={
+              <ProtectedRoute>
+                <AttemptHistoryDashboard />
               </ProtectedRoute>
             }
           />
@@ -379,8 +441,44 @@ function App() {
             }
           />
 
+          <Route
+            path="/focus-analytics"
+            element={
+              <ProtectedRoute>
+                <FocusSessionAnalyticsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/interview"
+            element={
+              <ProtectedRoute>
+                <InterviewRoomPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/interview/:roomId"
+            element={
+              <ProtectedRoute>
+                <InterviewRoomPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/streak-dashboard"
+            element={
+              <ProtectedRoute>
+                <StreakDashboard />
+              </ProtectedRoute>
+            }
+          />
+
           <Route element={<AdminRoute />}>
             <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/analytics" element={<AdminAnalytics />} />
           </Route>
 
           <Route path="/medical-cases" element={<MedicalCaseSimulator />} />
@@ -389,6 +487,12 @@ function App() {
       </Suspense>
       </main>
       <MobileBottomNav />
+      {savedSessionPrompt && (
+        <SessionRestoreModal
+          savedSession={savedSessionPrompt}
+          onClose={() => setSavedSessionPrompt(null)}
+        />
+      )}
     </>
   );
 

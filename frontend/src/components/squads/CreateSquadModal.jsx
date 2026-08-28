@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 export default function CreateSquadModal({ isOpen, onClose, onCreate, onJoin }) {
   const [mode, setMode] = useState('create');
   const [name, setName] = useState('');
+  const [sharedWhiteboardUrl, setSharedWhiteboardUrl] = useState('');
   const [inviteCode, setInviteCode] = useState('');
 
   if (!isOpen) return null;
@@ -40,8 +41,16 @@ export default function CreateSquadModal({ isOpen, onClose, onCreate, onJoin }) 
               className="w-full p-2 rounded bg-slate-700 border border-slate-600 mb-4"
               placeholder="e.g. Exam Crushers"
             />
+            <label className="block mb-2 text-sm font-medium">Shared Whiteboard Link (Optional)</label>
+            <input 
+              type="text" 
+              value={sharedWhiteboardUrl} 
+              onChange={(e) => setSharedWhiteboardUrl(e.target.value)}
+              className="w-full p-2 rounded bg-slate-700 border border-slate-600 mb-4"
+              placeholder="e.g. https://excalidraw.com/..."
+            />
             <button 
-              onClick={() => onCreate(name)}
+              onClick={() => onCreate(name, sharedWhiteboardUrl)}
               disabled={!name.trim()}
               className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium py-2 px-4 rounded"
             >

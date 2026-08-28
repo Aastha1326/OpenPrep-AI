@@ -15,6 +15,7 @@ const Achievement = require('../models/Achievement');
 const sendEmail = require('../services/emailService');
 
 const MAX_ACTIVE_SESSIONS = parseInt(process.env.MAX_ACTIVE_SESSIONS, 10) || 10;
+const jwtSecret = process.env.JWT_SECRET;
 
 const getAuthCookieOptions = () => ({
   httpOnly: true,
@@ -134,8 +135,6 @@ const sendVerificationEmail = async (user) => {
     text: `Hi ${user.name || 'there'},\n\nConfirm your email address to activate your OpenPrep AI account:\n\n${verifyUrl}\n\nThis link expires in 24 hours. If you didn't create an account, you can ignore this message.`,
     html: `<p>Hi ${user.name || 'there'},</p><p>Confirm your email address to activate your OpenPrep AI account:</p><p><a href="${verifyUrl}">Verify my email</a></p><p>This link expires in 24 hours. If you didn't create an account, you can ignore this message.</p>`,
   });
-
-  return rawToken;
 };
 
 /**
@@ -157,8 +156,6 @@ const sendPasswordResetEmail = async (user) => {
     text: `Hi ${user.name || 'there'},\n\nUse the link below to choose a new password:\n\n${resetUrl}\n\nThis link expires in 1 hour. If you didn't request a reset, no action is needed.`,
     html: `<p>Hi ${user.name || 'there'},</p><p>Use the link below to choose a new password:</p><p><a href="${resetUrl}">Reset my password</a></p><p>This link expires in 1 hour. If you didn't request a reset, no action is needed.</p>`,
   });
-
-  return rawToken;
 };
 
 /**
@@ -349,38 +346,6 @@ exports.login = async (req, res, next) => {
         role: user.role,
       },
     });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * @swagger
- * /api/auth/logout:
- *   post:
- *     summary: Logout user and clear authentication cookies
- *     tags: [Authentication]
- *     responses:
- *       200:
- *         description: Logged out successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Logged out successfully"
- */
-exports.logout = async (req, res, next) => {
-  try {
-    const cookieOptions = getAuthCookieOptions();
-    res.clearCookie('token', cookieOptions);
-    res.clearCookie('refreshToken', cookieOptions);
-    res.status(200).json({ success: true, message: 'Logged out successfully' });
   } catch (error) {
     next(error);
   }
@@ -1397,7 +1362,7 @@ exports.logout = async (req, res, next) => {
     }
 
     clearRefreshTokenCookie(res);
-    res.clearCookie('token', getAuthCookieOptions());
+    res.clearCookie('token', getAccessTokenCookieOptions());
 
     res.status(200).json({
       success: true,

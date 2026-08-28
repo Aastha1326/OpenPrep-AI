@@ -19,7 +19,11 @@ describe('useVoiceControl', () => {
       lang: '',
     };
     
-    MockRecognition = vi.fn(function() { return mockRecognitionInstance; });
+    instances = [];
+    MockRecognition = vi.fn(function () {
+      instances.push(mockRecognitionInstance);
+      return mockRecognitionInstance;
+    });
     window.SpeechRecognition = MockRecognition;
 
     mockSynth = {
@@ -197,18 +201,17 @@ describe('useVoiceControl', () => {
 
     const recognition = instances[0];
 
-  const recognition = mockRecognitionInstance;
-
-  act(() => {
-    recognition.onstart();
-    recognition.onresult({
-      results: [
-        [
-          {
-            transcript: 'A component is a reusable UI building block',
-            confidence: 0.9,
-          },
-        ],
+    act(() => {
+      recognition.onstart();
+      recognition.onresult({
+        results: [
+          [
+            {
+              transcript: 'A component is a reusable UI building block',
+              confidence: 0.9,
+            },
+          ]
+        ]
       });
     });
 
@@ -242,7 +245,19 @@ describe('useVoiceControl', () => {
     expect(result.current.errorMsg).toMatch(/microphone permission/i);
   });
 
-  const recognition = mockRecognitionInstance;
+  it('keeps the recognition session alive while a command is being processed', () => {
+    const { result } = renderHook(() => useVoiceControl({ onCommand: mockOnCommand }));
+
+    act(() => {
+      result.current.toggleVoiceMode();
+      mockRecognitionInstance.onstart();
+    });
+
+    // Enabling voice mode re-runs the effect, and its cleanup aborts the
+    // recognition object created on the initial (disabled) render. Every
+    // constructor call hands back the same mock, so clear the calls here to
+    // scope the assertion below to the session that is actually live.
+    mockRecognitionInstance.abort.mockClear();
 
     // Trigger onresult which transitions status to PROCESSING
     act(() => {

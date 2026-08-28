@@ -4,7 +4,7 @@ import React from 'react';
 import QuestionExplanation from './QuestionExplanation';
 
 // Mock dependencies
-vi.mock('../../services/api', () => ({
+vi.mock('../../services/api.js', () => ({
   default: {
     post: vi.fn(),
   },
@@ -29,3 +29,4 @@ describe('QuestionExplanation Markdown Links Safety', () => {
     // or we can test markdownComponents object directly.
   });
 });
+

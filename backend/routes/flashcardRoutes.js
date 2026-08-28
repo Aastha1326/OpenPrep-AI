@@ -19,6 +19,9 @@ const {
   rateCommunityDeck,
   starCommunityDeck,
   batchSyncOfflineReviews,
+  generateClozeFlashcards,
+  generateDeckPodcast,
+  getPodcastEpisodeById,
 } = require('../controllers/flashcardController');
 const { protect } = require('../middleware/auth');
 const cacheMiddleware = require('../middleware/cacheMiddleware');
@@ -123,6 +126,14 @@ router.post(
   checkQuota,
   validateGenerateAIFlashcards,
   generateAIFlashcards
+);
+
+router.post(
+  '/generate-cloze',
+  protect,
+  aiLimiter,
+  checkQuota,
+  generateClozeFlashcards
 );
 
 /**
@@ -877,6 +888,8 @@ router.post('/decks/:subjectId/rate', protect, rateCommunityDeck);
 router.post('/decks/:subjectId/star', protect, starCommunityDeck);
 router.post('/batch-sync', protect, batchSyncOfflineReviews);
 router.post('/sync-batch', protect, batchSyncOfflineReviews);
+router.get('/podcasts/:id', protect, getPodcastEpisodeById);
+router.post('/:deckId/generate-podcast', protect, generateDeckPodcast);
 
 router.delete('/:id', protect, deleteFlashcard);
 

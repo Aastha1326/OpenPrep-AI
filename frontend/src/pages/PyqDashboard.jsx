@@ -358,6 +358,13 @@ const [activeInsightTab, setActiveInsightTab] = useState('paper');
               <TrendingUp className="w-4 h-4 text-amber-250" />
               Batch Trend Analyzer
             </Link>
+            <button
+              onClick={() => alert("Multi-Doc Analysis: Please export your PDFs and upload them directly to ChatGPT or Claude for comparative analysis. We do not support native multi-doc matrix generation to keep the platform fast and minimal.")}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-900 border border-slate-700 text-white rounded-lg text-xs font-bold shadow-sm transition-all uppercase tracking-wider"
+            >
+              <Layers className="w-4 h-4 text-slate-300" />
+              Multi-Doc Analysis
+            </button>
             <ThemeToggle />
           </div>
         </div>

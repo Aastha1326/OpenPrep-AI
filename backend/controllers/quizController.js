@@ -67,6 +67,15 @@ exports.generateAIQuiz = async (req, res, next) => {
     const { subjectId, topicId, count, language, questionType = 'MCQ' } = req.body;
     const normalizedLanguage = normalizeQuizLanguage(language);
 
+    const MAX_QUIZ_COUNT = 50;
+    const requestedCount = parseInt(count, 10) || 5;
+    if (requestedCount < 1 || requestedCount > MAX_QUIZ_COUNT) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid count parameter. Must be between 1 and ${MAX_QUIZ_COUNT}.`,
+      });
+    }
+
     const subject = await Subject.findByPk(subjectId);
     if (!subject) {
       return res.status(404).json({ success: false, error: 'Subject not found' });
@@ -97,7 +106,7 @@ exports.generateAIQuiz = async (req, res, next) => {
     const cacheKey = cacheService.hashPayload('quiz', {
       subject: subject.name,
       topic: topicName,
-      count: count || 5,
+      count: requestedCount,
       language: normalizedLanguage,
       difficulty: difficultyLevel,
       questionType,
@@ -119,7 +128,7 @@ exports.generateAIQuiz = async (req, res, next) => {
         subject.name,
         topicName,
         notesText,
-        count || 5,
+        requestedCount,
         isRefresh,
         normalizedLanguage,
         difficultyLevel,
@@ -202,6 +211,15 @@ exports.generateCustomQuiz = async (req, res, next) => {
   try {
     const { subjectId, topics = [], difficulty = 'medium', years = [], count = 5, timeLimit = 20, language = 'english' } = req.body;
 
+    const MAX_QUIZ_COUNT = 50;
+    const requestedCount = parseInt(count, 10) || 5;
+    if (requestedCount < 1 || requestedCount > MAX_QUIZ_COUNT) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid count parameter. Must be between 1 and ${MAX_QUIZ_COUNT}.`,
+      });
+    }
+
     const subject = await Subject.findByPk(subjectId);
     if (!subject) {
       return res.status(404).json({ success: false, error: 'Subject not found' });
@@ -234,7 +252,7 @@ exports.generateCustomQuiz = async (req, res, next) => {
       subject.name,
       topics,
       difficultyLevel,
-      count,
+      requestedCount,
       pyqQuestionsText,
       language
     );
@@ -1464,4 +1482,53 @@ exports.getNextAdaptiveQuestionEndpoint = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Evaluate question distractors quality & plausibility metrics
+// @route   POST /api/quiz/evaluate-distractors
+// @access  Private
+exports.evaluateDistractors = async (req, res, next) => {
+  try {
+    const { evaluateDistractors } = require('../services/distractorScorerService');
+    const { question, options, correctAnswerIndex = 0, context } = req.body;
+
+    if (!question || !Array.isArray(options) || options.length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid input. "question" string and "options" array (min 2 choices) are required.',
+      });
+    }
+
+    const result = await evaluateDistractors({
+      question,
+      options,
+      correctAnswerIndex: parseInt(correctAnswerIndex, 10) || 0,
+      context,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Generate misconception-based distractors
+// @route   POST /api/quizzes/generate-distractors
+// @access  Private
+exports.generateDistractors = async (req, res, next) => {
+  try {
+    const { generateDistractors } = require('../services/distractorGeneratorService');
+    const { question, correctAnswer, context = '', language = 'english' } = req.body;
+    const result = await generateDistractors({ question, correctAnswer, context, language });
+    return res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    if (error.status === 400 || error.status === 502) {
+      return res.status(error.status).json({ success: false, error: error.message });
+    }
+    next(error);
+  }
+};
+
 

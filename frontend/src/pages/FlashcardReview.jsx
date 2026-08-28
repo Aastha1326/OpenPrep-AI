@@ -13,9 +13,13 @@ import {
   Settings,
   FileAudio,
   Keyboard,
+  Play,
+  Video,
+  X,
 } from 'lucide-react';
 import MathRenderer from '../components/common/MathRenderer';
 import API from '../services/api';
+import { db } from '../services/db.js';
 import useVoiceControl from '../hooks/useVoiceControl';
 import VoiceModeToggle from '../components/VoiceModeToggle';
 import AudioWaveform from '../components/AudioWaveform';
@@ -23,6 +27,8 @@ import GenerateFlashcardsFromAudioModal from '../components/dashboard/GenerateFl
 import RemediationQuizModal from '../components/flashcards/RemediationQuizModal';
 import KeyboardShortcutsModal from '../components/flashcards/KeyboardShortcutsModal';
 import PomodoroTimer from '../components/dashboard/PomodoroTimer';
+import MobileBottomSheet from '../components/common/MobileBottomSheet';
+import offlineSyncService from '../services/offlineSyncService';
 const STORAGE_KEY = 'flashcardReviewSession';
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -555,6 +561,21 @@ useEffect(() => {
       clearSession();
     }
   }, [isSessionComplete, noCardsDue]);
+  const bind = useDrag(({ down, movement: [mx], cancel }) => {
+    if (down && Math.abs(mx) > 120) {
+      cancel();
+      if (mx < 0) {
+        // Swipe Left
+        if (!isFlipped) handleCardFlip();
+        else handleReview(1); // Mark as Wrong
+      } else {
+        // Swipe Right
+        if (!isFlipped) handleCardFlip();
+        else handleReview(5); // Mark as Easy
+      }
+    }
+  });
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center">
@@ -670,21 +691,6 @@ useEffect(() => {
 
   // --- Active Review Queue Screen ---
   const progressPercent = Math.round((currentIndex / cards.length) * 100);
-
-  const bind = useDrag(({ down, movement: [mx], cancel }) => {
-    if (down && Math.abs(mx) > 120) {
-      cancel();
-      if (mx < 0) {
-        // Swipe Left
-        if (!isFlipped) handleCardFlip();
-        else handleReview(1); // Mark as Wrong
-      } else {
-        // Swipe Right
-        if (!isFlipped) handleCardFlip();
-        else handleReview(5); // Mark as Easy
-      }
-    }
-  });
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-6 px-4 flex flex-col items-center">
@@ -1031,6 +1037,11 @@ useEffect(() => {
         title="SM-2 Algorithm Settings"
       >
         <div className="flex flex-col gap-4 py-2">
+          {/* Note about Audio Pitch */}
+          <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-lg text-xs text-amber-800 dark:text-amber-300">
+            <strong>Audio Review Mode:</strong> Voice speed controls are available during review. Pitch and voice selection are handled natively by your device's OS (no custom controls needed).
+          </div>
+          
           {/* Easy Factor Modifier */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold text-neutral-600 dark:text-neutral-300 uppercase tracking-wider">
@@ -1336,3 +1347,4 @@ useEffect(() => {
 };
 
 export default FlashcardReview;
+
