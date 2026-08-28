@@ -60,6 +60,25 @@ const NotificationSettings = require('./NotificationSettings');
 const WeaknessReport = require('./WeaknessReport');
 const SecurityAuditLog = require('./SecurityAuditLog');
 const MockInterviewSession = require('./MockInterviewSession');
+
+// Referenced by the association block below and by module.exports, but never
+// imported — each one was a ReferenceError at load, and models/index.js is on
+// the require path of nearly every controller, so the server could not boot.
+const SkillDependency = require('./SkillDependency');
+const FocusSessionLog = require('./FocusSessionLog');
+const StudyGoal = require('./StudyGoal');
+const StudyGoalProgress = require('./StudyGoalProgress');
+const WeeklyStudyReport = require('./WeeklyStudyReport');
+const ExamStrategy = require('./ExamStrategy');
+const StudyTip = require('./StudyTip');
+const StudyReminder = require('./StudyReminder');
+
+// Present on disk and loading cleanly, but absent from the registry, so
+// sequelize.sync() skipped them and they had no table.
+const AlumniMentorProfile = require('./AlumniMentorProfile');
+const ResumeParseSession = require('./ResumeParseSession');
+const MockInterview = require('./MockInterview');
+const SalaryNegotiation = require('./SalaryNegotiation');
 const { Bounty, initBounty } = require('./Bounty');
 const { BountySolution, initBountySolution } = require('./BountySolution');
 const { BountySolutionVote, initBountySolutionVote } = require('./BountySolutionVote');
@@ -446,4 +465,11 @@ module.exports = {
   BountySolution,
   BountySolutionVote,
   StudyReminder,
+  SkillDependency,
+  ExamStrategy,
+  StudyTip,
+  AlumniMentorProfile,
+  ResumeParseSession,
+  MockInterview,
+  SalaryNegotiation,
 };
