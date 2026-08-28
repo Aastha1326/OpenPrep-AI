@@ -66,8 +66,10 @@ const QuizAttempt = sequelize.define(
 );
 
 const cacheManager = require('../utils/cacheManager');
+const { emitUserChanged } = require('../services/cacheInvalidationService');
 
 QuizAttempt.afterSave(async (attempt, options) => {
+  emitUserChanged(attempt.user);
   try {
     const pattern = `user_${attempt.user}:*`;
     await cacheManager.invalidate(pattern);
@@ -77,6 +79,7 @@ QuizAttempt.afterSave(async (attempt, options) => {
 });
 
 QuizAttempt.afterDestroy(async (attempt, options) => {
+  emitUserChanged(attempt.user);
   try {
     const pattern = `user_${attempt.user}:*`;
     await cacheManager.invalidate(pattern);

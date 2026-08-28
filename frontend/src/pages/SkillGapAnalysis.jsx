@@ -3,8 +3,7 @@
  * Features drag-and-drop file upload and results visualization.
  */
 import React, { useState } from 'react';
-import SkillRadarChart from '../components/SkillGap/SkillRadarChart';
-import axios from 'axios';
+import SkillRadarChart from '../components/SkillGap/SkillRadarChart';import axios from 'axios';
 
 const SkillGapAnalysis = () => {
     const [file, setFile] = useState(null);
@@ -157,6 +156,19 @@ const SkillGapAnalysis = () => {
                     </div>
                 )}
             </div>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+    <div className="mb-5">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+            Skill Dependency Graph
+        </h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            Prerequisite skills are shown before the skills that depend on them.
+            Root gaps should be addressed first.
+        </p>
+    </div>
+
+    <SkillDependencyGraph />
+</div>
         </div>
     );
 };

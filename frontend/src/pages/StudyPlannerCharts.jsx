@@ -23,7 +23,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
-import { SUBJECTS } from './studyPlannerTypes';
+import { SUBJECTS, TASK_STATUS } from './studyPlannerTypes';
 
 const CHART_COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#ef4444', '#06b6d4'];
 
@@ -194,14 +194,14 @@ const SessionTypeBarChart = ({ data }) => {
 
 const TaskCompletionChart = ({ tasks }) => {
   const statusCounts = {};
-  Object.keys(require('./studyPlannerTypes').TASK_STATUS).forEach(s => { statusCounts[s] = 0; });
+  Object.keys(TASK_STATUS).forEach(s => { statusCounts[s] = 0; });
   tasks.forEach(t => { statusCounts[t.status] = (statusCounts[t.status] || 0) + 1; });
   const data = Object.entries(statusCounts)
     .filter(([_, count]) => count > 0)
     .map(([status, count]) => ({
       name: status.replace(/_/g, ' '),
       value: count,
-      color: require('./studyPlannerTypes').TASK_STATUS[status]?.color || '#9ca3af',
+      color: TASK_STATUS[status]?.color || '#9ca3af',
     }));
 
   return (

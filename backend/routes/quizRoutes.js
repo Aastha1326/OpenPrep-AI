@@ -24,6 +24,7 @@ const {
   generateRemediationQuiz,
   getNextAdaptiveQuestionEndpoint,
   evaluateDistractors,
+  generateDistractors,
 } = require('../controllers/quizController');
 const { generateQuizFromPdf } = require('../controllers/pdfQuizController');
 const { protect } = require('../middleware/auth');
@@ -49,6 +50,7 @@ router.get('/questions/:questionId/explanation', protect, aiLimiter, checkAiQuot
 
 // Register distractor quality evaluation & auto-enhancer route
 router.post('/evaluate-distractors', protect, aiLimiter, checkAiQuota, evaluateDistractors);
+router.post('/generate-distractors', protect, aiLimiter, checkAiQuota, aiSanitizer, generateDistractors);
 
 // Register adaptive routes
 router.get('/next', getNextAdaptiveQuestionEndpoint);

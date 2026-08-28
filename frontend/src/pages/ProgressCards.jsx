@@ -92,31 +92,46 @@ const SubjectProgressCard = ({ subject, delay = 0 }) => (
   </motion.div>
 );
 
-const MilestoneCard = ({ milestone, delay = 0 }) => (
+const MilestoneCard = ({ milestone, delay = 0, onClaim, claimingId }) => (
   <motion.div
     initial={{ opacity: 0, x: -20 }}
     animate={{ opacity: 1, x: 0 }}
     transition={{ delay, duration: 0.3 }}
     className={`flex items-center gap-3 p-3 rounded-xl transition-all duration-200 hover:bg-white/5 ${
-      milestone.isNew ? 'bg-gradient-to-r from-amber-500/10 to-yellow-500/5 border border-amber-200/30' : ''
+      milestone.isNew || milestone.status === 'pending' ? 'bg-gradient-to-r from-amber-500/10 to-yellow-500/5 border border-amber-200/30' : ''
     }`}
   >
     <div
-      className="w-10 h-10 rounded-lg flex items-center justify-center text-lg flex-shrink-0"
-      style={{ backgroundColor: `${milestone.color}20` }}
+      className="w-10 h-10 rounded-lg flex items-center justify-center text-lg flex-shrink-0 bg-yellow-600/20"
+      style={milestone.color ? { backgroundColor: `${milestone.color}20` } : {}}
     >
-      {milestone.icon}
+      {milestone.icon || '🏆'}
     </div>
     <div className="flex-1 min-w-0">
       <div className="flex items-center gap-2">
-        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{milestone.label}</p>
-        {milestone.isNew && (
+        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+          {milestone.title || milestone.label}
+        </p>
+        {(milestone.isNew || milestone.status === 'pending') && (
           <span className="text-[10px] font-bold bg-amber-400 text-amber-900 px-1.5 py-0.5 rounded-full">NEW</span>
         )}
       </div>
       <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{milestone.description}</p>
     </div>
-    <span className="text-xs text-gray-400 flex-shrink-0">{milestone.dateLabel}</span>
+    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+      <span className="text-xs text-gray-400">
+        {milestone.dateLabel || (milestone.date ? new Date(milestone.date).toLocaleDateString() : '')}
+      </span>
+      {milestone.status !== 'completed' && (!milestone.date || new Date(milestone.date).getTime() <= Date.now()) && onClaim && (
+        <button
+          onClick={() => onClaim(milestone.id)}
+          disabled={claimingId === milestone.id}
+          className="px-2 py-1 bg-yellow-600 text-white text-[10px] font-semibold rounded hover:bg-yellow-700 transition-colors disabled:opacity-50"
+        >
+          {claimingId === milestone.id ? 'Claiming...' : 'Claim Reward'}
+        </button>
+      )}
+    </div>
   </motion.div>
 );
 
