@@ -386,4 +386,5 @@ module.exports = {
   Bounty,
   BountySolution,
   BountySolutionVote,
+  StudyReminder,
 };
