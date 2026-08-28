@@ -14,14 +14,14 @@ import authReducer, {
   resetPassword,
   refreshTokenThunk,
 } from './authSlice';
-import API from '../../services/api';
+import API from '../../services/api.js';
 
 const mockUser = { id: 'user123', name: 'Test User', email: 'test@example.com' };
 const mockToken = 'fake-jwt-token';
 const mockRefreshToken = 'fake-refresh-token';
 
 // Mock the API service
-vi.mock('../../services/api', () => ({
+vi.mock('../../services/api.js', () => ({
   default: {
     post: vi.fn(),
     get: vi.fn(),
@@ -570,3 +570,4 @@ describe('authSlice', () => {
     });
   });
 });
+

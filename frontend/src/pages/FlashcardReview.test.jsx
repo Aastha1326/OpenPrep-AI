@@ -3,7 +3,20 @@ import { MemoryRouter } from 'react-router-dom';
 import FlashcardReview from './FlashcardReview';
 import API from '../services/api';
 
-vi.mock('../services/api', () => ({
+vi.mock('../services/db.js', () => ({
+  db: {
+    cachedFlashcards: {
+      clear: vi.fn().mockResolvedValue(),
+      bulkPut: vi.fn().mockResolvedValue(),
+      toArray: vi.fn().mockResolvedValue([]),
+    },
+    offlineReviews: {
+      add: vi.fn().mockResolvedValue(),
+    }
+  }
+}));
+
+vi.mock('../services/api.js', () => ({
   default: {
     get: vi.fn(),
     put: vi.fn(),
@@ -343,3 +356,5 @@ test('allows speech speed and language controls when hands-free mode is enabled'
     expect(await screen.findByText('Flip flashcard front or back')).toBeInTheDocument();
   });
 });
+
+

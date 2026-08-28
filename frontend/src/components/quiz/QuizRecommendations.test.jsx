@@ -8,7 +8,7 @@ import { QuizRecommendations } from './QuizRecommendations';
 import * as api from '../../services/api';
 
 // Mock API service calls
-vi.mock('../../services/api', () => ({
+vi.mock('../../services/api.js', () => ({
   getQuizRecommendations: vi.fn(),
   logRecommendationHit: vi.fn().mockResolvedValue({ data: { success: true } }),
 }));
@@ -101,3 +101,4 @@ describe('QuizRecommendations Component', () => {
     });
   });
 });
+

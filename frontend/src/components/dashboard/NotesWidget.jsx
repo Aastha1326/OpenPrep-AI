@@ -15,7 +15,7 @@ import {
   Users,
   Download,
 } from 'lucide-react';
-import API from '../../services/api';
+import API from '../../services/api.js';
 import VintagePaper from './VintagePaper';
 import AudioReader from '../AudioReader';
 import HighlightedText from '../HighlightedText';

@@ -3,7 +3,7 @@ import React from 'react';
 import ExportDeckDropdown from './ExportDeckDropdown';
 import API from '../../services/api';
 
-vi.mock('../../services/api', () => ({
+vi.mock('../../services/api.js', () => ({
   default: {
     get: vi.fn(),
     put: vi.fn(),
@@ -65,3 +65,4 @@ describe('ExportDeckDropdown Component', () => {
     });
   });
 });
+

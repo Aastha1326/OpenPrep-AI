@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useSelector } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   FaCheckCircle,
@@ -24,6 +25,7 @@ import RevisionSheetModal from '../components/dashboard/RevisionSheetModal';
 import RemediationPlanModal from '../components/dashboard/RemediationPlanModal';
 import QuestionExplanation from '../components/dashboard/QuestionExplanation';
 import SubjectiveQuestionView from '../components/quiz/SubjectiveQuestionView';
+import QuestionDiscussionThread from '../components/quiz/QuestionDiscussionThread';
 import confetti from 'canvas-confetti';
 
 export const getScoreMotivationalMessage = (score) => {
@@ -104,6 +106,7 @@ const buildQuizResultRows = (quiz, answers) =>
 const QuizSession = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const userRole = useSelector((state) => state.auth.user?.role || 'student');
 
   const [quiz, setQuiz] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -524,7 +527,7 @@ const submitQuiz = useCallback(async () => {
     const loadBookmarks = async () => {
       try {
         const res = await API.get(`/quizzes/${id}/bookmarks`);
-        setBookmarkedIds(new Set(res.data?.data || []));
+        setBookmarkedIds(new Set(Array.isArray(res.data?.data) ? res.data.data : []));
       } catch (err) {
         console.error('Failed to load bookmarks:', err);
       }
@@ -832,6 +835,11 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
             </div>
           </div>
           )}
+
+          <QuestionDiscussionThread
+            questionId={currentQuestion._id || currentQuestion.id}
+            userRole={userRole}
+          />
 
           {/* Global Quiz Question Navigation Bar */}
           <div className="flex justify-between items-center mt-6">
