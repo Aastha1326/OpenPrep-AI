@@ -28,6 +28,7 @@ try {
   // Graceful fallback if firebase storage service is omitted or missing
 }
 const { checkAndAwardBadges } = require('../services/achievementService');
+const { createNotification } = require('../services/notificationService');
 
 // Window (ms) during which duplicate quiz submissions for the same quiz are ignored.
 // Prevents double-click on "Submit Quiz" from creating duplicate attempt records.
