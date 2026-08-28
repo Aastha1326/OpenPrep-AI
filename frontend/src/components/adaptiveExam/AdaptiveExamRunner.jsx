@@ -143,13 +143,13 @@ const AdaptiveExamRunner = ({ subjectId = 'general', onExamFinish }) => {
             Question {session?.currentStep} / {session?.totalQuestions}
           </span>
           <span className={`px-3 py-1 border rounded-xl text-xs font-bold ${difficultyBadge.color}`}>
-            {difficultyBadge.label} ({currentQ?.difficulty &gt; 0 ? `+${currentQ?.difficulty}` : currentQ?.difficulty})
+            {difficultyBadge.label} ({currentQ?.difficulty > 0 ? `+${currentQ?.difficulty}` : currentQ?.difficulty})
           </span>
         </div>
 
         <div className="flex items-center gap-4">
           <button
-            onClick={() =&gt; setShowFormulaModal(true)}
+            onClick={() => setShowFormulaModal(true)}
             className="flex items-center gap-1.5 text-xs text-stone-300 bg-neutral-800 hover:bg-neutral-700 px-3 py-1.5 rounded-xl transition-all cursor-pointer"
           >
             <BookOpen className="w-4 h-4 text-indigo-400" />
@@ -162,7 +162,7 @@ const AdaptiveExamRunner = ({ subjectId = 'general', onExamFinish }) => {
         </div>
       </div>
 
-      {error &amp;&amp; (
+      {error && (
         <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-xs flex items-center gap-2">
           <ShieldAlert className="w-4 h-4 shrink-0" />
           <span>{error}</span>
@@ -174,7 +174,7 @@ const AdaptiveExamRunner = ({ subjectId = 'general', onExamFinish }) => {
         <div className="flex items-start justify-between gap-4">
           <h3 className="text-stone-100 font-semibold text-base leading-relaxed">{currentQ?.question}</h3>
           <button
-            onClick={() =&gt; setFlagged(!flagged)}
+            onClick={() => setFlagged(!flagged)}
             className={`p-2 rounded-xl transition-all cursor-pointer ${flagged ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-neutral-800 text-stone-400 hover:text-stone-200'}`}
           >
             <Flag className="w-4 h-4" />
@@ -183,10 +183,10 @@ const AdaptiveExamRunner = ({ subjectId = 'general', onExamFinish }) => {
 
         {/* Options Grid */}
         <div className="space-y-2.5 pt-2">
-          {currentQ?.options?.map((opt, idx) =&gt; (
+          {currentQ?.options?.map((opt, idx) => (
             <button
               key={idx}
-              onClick={() =&gt; setSelectedOption(idx)}
+              onClick={() => setSelectedOption(idx)}
               className={`w-full text-left p-4 rounded-2xl border transition-all text-xs font-medium cursor-pointer flex items-center justify-between ${
                 selectedOption === idx
                   ? 'bg-indigo-600/15 border-indigo-500 text-stone-100 shadow-md'
@@ -195,7 +195,7 @@ const AdaptiveExamRunner = ({ subjectId = 'general', onExamFinish }) => {
             >
               <span>{opt}</span>
               <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedOption === idx ? 'border-indigo-400 bg-indigo-500' : 'border-neutral-700'}`}>
-                {selectedOption === idx &amp;&amp; <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                {selectedOption === idx && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
               </div>
             </button>
           ))}

@@ -44,19 +44,197 @@ class MockInterviewController {
             res.status(400).json({ error: error.message || 'Failed to process reply' });
         }
     }
+    // GET /api/interviews/:id/evaluation
+    static async getEvaluation(req, res) {
+        try {
+            const userId = req.user?.id || req.body.userId;
 
+            const evaluation =
+                await MockInterviewService.getEvaluationMetadata(
+                    req.params.id,
+                    userId
+                );
+
+            return res.status(200).json({
+                success: true,
+                data: evaluation,
+            });
+                // GET /api/interviews/:id/feedback-provenance
+    static async getFeedbackProvenance(req, res) {
+        try {
+            const userId = req.user?.id || req.body.userId;
+
+            const session = await require('../models/MockInterview').findOne({
+                where: {
+                    id: req.params.id,
+                    userId,
+                },
+                attributes: [
+                    'id',
+                    'overallScore',
+                    'technicalScore',
+                    'communicationScore',
+                    'feedbackSummary',
+                    'feedbackProvenance',
+                ],
+            });
+
+            if (!session) {
+                return res.status(404).json({
+                    error: 'Interview session not found',
+                });
+            }
+
+            return res.status(200).json({
+                success: true,
+                data: {
+                    interviewId: session.id,
+                    scores: {
+                        overallScore: session.overallScore,
+                        technicalScore: session.technicalScore,
+                        communicationScore: session.communicationScore,
+                    },
+                    feedbackSummary: session.feedbackSummary,
+                    provenance: session.feedbackProvenance,
+                },
+            });
+        } catch (error) {
+            console.error('[getFeedbackProvenance error]', error);
+            return res.status(400).json({
+                error:
+                    error.message ||
+                    'Failed to get feedback provenance',
+            });
+        }
+    }
+        } catch (error) {
+            console.error('[getEvaluation error]', error);
+            return res.status(400).json({
+                error: error.message || 'Failed to get evaluation metadata',
+            });
+        }
+    }
+
+    // GET /api/interviews/:id/compare/:version
+    static async compareEvaluation(req, res) {
+        try {
+            const userId = req.user?.id || req.body.userId;
+
+            const comparison =
+                await MockInterviewService.compareEvaluationVersions(
+                    req.params.id,
+                    userId,
+                    req.params.version
+                );
+
+            return res.status(200).json({
+                success: true,
+                data: comparison,
+            });
+        } catch (error) {
+            console.error('[compareEvaluation error]', error);
+            return res.status(400).json({
+                error: error.message || 'Failed to compare evaluation versions',
+            });
+        }
+    }
     // POST /api/interviews/:id/conclude
     static async conclude(req, res) {
         try {
             const userId = req.user?.id || req.body.userId;
-            const finalSession = await MockInterviewService.concludeSession(req.params.id, userId);
 
-            return res.status(200).json({ success: true, data: finalSession });
+            const session = await MockInterviewService.concludeSession(
+                req.params.id,
+                userId
+            );
+
+            const {
+                enqueueProcessing,
+            } = require('../services/interviewProcessingService');
+
+            const processing = await enqueueProcessing(
+                session.id,
+                userId
+            );
+
+            return res.status(202).json({
+                success: true,
+                data: {
+                    interviewId: session.id,
+                    processingJobId: processing.job.id,
+                    status: processing.job.status,
+                    processingState: session.processingState,
+                    duplicate: processing.duplicate,
+                },
+            });
         } catch (error) {
             console.error('[conclude error]', error);
-            res.status(400).json({ error: error.message || 'Failed to conclude session' });
+            res.status(400).json({
+                error:
+                    error.message ||
+                    'Failed to queue interview processing',
+            });
         }
     }
-}
+
+    // GET /api/interviews/:id/processing-status
+    static async processingStatus(req, res) {
+        try {
+            const userId = req.user?.id || req.body.userId;
+
+            const {
+                getJobStatus,
+            } = require('../services/interviewProcessingService');
+
+            const status = await getJobStatus(
+                req.params.id,
+                userId
+            );
+
+            return res.status(200).json({
+                success: true,
+                data: status,
+            });
+        } catch (error) {
+            console.error('[processingStatus error]', error);
+            res.status(400).json({
+                error:
+                    error.message ||
+                    'Failed to get processing status',
+            });
+        }
+    }
+
+    // POST /api/interviews/:id/processing-retry
+    static async retryProcessing(req, res) {
+        try {
+            const userId = req.user?.id || req.body.userId;
+
+            const {
+                retryInterviewJob,
+            } = require('../services/interviewProcessingService');
+
+            const job = await retryInterviewJob(
+                req.params.jobId,
+                userId
+            );
+
+            return res.status(202).json({
+                success: true,
+                data: {
+                    jobId: job.id,
+                    status: job.status,
+                    currentStage: job.currentStage,
+                },
+            });
+        } catch (error) {
+            console.error('[retryProcessing error]', error);
+            res.status(400).json({
+                error:
+                    error.message ||
+                    'Failed to retry interview processing',
+            });
+        }
+    }}
 
 module.exports = MockInterviewController;

@@ -1514,4 +1514,21 @@ exports.evaluateDistractors = async (req, res, next) => {
   }
 };
 
+// @desc    Generate misconception-based distractors
+// @route   POST /api/quizzes/generate-distractors
+// @access  Private
+exports.generateDistractors = async (req, res, next) => {
+  try {
+    const { generateDistractors } = require('../services/distractorGeneratorService');
+    const { question, correctAnswer, context = '', language = 'english' } = req.body;
+    const result = await generateDistractors({ question, correctAnswer, context, language });
+    return res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    if (error.status === 400 || error.status === 502) {
+      return res.status(error.status).json({ success: false, error: error.message });
+    }
+    next(error);
+  }
+};
+
 

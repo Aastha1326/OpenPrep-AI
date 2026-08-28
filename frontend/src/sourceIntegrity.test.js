@@ -57,6 +57,28 @@ function importedSpecifiers(code) {
   return specs;
 }
 
+
+/**
+ * Every `path="…"` that appears inside a `<Route` element, in source order.
+ *
+ * React Router matches the first entry that wins its ranking and silently
+ * ignores any later duplicate, so a route declared twice is invisible at
+ * runtime — no warning, no error, just a second copy nobody notices. Both of
+ * the duplicates found in issue #1809 sat directly next to a `<Route` element
+ * that had been truncated mid-tag, which is the tell: the duplicate and the
+ * broken element are two halves of one mis-resolved conflict. Catching the
+ * duplicate catches the class before it reaches the parser.
+ */
+function routePaths(code) {
+  const paths = [];
+  const pattern = /<Route\b[^>]*?\bpath=\{?["']([^"']+)["']/gs;
+  let match;
+  while ((match = pattern.exec(code)) !== null) {
+    paths.push(match[1]);
+  }
+  return paths;
+}
+
 function duplicatesIn(values) {
   const seen = new Set();
   const repeated = new Set();
@@ -100,6 +122,21 @@ describe('frontend source integrity', () => {
       const repeated = duplicatesIn(topLevelDeclarations(readFileSync(file, 'utf8')));
       if (repeated.length > 0) {
         offenders.push(`${asRepoPath(file)} declares ${repeated.join(', ')} more than once`);
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('never declares the same router path twice', () => {
+    const offenders = [];
+
+    // Test files are exempt: independent cases routinely mount the same path
+    // in their own isolated router, and that is not a duplicate declaration.
+    for (const file of sourceFiles.filter((f) => !/\.test\.jsx?$/.test(f))) {
+      const repeated = duplicatesIn(routePaths(readFileSync(file, 'utf8')));
+      if (repeated.length > 0) {
+        offenders.push(`${asRepoPath(file)} routes ${repeated.join(', ')} more than once`);
       }
     }
 

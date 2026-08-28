@@ -204,7 +204,7 @@ const initializeStudyRoomSockets = (io) => {
             });
 
             console.log(`[Socket] User ${username} joined room ${roomId}`);
-        });
+        };
 
         const handleLeaveRoom = async () => {
             const roomId = socket.data.roomId;

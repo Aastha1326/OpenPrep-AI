@@ -52,7 +52,7 @@ const MilestoneBadge = ({ date, status }) => {
   );
 };
 
-const MilestonesSection = ({ milestones }) => (
+const MilestonesSection = ({ milestones, onClaimMilestone, claimingMilestoneId }) => (
   <div className="mt-12 mb-8">
     <div className="flex items-center gap-2 mb-6 border-b border-[#8B4513]/20 pb-2">
       <Sparkles className="w-6 h-6 text-yellow-600" />
@@ -78,7 +78,18 @@ const MilestonesSection = ({ milestones }) => (
                 {m.title}
               </h4>
             </div>
-            <MilestoneBadge date={m.date} status={m.status} />
+            <div className="flex flex-col items-end gap-2">
+              <MilestoneBadge date={m.date} status={m.status} />
+              {m.status !== 'completed' && new Date(m.date).getTime() <= Date.now() && (
+                <button
+                  onClick={() => onClaimMilestone && onClaimMilestone(m.id)}
+                  disabled={claimingMilestoneId === m.id}
+                  className="px-3 py-1 bg-yellow-600 text-white text-xs font-semibold rounded shadow hover:bg-yellow-700 disabled:opacity-50"
+                >
+                  {claimingMilestoneId === m.id ? 'Claiming...' : 'Claim Reward'}
+                </button>
+              )}
+            </div>
           </div>
           <p className="text-sm text-neutral-600 relative z-10">
             {m.description}
@@ -276,8 +287,10 @@ const StudyPlanModal = ({
   const [isExportingServerPdf, setIsExportingServerPdf] = useState(false);
   const [exportPdfError, setExportPdfError] = useState(null);
   const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
-const [isRescheduling, setIsRescheduling] = useState(false);
-  const [isRebalancing, setIsRebalancing] = useState(false);  const [rescheduleMessage, setRescheduleMessage] = useState(null);
+  const [isRescheduling, setIsRescheduling] = useState(false);
+  const [isRebalancing, setIsRebalancing] = useState(false);
+  const [rescheduleMessage, setRescheduleMessage] = useState(null);
+  const [claimingMilestoneId, setClaimingMilestoneId] = useState(null);
   const [showWeakOnly, setShowWeakOnly] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'timeline' | 'calendar'
@@ -423,6 +436,21 @@ const totalWeakCount = useMemo(() => {
     }
   };
 
+  const handleClaimMilestone = async (milestoneId) => {
+    try {
+      setClaimingMilestoneId(milestoneId);
+      const res = await API.put(`/milestones/${milestoneId}/claim`);
+      if (res.data.success) {
+        if (onPlanUpdate) {
+          onPlanUpdate();
+        }
+      }
+    } catch (err) {
+      console.error('Failed to claim milestone:', err);
+    } finally {
+      setClaimingMilestoneId(null);
+    }
+  };
 
 const handleExportIcs = async () => {
   if (!activePlan?.id) {
@@ -1046,7 +1074,11 @@ const handleGoogleCalendarSync = async () => {
                     )}
                   </div>
                   {activePlan?.milestones?.length > 0 && (
-                    <MilestonesSection milestones={activePlan.milestones} />
+                    <MilestonesSection 
+                      milestones={activePlan.milestones}
+                      onClaimMilestone={handleClaimMilestone}
+                      claimingMilestoneId={claimingMilestoneId}
+                    />
                   )}
                   {/* PDF Footer spacer */}
                   <div className="mt-12 pt-4 border-t border-[#8B4513]/20 text-center text-sm text-[#8B4513]/60 italic font-playfair">
