@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import MathRenderer from '../components/common/MathRenderer';
 import API from '../services/api';
+import { db } from '../services/db.js';
 import useVoiceControl from '../hooks/useVoiceControl';
 import VoiceModeToggle from '../components/VoiceModeToggle';
 import AudioWaveform from '../components/AudioWaveform';
@@ -555,6 +556,21 @@ useEffect(() => {
       clearSession();
     }
   }, [isSessionComplete, noCardsDue]);
+  const bind = useDrag(({ down, movement: [mx], cancel }) => {
+    if (down && Math.abs(mx) > 120) {
+      cancel();
+      if (mx < 0) {
+        // Swipe Left
+        if (!isFlipped) handleCardFlip();
+        else handleReview(1); // Mark as Wrong
+      } else {
+        // Swipe Right
+        if (!isFlipped) handleCardFlip();
+        else handleReview(5); // Mark as Easy
+      }
+    }
+  });
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center">
@@ -1031,6 +1047,11 @@ useEffect(() => {
         title="SM-2 Algorithm Settings"
       >
         <div className="flex flex-col gap-4 py-2">
+          {/* Note about Audio Pitch */}
+          <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-lg text-xs text-amber-800 dark:text-amber-300">
+            <strong>Audio Review Mode:</strong> Voice speed controls are available during review. Pitch and voice selection are handled natively by your device's OS (no custom controls needed).
+          </div>
+          
           {/* Easy Factor Modifier */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold text-neutral-600 dark:text-neutral-300 uppercase tracking-wider">
@@ -1336,3 +1357,4 @@ useEffect(() => {
 };
 
 export default FlashcardReview;
+

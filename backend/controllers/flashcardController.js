@@ -10,6 +10,8 @@ const User = require('../models/User');
 const Exam = require('../models/Exam');
 const FlashcardDeck = require('../models/FlashcardDeck');
 const DeckCollaborator = require('../models/DeckCollaborator');
+const PodcastEpisode = require('../models/PodcastEpisode');
+const audioPodcastService = require('../services/audioPodcastService');
 const { calculateTopicProficiency, getDifficultyLevel } = require('../services/proficiencyService');
 const remediationService = require('../services/remediationService');
 const { checkAndAwardBadges } = require('../services/achievementService');
@@ -1567,3 +1569,35 @@ exports.batchSyncOfflineReviews = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Generate AI-Powered Cloze Deletion (Fill-in-the-Blank) Flashcards
+// @route   POST /api/flashcards/generate-cloze
+// @access  Private
+exports.generateClozeFlashcards = async (req, res, next) => {
+  try {
+    const { extractClozeFlashcards } = require('../services/clozeExtractionService');
+    const { text, maskDensity = 'Medium', maxCards = 10, subject } = req.body;
+
+    if (!text || typeof text !== 'string' || text.trim().length < 10) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid text payload. Minimum 10 characters required for cloze extraction.',
+      });
+    }
+
+    const result = await extractClozeFlashcards({
+      text,
+      maskDensity,
+      maxCards: parseInt(maxCards, 10) || 10,
+      subject,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

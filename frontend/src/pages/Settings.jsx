@@ -20,7 +20,8 @@ import {
   CalendarDays,
   Volume2,
   Palette,
-} from 'lucide-react';import LeatherBoard from '../components/dashboard/LeatherBoard';
+} from 'lucide-react';
+import LeatherBoard from '../components/dashboard/LeatherBoard.jsx';
 import VintagePaper from '../components/dashboard/VintagePaper';
 import ThemeToggle from '../components/ThemeToggle';
 import API from '../services/api';
@@ -32,7 +33,7 @@ import {
 } from '../services/notificationApi';
 import { loadUser } from '../store/slices/authSlice';
 import { validateAvatarFile } from '../utils/fileValidation';
-import { BADGE_LIST, BADGE_ICONS } from '../config/badges';
+import { BADGE_LIST, BADGE_ICONS } from '../config/badges.js';
 import LazyImage from '../components/common/LazyImage';
 import ThemeCustomizerDrawer from '../components/ThemeCustomizerDrawer';
 import BadgeCarousel from '../components/badges/BadgeCarousel';

@@ -1,6 +1,6 @@
 import axios from 'axios';
-import { store } from '../store';
-import { logout } from '../store/slices/authSlice';
+
+
 import {
   DEFAULT_TIMEOUT_MS,
   getRetryDelay,
@@ -11,11 +11,11 @@ import {
   shouldRetry,
   wait,
   waitForOnline,
-} from '../utils/retry';
+} from '../utils/retry.js';
 
 const getBaseUrl = () => {
-  if (import.meta.env.VITE_API_URL) {
-    const url = import.meta.env.VITE_API_URL.replace(/\/$/, '');
+  if ((import.meta && import.meta.env && import.meta.env.VITE_API_URL)) {
+    const url = (import.meta && import.meta.env && import.meta.env.VITE_API_URL).replace(/\/$/, '');
     return url.endsWith('/api') ? url : `${url}/api`;
   }
   if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
@@ -326,6 +326,7 @@ API.interceptors.response.use(
       localStorage.setItem('token', newToken);
       localStorage.setItem('refreshToken', newRefreshToken);
 
+      const { store } = await import('../store/index.js');
       store.dispatch({ type: 'auth/refreshToken/fulfilled', payload: response.data });
 
       API.defaults.headers.common.Authorization = `Bearer ${newToken}`;
@@ -335,6 +336,8 @@ API.interceptors.response.use(
       return API(originalRequest);
     } catch (refreshError) {
       processQueue(refreshError, null);
+      const { store } = await import('../store/index.js');
+      const { logout } = await import('../store/slices/authSlice.js');
       store.dispatch(logout());
       if (originalRequest?.isBackground) {
         showBackgroundErrorToast('Session expired. Auto-save disabled.');
@@ -365,5 +368,40 @@ export const generateRemediationQuiz = (payload) =>
  */
 export const evaluateSubjectiveAnswer = (payload) =>
   API.post('/quizzes/evaluate-subjective', payload);
+
+export const generateDistractors = (payload) =>
+  API.post('/quizzes/generate-distractors', payload);
+
+export const getQuizRecommendations = (userId, params) =>
+  API.get(`/recommendations/${userId}`, { params });
+
+export const logRecommendationHit = (userId, payload) =>
+  API.post(`/recommendations/${userId}/hit`, payload);
+
+// ── Doubt Session (Socratic Hint) APIs ──────────────────────────────
+/**
+ * Start a new doubt-solving session.
+ * POST /api/doubts/start
+ * @param {FormData} formData – must include "question"; optionally "image" file.
+ */
+export const startDoubtSession = (formData) =>
+  API.post('/doubts/start', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 60000,
+  });
+
+/**
+ * Send a follow-up message in an existing doubt session.
+ * POST /api/doubts/:id/message
+ */
+export const sendDoubtMessage = (sessionId, message) =>
+  API.post(`/doubts/${sessionId}/message`, { message });
+
+/**
+ * Reveal the next progressive hint for a doubt session.
+ * POST /api/doubts/:id/reveal-step
+ */
+export const revealDoubtStep = (sessionId) =>
+  API.post(`/doubts/${sessionId}/reveal-step`);
 
 export default API;

@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import AdaptiveLearningPath from './AdaptiveLearningPath';
 import API from '../../services/api';
 
-vi.mock('../../services/api', () => ({
+vi.mock('../../services/api.js', () => ({
   default: {
     get: vi.fn(),
     post: vi.fn(),
@@ -100,3 +100,4 @@ describe('AdaptiveLearningPath UI Component', () => {
     });
   });
 });
+

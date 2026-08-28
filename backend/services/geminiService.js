@@ -2241,6 +2241,98 @@ exports.generateCustomQuiz = async (
   }
 };
 
+/**
+ * Generate misconception-based distractors for a multiple-choice question.
+ */
+exports.generateDistractors = async ({ question, correctAnswer, context = '', language = 'english' }) => {
+  if (!genAI) {
+    return {
+      distractors: [
+        { text: `A related but incorrect interpretation of: ${correctAnswer}`, misconception: 'Confuses the core concept with a related idea.' },
+        { text: `An incomplete application of the rule for: ${correctAnswer}`, misconception: 'Stops after an intermediate reasoning step.' },
+        { text: `The opposite or inverted form of: ${correctAnswer}`, misconception: 'Reverses a relationship, sign, or condition.' },
+      ],
+    };
+  }
+
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const prompt = `
+Create exactly three plausible, incorrect multiple-choice distractors for this question.
+Question: ${JSON.stringify(question)}
+Correct answer: ${JSON.stringify(correctAnswer)}
+Subject/context: ${JSON.stringify(context || 'General education')}
+Language: ${language}
+
+Each distractor must reflect a realistic student misconception, such as a sign or calculation error,
+an inverted formula, a related-term confusion, a common false cognate, or a date/sequence mix-up.
+Do not invent facts unrelated to the question. Do not repeat the correct answer or another distractor.
+Return only valid JSON with this exact shape:
+{
+  "distractors": [
+    { "text": "string", "misconception": "Why a student might choose this" },
+    { "text": "string", "misconception": "Why a student might choose this" },
+    { "text": "string", "misconception": "Why a student might choose this" }
+  ]
+}`;
+
+  const result = await generateWithRetry(model, prompt);
+  const parsed = cleanJSON(result.response.text());
+  if (!parsed || !Array.isArray(parsed.distractors)) {
+    throw new Error('Invalid JSON format from Gemini distractor generator');
+  }
+  return parsed;
+};
+
+/**
+ * Generate three graded Socratic hints for a problem the solver has already
+ * worked out.
+ *
+ * Returns `{ hints: [{ level, content }] }` with exactly three entries - the
+ * caller appends the worked solution as the fourth rung. Throws rather than
+ * returning a partial ladder, because doubtSessionService has a deterministic
+ * fallback that derives hints from the solution text and would rather use it
+ * than store something half-formed.
+ */
+exports.generateSocraticHints = async ({ question, solution, subject = '' }) => {
+  if (!genAI) {
+    throw new Error('Gemini API key not configured for Socratic hint generation');
+  }
+
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const prompt = `
+You are tutoring a student who is stuck. You already know the full solution.
+Write exactly three hints that lead them to it without ever stating the answer.
+
+Question: ${JSON.stringify(question)}
+Subject: ${JSON.stringify(subject || 'General')}
+Full worked solution (for your reference only - never quote it back):
+${JSON.stringify(solution)}
+
+Hint 1 must name the underlying concept and nothing else.
+Hint 2 must point at the relationship, formula or rule that applies, without substituting any values.
+Hint 3 must describe the first concrete step and say how many steps remain.
+
+Each hint must refer to this specific problem. Generic advice such as
+"identify the core concept" or "recall relevant formulas" is not acceptable.
+No hint may contain the final answer.
+Return only valid JSON with this exact shape:
+{
+  "hints": [
+    { "level": 1, "content": "string" },
+    { "level": 2, "content": "string" },
+    { "level": 3, "content": "string" }
+  ]
+}`;
+
+  const result = await generateWithRetry(model, prompt);
+  const parsed = cleanJSON(result.response.text());
+  if (!parsed || !Array.isArray(parsed.hints) || parsed.hints.length < 3) {
+    throw new Error('Invalid JSON format from Gemini Socratic hint generator');
+  }
+
+  return parsed;
+};
+
 function getMockMindMap(subjectName = 'Computer Science', topicName = 'Data Structures') {
   return {
     title: `${topicName} - ${subjectName} Concept Mind Map`,

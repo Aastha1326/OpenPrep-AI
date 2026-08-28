@@ -1,3 +1,6 @@
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import API from '../../services/api.js';
+
 // ── Widget Registry & Layout Defaults ──
 
 export const WIDGET_REGISTRY = [
@@ -207,12 +210,12 @@ export const reviewFlashcard = createAsyncThunk(
 const getInitialTheme = () => {
   try {
     if (typeof localStorage === 'undefined' || !localStorage || typeof localStorage.getItem !== 'function') {
-      return 'light';
+      return 'system';
     }
     const saved = localStorage.getItem('openprep_theme') || localStorage.getItem('theme');
-    return saved === 'dark' ? 'dark' : 'light';
+    return saved || 'system';
   } catch (e) {
-    return 'light';
+    return 'system';
   }
 };
 
