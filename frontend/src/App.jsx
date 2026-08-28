@@ -50,6 +50,7 @@ const QuizSession = lazy(() => import('./pages/QuizSession'));
 const MindMapViewer = lazy(() => import('./pages/MindMapViewer'));
 const WeaknessDetectionDashboard = lazy(() => import('./pages/WeaknessDetectionDashboard'));
 const StudyPlanner = lazy(() => import('./pages/StudyPlanner'));
+const StudyGoals = lazy(() => import('./pages/StudyGoals'));
 const VivaSimulator = lazy(() => import('./pages/VivaSimulator'));
 const AttemptHistoryDashboard = lazy(() => import('./pages/AttemptHistoryDashboard'));
 const CollaborativeNoteView = lazy(() => import('./pages/CollaborativeNoteView'));
@@ -321,6 +322,15 @@ function App() {
           />
 
           <Route
+            path="/revision-scheduler"
+            element={
+              <ProtectedRoute>
+                <RevisionScheduler />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/viva-simulator"
             element={
               <ProtectedRoute>
@@ -380,16 +390,16 @@ function App() {
             path="/exam-planner"
             element={
               <ProtectedRoute>
-                <ExamCountdownPlanner />
+                <FormulaScratchpad />
               </ProtectedRoute>
             }
           />
 
           <Route
-            path="/tools/calculator"
+            path="/study-goals"
             element={
               <ProtectedRoute>
-                <FormulaScratchpad />
+                <StudyGoals />
               </ProtectedRoute>
             }
           />
@@ -425,6 +435,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <InterviewRoomPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/streak-dashboard"
+            element={
+              <ProtectedRoute>
+                <StreakDashboard />
               </ProtectedRoute>
             }
           />
