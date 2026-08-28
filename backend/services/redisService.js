@@ -9,30 +9,18 @@ class RedisService {
   connect() {
     if (this.client) return this.client;
 
-    const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
-    
-    // Lazy mode: don't crash if Redis is unavailable, just log it
-    this.client = new Redis(redisUrl, {
-      maxRetriesPerRequest: 1,
-      retryStrategy(times) {
-        if (times > 3) {
-          console.warn('Redis is unreachable. Falling back to DB only.');
-          return null; // Stop retrying
-        }
-        return Math.min(times * 50, 2000);
-      }
-    });
+    const redisSentinelService = require('./redisSentinelService');
+    this.client = redisSentinelService.connect();
 
-    this.client.on('error', (err) => {
-      console.warn('Redis Connection Error:', err.message);
+    this.client.on('error', () => {
       this.isReady = false;
     });
 
     this.client.on('ready', () => {
-      console.log('Redis connected successfully');
       this.isReady = true;
     });
 
+    this.isReady = redisSentinelService.isReady;
     return this.client;
   }
 
