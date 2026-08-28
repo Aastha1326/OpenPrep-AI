@@ -1,5 +1,6 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
+const searchIndex = require('../services/searchIndexService');
 
 const Flashcard = sequelize.define(
   'Flashcard',
@@ -109,6 +110,7 @@ const Flashcard = sequelize.define(
 const cacheManager = require('../utils/cacheManager');
 
 Flashcard.afterSave(async (flashcard, options) => {
+  searchIndex.enqueueIndex('flashcard', flashcard);
   try {
     const pattern = `user_${flashcard.user}:*`;
     await cacheManager.invalidate(pattern);
@@ -118,6 +120,7 @@ Flashcard.afterSave(async (flashcard, options) => {
 });
 
 Flashcard.afterDestroy(async (flashcard, options) => {
+  searchIndex.removeRecord('flashcard', flashcard);
   try {
     const pattern = `user_${flashcard.user}:*`;
     await cacheManager.invalidate(pattern);
