@@ -1,23 +1,47 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Flame, Trophy, Award, Zap, Filter, Download, X, RefreshCw, Loader2 } from 'lucide-react';
+import {
+  Clock,
+  BookOpen,
+  Zap,
+  Upload,
+  FileText,
+  Calendar,
+  Filter,
+  Download,
+  X,
+  RefreshCw,
+  Loader2,
+  Bell,
+  CheckCircle,
+} from 'lucide-react';
 import { socket, connectSocket } from '../../services/socket';
 import API from '../../services/api';
 
-const EMOJIS = ['🔥', '👏', '🎯'];
-
 const ACTIVITY_ICONS = {
-  quiz_completed: Zap,
-  streak_hit: Flame,
-  badge_unlocked: Award,
+  quiz_attempt: Zap,
+  pyq_upload: Upload,
+  flashcard_review: BookOpen,
+  study_plan_create: FileText,
+  note_upload: FileText,
+};
+
+const ACTIVITY_LABELS = {
+  quiz_attempt: 'Quiz Attempt',
+  pyq_upload: 'PYQ Upload',
+  flashcard_review: 'Flashcard Review',
+  study_plan_create: 'Study Plan Created',
+  note_upload: 'Note Uploaded',
 };
 
 const ACTIVITY_TYPES = [
-  { value: 'quiz_completed', label: 'Quiz Completed' },
-  { value: 'streak_hit', label: 'Streak Hit' },
-  { value: 'badge_unlocked', label: 'Badge Unlocked' },
+  { value: 'quiz_attempt', label: 'Quiz Attempt' },
+  { value: 'pyq_upload', label: 'PYQ Upload' },
+  { value: 'flashcard_review', label: 'Flashcard Review' },
+  { value: 'study_plan_create', label: 'Study Plan Created' },
+  { value: 'note_upload', label: 'Note Uploaded' },
 ];
 
-export default function SquadActivityFeed({ squadId }) {
+export default function ActivityFeed() {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -26,20 +50,19 @@ export default function SquadActivityFeed({ squadId }) {
   const [hasMore, setHasMore] = useState(true);
   const [filters, setFilters] = useState({
     activityType: '',
-    userId: '',
     dateFrom: '',
     dateTo: '',
   });
   const [filterOpen, setFilterOpen] = useState(false);
   const observerRef = useRef(null);
   const loadMoreRef = useRef(null);
+  const userIdRef = useRef(null);
 
   const buildQueryParams = useCallback(() => {
     const params = new URLSearchParams();
     params.append('limit', '50');
     params.append('offset', String(page * 50));
     if (filters.activityType) params.append('activityType', filters.activityType);
-    if (filters.userId) params.append('userId', filters.userId);
     if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
     if (filters.dateTo) params.append('dateTo', filters.dateTo);
     return params.toString();
@@ -55,17 +78,17 @@ export default function SquadActivityFeed({ squadId }) {
       setLoading(true);
       setError('');
       const query = buildQueryParams();
-      const res = await API.get(`/squads/${squadId}/activity?${query}`);
-      const newActivities = res.data || [];
+      const res = await API.get(`/progress/activity?${query}`);
+      const newActivities = res.data?.data || res.data || [];
       setActivities((prev) => (reset ? newActivities : [...prev, ...newActivities]));
       setHasMore(newActivities.length === 50);
       if (!reset) setPage((p) => p + 1);
     } catch (err) {
-      setError('Could not load the activity feed.');
+      setError('Could not load activity feed.');
     } finally {
       setLoading(false);
     }
-  }, [squadId, buildQueryParams]);
+  }, [buildQueryParams]);
 
   useEffect(() => {
     fetchFeed(true);
@@ -73,35 +96,24 @@ export default function SquadActivityFeed({ squadId }) {
 
   useEffect(() => {
     connectSocket();
-    socket.emit('join_squad_room', { squadId });
+    const userId = localStorage.getItem('userId') || 'unknown';
+    userIdRef.current = userId;
+    socket.emit('join_activity_room', { userId });
 
     const handleNewActivity = (data) => {
-      if (data.squadId !== squadId) return;
+      if (data.userId !== userIdRef.current) return;
       setActivities((prev) => [
         {
-          id: data.activity.id,
-          activityType: data.activity.activityType,
-          message: data.activity.message,
-          reactionCounts: data.activity.reactionCounts || {},
-          myReactions: [],
-          createdAt: data.activity.createdAt,
-          user: { id: data.activity.userId, name: data.activity.userName },
+          id: data.id,
+          activityType: data.activityType,
+          description: data.description,
+          timestamp: data.timestamp,
         },
         ...prev,
       ]);
     };
 
-    const handleReaction = (data) => {
-      if (data.squadId !== squadId) return;
-      setActivities((prev) =>
-        prev.map((a) =>
-          a.id === data.activityId ? { ...a, reactionCounts: data.reactionCounts } : a
-        )
-      );
-    };
-
-    socket.on('squad:activity_new', handleNewActivity);
-    socket.on('squad:activity_reaction', handleReaction);
+    socket.on('activity:new', handleNewActivity);
 
     socket.io.on('reconnect_attempt', () => setReconnecting(true));
     socket.io.on('reconnect', () => {
@@ -111,15 +123,14 @@ export default function SquadActivityFeed({ squadId }) {
     socket.io.on('reconnect_error', () => setReconnecting(false));
 
     return () => {
-      socket.emit('leave_squad_room', { squadId });
-      socket.off('squad:activity_new', handleNewActivity);
-      socket.off('squad:activity_reaction', handleReaction);
+      socket.emit('leave_activity_room', { userId });
+      socket.off('activity:new', handleNewActivity);
       socket.io.off('reconnect_attempt');
       socket.io.off('reconnect');
       socket.io.off('reconnect_error');
       if (observerRef.current) observerRef.current.disconnect();
     };
-  }, [squadId, fetchFeed]);
+  }, [fetchFeed]);
 
   useEffect(() => {
     if (!hasMore || loading) return;
@@ -137,66 +148,52 @@ export default function SquadActivityFeed({ squadId }) {
     };
   }, [hasMore, loading, fetchFeed]);
 
-  const handleReact = async (activityId, emoji) => {
-    setActivities((prev) =>
-      prev.map((a) => {
-        if (a.id !== activityId) return a;
-        const alreadyReacted = a.myReactions.includes(emoji);
-        const nextCount = (a.reactionCounts[emoji] || 0) + (alreadyReacted ? -1 : 1);
-        return {
-          ...a,
-          reactionCounts: { ...a.reactionCounts, [emoji]: Math.max(0, nextCount) },
-          myReactions: alreadyReacted
-            ? a.myReactions.filter((e) => e !== emoji)
-            : [...a.myReactions, emoji],
-        };
-      })
-    );
-
-    try {
-      await API.post(`/squads/${squadId}/activity/${activityId}/react`, { emoji });
-    } catch (err) {
-      fetchFeed(true);
-    }
-  };
-
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
   const clearFilters = () => {
-    setFilters({ activityType: '', userId: '', dateFrom: '', dateTo: '' });
+    setFilters({ activityType: '', dateFrom: '', dateTo: '' });
   };
 
   const hasActiveFilters = Object.values(filters).some((v) => v);
 
   const exportCSV = () => {
-    const headers = ['Date', 'User', 'Activity Type', 'Message', 'Reactions'];
+    const headers = ['Date', 'Activity Type', 'Description'];
     const rows = activities.map((a) => [
-      new Date(a.createdAt).toLocaleString(),
-      a.user?.name || 'Unknown',
-      a.activityType,
-      a.message,
-      Object.entries(a.reactionCounts || {}).map(([emoji, count]) => `${emoji}${count}`).join(' '),
+      new Date(a.timestamp).toLocaleString(),
+      ACTIVITY_LABELS[a.activityType] || a.activityType,
+      a.description,
     ]);
     const csv = [headers, ...rows].map((r) => r.map((c) => `"${c}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `squad-activity-${squadId}-${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `activity-feed-${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
   };
 
-  const getActivityTypeLabel = (type) => {
-    const found = ACTIVITY_TYPES.find((t) => t.value === type);
-    return found ? found.label : type;
+  const getIcon = (type) => {
+    const Icon = ACTIVITY_ICONS[type] || Clock;
+    return <Icon className="w-4 h-4" />;
+  };
+
+  const getActivityColor = (type) => {
+    const colors = {
+      quiz_attempt: 'text-purple-400 bg-purple-500/20',
+      pyq_upload: 'text-blue-400 bg-blue-500/20',
+      flashcard_review: 'text-green-400 bg-green-500/20',
+      study_plan_create: 'text-indigo-400 bg-indigo-500/20',
+      note_upload: 'text-amber-400 bg-amber-500/20',
+    };
+    return colors[type] || 'text-slate-400 bg-slate-500/20';
   };
 
   return (
     <div className="bg-slate-800 p-6 rounded-lg shadow-md border border-slate-700">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
         <div className="flex items-center gap-2">
-          <Trophy className="w-5 h-5 text-amber-400" />
+          <Bell className="w-5 h-5 text-amber-400" />
           <h3 className="text-lg font-bold">Activity Feed</h3>
         </div>
 
@@ -249,7 +246,7 @@ export default function SquadActivityFeed({ squadId }) {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs text-slate-400 mb-1">Activity Type</label>
               <select
@@ -262,17 +259,6 @@ export default function SquadActivityFeed({ squadId }) {
                   <option key={t.value} value={t.value}>{t.label}</option>
                 ))}
               </select>
-            </div>
-
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">User ID</label>
-              <input
-                type="text"
-                value={filters.userId}
-                onChange={(e) => handleFilterChange('userId', e.target.value)}
-                placeholder="Filter by user ID"
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
             </div>
 
             <div>
@@ -319,52 +305,34 @@ export default function SquadActivityFeed({ squadId }) {
       {!loading && error && <p className="text-red-400 text-sm mb-4">{error}</p>}
 
       {!loading && !error && activities.length === 0 && (
-        <p className="text-slate-400 text-sm">
-          No activity yet. Complete a quiz, hit a streak, or unlock a badge to show up here!
-        </p>
+        <div className="text-center py-8">
+          <CheckCircle className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+          <p className="text-slate-400 text-sm">
+            No activity yet. Complete a quiz, upload a PYQ, review flashcards, create a study plan, or upload a note to see your activity here!
+          </p>
+        </div>
       )}
 
       <div className="space-y-3 max-h-96 overflow-y-auto">
         {activities.map((activity) => {
-          const Icon = ACTIVITY_ICONS[activity.activityType] || Trophy;
+          const colorClass = getActivityColor(activity.activityType);
           return (
             <div key={activity.id} className="p-3 bg-slate-700 rounded-lg">
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center flex-shrink-0">
-                  <Icon className="w-4 h-4 text-indigo-300" />
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${colorClass}`}>
+                  {getIcon(activity.activityType)}
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-slate-200">
-                    <span className="font-semibold">{activity.user?.name || 'A squad member'}</span>{' '}
-                    {activity.message}
-                  </p>
+                  <p className="text-sm text-slate-200">{activity.description}</p>
                   <div className="flex items-center gap-2 mt-0.5">
                     <p className="text-xs text-slate-500">
-                      {new Date(activity.createdAt).toLocaleString()}
+                      {new Date(activity.timestamp).toLocaleString()}
                     </p>
-                    <span className="px-1.5 py-0.5 text-xs bg-slate-800 border border-slate-600 rounded text-slate-400">
-                      {getActivityTypeLabel(activity.activityType)}
+                    <span className={`px-1.5 py-0.5 text-xs rounded ${colorClass.replace('bg-', 'bg-').replace('text-', 'border-')}`}>
+                      {ACTIVITY_LABELS[activity.activityType] || activity.activityType}
                     </span>
                   </div>
                 </div>
-              </div>
-
-              <div className="flex items-center gap-2 mt-2 ml-11">
-                {EMOJIS.map((emoji) => (
-                  <button
-                    key={emoji}
-                    type="button"
-                    onClick={() => handleReact(activity.id, emoji)}
-                    className={`px-2 py-1 text-xs rounded-full border transition-colors flex items-center gap-1 ${
-                      activity.myReactions.includes(emoji)
-                        ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200'
-                        : 'bg-slate-800 border-slate-600 text-slate-300 hover:border-slate-500'
-                    }`}
-                  >
-                    <span>{emoji}</span>
-                    <span>{activity.reactionCounts[emoji] || 0}</span>
-                  </button>
-                ))}
               </div>
             </div>
           );
