@@ -27,6 +27,7 @@ const {
 const { protect } = require('../middleware/auth');
 const passport = require('passport');
 const verifyCaptcha = require('../middleware/captchaMiddleware');
+const { smartRateLimiter } = require('../middleware/smartRateLimiter');
 
 const {
   validateRegister,
@@ -194,8 +195,15 @@ router.post('/register', registerLimiter, verifyCaptcha, validateRegister, regis
  *               $ref: '#/components/schemas/Error'
  */
 
+const loginSmartLimiter = smartRateLimiter({
+  cost: 10,
+  maxTokens: 50,
+  replenishRate: 1,
+  eventType: 'user_login'
+});
+
 // Authenticate a user and issue access/refresh tokens
-router.post('/login', loginLimiter, verifyCaptcha, validateLogin, login);
+router.post('/login', loginSmartLimiter, verifyCaptcha, validateLogin, login);
 
 // Request a password reset email
 router.post(
