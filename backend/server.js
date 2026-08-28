@@ -546,10 +546,14 @@ require('./sockets/squadHandler')(io);
 require('./sockets/flashcardCollaborationHandler')(io);
 require('./sockets/focusRoomHandler')(io);
 require('./sockets/studyRoomSocket')(io);
+<<<<<<< HEAD
+require('./sockets/activityHandler')(io);
+=======
 require('./sockets/interviewSocket')(io);
 require('./sockets/interviewSignalling')(io);
 require('./sockets/noteSyncHandler')(io);
 require('./services/webrtcSignalingService')(io);
+>>>>>>> ffda97c00aff7cb1d492ae7735c7dc4a973d72d5
 // Authenticate Socket.io connections
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
