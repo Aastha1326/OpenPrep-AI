@@ -58,6 +58,9 @@ const StudySquadDashboard = lazy(() => import('./pages/SquadsPage'));
 const CollabNote = lazy(() => import('./pages/CollaborativeNoteView'));
 const LiveQuizSession = lazy(() => import('./pages/LiveQuizSession'));
 const InterviewRoomPage = lazy(() => import('./pages/InterviewRoomPage'));
+const StudyAnalytics = lazy(() => import('./pages/StudyAnalytics'));
+const ExamCountdownPlanner = lazy(() => import('./pages/ExamCountdownPlanner'));
+const FormulaScratchpad = lazy(() => import('./pages/FormulaScratchpad'));
 
 function App() {
 
