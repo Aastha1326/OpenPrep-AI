@@ -9,12 +9,13 @@ async function getFeed(req, res, next) {
       return res.status(403).json({ error: 'Not authorized to view this squad activity feed' });
     }
 
-    const { limit, offset } = req.query;
+    const { limit, offset, activityType, userId, dateFrom, dateTo } = req.query;
     const feed = await squadActivityService.getActivityFeed(
       squadId,
       req.user.id,
       limit,
-      offset
+      offset,
+      { activityType, userId, dateFrom, dateTo }
     );
     res.status(200).json(feed);
   } catch (err) {

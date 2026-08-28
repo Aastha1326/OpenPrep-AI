@@ -201,7 +201,7 @@ router.get('/dashboard', protect, cacheMiddleware(900), getDashboardStats);
  *               $ref: '#/components/schemas/Error'
  */
 
-router.get('/subjects', protect, getSubjectBreakdown);
+router.get('/subjects', protect, cacheMiddleware(900), getSubjectBreakdown);
 
 /**
  * @swagger
@@ -270,7 +270,7 @@ router.get('/subjects', protect, getSubjectBreakdown);
  *               $ref: '#/components/schemas/Error'
  */
 
-router.get('/mastery', protect, getMasteryLevels);
+router.get('/mastery', protect, cacheMiddleware(900), getMasteryLevels);
 router.put('/subject-goals/:subjectId', protect, updateSubjectGoal);
 /**
  * @swagger
@@ -562,7 +562,7 @@ router.put('/topic/:id', protect, validateUpdateTopicProgress, updateTopicProgre
  *               $ref: '#/components/schemas/Error'
  */
 
-router.get('/activity', protect, getActivityFeed);
+router.get('/activity', protect, cacheMiddleware(300), getActivityFeed);
 
 router.post('/focus-session', protect, validateFocusSession, logFocusSession);
 router.get('/focus-session/weekly', protect, getWeeklyFocusEfficiency);
@@ -572,6 +572,6 @@ router.post('/xp/award', protect, awardXP);
 router.post('/xp/unlock', protect, unlockSkillNode);
 router.post('/streak-freeze/equip', protect, equipStreakFreeze);
 
-router.get('/analytics', protect, getInteractiveAnalytics);
+router.get('/analytics', protect, cacheMiddleware(900), getInteractiveAnalytics);
 
 module.exports = router;

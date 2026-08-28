@@ -99,6 +99,7 @@ const BadgeUnlockModal = lazy(() => import('../components/gamification/BadgeUnlo
 const LevelUpModal = lazy(() => import('../components/gamification/LevelUpModal'));
 const CommunityDecksModal = lazy(() => import('../components/dashboard/CommunityDecksModal'));
 const QuizSetupModal = lazy(() => import('../components/dashboard/QuizSetupModal'));
+const DistractorReviewModal = lazy(() => import('../components/quiz/DistractorReviewModal'));
 const GenerateFlashcardsFromYouTubeModal = lazy(() => import('../components/dashboard/GenerateFlashcardsFromYouTubeModal'));
 import {
   fetchDashboardStats,
@@ -342,6 +343,8 @@ const Dashboard = () => {
   // ── Note & PYQ Modal State ──
 const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isQuizSetupOpen, setIsQuizSetupOpen] = useState(false);
+  const [distractorReviewQuestion, setDistractorReviewQuestion] = useState(null);
+  const [pendingGeneratedQuiz, setPendingGeneratedQuiz] = useState(null);
   const [isYoutubeFlashcardModalOpen, setIsYoutubeFlashcardModalOpen] = useState(false);
   const [isStudyPlanOpen, setIsStudyPlanOpen] = useState(false);
   const [isPyqModalOpen, setIsPyqModalOpen] = useState(false);
@@ -1300,8 +1303,29 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
         onClose={() => setIsQuizSetupOpen(false)}
         onQuizGenerated={(quiz) => {
           if (quiz?.id) {
-            navigate(`/quiz/${quiz.id}`);
+            const firstMcq = (quiz.questions || []).find((question) => question.questionType !== 'SUBJECTIVE' && question.options?.length);
+            if (firstMcq) {
+              setPendingGeneratedQuiz(quiz);
+              setDistractorReviewQuestion(firstMcq);
+            } else {
+              navigate(`/quiz/${quiz.id}`);
+            }
           }
+        }}
+      />
+
+      <DistractorReviewModal
+        isOpen={!!distractorReviewQuestion}
+        question={distractorReviewQuestion}
+        onClose={() => {
+          if (pendingGeneratedQuiz?.id) navigate(`/quiz/${pendingGeneratedQuiz.id}`);
+          setDistractorReviewQuestion(null);
+          setPendingGeneratedQuiz(null);
+        }}
+        onContinue={() => {
+          if (pendingGeneratedQuiz?.id) navigate(`/quiz/${pendingGeneratedQuiz.id}`);
+          setDistractorReviewQuestion(null);
+          setPendingGeneratedQuiz(null);
         }}
       />
 
