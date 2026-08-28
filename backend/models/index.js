@@ -60,6 +60,7 @@ const NotificationSettings = require('./NotificationSettings');
 const WeaknessReport = require('./WeaknessReport');
 const SecurityAuditLog = require('./SecurityAuditLog');
 const MockInterviewSession = require('./MockInterviewSession');
+const ExamIntegrityReport = require('./ExamIntegrityReport');
 const { Bounty, initBounty } = require('./Bounty');
 const { BountySolution, initBountySolution } = require('./BountySolution');
 const { BountySolutionVote, initBountySolutionVote } = require('./BountySolutionVote');
@@ -120,6 +121,7 @@ User.hasMany(Achievement, { foreignKey: 'userId', as: 'achievements', onDelete: 
 User.hasMany(UserBadge, { foreignKey: 'userId', as: 'badgesRef', onDelete: 'CASCADE' });
 User.hasMany(SecurityAuditLog, { foreignKey: 'userId', as: 'securityLogs', onDelete: 'SET NULL' });
 User.hasMany(MockInterviewSession, { foreignKey: 'userId', as: 'mockInterviews', onDelete: 'CASCADE' });
+User.hasMany(ExamIntegrityReport, { foreignKey: 'userId', as: 'integrityReports', onDelete: 'CASCADE' });
 User.hasMany(Folder, { foreignKey: 'userId', onDelete: 'CASCADE' });
 User.hasOne(NotificationSettings, { foreignKey: 'userId', as: 'notificationSettings', onDelete: 'CASCADE' });
 
@@ -204,6 +206,9 @@ Quiz.hasMany(QuizTelemetryEvent, { foreignKey: 'quiz', onDelete: 'CASCADE' });
 // QuizAttempt associations
 QuizAttempt.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 QuizAttempt.belongsTo(Quiz, { foreignKey: 'quiz', as: 'quizRef', onDelete: 'CASCADE' });
+QuizAttempt.hasOne(ExamIntegrityReport, { foreignKey: 'quizAttemptId', as: 'integrityReport', onDelete: 'CASCADE' });
+ExamIntegrityReport.belongsTo(QuizAttempt, { foreignKey: 'quizAttemptId', as: 'attemptRef' });
+ExamIntegrityReport.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 
 // Note associations
 Note.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'CASCADE' });
@@ -442,6 +447,7 @@ module.exports = {
   WeaknessReport,
   SecurityAuditLog,
   MockInterviewSession,
+  ExamIntegrityReport,
   Bounty,
   BountySolution,
   BountySolutionVote,
