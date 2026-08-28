@@ -50,6 +50,7 @@ const SquadsPage = lazy(() => import('./pages/SquadsPage'));
 const StudySquadDashboard = lazy(() => import('./pages/SquadsPage'));
 const CollabNote = lazy(() => import('./pages/CollaborativeNoteView'));
 const LiveQuizSession = lazy(() => import('./pages/LiveQuizSession'));
+const MedicalCaseSimulator = lazy(() => import('./pages/MedicalCaseSimulator'));
 
 function App() {
 
@@ -382,6 +383,7 @@ function App() {
             <Route path="/admin" element={<AdminDashboard />} />
           </Route>
 
+          <Route path="/medical-cases" element={<MedicalCaseSimulator />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
