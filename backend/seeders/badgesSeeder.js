@@ -22,6 +22,12 @@ const defaultBadges = [
   { name: 'Card Sharp', description: 'Review 50 flashcards using spaced repetition', category: 'MASTERY', icon: 'Layers', tier: 'Bronze', xpReward: 60, conditionType: 'FLASHCARDS_REVIEWED', conditionValue: 50 },
   { name: 'Memory Architect', description: 'Review 500 flashcards using spaced repetition', category: 'MASTERY', icon: 'Brain', tier: 'Silver', xpReward: 400, conditionType: 'FLASHCARDS_REVIEWED', conditionValue: 500 },
   { name: 'Photographic Recall', description: 'Review 2000 flashcards', category: 'MASTERY', icon: 'Sparkles', tier: 'Gold', xpReward: 1500, conditionType: 'FLASHCARDS_REVIEWED', conditionValue: 2000 },
+
+  // Milestone Achievements
+  { name: 'First Step', description: 'Complete your first study plan milestone', category: 'ACHIEVEMENT', icon: 'Flag', tier: 'Bronze', xpReward: 100, conditionType: 'MILESTONES_COMPLETED', conditionValue: 1 },
+  { name: 'Pacing Well', description: 'Complete 3 study plan milestones', category: 'ACHIEVEMENT', icon: 'TrendingUp', tier: 'Silver', xpReward: 300, conditionType: 'MILESTONES_COMPLETED', conditionValue: 3 },
+  { name: 'Milestone Master', description: 'Complete 10 study plan milestones', category: 'ACHIEVEMENT', icon: 'CheckCircle', tier: 'Gold', xpReward: 800, conditionType: 'MILESTONES_COMPLETED', conditionValue: 10 },
+  { name: 'Platinum Finisher', description: 'Complete 25 study plan milestones', category: 'ACHIEVEMENT', icon: 'Award', tier: 'Platinum', xpReward: 2000, conditionType: 'MILESTONES_COMPLETED', conditionValue: 25 },
 ];
 
 async function seedBadges() {

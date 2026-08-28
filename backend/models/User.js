@@ -263,6 +263,38 @@ examCountdownPreferences: {
       allowNull: true,
       defaultValue: null,
     },
+    /**
+     * Whether this account is shadow banned from community discussion.
+     *
+     * The column has existed since the question-comments migration, but the
+     * attribute did not, and Sequelize builds its SET clause from
+     * rawAttributes: `User.update({ isShadowBanned: true }, ...)` produced SQL
+     * that updated nothing, silently, and `req.user.isShadowBanned` was never
+     * hydrated so it read as undefined on every request. The flag pipeline
+     * looked like it worked and banned no one.
+     *
+     * A shadow-banned author can still post; their comments are created
+     * hidden, so the account sees its own contributions and no one else does.
+     */
+    isShadowBanned: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
+    /**
+     * IANA timezone name, used to decide when a user's study day rolls over.
+     *
+     * Same omission as isShadowBanned above, found by the migration/model
+     * cross-check added alongside it: the column arrived in
+     * 20260821140000-add-timezone-to-users.js and the attribute never did, so
+     * `user.timezone = timezone; await user.save()` in userController wrote
+     * nothing and the endpoint echoed the value straight back as if it had.
+     */
+    timezone: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'Asia/Kolkata',
+    },
   },
   {
     timestamps: true,

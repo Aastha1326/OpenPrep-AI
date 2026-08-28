@@ -59,6 +59,8 @@ const authRoutes = require('./routes/authRoutes');
 const academicRoutes = require('./routes/academicRoutes');
 const pyqRoutes = require('./routes/pyqRoutes');
 const studyPlanRoutes = require('./routes/studyPlanRoutes');
+const milestoneRoutes = require('./routes/milestoneRoutes');
+const streakRoutes = require('./routes/streakRoutes');
 const quizRoutes = require('./routes/quizRoutes');
 const questionDiscussionRoutes = require('./routes/questionDiscussionRoutes');
 const commentRoutes = require('./routes/commentRoutes');
@@ -95,6 +97,7 @@ const analyticsInsightsRoutes = require('./routes/analyticsInsightsRoutes');
 const adaptiveExamRoutes = require('./routes/adaptiveExamRoutes');
 const diagramQuestionRoutes = require('./routes/diagramQuestionRoutes');
 const classroomRoutes = require('./routes/classroomRoutes');
+const studyReminderRoutes = require('./routes/studyReminderRoutes');
 const sessionRoutes = require('./routes/sessionRoutes');
 const recommendationRoutes = require('./routes/recommendationRoutes');
 const { initNotificationCron } = require('./services/notificationService');
@@ -364,6 +367,8 @@ app.use('/api/study', fatigueRoutes);
 app.use('/api/documents', pdfAnnotationRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/study-plans', studyPlanRoutes);
+app.use('/api/milestones', milestoneRoutes);
+app.use('/api/streaks', streakRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/questions', questionDiscussionRoutes);
 app.use('/api/comments', commentRoutes);
@@ -392,6 +397,7 @@ app.use('/api/adaptive-exams', adaptiveExamRoutes);
 app.use('/api/quizzes/diagram-hotspot', diagramQuestionRoutes);
 app.use('/api/diagram-hotspots', diagramQuestionRoutes);
 app.use('/api/classrooms', classroomRoutes);
+app.use('/api/reminders', studyReminderRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/doubts', doubtSessionRoutes);
 app.use('/api/readiness', readinessRoutes);
@@ -400,7 +406,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/dashboard', analyticsRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/integrations/google-calendar', calendarRoutes);
-app.use('/api/physics', require('./routes/physicsRoutes'));
+app.use('/api/graphs', require('./routes/graphRoutes'));
 app.use('/api/deck-versioning', require('./routes/deckVersionRoutes'));
 app.use('/api/integrations', require('./routes/integrationRoutes'));
 app.use('/api/gamification', gamificationRoutes);
@@ -413,6 +419,8 @@ app.get('/api/leaderboard', protect, require('./controllers/badgeController').ge
 app.get('/leaderboard', protect, require('./controllers/badgeController').getLeaderboardData);
 app.use('/api/visualizer', visualizerRoutes);
 app.use('/api/analytics-insights', analyticsInsightsRoutes);
+app.use('/api/exam-strategies', examStrategyRoutes);
+app.use('/api/study-tips', studyTipRoutes);
 app.use('/api/learning-path', require('./routes/learningPathRoutes'));
 app.use('/user/learning-path', require('./routes/learningPathRoutes'));
 
@@ -539,6 +547,8 @@ require('./sockets/flashcardCollaborationHandler')(io);
 require('./sockets/focusRoomHandler')(io);
 require('./sockets/studyRoomSocket')(io);
 require('./sockets/interviewSocket')(io);
+require('./sockets/interviewSignalling')(io);
+require('./sockets/noteSyncHandler')(io);
 require('./services/webrtcSignalingService')(io);
 // Authenticate Socket.io connections
 io.use((socket, next) => {
@@ -568,6 +578,9 @@ io.on('connection', (socket) => {
 // Start background schedulers
 const { startScheduler } = require('./services/weeklyDigestService');
 startScheduler();
+
+const { startReconciliationScheduler } = require('./services/otSyncService');
+startReconciliationScheduler();
 
 const { initStudyReminderCron } = require('./jobs/studyReminderCron');
 const { initStreakReminderCron } = require('./jobs/streakReminderCron');
@@ -611,6 +624,14 @@ const gracefulShutdown = (signal) => {
     clearTimeout(forceExitTimeout);
 
     try {
+      const { stopReconciliationScheduler } = require('./services/otSyncService');
+      stopReconciliationScheduler();
+      logger.info('OT reconciliation scheduler stopped');
+    } catch (otErr) {
+      logger.error('error stopping OT reconciliation scheduler', { err: otErr });
+    }
+
+    try {
       const { stopWorker } = require('./workers/squadActivityWorker');
       stopWorker();
       logger.info('squad activity worker stopped');
@@ -624,6 +645,17 @@ const gracefulShutdown = (signal) => {
       logger.info('task queue worker stopped');
     } catch (taskWorkerErr) {
       logger.error('error stopping task queue worker', { err: taskWorkerErr });
+    }
+
+    try {
+      // Drain queued search-index writes before the pools close, so an
+      // in-flight embedding does not fire against a shutting-down process.
+      const searchIndex = require('./services/searchIndexService');
+      await searchIndex.drain();
+      searchIndex.shutdown();
+      logger.info('search index queue drained');
+    } catch (indexErr) {
+      logger.error('error draining search index queue', { err: indexErr });
     }
 
     try {

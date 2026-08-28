@@ -14,7 +14,16 @@ const {
   findUnboundRouterIdentifiers,
   findUnmountableRouters,
   boundIdentifiers,
+  requiredSpecifiers,
+  isBuiltinModule,
+  findUnresolvableRequires,
+  collectBootReachableFiles,
+  findBrokenRelativeRequires,
+  findForbiddenBootPackages,
+  guardedSpecifiers,
 } = require('./moduleParser');
+
+const BOOT_REACHABLE = collectBootReachableFiles();
 
 const SOURCE_FILES = collectSourceFiles();
 
@@ -232,5 +241,182 @@ describe('the guard itself', () => {
     withFixture('utils/esm.js', 'export function value() {\n  return 1;\n}\n', (root) => {
       expect(parseFile('utils/esm.js', root).ok).toBe(true);
     });
+  });
+});
+
+describe('every require in a boot-path module resolves', () => {
+  // The check that was missing when models/DoubtSessionModel.js reached main
+  // naming `mongoose` - a package listed in package.json, never installed, and
+  // with no mongoose.connect() anywhere in a Postgres-only stack. The file
+  // parsed, the router it fed was bound in server.js, and both existing
+  // integrity checks passed. It failed only when the process booted.
+  it('reaches the modules server.js actually loads', () => {
+    expect(BOOT_REACHABLE).toContain('server.js');
+    expect(BOOT_REACHABLE).toContain('models/index.js');
+    expect(BOOT_REACHABLE).toContain('routes/doubtSessionRoutes.js');
+    expect(BOOT_REACHABLE.length).toBeGreaterThan(100);
+  });
+
+  it('reports no broken relative requires on the boot path', () => {
+    const offenders = findBrokenRelativeRequires(BOOT_REACHABLE);
+    const report = offenders
+      .map((entry) => `${entry.file}: ${entry.unresolvable.map((item) => item.specifier).join(', ')}`)
+      .join('\n');
+
+    expect(report).toBe('');
+  });
+
+  it('reports no boot-path module requiring a package this stack cannot serve', () => {
+    // models/DoubtSessionModel.js required mongoose. There is no
+    // mongoose.connect() anywhere and config/db.js is Sequelize over Postgres,
+    // so server.js could not complete a single require pass.
+    const offenders = findForbiddenBootPackages(BOOT_REACHABLE);
+    const report = offenders
+      .map((entry) => `${entry.file} requires ${entry.package} - ${entry.reason}`)
+      .join('\n');
+
+    expect(report).toBe('');
+  });
+
+  it('flags a boot-path module that reaches for mongoose', () => {
+    withFixture('models/Legacy.js', "const mongoose = require('mongoose');\nmodule.exports = mongoose;\n", (root) => {
+      const offenders = findForbiddenBootPackages(['models/Legacy.js'], root);
+      expect(offenders).toHaveLength(1);
+      expect(offenders[0].package).toBe('mongoose');
+    });
+  });
+
+  it('flags a module that requires a package which is not installed', () => {
+    withFixture('models/Ghost.js', "const ghost = require('definitely-not-installed-pkg');\nmodule.exports = ghost;\n", (root) => {
+      // Parses cleanly - which is exactly why the syntax check missed it.
+      expect(parseFile('models/Ghost.js', root).ok).toBe(true);
+
+      const unresolvable = findUnresolvableRequires('models/Ghost.js', root);
+      expect(unresolvable).toHaveLength(1);
+      expect(unresolvable[0].specifier).toBe('definitely-not-installed-pkg');
+      expect(unresolvable[0].reason).toBe('MODULE_NOT_FOUND');
+    });
+  });
+
+  it('flags a relative require pointing at a file that does not exist', () => {
+    withFixture('controllers/orphan.js', "const gone = require('../services/deletedService');\n", (root) => {
+      const unresolvable = findUnresolvableRequires('controllers/orphan.js', root);
+      expect(unresolvable.map((item) => item.specifier)).toEqual(['../services/deletedService']);
+    });
+  });
+
+  it('resolves a relative require that does exist', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'openprep-integrity-'));
+    try {
+      fs.mkdirSync(path.join(root, 'controllers'), { recursive: true });
+      fs.mkdirSync(path.join(root, 'services'), { recursive: true });
+      fs.writeFileSync(path.join(root, 'services', 'realService.js'), 'module.exports = {};\n');
+      fs.writeFileSync(
+        path.join(root, 'controllers', 'ok.js'),
+        "const real = require('../services/realService');\nmodule.exports = real;\n"
+      );
+
+      expect(findUnresolvableRequires('controllers/ok.js', root)).toEqual([]);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not flag node builtins, with or without the node: prefix', () => {
+    withFixture('utils/builtins.js', "const fs = require('fs');\nconst path = require('node:path');\nmodule.exports = { fs, path };\n", (root) => {
+      expect(findUnresolvableRequires('utils/builtins.js', root)).toEqual([]);
+    });
+
+    expect(isBuiltinModule('crypto')).toBe(true);
+    expect(isBuiltinModule('node:crypto')).toBe(true);
+    expect(isBuiltinModule('mongoose')).toBe(false);
+  });
+
+  it('collects each literal require specifier once and skips computed ones', () => {
+    const source = [
+      "const a = require('express');",
+      "const b = require('express');",
+      "const c = require(\"../models\");",
+      'const d = require(dynamicName);',
+      'const e = require(`./${folder}/thing`);',
+    ].join('\n');
+
+    expect(requiredSpecifiers(source)).toEqual(['express', '../models']);
+  });
+
+  it('resolves the doubt session boot chain end to end', () => {
+    // The specific regression: server.js mounts this router, so any
+    // unresolvable require along the chain stops the process from booting.
+    const chain = [
+      'routes/doubtSessionRoutes.js',
+      'controllers/doubtSolverController.js',
+      'services/doubtSessionService.js',
+      'models/DoubtSession.js',
+      'models/DoubtSessionMessage.js',
+    ];
+
+    for (const file of chain) {
+      expect(findUnresolvableRequires(file), `${file} has an unresolvable require`).toEqual([]);
+    }
+  });
+});
+
+describe('optional dependencies are told apart from broken ones', () => {
+  const OPTIONAL_DEPENDENCY = [
+    'let uploadFileToFirebase = null;',
+    'try {',
+    "  const firebaseService = require('../services/firebaseStorageService');",
+    '  uploadFileToFirebase = firebaseService.uploadFileToFirebase;',
+    '} catch (e) {',
+    '  // Graceful fallback if firebase storage service is omitted or missing',
+    '}',
+    "const fs = require('fs');",
+  ].join('\n');
+
+  it('treats a require inside a try block as guarded', () => {
+    const guarded = guardedSpecifiers(OPTIONAL_DEPENDENCY);
+
+    expect(guarded.has('../services/firebaseStorageService')).toBe(true);
+    expect(guarded.has('fs')).toBe(false);
+  });
+
+  it('does not report a guarded require as broken', () => {
+    withFixture('controllers/optional.js', OPTIONAL_DEPENDENCY, (root) => {
+      // The module it names really is absent, and the controller copes.
+      expect(findUnresolvableRequires('controllers/optional.js', root).length).toBeGreaterThan(0);
+      expect(findBrokenRelativeRequires(['controllers/optional.js'], root)).toEqual([]);
+    });
+  });
+
+  it('still reports an unguarded require after a closed try block', () => {
+    const source = [
+      'try {',
+      "  const optional = require('./optionalThing');",
+      '} catch (e) {}',
+      "const required = require('./missingThing');",
+    ].join('\n');
+
+    withFixture('controllers/mixed.js', source, (root) => {
+      const broken = findBrokenRelativeRequires(['controllers/mixed.js'], root);
+      expect(broken).toHaveLength(1);
+      expect(broken[0].unresolvable.map((entry) => entry.specifier)).toEqual(['./missingThing']);
+    });
+  });
+
+  it('handles nested try blocks without losing track of the depth', () => {
+    const source = [
+      'function boot() {',
+      '  try {',
+      '    try {',
+      "      const inner = require('./inner');",
+      '    } catch (e) {}',
+      '  } catch (e) {}',
+      '}',
+      "const outer = require('./outer');",
+    ].join('\n');
+
+    const guarded = guardedSpecifiers(source);
+    expect(guarded.has('./inner')).toBe(true);
+    expect(guarded.has('./outer')).toBe(false);
   });
 });
