@@ -335,6 +335,22 @@ SyllabusTopic.belongsTo(Syllabus, { foreignKey: 'syllabusId', as: 'syllabusRef' 
 User.hasMany(PDFAnnotation, { foreignKey: 'userId', onDelete: 'CASCADE' });
 PDFAnnotation.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 
+// StudyGoal associations
+User.hasMany(StudyGoal, { foreignKey: 'user', onDelete: 'CASCADE' });
+StudyGoal.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+StudyGoal.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'SET NULL' });
+Subject.hasMany(StudyGoal, { foreignKey: 'subject', onDelete: 'SET NULL' });
+
+// StudyGoalProgress associations
+StudyGoal.hasMany(StudyGoalProgress, { foreignKey: 'goalId', onDelete: 'CASCADE' });
+StudyGoalProgress.belongsTo(StudyGoal, { foreignKey: 'goalId', as: 'goalRef' });
+User.hasMany(StudyGoalProgress, { foreignKey: 'user', onDelete: 'CASCADE' });
+StudyGoalProgress.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
+// WeeklyStudyReport associations
+User.hasMany(WeeklyStudyReport, { foreignKey: 'user', onDelete: 'CASCADE' });
+WeeklyStudyReport.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
 // WeaknessReport associations
 User.hasMany(WeaknessReport, { foreignKey: 'user', onDelete: 'CASCADE' });
 WeaknessReport.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
