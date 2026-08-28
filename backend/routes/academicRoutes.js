@@ -27,7 +27,7 @@ const cacheMiddleware = require('../middleware/cache');
 const clearCache = require('../middleware/clearCache');
 const upload = require('../middleware/upload');
 
-const aiLimiter = require('../middleware/rateLimiter').aiLimiter || require('../middleware/rateLimiter');
+const { aiLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
 

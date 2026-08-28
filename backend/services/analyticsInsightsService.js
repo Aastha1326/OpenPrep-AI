@@ -18,8 +18,7 @@ const {
   StudySession,
   Topic,
 } = require('../models');
-const { Op, fn, col, literal, QueryTypes } = require('sequelize');
-const sequelize = require('../config/database');
+const { Op, fn, col, literal } = require('sequelize');
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 

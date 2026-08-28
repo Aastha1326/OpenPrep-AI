@@ -311,7 +311,7 @@ const MEDICAL_CASES = [
       { name: 'Platelets', result: '95,000/μL (thrombocytopenia)', critical: true },
       { name: 'LDH', result: '680 U/L (elevated)', critical: false },
       { name: 'Uric Acid', result: '7.8 mg/dL (elevated)', critical: false },
-      { name: 'Urinalysis', result: 'Protein 2+', no infection', critical: false },
+      { name: 'Urinalysis', result: 'Protein 2+, no infection', critical: false },
       { name: 'Fetal NST', result: 'Non-reactive, reduced variability', critical: true },
     ],
     differentials: [
