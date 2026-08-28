@@ -443,6 +443,15 @@ function App() {
           />
 
           <Route
+            path="/focus-analytics"
+            element={
+              <ProtectedRoute>
+                <FocusSessionAnalyticsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/interview"
             element={
               <ProtectedRoute>
