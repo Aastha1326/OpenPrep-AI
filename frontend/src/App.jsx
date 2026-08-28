@@ -320,6 +320,15 @@ function App() {
           />
 
           <Route
+            path="/revision-scheduler"
+            element={
+              <ProtectedRoute>
+                <RevisionScheduler />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/viva-simulator"
             element={
               <ProtectedRoute>

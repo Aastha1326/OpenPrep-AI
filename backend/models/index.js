@@ -51,6 +51,8 @@ const SquadActivityReaction = require('./SquadActivityReaction');
 const Syllabus = require('./Syllabus');
 const SyllabusTopic = require('./SyllabusTopic');
 const PDFAnnotation = require('./PDFAnnotation');
+const RevisionSchedule = require('./RevisionSchedule');
+const RevisionSlot = require('./RevisionSlot');
 const QuizRoom = require('./QuizRoom');
 const HandwrittenSubmission = require('./HandwrittenSubmission');
 const LearningPath = require('./LearningPath');
@@ -415,6 +417,8 @@ module.exports = {
   Syllabus,
   SyllabusTopic,
   PDFAnnotation,
+  RevisionSchedule,
+  RevisionSlot,
   QuizRoom,
   HandwrittenSubmission,
   LearningPath,

@@ -423,6 +423,8 @@ app.get('/api/user/badges', protect, require('./controllers/badgeController').ge
 app.get('/api/leaderboard', protect, require('./controllers/badgeController').getLeaderboardData);
 app.get('/leaderboard', protect, require('./controllers/badgeController').getLeaderboardData);
 app.use('/api/visualizer', visualizerRoutes);
+const revisionSchedulerRoutes = require('./routes/revisionSchedulerRoutes');
+app.use('/api/revision-schedules', revisionSchedulerRoutes);
 app.use('/api/analytics-insights', analyticsInsightsRoutes);
 app.use('/api/exam-strategies', examStrategyRoutes);
 app.use('/api/study-tips', studyTipRoutes);
