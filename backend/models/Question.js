@@ -1,5 +1,6 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
+const searchIndex = require('../services/searchIndexService');
 
 const Question = sequelize.define(
   'Question',
@@ -48,5 +49,8 @@ const Question = sequelize.define(
     tableName: 'questions',
   }
 );
+
+Question.afterSave((question) => searchIndex.enqueueIndex('question', question));
+Question.afterDestroy((question) => searchIndex.removeRecord('question', question));
 
 module.exports = Question;
