@@ -1,4 +1,5 @@
-const { sequelize, QuestionComment, CommentVote, CommentFlag, User } = require('../models');
+const { sequelize, QuestionComment, CommentVote, User } = require('../models');
+const moderation = require('../services/commentModerationService');
 
 const MAX_CONTENT_LENGTH = 10000;
 const MENTOR_ROLES = new Set(['admin', 'contributor', 'educator', 'mentor', 'teaching_assistant']);
@@ -58,6 +59,10 @@ exports.createQuestionComment = async (req, res, next) => {
       if (depth > 2) return res.status(400).json({ success: false, error: 'Replies can only be nested three levels deep.' });
     }
 
+    // Read the ban through the model rather than off req.user: a ban applied
+    // mid-session would otherwise not bite until the token was refreshed.
+    const shadowBanned = await moderation.shouldHideNewComment(req.user.id);
+
     const comment = await QuestionComment.create({
       questionId: req.params.id,
       authorId: req.user.id,
@@ -65,9 +70,9 @@ exports.createQuestionComment = async (req, res, next) => {
       depth,
       content: trimmedContent,
       latexContent: latexContent ? String(latexContent).trim() : null,
-      isHidden: Boolean(req.user.isShadowBanned),
+      isHidden: shadowBanned,
     });
-    return res.status(201).json({ success: true, data: comment, shadowBanned: Boolean(req.user.isShadowBanned) });
+    return res.status(201).json({ success: true, data: comment, shadowBanned });
   } catch (error) {
     return next(error);
   }
@@ -128,19 +133,49 @@ exports.verifyComment = async (req, res, next) => {
 
 exports.flagComment = async (req, res, next) => {
   try {
-    const reason = ['spam', 'incorrect', 'abuse', 'other'].includes(req.body.reason) ? req.body.reason : 'other';
-    const comment = await QuestionComment.findByPk(req.params.id);
-    if (!comment || comment.isHidden) return res.status(404).json({ success: false, error: 'Comment not found.' });
-    await CommentFlag.create({ commentId: comment.id, reporterId: req.user.id, reason });
-    comment.reportCount += 1;
-    if (comment.reportCount >= 3) {
-      comment.isHidden = true;
-      await User.update({ isShadowBanned: true }, { where: { id: comment.authorId } });
-    }
-    await comment.save();
-    return res.status(201).json({ success: true, message: 'Comment reported.' });
+    const result = await moderation.flagComment({
+      commentId: req.params.id,
+      reporterId: req.user.id,
+      reason: req.body.reason,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: result.hidden
+        ? 'Comment reported and hidden pending review.'
+        : 'Comment reported.',
+      data: { hidden: result.hidden },
+    });
   } catch (error) {
-    if (error.name === 'SequelizeUniqueConstraintError') return res.status(409).json({ success: false, error: 'You have already reported this comment.' });
+    if (error?.status) {
+      return res.status(error.status).json({ success: false, error: error.message });
+    }
+    return next(error);
+  }
+};
+
+/**
+ * Lift a shadow ban.
+ *
+ * @route PATCH /api/admin/users/:id/shadow-ban
+ */
+exports.liftShadowBan = async (req, res, next) => {
+  try {
+    const result = await moderation.liftShadowBan({
+      targetUserId: req.params.id,
+      moderatorId: req.user.id,
+      reason: req.body.reason,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: result.alreadyLifted ? 'This account was not shadow banned.' : 'Shadow ban lifted.',
+      data: result,
+    });
+  } catch (error) {
+    if (error?.status) {
+      return res.status(error.status).json({ success: false, error: error.message });
+    }
     return next(error);
   }
 };
