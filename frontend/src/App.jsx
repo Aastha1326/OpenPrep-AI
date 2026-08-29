@@ -376,7 +376,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/analytics"
             element={
