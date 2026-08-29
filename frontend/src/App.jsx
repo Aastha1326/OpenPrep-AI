@@ -456,6 +456,7 @@ function App() {
 
           <Route path="/medical-cases" element={<MedicalCaseSimulator />} />
           <Route path="/drug-interactions" element={<DrugInteractionChecker />} />
+          <Route path="/exam-countdown" element={<ExamCountdownPlanner />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
