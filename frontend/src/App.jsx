@@ -60,10 +60,9 @@ const CollabNote = lazy(() => import('./pages/CollaborativeNoteView'));
 const LiveQuizSession = lazy(() => import('./pages/LiveQuizSession'));
 const MedicalCaseSimulator = lazy(() => import('./pages/MedicalCaseSimulator'));
 const InterviewRoomPage = lazy(() => import('./pages/InterviewRoomPage'));
-const StreakDashboard = lazy(() => import('./pages/StreakDashboard'));
-const DrugInteractionChecker = lazy(() => import('./pages/DrugInteractionChecker'));
+const StudyAnalytics = lazy(() => import('./pages/StudyAnalytics'));
 const ExamCountdownPlanner = lazy(() => import('./pages/ExamCountdownPlanner'));
-const ClinicalNotesSummarizer = lazy(() => import('./pages/ClinicalNotesSummarizer'));
+const FormulaScratchpad = lazy(() => import('./pages/FormulaScratchpad'));
 
 function App() {
 
@@ -380,7 +379,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/analytics"
             element={
@@ -389,18 +387,8 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/exam-planner"
-            element={
-              <ProtectedRoute>
-                <ExamCountdownPlanner />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/tools/calculator"
             element={
               <ProtectedRoute>
                 <FormulaScratchpad />
@@ -431,24 +419,6 @@ function App() {
             element={
               <ProtectedRoute>
                 <AttemptHistoryDashboard />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/squads"
-            element={
-              <ProtectedRoute>
-                <SquadsPage />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/focus-analytics"
-            element={
-              <ProtectedRoute>
-                <FocusSessionAnalyticsPage />
               </ProtectedRoute>
             }
           />
