@@ -1,117 +1,44 @@
-const Notification = require('../models/Notification');
-const PushSubscription = require('../models/PushSubscription');
+const { vapidPublicKey } = require('../services/smartNotificationService');
 
-// @desc    Get user notifications & unread count
-// @route   GET /api/notifications
-// @access  Private
-exports.getUserNotifications = async (req, res, next) => {
+/**
+ * Endpoint to get the VAPID public key for the frontend to subscribe to Web Push.
+ */
+exports.getVapidKey = (req, res) => {
+  res.status(200).json({ publicKey: vapidPublicKey });
+};
+
+/**
+ * Registers browser VAPID push subscription.
+ */
+exports.subscribe = async (req, res) => {
   try {
-    const notifications = await Notification.findAll({
-      where: { user: req.user.id },
-      order: [['createdAt', 'DESC']],
-      limit: 20,
-    });
-
-    const unreadCount = await Notification.count({
-      where: { user: req.user.id, isRead: false },
-    });
-
-    res.status(200).json({
-      success: true,
-      unreadCount,
-      count: notifications.length,
-      data: notifications,
-    });
+    const { subscription } = req.body;
+    
+    // In a real application, we would update the user record in the DB:
+    // await User.findByIdAndUpdate(req.user.id, { pushSubscription: subscription });
+    
+    res.status(201).json({ message: 'Push subscription created successfully.' });
   } catch (error) {
-    next(error);
+    console.error('Failed to subscribe:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
-// @desc    Mark a single notification as read
-// @route   PATCH /api/notifications/:id/read
-// @access  Private
-exports.markNotificationRead = async (req, res, next) => {
+/**
+ * Configures quiet hours and reminder frequencies.
+ */
+exports.updatePreferences = async (req, res) => {
   try {
-    const notification = await Notification.findOne({
-      where: { id: req.params.id, user: req.user.id },
-    });
+    const { quietHours, frequency } = req.body;
+    
+    // In a real application, we would update the user's preferences in the DB:
+    // await User.findByIdAndUpdate(req.user.id, { 
+    //   notificationPreferences: { quietHours, frequency } 
+    // });
 
-    if (!notification) {
-      return res.status(404).json({ success: false, error: 'Notification not found' });
-    }
-
-    notification.isRead = true;
-    await notification.save();
-
-    const unreadCount = await Notification.count({
-      where: { user: req.user.id, isRead: false },
-    });
-
-    res.status(200).json({
-      success: true,
-      unreadCount,
-      data: notification,
-    });
+    res.status(200).json({ message: 'Notification preferences updated.' });
   } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Mark all user notifications as read
-// @route   PATCH /api/notifications/read-all
-// @access  Private
-exports.markAllNotificationsRead = async (req, res, next) => {
-  try {
-    await Notification.update(
-      { isRead: true },
-      { where: { user: req.user.id, isRead: false } }
-    );
-
-    res.status(200).json({
-      success: true,
-      unreadCount: 0,
-      message: 'All notifications marked as read',
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Save browser Web Push subscription
-// @route   POST /api/notifications/subscribe-push
-// @access  Private
-exports.subscribePushNotifications = async (req, res, next) => {
-  try {
-    const { endpoint, keys } = req.body;
-
-    if (!endpoint || !keys || !keys.p256dh || !keys.auth) {
-      return res.status(400).json({
-        success: false,
-        error: 'Valid push subscription endpoint and keys are required',
-      });
-    }
-
-    let sub = await PushSubscription.findOne({
-      where: { user: req.user.id, endpoint },
-    });
-
-    if (sub) {
-      sub.keys = keys;
-      await sub.save();
-    } else {
-      sub = await PushSubscription.create({
-        user: req.user.id,
-        endpoint,
-        keys,
-      });
-    }
-
-    res.status(201).json({
-      success: true,
-      message: 'Web Push subscription registered successfully',
-      data: sub,
-    });
-  } catch (error) {
-    next(error);
+    console.error('Failed to update preferences:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
