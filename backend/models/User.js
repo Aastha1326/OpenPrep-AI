@@ -91,6 +91,11 @@ const User = sequelize.define(
       type: DataTypes.FLOAT,
       defaultValue: 0,
     },
+    eloRating: {
+      type: DataTypes.INTEGER,
+      defaultValue: 1200,
+      allowNull: false,
+    },
     avatar: {
       type: DataTypes.STRING,
       defaultValue: '',

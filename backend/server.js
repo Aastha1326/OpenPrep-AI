@@ -611,6 +611,9 @@ startWorker();
 const { startWorker: startTaskWorker } = require('./workers/taskQueueWorker');
 startTaskWorker();
 
+const { startMatchmakerDaemon } = require('./workers/matchmakerDaemon');
+startMatchmakerDaemon();
+
 const {
   registerWorker: registerInterviewProcessingWorker,
   recoverStaleJobs,
