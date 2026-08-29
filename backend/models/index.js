@@ -56,6 +56,7 @@ const { Bounty, initBounty } = require('./Bounty');
 const { BountySolution, initBountySolution } = require('./BountySolution');
 const { BountySolutionVote, initBountySolutionVote } = require('./BountySolutionVote');
 const StudyGoal = require('./StudyGoal');
+const StudyAnalyticsSnapshot = require('./StudyAnalyticsSnapshot');
 const StudyGoalProgress = require('./StudyGoalProgress');
 const WeeklyStudyReport = require('./WeeklyStudyReport');
 
@@ -296,6 +297,10 @@ StudyGoal.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 StudyGoal.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'SET NULL' });
 Subject.hasMany(StudyGoal, { foreignKey: 'subject', onDelete: 'SET NULL' });
 
+// StudyAnalyticsSnapshot associations
+User.hasMany(StudyAnalyticsSnapshot, { foreignKey: 'user', onDelete: 'CASCADE' });
+StudyAnalyticsSnapshot.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
 // StudyGoalProgress associations
 StudyGoal.hasMany(StudyGoalProgress, { foreignKey: 'goalId', onDelete: 'CASCADE' });
 StudyGoalProgress.belongsTo(StudyGoal, { foreignKey: 'goalId', as: 'goalRef' });
@@ -314,6 +319,7 @@ Subject.hasMany(DeckRating, { foreignKey: 'deckId', as: 'ratings', onDelete: 'CA
 module.exports = {
   sequelize,
   User,
+  StudyAnalyticsSnapshot,
   Folder,
   Exam,
   Subject,
