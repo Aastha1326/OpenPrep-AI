@@ -452,4 +452,11 @@ module.exports = {
   BountySolution,
   BountySolutionVote,
   StudyReminder,
+  SkillDependency,
+  ExamStrategy,
+  StudyTip,
+  AlumniMentorProfile,
+  ResumeParseSession,
+  MockInterview,
+  SalaryNegotiation,
 };

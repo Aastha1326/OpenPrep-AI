@@ -1,4 +1,4 @@
- feat/dynamic-rate-limiter-1790
+ feat/real-time-matchmaker-1794
 const redis = require('../config/redis');
 
 const redisService = require('./redisService');
@@ -8,7 +8,7 @@ const logger = require('../utils/logger');
 const QUEUE_KEY = 'matchmaking:queue';
 
 /**
- feat/dynamic-rate-limiter-1790
+ feat/real-time-matchmaker-1794
  * Adds a user to the Redis sorted matchmaking queue by their ELO rating.
  *
  * @param {string} userId - The unique identifier of the user

@@ -1,4 +1,4 @@
- feat/dynamic-rate-limiter-1790
+ feat/real-time-matchmaker-1794
 const redis = require('../config/redis');
 const { QUEUE_KEY, removeFromQueue } = require('../services/matchmakingService');
 const io = require('../config/socket');
