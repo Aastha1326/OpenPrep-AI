@@ -58,6 +58,7 @@ const SquadsPage = lazy(() => import('./pages/SquadsPage'));
 const StudySquadDashboard = lazy(() => import('./pages/SquadsPage'));
 const CollabNote = lazy(() => import('./pages/CollaborativeNoteView'));
 const LiveQuizSession = lazy(() => import('./pages/LiveQuizSession'));
+const MedicalCaseSimulator = lazy(() => import('./pages/MedicalCaseSimulator'));
 const InterviewRoomPage = lazy(() => import('./pages/InterviewRoomPage'));
 const StudyAnalytics = lazy(() => import('./pages/StudyAnalytics'));
 const ExamCountdownPlanner = lazy(() => import('./pages/ExamCountdownPlanner'));
@@ -453,6 +454,7 @@ function App() {
             <Route path="/admin/analytics" element={<AdminAnalytics />} />
           </Route>
 
+          <Route path="/medical-cases" element={<MedicalCaseSimulator />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
