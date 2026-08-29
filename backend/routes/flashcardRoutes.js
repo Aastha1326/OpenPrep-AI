@@ -20,6 +20,8 @@ const {
   starCommunityDeck,
   batchSyncOfflineReviews,
   generateClozeFlashcards,
+  generateDeckPodcast,
+  getPodcastEpisodeById,
 } = require('../controllers/flashcardController');
 const { protect } = require('../middleware/auth');
 const cacheMiddleware = require('../middleware/cacheMiddleware');
