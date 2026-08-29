@@ -2,6 +2,7 @@ const { sequelize } = require('../config/db');
 
 // Import all models
 const User = require('./User');
+const QuizValidationLog = require('./QuizValidationLog');
 const Folder = require('./Folder');
 const Exam = require('./Exam');
 const Subject = require('./Subject');
@@ -411,6 +412,7 @@ module.exports = {
   UsageQuota,
   Achievement,
   FocusSession,
+    QuizValidationLog,
   QuizTelemetryEvent,
   QuizBookmark,
   DeckRating,
