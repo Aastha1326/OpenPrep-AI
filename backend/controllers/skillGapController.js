@@ -121,6 +121,8 @@ const createDependency = async (req, res) => {
             message: error.message || 'Failed to create skill dependency.',
         });
     }
+};
+
 module.exports = {
     analyzeResume,
     getHistory,
