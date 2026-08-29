@@ -3,6 +3,7 @@ const {
   getStats,
   getAnalytics,
   getUsers,
+  getQueueStatus,
   updateUserRole,
   deleteUser,
   getAdminBadges,
@@ -18,6 +19,8 @@ const {
   getThreatSummary,
 } = require('../controllers/securityController');
 
+const { getRedisStatus } = require('../controllers/redisController');
+
 const router = express.Router();
 
 // Apply protect and requireAdmin globally to all admin routes
@@ -25,8 +28,9 @@ router.use(protect);
 router.use(requireAdmin);
 
 router.get('/stats', getStats);
-router.get('/analytics', getAnalytics);
 router.get('/users', getUsers);
+router.get('/queues/status', getQueueStatus);
+router.get('/redis/status', getRedisStatus);
 router.put('/users/:id/role', updateUserRole);
 router.delete('/users/:id', deleteUser);
 
