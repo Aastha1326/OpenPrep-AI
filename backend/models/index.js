@@ -58,6 +58,9 @@ const { BountySolutionVote, initBountySolutionVote } = require('./BountySolution
 const StudyGoal = require('./StudyGoal');
 const StudyAnalyticsSnapshot = require('./StudyAnalyticsSnapshot');
 const FlashcardMasterySnapshot = require('./FlashcardMasterySnapshot');
+const StudyHabit = require('./StudyHabit');
+const HabitLog = require('./HabitLog');
+const HabitStreak = require('./HabitStreak');
 const StudyGoalProgress = require('./StudyGoalProgress');
 const WeeklyStudyReport = require('./WeeklyStudyReport');
 
@@ -302,6 +305,18 @@ Subject.hasMany(StudyGoal, { foreignKey: 'subject', onDelete: 'SET NULL' });
 User.hasMany(StudyAnalyticsSnapshot, { foreignKey: 'user', onDelete: 'CASCADE' });
 StudyAnalyticsSnapshot.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 
+// StudyHabit, HabitLog & HabitStreak associations
+User.hasMany(StudyHabit, { foreignKey: 'userId', as: 'habits', onDelete: 'CASCADE' });
+StudyHabit.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+StudyHabit.hasMany(HabitLog, { foreignKey: 'habitId', as: 'logs', onDelete: 'CASCADE' });
+HabitLog.belongsTo(StudyHabit, { foreignKey: 'habitId', as: 'habitRef' });
+User.hasMany(HabitLog, { foreignKey: 'userId', as: 'habitLogs', onDelete: 'CASCADE' });
+HabitLog.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+StudyHabit.hasOne(HabitStreak, { foreignKey: 'habitId', as: 'streak', onDelete: 'CASCADE' });
+HabitStreak.belongsTo(StudyHabit, { foreignKey: 'habitId', as: 'habitRef' });
+User.hasMany(HabitStreak, { foreignKey: 'userId', as: 'habitStreaks', onDelete: 'CASCADE' });
+HabitStreak.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
 // FlashcardMasterySnapshot associations
 User.hasMany(FlashcardMasterySnapshot, { foreignKey: 'user', onDelete: 'CASCADE' });
 FlashcardMasterySnapshot.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
@@ -326,6 +341,9 @@ module.exports = {
   User,
   StudyAnalyticsSnapshot,
   FlashcardMasterySnapshot,
+  StudyHabit,
+  HabitLog,
+  HabitStreak,
   Folder,
   Exam,
   Subject,

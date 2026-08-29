@@ -414,6 +414,8 @@ const studyAnalyticsRoutes = require('./routes/studyAnalyticsRoutes');
 app.use('/api/study-analytics', studyAnalyticsRoutes);
 const flashcardMasteryRoutes = require('./routes/flashcardMasteryRoutes');
 app.use('/api/flashcard-mastery', flashcardMasteryRoutes);
+const habitTrackerRoutes = require('./routes/habitTrackerRoutes');
+app.use('/api/habits', habitTrackerRoutes);
 
 // Serve static assets from frontend build folder in production
 if (process.env.NODE_ENV === 'production') {
