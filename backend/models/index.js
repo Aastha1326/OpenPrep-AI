@@ -1,8 +1,18 @@
 const { sequelize } = require('../config/db');
 
 // Import all models
-const User = require('./User');
-const SchedulerVersion = require('./SchedulerVersion');
+const User = require('./User')(sequelize, DataTypes);
+const Quiz = require('./Quiz')(sequelize, DataTypes);
+const AIUsageLog = require('./AIUsageLog')(sequelize, DataTypes);
+const ProviderHealthStatus = require('./ProviderHealthStatus')(sequelize, DataTypes);
+// ... other models
+module.exports = {
+  User,
+  Quiz,
+  AIUsageLog,
+  ProviderHealthStatus,
+  // ... other exports
+};const SchedulerVersion = require('./SchedulerVersion');
 const FlashcardSchedulingState = require('./FlashcardSchedulingState');
 const FlashcardReviewHistory = require('./FlashcardReviewHistory');
 const ReviewSubmissionToken = require('./ReviewSubmissionToken');
