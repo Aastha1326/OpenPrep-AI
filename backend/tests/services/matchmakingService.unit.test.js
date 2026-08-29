@@ -1,4 +1,4 @@
- feat/collaborative-ot-sync-1792
+ feat/real-time-matchmaker-1794
 const assert = require('assert');
 const redis = require('../../config/redis');
 const { addToQueue, removeFromQueue, QUEUE_KEY } = require('../../services/matchmakingService');
