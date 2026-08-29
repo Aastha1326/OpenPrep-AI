@@ -449,6 +449,10 @@ app.use('/api/exam-strategies', examStrategyRoutes);
 app.use('/api/study-tips', studyTipRoutes);
 app.use('/api/learning-path', require('./routes/learningPathRoutes'));
 app.use('/user/learning-path', require('./routes/learningPathRoutes'));
+const studyGoalRoutes = require('./routes/studyGoalRoutes');
+app.use('/api/study-goals', studyGoalRoutes);
+const habitTrackerRoutes = require('./routes/habitTrackerRoutes');
+app.use('/api/habits', habitTrackerRoutes);
 app.use('/api/interviews', mockInterviewRoutes);
 // Serve static assets from frontend build folder in production
 if (process.env.NODE_ENV === 'production') {
