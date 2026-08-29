@@ -36,6 +36,9 @@ const Notification = require('./Notification');
 const PushSubscription = require('./PushSubscription');
 const ReadinessSnapshot = require('./ReadinessSnapshot');
 const SubjectGoal = require('./SubjectGoal');
+const StudyHabit = require('./StudyHabit');
+const HabitLog = require('./HabitLog');
+const HabitStreak = require('./HabitStreak');
 const StudySquad = require('./StudySquad');
 const SquadMember = require('./SquadMember');
 const SquadChallenge = require('./SquadChallenge');
@@ -305,6 +308,19 @@ StudyGoalProgress.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 // WeeklyStudyReport associations
 User.hasMany(WeeklyStudyReport, { foreignKey: 'user', onDelete: 'CASCADE' });
 WeeklyStudyReport.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
+// StudyHabit, HabitLog & HabitStreak associations
+User.hasMany(StudyHabit, { foreignKey: 'userId', as: 'habits', onDelete: 'CASCADE' });
+StudyHabit.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+StudyHabit.hasMany(HabitLog, { foreignKey: 'habitId', as: 'logs', onDelete: 'CASCADE' });
+HabitLog.belongsTo(StudyHabit, { foreignKey: 'habitId', as: 'habitRef' });
+User.hasMany(HabitLog, { foreignKey: 'userId', as: 'habitLogs', onDelete: 'CASCADE' });
+HabitLog.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+StudyHabit.hasOne(HabitStreak, { foreignKey: 'habitId', as: 'streak', onDelete: 'CASCADE' });
+HabitStreak.belongsTo(StudyHabit, { foreignKey: 'habitId', as: 'habitRef' });
+User.hasMany(HabitStreak, { foreignKey: 'userId', as: 'habitStreaks', onDelete: 'CASCADE' });
+HabitStreak.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
 // DeckRating associations
 DeckRating.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 User.hasMany(DeckRating, { foreignKey: 'userId', as: 'ratings', onDelete: 'CASCADE' });
@@ -358,6 +374,9 @@ module.exports = {
   SquadAchievement,
   SquadActivity,
   SquadActivityReaction,
+  StudyHabit,
+  HabitLog,
+  HabitStreak,
   Syllabus,
   SyllabusTopic,
   PDFAnnotation,
