@@ -85,9 +85,6 @@ const { BountySolutionVote, initBountySolutionVote } = require('./BountySolution
 const StudyGoal = require('./StudyGoal');
 const StudyAnalyticsSnapshot = require('./StudyAnalyticsSnapshot');
 const FlashcardMasterySnapshot = require('./FlashcardMasterySnapshot');
-const StudyHabit = require('./StudyHabit');
-const HabitLog = require('./HabitLog');
-const HabitStreak = require('./HabitStreak');
 const StudyGoalProgress = require('./StudyGoalProgress');
 const WeeklyStudyReport = require('./WeeklyStudyReport');
 const StudyMilestone = require('./StudyMilestone');
@@ -390,6 +387,10 @@ HabitStreak.belongsTo(StudyHabit, { foreignKey: 'habitId', as: 'habitRef' });
 User.hasMany(HabitStreak, { foreignKey: 'userId', as: 'habitStreaks', onDelete: 'CASCADE' });
 HabitStreak.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 
+// LearningJournal associations
+User.hasMany(LearningJournal, { foreignKey: 'user', onDelete: 'CASCADE' });
+LearningJournal.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
 // FlashcardMasterySnapshot associations
 User.hasMany(FlashcardMasterySnapshot, { foreignKey: 'user', onDelete: 'CASCADE' });
 FlashcardMasterySnapshot.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
@@ -403,18 +404,6 @@ StudyGoalProgress.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 // WeeklyStudyReport associations
 User.hasMany(WeeklyStudyReport, { foreignKey: 'user', onDelete: 'CASCADE' });
 WeeklyStudyReport.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
-
-// StudyHabit, HabitLog & HabitStreak associations
-User.hasMany(StudyHabit, { foreignKey: 'userId', as: 'habits', onDelete: 'CASCADE' });
-StudyHabit.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
-StudyHabit.hasMany(HabitLog, { foreignKey: 'habitId', as: 'logs', onDelete: 'CASCADE' });
-HabitLog.belongsTo(StudyHabit, { foreignKey: 'habitId', as: 'habitRef' });
-User.hasMany(HabitLog, { foreignKey: 'userId', as: 'habitLogs', onDelete: 'CASCADE' });
-HabitLog.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
-StudyHabit.hasOne(HabitStreak, { foreignKey: 'habitId', as: 'streak', onDelete: 'CASCADE' });
-HabitStreak.belongsTo(StudyHabit, { foreignKey: 'habitId', as: 'habitRef' });
-User.hasMany(HabitStreak, { foreignKey: 'userId', as: 'habitStreaks', onDelete: 'CASCADE' });
-HabitStreak.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 
 // WeaknessReport associations
 User.hasMany(WeaknessReport, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -449,6 +438,7 @@ module.exports = {
   StudyHabit,
   HabitLog,
   HabitStreak,
+  LearningJournal,
   Folder,
   Exam,
   Subject,
@@ -507,9 +497,6 @@ module.exports = {
   SquadAchievement,
   SquadActivity,
   SquadActivityReaction,
-  StudyHabit,
-  HabitLog,
-  HabitStreak,
   Syllabus,
   SyllabusTopic,
   PDFAnnotation,
