@@ -13,6 +13,12 @@ const ActivityLog = require('../models/ActivityLog');
 const Progress = require('../models/Progress');
 const QuizTelemetryEvent = require('../models/QuizTelemetryEvent');
 const QuizBookmark = require('../models/QuizBookmark');
+
+// Refactored Services
+const quizGenerationService = require('../services/quizGenerationService');
+const quizEvaluationService = require('../services/quizEvaluationService');
+const quizAnalyticsService = require('../services/quizAnalyticsService');
+
 const geminiService = require('../services/geminiService');
 const cacheService = require('../services/cacheService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
@@ -28,6 +34,7 @@ try {
   // Graceful fallback if firebase storage service is omitted or missing
 }
 const { checkAndAwardBadges } = require('../services/achievementService');
+const { createNotification } = require('../services/notificationService');
 
 // Window (ms) during which duplicate quiz submissions for the same quiz are ignored.
 // Prevents double-click on "Submit Quiz" from creating duplicate attempt records.
@@ -1510,6 +1517,23 @@ exports.evaluateDistractors = async (req, res, next) => {
       data: result,
     });
   } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Generate misconception-based distractors
+// @route   POST /api/quizzes/generate-distractors
+// @access  Private
+exports.generateDistractors = async (req, res, next) => {
+  try {
+    const { generateDistractors } = require('../services/distractorGeneratorService');
+    const { question, correctAnswer, context = '', language = 'english' } = req.body;
+    const result = await generateDistractors({ question, correctAnswer, context, language });
+    return res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    if (error.status === 400 || error.status === 502) {
+      return res.status(error.status).json({ success: false, error: error.message });
+    }
     next(error);
   }
 };

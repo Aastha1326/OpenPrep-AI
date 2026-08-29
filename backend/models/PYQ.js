@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
+const { emitUserChanged, emitExamChanged } = require('../services/cacheInvalidationService');
 
 const PYQ = sequelize.define(
   'PYQ',
@@ -107,7 +108,13 @@ const PYQ = sequelize.define(
       },
     ],
     hooks: {
+      afterSave: (pyq) => {
+        emitUserChanged(pyq.user);
+        emitExamChanged(pyq.exam);
+      },
       afterDestroy: (pyq) => {
+        emitUserChanged(pyq.user);
+        emitExamChanged(pyq.exam);
         if (!pyq.fileUrl) return;
 
         const uploadsDir = path.resolve(path.join(__dirname, '../uploads'));

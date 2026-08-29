@@ -12,7 +12,7 @@ import SessionTimeoutModal from './components/SessionTimeoutModal';
 import SessionRestoreModal from './components/SessionRestoreModal';
 import API from './services/api';
 import QuotaExceededModal from './components/dashboard/QuotaExceededModal';
-import CommandPalette from './components/search/CommandPalette';
+import GlobalSearchModal from './components/search/GlobalSearchModal';
 import OfflineBanner from './components/common/OfflineBanner';
 import OfflineStatusBanner from './components/common/OfflineStatusBanner';
 import PwaInstallPrompt from './components/common/PwaInstallPrompt';
@@ -58,7 +58,11 @@ const SquadsPage = lazy(() => import('./pages/SquadsPage'));
 const StudySquadDashboard = lazy(() => import('./pages/SquadsPage'));
 const CollabNote = lazy(() => import('./pages/CollaborativeNoteView'));
 const LiveQuizSession = lazy(() => import('./pages/LiveQuizSession'));
+const MedicalCaseSimulator = lazy(() => import('./pages/MedicalCaseSimulator'));
 const InterviewRoomPage = lazy(() => import('./pages/InterviewRoomPage'));
+const StudyAnalytics = lazy(() => import('./pages/StudyAnalytics'));
+const ExamCountdownPlanner = lazy(() => import('./pages/ExamCountdownPlanner'));
+const FormulaScratchpad = lazy(() => import('./pages/FormulaScratchpad'));
 
 function App() {
 
@@ -179,7 +183,7 @@ function App() {
       <QuotaExceededModal />
       <SessionTimeoutModal />
       <Walkthrough />
-      <CommandPalette isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+      <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
       {localStorage.getItem('token') && <PomodoroWidget />}
       <main id="main-content" tabIndex="-1" role="main" className="focus:outline-none min-h-screen">
         <Suspense fallback={<PageSkeleton />}>
@@ -319,6 +323,15 @@ function App() {
           />
 
           <Route
+            path="/revision-scheduler"
+            element={
+              <ProtectedRoute>
+                <RevisionScheduler />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/viva-simulator"
             element={
               <ProtectedRoute>
@@ -366,7 +379,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/analytics"
             element={
@@ -375,29 +387,8 @@ function App() {
               </ProtectedRoute>
             }
           />
-
-          <Route
-            path="/analytics"
-            element={
-              <ProtectedRoute>
-                <StudyAnalytics />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            
           <Route
             path="/exam-planner"
-            element={
-              <ProtectedRoute>
-                <ExamCountdownPlanner />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/tools/calculator"
             element={
               <ProtectedRoute>
                 <FormulaScratchpad />
@@ -433,15 +424,6 @@ function App() {
           />
 
           <Route
-            path="/squads"
-            element={
-              <ProtectedRoute>
-                <SquadsPage />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
             path="/interview"
             element={
               <ProtectedRoute>
@@ -458,11 +440,24 @@ function App() {
             }
           />
 
+          <Route
+            path="/streak-dashboard"
+            element={
+              <ProtectedRoute>
+                <StreakDashboard />
+              </ProtectedRoute>
+            }
+          />
+
           <Route element={<AdminRoute />}>
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/analytics" element={<AdminAnalytics />} />
           </Route>
 
+          <Route path="/medical-cases" element={<MedicalCaseSimulator />} />
+          <Route path="/drug-interactions" element={<DrugInteractionChecker />} />
+          <Route path="/exam-countdown" element={<ExamCountdownPlanner />} />
+          <Route path="/clinical-notes" element={<ClinicalNotesSummarizer />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>

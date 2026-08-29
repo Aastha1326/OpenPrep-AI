@@ -2,7 +2,10 @@
  * @fileoverview Controller for handling resume uploads and skill gap analysis requests.
  */
 const skillGapService = require('../services/resumeParserService');
-// const SkillAnalysis = require('../models/SkillAnalysis'); // Uncomment when model is registered
+const {
+    getSkillGraph,
+    addDependency,
+} = require('../services/skillDependencyService');// const SkillAnalysis = require('../models/SkillAnalysis'); // Uncomment when model is registered
 
 /**
  * Processes a resume file and job description to generate a skill gap report.
@@ -65,8 +68,64 @@ const getHistory = async (req, res) => {
         res.status(500).json({ success: false, message: 'Internal server error.' });
     }
 };
+const getDependencyGraph = async (req, res) => {
+    try {
+        const graph = await getSkillGraph(req.user.id);
+
+        return res.status(200).json({
+            success: true,
+            data: graph,
+        });
+    } catch (error) {
+        console.error('Error fetching skill dependency graph:', error);
+
+        return res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to fetch skill dependency graph.',
+        });
+    }
+};
+
+const createDependency = async (req, res) => {
+    try {
+        const {
+            skillId,
+            prerequisiteSkillId,
+            dependencyType,
+            weight,
+        } = req.body;
+
+        if (!skillId || !prerequisiteSkillId) {
+            return res.status(400).json({
+                success: false,
+                message: 'skillId and prerequisiteSkillId are required.',
+            });
+        }
+
+        const dependency = await addDependency({
+            skillId,
+            prerequisiteSkillId,
+            dependencyType,
+            weight,
+        });
+
+        return res.status(201).json({
+            success: true,
+            data: dependency,
+        });
+    } catch (error) {
+        console.error('Error creating skill dependency:', error);
+
+        return res.status(400).json({
+            success: false,
+            message: error.message || 'Failed to create skill dependency.',
+        });
+    }
+};
 
 module.exports = {
     analyzeResume,
     getHistory,
+    getDependencyGraph,
+    createDependency,
 };
