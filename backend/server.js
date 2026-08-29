@@ -91,6 +91,7 @@ const calendarRoutes = require('./routes/calendarRoutes');
 const gamificationRoutes = require('./routes/gamificationRoutes');
 const battleRoutes = require('./routes/battleRoutes');
 const readinessRoutes = require('./routes/readinessRoutes');
+const proctoringRoutes = require('./routes/proctoringRoutes');
 const squadRoutes = require('./routes/squadRoutes');
 const badgeRoutes = require('./routes/badgeRoutes');
 const visualizerRoutes = require('./routes/visualizerRoutes');
@@ -411,6 +412,7 @@ app.use('/api/reminders', studyReminderRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/doubts', doubtSessionRoutes);
 app.use('/api/readiness', readinessRoutes);
+app.use('/api/proctoring', proctoringRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/dashboard', analyticsRoutes);
@@ -608,6 +610,9 @@ startWorker();
 
 const { startWorker: startTaskWorker } = require('./workers/taskQueueWorker');
 startTaskWorker();
+
+const { startMatchmakerDaemon } = require('./workers/matchmakerDaemon');
+startMatchmakerDaemon();
 
 const {
   registerWorker: registerInterviewProcessingWorker,
