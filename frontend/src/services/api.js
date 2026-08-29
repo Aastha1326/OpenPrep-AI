@@ -397,11 +397,10 @@ export const startDoubtSession = (formData) =>
 export const sendDoubtMessage = (sessionId, message) =>
   API.post(`/doubts/${sessionId}/message`, { message });
 
-/**
- * Reveal the next progressive hint for a doubt session.
- * POST /api/doubts/:id/reveal-step
- */
-export const revealDoubtStep = (sessionId) =>
-  API.post(`/doubts/${sessionId}/reveal-step`);
+// ── 3D Molecular & Biology Structure APIs ──────────────────────────
+export const getMolecularStructures = () => API.get('/molecular/structures');
+export const getMolecularStructureById = (id) => API.get(`/molecular/structures/${id}`);
+export const explainMolecularStructure = (payload) => API.post('/molecular/explain', payload);
 
 export default API;
+
