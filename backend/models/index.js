@@ -1,7 +1,22 @@
 const { sequelize } = require('../config/db');
 
 // Import all models
-const User = require('./User');
+const User = require('./User')(sequelize, DataTypes);
+const Quiz = require('./Quiz')(sequelize, DataTypes);
+const AIUsageLog = require('./AIUsageLog')(sequelize, DataTypes);
+const ProviderHealthStatus = require('./ProviderHealthStatus')(sequelize, DataTypes);
+// ... other models
+module.exports = {
+  User,
+  Quiz,
+  AIUsageLog,
+  ProviderHealthStatus,
+  // ... other exports
+};const SchedulerVersion = require('./SchedulerVersion');
+const FlashcardSchedulingState = require('./FlashcardSchedulingState');
+const FlashcardReviewHistory = require('./FlashcardReviewHistory');
+const ReviewSubmissionToken = require('./ReviewSubmissionToken');
+const QuizValidationLog = require('./QuizValidationLog');
 const Folder = require('./Folder');
 const Exam = require('./Exam');
 const Subject = require('./Subject');
@@ -394,6 +409,10 @@ module.exports = {
   QuizAttempt,
   Note,
   Question,
+    SchedulerVersion,
+  FlashcardSchedulingState,
+  FlashcardReviewHistory,
+  ReviewSubmissionToken,
   QuestionComment,
   DoubtSession,
   DoubtSessionMessage,
@@ -411,6 +430,7 @@ module.exports = {
   UsageQuota,
   Achievement,
   FocusSession,
+    QuizValidationLog,
   QuizTelemetryEvent,
   QuizBookmark,
   DeckRating,
@@ -452,4 +472,11 @@ module.exports = {
   BountySolution,
   BountySolutionVote,
   StudyReminder,
+  SkillDependency,
+  ExamStrategy,
+  StudyTip,
+  AlumniMentorProfile,
+  ResumeParseSession,
+  MockInterview,
+  SalaryNegotiation,
 };

@@ -253,7 +253,13 @@ exports.generateCustomQuiz = async (req, res, next) => {
       .join('\n\n');
 
     const difficultyLevel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
-
+const quizGenerationService = require('../services/quizGenerationService');
+const generatedQuestions = await quizGenerationService.generateQuestionsWithValidation(
+  topic,
+  questionCount,
+  sourceContext,
+  req.body.quizId
+);
     // Call Gemini Service
     const aiQuiz = await geminiService.generateCustomQuiz(
       subject.name,

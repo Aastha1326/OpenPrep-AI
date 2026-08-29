@@ -239,7 +239,15 @@ app.use(compression({
   level: 6, // balanced gzip compression
   threshold: 0,
 }));
+// Existing middleware setup
+app.use(express.json());
+app.use(cors(corsOptions));
+app.use(requestLogger);
 
+// AI Usage Budget middleware
+const { checkAIBudget, recordUsageAfterRequest } = require('./middleware/aiUsageBudgetMiddleware');
+app.use(checkAIBudget);
+app.use(recordUsageAfterRequest);
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
@@ -435,6 +443,8 @@ app.use('/api/visualizer', visualizerRoutes);
 const revisionSchedulerRoutes = require('./routes/revisionSchedulerRoutes');
 app.use('/api/revision-schedules', revisionSchedulerRoutes);
 app.use('/api/analytics-insights', analyticsInsightsRoutes);
+const examStrategyRoutes = require('./routes/examStrategyRoutes');
+const studyTipRoutes = require('./routes/studyTipRoutes');
 app.use('/api/exam-strategies', examStrategyRoutes);
 app.use('/api/study-tips', studyTipRoutes);
 app.use('/api/learning-path', require('./routes/learningPathRoutes'));

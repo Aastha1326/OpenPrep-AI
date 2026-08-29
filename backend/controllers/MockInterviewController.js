@@ -59,7 +59,15 @@ class MockInterviewController {
                 success: true,
                 data: evaluation,
             });
-                // GET /api/interviews/:id/feedback-provenance
+        } catch (error) {
+            console.error('[getEvaluation error]', error);
+            return res.status(400).json({
+                error: error.message || 'Failed to get evaluation metadata',
+            });
+        }
+    }
+
+    // GET /api/interviews/:id/feedback-provenance
     static async getFeedbackProvenance(req, res) {
         try {
             const userId = req.user?.id || req.body.userId;
@@ -104,13 +112,6 @@ class MockInterviewController {
                 error:
                     error.message ||
                     'Failed to get feedback provenance',
-            });
-        }
-    }
-        } catch (error) {
-            console.error('[getEvaluation error]', error);
-            return res.status(400).json({
-                error: error.message || 'Failed to get evaluation metadata',
             });
         }
     }
@@ -235,6 +236,7 @@ class MockInterviewController {
                     'Failed to retry interview processing',
             });
         }
-    }}
+    }
+}
 
 module.exports = MockInterviewController;
