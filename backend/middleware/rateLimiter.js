@@ -1,18 +1,50 @@
 const Redis = require('ioredis');
+const rateLimit = require('express-rate-limit');
+const { RATE_LIMIT } = require('../config/constants');
 
-// Initialize Redis Client with fallback safety parameters
+/**
+ * The Redis client is built on first use rather than at require time.
+ *
+ * Connecting eagerly meant that merely requiring any route that imports this
+ * file opened a socket and began retrying. On a machine without Redis — every
+ * CI unit job, most contributor laptops — that floods the run with connection
+ * errors and keeps the event loop alive so the process never exits on its own.
+ * services/redisService.js already builds its client behind an explicit
+ * connect(); this now follows the same shape.
+ */
 let redisClient = null;
-try {
-  redisClient = new Redis(process.env.REDIS_URL || 'redis://127.0.0.1:6379', {
-    maxRetriesPerRequest: 1,
-    connectTimeout: 2000,
-  });
-  
-  redisClient.on('error', (err) => {
-    console.error('⚠️ Redis connection error down. Switching to In-Memory fallback rate limiting:', err.message);
-  });
-} catch (e) {
-  console.error('❌ Failed to instantiate Redis. Using In-Memory local rate limiting fallback:', e);
+let redisAttempted = false;
+
+function getRedisClient() {
+  if (redisAttempted) return redisClient;
+  redisAttempted = true;
+
+  try {
+    redisClient = new Redis(process.env.REDIS_URL || 'redis://127.0.0.1:6379', {
+      maxRetriesPerRequest: 1,
+      connectTimeout: 2000,
+      lazyConnect: true,
+      retryStrategy(times) {
+        // Give up rather than reconnect forever behind an unreachable host.
+        if (times > 3) return null;
+        return Math.min(times * 50, 2000);
+      },
+    });
+
+    redisClient.on('error', (err) => {
+      console.error('⚠️ Redis connection error down. Switching to In-Memory fallback rate limiting:', err.message);
+    });
+
+    redisClient.connect().catch(() => {
+      // Already reported by the error handler above; the in-memory window
+      // below is a complete fallback, so there is nothing to escalate.
+    });
+  } catch (e) {
+    console.error('❌ Failed to instantiate Redis. Using In-Memory local rate limiting fallback:', e);
+    redisClient = null;
+  }
+
+  return redisClient;
 }
 
 // In-Memory Backup Store for Fallback Mode (Simulated LRU Structure)
@@ -53,9 +85,10 @@ async function rateLimiterMiddleware(req, res, next) {
   const clearBefore = now - window;
 
   // --- REDIS MASTER TRACKING PIPELINE PATH ---
-  if (redisClient && redisClient.status === 'ready') {
+  const client = getRedisClient();
+  if (client && client.status === 'ready') {
     try {
-      const pipeline = redisClient.pipeline();
+      const pipeline = client.pipeline();
       
       // 1. Evict stale request elements outside the sliding window boundary
       pipeline.zremrangebyscore(trackingKey, 0, clearBefore);
@@ -130,4 +163,93 @@ async function rateLimiterMiddleware(req, res, next) {
   return next();
 }
 
+/**
+ * Skip limiting in ordinary test runs, but let the dedicated rate-limit suites
+ * opt back in with the `x-test-rate-limit` header.
+ */
+const shouldSkip = (req) =>
+  process.env.NODE_ENV === 'test' && !req?.headers?.['x-test-rate-limit'];
+
+/** Keys by user id when authenticated, otherwise by originating address. */
+const keyByUserOrIp = (req) =>
+  req.user && req.user.id
+    ? String(req.user.id)
+    : String(
+        req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1'
+      );
+
+/**
+ * AI endpoint limiter — 10 requests / 15 minutes.
+ *
+ * These routes spend paid Gemini quota per call, so they carry a budget of
+ * their own rather than the generic per-tier allowance in the middleware
+ * above. Introduced in #1257 and deleted by accident in #1715.
+ */
+const aiLimiter = rateLimit({
+  windowMs: RATE_LIMIT.WINDOWS.FIFTEEN_MINUTES,
+  max: 10,
+  skip: shouldSkip,
+  keyGenerator: keyByUserOrIp,
+  handler: (req, res, next, options) => {
+    const retryInSeconds = Math.ceil(options.windowMs / 1000);
+    res.setHeader('Retry-After', retryInSeconds);
+    res.status(429).json({
+      success: false,
+      error: 'AI rate limit exceeded',
+      retryInSeconds,
+      remainingQuota: 0,
+    });
+  },
+  standardHeaders: true,
+  legacyHeaders: true,
+});
+
+/**
+ * Upload-and-analyse limiter — 5 requests / minute.
+ *
+ * These endpoints do a file upload *and* an AI pass, so they are tighter than
+ * aiLimiter on a much shorter window.
+ */
+const strictAiLimiter = rateLimit({
+  windowMs: RATE_LIMIT.WINDOWS.ONE_MINUTE,
+  max: 5,
+  skip: shouldSkip,
+  message: {
+    success: false,
+    error: 'Too many AI analysis requests. Please wait a moment before uploading more files.',
+  },
+  standardHeaders: true,
+  legacyHeaders: true,
+});
+
+/**
+ * Auth email limiter — 3 requests / 15 minutes.
+ *
+ * Guards the endpoints that send mail (verification resend, OTP) against
+ * being used to spam a third party or exhaust the SMTP allowance.
+ */
+const authEmailLimiter = rateLimit({
+  windowMs: RATE_LIMIT.WINDOWS.FIFTEEN_MINUTES,
+  max: 3,
+  skip: shouldSkip,
+  message: {
+    success: false,
+    error: 'Too many requests. Please try again after 15 minutes.',
+  },
+  standardHeaders: true,
+  legacyHeaders: true,
+});
+
+/**
+ * Exported as a callable middleware with the named limiters hung off it.
+ *
+ * Two consumer shapes exist in the tree and both are legitimate:
+ * `require('.../rateLimiter')` used directly as app-level middleware, and
+ * `const { aiLimiter } = require('.../rateLimiter')` in the route modules.
+ * A function object satisfies both, so neither side has to be rewritten.
+ */
 module.exports = rateLimiterMiddleware;
+module.exports.rateLimiterMiddleware = rateLimiterMiddleware;
+module.exports.aiLimiter = aiLimiter;
+module.exports.strictAiLimiter = strictAiLimiter;
+module.exports.authEmailLimiter = authEmailLimiter;

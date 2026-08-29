@@ -259,6 +259,8 @@ router.post(
 );
 
 // Log out the current user
+router.post('/logout', logout);
+
 // Log out the authenticated user from all devices
 router.post('/logout-all', protect, logoutAll);
 // Retrieve the authenticated user's profile

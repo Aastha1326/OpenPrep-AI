@@ -9,30 +9,18 @@ class RedisService {
   connect() {
     if (this.client) return this.client;
 
-    const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
-    
-    // Lazy mode: don't crash if Redis is unavailable, just log it
-    this.client = new Redis(redisUrl, {
-      maxRetriesPerRequest: 1,
-      retryStrategy(times) {
-        if (times > 3) {
-          console.warn('Redis is unreachable. Falling back to DB only.');
-          return null; // Stop retrying
-        }
-        return Math.min(times * 50, 2000);
-      }
-    });
+    const redisSentinelService = require('./redisSentinelService');
+    this.client = redisSentinelService.connect();
 
-    this.client.on('error', (err) => {
-      console.warn('Redis Connection Error:', err.message);
+    this.client.on('error', () => {
       this.isReady = false;
     });
 
     this.client.on('ready', () => {
-      console.log('Redis connected successfully');
       this.isReady = true;
     });
 
+    this.isReady = redisSentinelService.isReady;
     return this.client;
   }
 
@@ -81,8 +69,66 @@ class RedisService {
     }
   }
 
-  async del(keyPattern) {
-    if (!this.isReady) return;
+  async zadd(key, score, member) {
+    if (!this.isReady) return false;
+
+    try {
+      await this.client.zadd(key, score, member);
+      return true;
+    } catch (error) {
+      console.warn('Redis ZAdd Error:', error.message);
+      return false;
+    }
+  }
+
+  async zscore(key, member) {
+    if (!this.isReady) return null;
+
+    try {
+      return await this.client.zscore(key, member);
+    } catch (error) {
+      console.warn('Redis ZScore Error:', error.message);
+      return null;
+    }
+  }
+
+  async zrevrank(key, member) {
+    if (!this.isReady) return null;
+
+    try {
+      return await this.client.zrevrank(key, member);
+    } catch (error) {
+      console.warn('Redis ZRevRank Error:', error.message);
+      return null;
+    }
+  }
+
+  async zrangeWithScores(key) {
+    if (!this.isReady) return [];
+
+    try {
+      return await this.client.zrange(
+        key,
+        0,
+        -1,
+        'WITHSCORES'
+      );
+    } catch (error) {
+      console.warn('Redis ZRange Error:', error.message);
+      return [];
+    }
+  }
+
+  async zcard(key) {
+    if (!this.isReady) return 0;
+
+    try {
+      return await this.client.zcard(key);
+    } catch (error) {
+      console.warn('Redis ZCard Error:', error.message);
+      return 0;
+    }
+  }    if (!this.isReady) return;
     try {
       // In a clustered environment, KEYS is bad, but for a single instance it's okay for our scope.
       const keys = await this.client.keys(keyPattern);
