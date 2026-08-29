@@ -23,7 +23,7 @@ const { strictAiLimiter } = require('../middleware/rateLimiter');
 const { checkQuota } = require('../middleware/quotaMiddleware');
 const upload = require('../middleware/upload');
 const { validateUploadPYQ, validateGetPYQClusters } = require('../middleware/validators');
-const cacheMiddleware = require('../middleware/cache');
+const cacheMiddleware = require('../middleware/cacheMiddleware');
 const clearCache = require('../middleware/clearCache');
 
 const router = express.Router();
@@ -67,9 +67,9 @@ router.post('/parse-pyq-pdf', protect, parsePdfUpload.single('pdf'), parsePyqPdf
  *       200:
  *         description: Upcoming forecast generated successfully
  */
-router.get('/forecast', protect, getUpcomingForecast);
+router.get('/forecast', protect, cacheMiddleware((req) => `openprep:cache:exam:${req.query.examId || req.query.subjectId || 'global'}:forecast:${req.originalUrl}`, 3600), getUpcomingForecast);
 
-router.get('/trends', protect, getPYQTrends);
+router.get('/trends', protect, cacheMiddleware((req) => `openprep:cache:exam:${req.query.examId || req.query.subjectId || 'global'}:trends:${req.originalUrl}`, 900), getPYQTrends);
 /**
  * @swagger
  * tags:

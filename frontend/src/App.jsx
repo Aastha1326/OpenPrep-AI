@@ -12,7 +12,7 @@ import SessionTimeoutModal from './components/SessionTimeoutModal';
 import SessionRestoreModal from './components/SessionRestoreModal';
 import API from './services/api';
 import QuotaExceededModal from './components/dashboard/QuotaExceededModal';
-import CommandPalette from './components/search/CommandPalette';
+import GlobalSearchModal from './components/search/GlobalSearchModal';
 import OfflineBanner from './components/common/OfflineBanner';
 import OfflineStatusBanner from './components/common/OfflineStatusBanner';
 import PwaInstallPrompt from './components/common/PwaInstallPrompt';
@@ -59,6 +59,9 @@ const StudySquadDashboard = lazy(() => import('./pages/SquadsPage'));
 const CollabNote = lazy(() => import('./pages/CollaborativeNoteView'));
 const LiveQuizSession = lazy(() => import('./pages/LiveQuizSession'));
 const InterviewRoomPage = lazy(() => import('./pages/InterviewRoomPage'));
+const StudyAnalytics = lazy(() => import('./pages/StudyAnalytics'));
+const ExamCountdownPlanner = lazy(() => import('./pages/ExamCountdownPlanner'));
+const FormulaScratchpad = lazy(() => import('./pages/FormulaScratchpad'));
 
 function App() {
 
@@ -179,7 +182,7 @@ function App() {
       <QuotaExceededModal />
       <SessionTimeoutModal />
       <Walkthrough />
-      <CommandPalette isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+      <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
       {localStorage.getItem('token') && <PomodoroWidget />}
       <main id="main-content" tabIndex="-1" role="main" className="focus:outline-none min-h-screen">
         <Suspense fallback={<PageSkeleton />}>
@@ -319,6 +322,15 @@ function App() {
           />
 
           <Route
+            path="/revision-scheduler"
+            element={
+              <ProtectedRoute>
+                <RevisionScheduler />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/viva-simulator"
             element={
               <ProtectedRoute>
@@ -366,7 +378,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/analytics"
             element={
@@ -375,29 +386,8 @@ function App() {
               </ProtectedRoute>
             }
           />
-
-          <Route
-            path="/analytics"
-            element={
-              <ProtectedRoute>
-                <StudyAnalytics />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            
           <Route
             path="/exam-planner"
-            element={
-              <ProtectedRoute>
-                <ExamCountdownPlanner />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/tools/calculator"
             element={
               <ProtectedRoute>
                 <FormulaScratchpad />
@@ -433,15 +423,6 @@ function App() {
           />
 
           <Route
-            path="/squads"
-            element={
-              <ProtectedRoute>
-                <SquadsPage />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
             path="/interview"
             element={
               <ProtectedRoute>
@@ -454,6 +435,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <InterviewRoomPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/streak-dashboard"
+            element={
+              <ProtectedRoute>
+                <StreakDashboard />
               </ProtectedRoute>
             }
           />

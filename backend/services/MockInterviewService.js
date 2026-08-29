@@ -1,11 +1,19 @@
 const MockInterview = require('../models/MockInterview');
-
+const {
+    parseAndValidateFeedback,
+} = require('./interviewFeedbackProvenanceService');const EvaluationVersion = require('../models/EvaluationVersion');
+const {
+    getActiveEvaluationVersion,
+    getEvaluationVersion,
+    evaluateInterview,
+} = require('./interviewEvaluationEngine');
 class MockInterviewService {
     /**
      * Initializes a new AI interview session
      */
     static async initiateSession(userId, configuration) {
         const { targetCompany, jobRole, difficultyLevel } = configuration;
+        const evaluationVersion = await getActiveEvaluationVersion();
 
         const session = await MockInterview.create({
             userId,
@@ -13,12 +21,12 @@ class MockInterviewService {
             jobRole,
             difficultyLevel,
             status: 'Scheduled',
-            transcript: []
+            transcript: [],
+            evaluationVersionId: evaluationVersion.id,
         });
 
         return session;
     }
-
     /**
      * Starts the session, updating status and tracking time
      */
@@ -100,25 +108,165 @@ class MockInterviewService {
      * Finalizes the session, generating scoring telemetry
      */
     static async concludeSession(sessionId, userId) {
-        const session = await MockInterview.findOne({ where: { id: sessionId, userId } });
+        const session = await MockInterview.findOne({
+            where: { id: sessionId, userId },
+        });
+
         if (!session) throw new Error('Session not found');
 
+        if (session.status === 'Completed') {
+            throw new Error('Interview has already been evaluated');
+        }
+
+        if (!session.evaluationVersionId) {
+            throw new Error('Interview evaluation version is missing');
+        }
+
+        const evaluationVersion = await EvaluationVersion.findByPk(
+            session.evaluationVersionId
+        );
+
+        if (!evaluationVersion) {
+            throw new Error('Interview evaluation version not found');
+        }
+
+        const evaluation = await evaluateInterview(
+            session.transcript || [],
+            session.confidenceMetrics || [],
+            evaluationVersion
+        );
+
         session.status = 'Completed';
+        session.overallScore = evaluation.overallScore;
+        session.technicalScore = evaluation.technicalScore;
+        session.communicationScore = evaluation.communicationScore;
+        session.feedbackSummary = evaluation.feedbackSummary;
 
-        // Generate simulated scoring based on transcript size
-        const msgCount = (session.transcript || []).length;
-        const baseline = msgCount > 6 ? 85 : 65;
+        session.evaluationSnapshot = {
+            version: evaluationVersion.version,
+            description: evaluationVersion.description,
+            weights: evaluationVersion.weights,
+            rubric: evaluationVersion.rubric,
+            rules: evaluationVersion.rules,
+            scores: evaluation,
+        };
+const feedback = {
+            strengths: [
+                {
+                    text: 'Demonstrated understanding of the interview topic.',
+                    evidenceRefs: session.transcript
+                        .map((message, transcriptIndex) => ({
+                            message,
+                            transcriptIndex,
+                        }))
+                        .filter(({ message }) => message.role === 'user')
+                        .slice(0, 1)
+                        .map(({ transcriptIndex }) => ({ transcriptIndex })),
+                },
+            ],
+            weaknesses: [
+                {
+                    text: 'Some responses could be more structured.',
+                    evidenceRefs: session.transcript
+                        .map((message, transcriptIndex) => ({
+                            message,
+                            transcriptIndex,
+                        }))
+                        .filter(({ message }) => message.role === 'user')
+                        .slice(0, 1)
+                        .map(({ transcriptIndex }) => ({ transcriptIndex })),
+                },
+            ],
+            recommendations: [
+                {
+                    text: 'Use STAR-format answers to make responses more structured.',
+                    evidenceRefs: session.transcript
+                        .map((message, transcriptIndex) => ({
+                            message,
+                            transcriptIndex,
+                        }))
+                        .filter(({ message }) => message.role === 'user')
+                        .slice(0, 1)
+                        .map(({ transcriptIndex }) => ({ transcriptIndex })),
+                },
+            ],
+            confidence: 0.8,
+        };
 
-        session.overallScore = Math.min(100, baseline + Math.floor(Math.random() * 10));
-        session.technicalScore = Math.min(100, baseline + Math.floor(Math.random() * 12));
-        session.communicationScore = Math.min(100, baseline + Math.floor(Math.random() * 8));
+        session.feedbackSummary =
+            'You demonstrated a solid understanding of fundamental principles. Focus on providing STAR-format answers and managing pauses more effectively.';
 
-        session.feedbackSummary = `You demonstrated a solid understanding of fundamental principles. Focus on providing STAR-format answers and managing pauses more effectively.`;
+        session.feedbackProvenance = parseAndValidateFeedback(
+            feedback,
+            session.transcript || []
+        );
 
-        await session.save(); // Triggers beforeSave hook for duration calculation
+await session.save(); // Triggers beforeSave hook for duration calculation
 
-        return session;
+// Update only the ranking partitions affected by this evaluation.
+const {
+    updateCandidateRanking,
+} = require('./candidateRankingService');
+
+await updateCandidateRanking(session);
+
+return session;    }
+
+    static async getEvaluationMetadata(sessionId, userId) {
+        const session = await MockInterview.findOne({
+            where: { id: sessionId, userId },
+            include: [{
+                model: EvaluationVersion,
+                as: 'evaluationVersion',
+            }],
+        });
+
+        if (!session) throw new Error('Session not found');
+
+        return {
+            interviewId: session.id,
+            evaluationVersion: session.evaluationVersion
+                ? {
+                    version: session.evaluationVersion.version,
+                    description: session.evaluationVersion.description,
+                    weights: session.evaluationVersion.weights,
+                    rubric: session.evaluationVersion.rubric,
+                    rules: session.evaluationVersion.rules,
+                }
+                : null,
+            evaluationSnapshot: session.evaluationSnapshot,
+            scores: {
+                overallScore: session.overallScore,
+                technicalScore: session.technicalScore,
+                communicationScore: session.communicationScore,
+            },
+        };
     }
-}
+
+    static async compareEvaluationVersions(sessionId, userId, version) {
+        const session = await MockInterview.findOne({
+            where: { id: sessionId, userId },
+        });
+
+        if (!session) throw new Error('Session not found');
+
+        const requestedVersion = await getEvaluationVersion(version);
+
+        const comparison = await evaluateInterview(
+            session.transcript || [],
+            session.confidenceMetrics || [],
+            requestedVersion
+        );
+
+        return {
+            interviewId: session.id,
+            historicalEvaluation: session.evaluationSnapshot,
+            comparedVersion: {
+                version: requestedVersion.version,
+                description: requestedVersion.description,
+            },
+            comparison,
+        };
+    }}
 
 module.exports = MockInterviewService;

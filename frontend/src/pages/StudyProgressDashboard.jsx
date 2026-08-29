@@ -338,8 +338,11 @@ const PredictionsTab = ({ predictions, peerComparison }) => (
   </div>
 );
 
-const GoalsTab = ({ goals, milestones }) => {
+const GoalsTab = ({ goals, milestones, realMilestones, milestoneFilter, setMilestoneFilter, onClaimMilestone, claimingId }) => {
   const completedGoals = goals.filter(g => g.current >= g.target).length;
+  
+  const displayMilestones = realMilestones && realMilestones.length > 0 ? realMilestones : milestones;
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -376,14 +379,22 @@ const GoalsTab = ({ goals, milestones }) => {
 
         <div className="glass-card rounded-2xl p-5 border border-white/20 dark:border-white/5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Milestones</h3>
-            <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-2 py-1 rounded-full font-medium">
-              {milestones.filter(m => m.isNew).length} new
-            </span>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              Milestones
+            </h3>
+            <select
+              value={milestoneFilter}
+              onChange={(e) => setMilestoneFilter(e.target.value)}
+              className="text-xs bg-gray-100 dark:bg-gray-800 border-none rounded px-2 py-1 outline-none text-gray-700 dark:text-gray-300 cursor-pointer"
+            >
+              <option value="all">All</option>
+              <option value="pending">Pending</option>
+              <option value="completed">Completed</option>
+            </select>
           </div>
           <div className="space-y-1 max-h-[250px] overflow-y-auto pr-1">
-            {milestones.map((m, i) => (
-              <MilestoneCard key={m.id} milestone={m} delay={i * 0.03} />
+            {displayMilestones.map((m, i) => (
+              <MilestoneCard key={m.id} milestone={m} delay={i * 0.03} onClaim={onClaimMilestone} claimingId={claimingId} />
             ))}
           </div>
         </div>
@@ -392,11 +403,17 @@ const GoalsTab = ({ goals, milestones }) => {
   );
 };
 
+import { useEffect } from 'react';
+
 const StudyProgressDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [view, setView] = useState('grid');
+  
+  const [realMilestones, setRealMilestones] = useState([]);
+  const [milestoneFilter, setMilestoneFilter] = useState('all');
+  const [claimingId, setClaimingId] = useState(null);
 
   const dailyData = useMemo(() => generateDailyStudyData(90), []);
   const weeklyData = useMemo(() => generateWeeklySummary(12), []);
@@ -409,10 +426,48 @@ const StudyProgressDashboard = () => {
   const peerComparison = useMemo(() => generatePeerComparison(), []);
   const stats = useMemo(() => generateOverallStats(), []);
 
+  useEffect(() => {
+    let isMounted = true;
+    const fetchMilestones = async () => {
+      try {
+        const { default: API } = await import('../../services/api');
+        const statusParam = milestoneFilter === 'all' ? undefined : milestoneFilter;
+        const res = await API.get('/milestones', { params: { status: statusParam } });
+        if (isMounted && res.data.success) {
+          setRealMilestones(res.data.data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch milestones', err);
+      }
+    };
+    fetchMilestones();
+    return () => { isMounted = false; };
+  }, [milestoneFilter]);
+
+  const handleClaimMilestone = async (id) => {
+    try {
+      setClaimingId(id);
+      const { default: API } = await import('../../services/api');
+      const res = await API.put(`/milestones/${id}/claim`);
+      if (res.data.success) {
+        // Refresh milestones
+        const statusParam = milestoneFilter === 'all' ? undefined : milestoneFilter;
+        const fetchRes = await API.get('/milestones', { params: { status: statusParam } });
+        if (fetchRes.data.success) {
+          setRealMilestones(fetchRes.data.data);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setClaimingId(null);
+    }
+  };
+
   const renderTab = () => {
     switch (activeTab) {
       case 'overview':
-        return <OverviewTab dailyData={dailyData} weeklyData={weeklyData} subjects={subjects} stats={stats} leaderboard={leaderboard} milestones={milestones} />;
+        return <OverviewTab dailyData={dailyData} weeklyData={weeklyData} subjects={subjects} stats={stats} leaderboard={leaderboard} milestones={realMilestones.length ? realMilestones : milestones} />;
       case 'subjects':
         return <SubjectsTab subjects={subjects} search={search} filter={filter} />;
       case 'activity':
@@ -422,7 +477,15 @@ const StudyProgressDashboard = () => {
       case 'predictions':
         return <PredictionsTab predictions={predictions} peerComparison={peerComparison} />;
       case 'goals':
-        return <GoalsTab goals={goals} milestones={milestones} />;
+        return <GoalsTab 
+                  goals={goals} 
+                  milestones={milestones} 
+                  realMilestones={realMilestones}
+                  milestoneFilter={milestoneFilter}
+                  setMilestoneFilter={setMilestoneFilter}
+                  onClaimMilestone={handleClaimMilestone}
+                  claimingId={claimingId}
+               />;
       default:
         return null;
     }

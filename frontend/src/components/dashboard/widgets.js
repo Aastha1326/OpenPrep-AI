@@ -6,6 +6,7 @@ import SubjectMasteryWidget from './SubjectMasteryWidget';
 import ActivityHeatmap from './ActivityHeatmap';
 import ReadinessWidget from './ReadinessWidget';
 import FlashcardWidget from './FlashcardWidget';
+import ActivityFeed from './ActivityFeed';
 
 export {
   ProgressChartWidget,
@@ -16,6 +17,7 @@ export {
   ActivityHeatmap,
   ReadinessWidget,
   FlashcardWidget,
+  ActivityFeed,
 };
 
 export const WIDGET_COMPONENT_MAP = {
@@ -27,4 +29,5 @@ export const WIDGET_COMPONENT_MAP = {
   RecentActivity: ActivityHeatmap,
   ReadinessWidget: ReadinessWidget,
   FlashcardWidget: FlashcardWidget,
+  ActivityFeed: ActivityFeed,
 };

@@ -3,6 +3,11 @@ import dashboardReducer, {
   reviewFlashcard,
   toggleTheme,
   setTheme,
+  addWidget,
+  removeWidget,
+  resizeWidget,
+  resetDashboardLayout,
+  DEFAULT_LAYOUT,
 } from './dashboardSlice';
 import API from '../../services/api.js';
 
@@ -157,7 +162,6 @@ describe('dashboardSlice - layout management', () => {
   });
 
   test('adds a new widget to layout and persists to localStorage', () => {
-    const { addWidget } = require('./dashboardSlice');
     const store = configureStore({ reducer: { dashboard: dashboardReducer } });
 
     const initialCount = store.getState().dashboard.layout.length;
@@ -173,7 +177,6 @@ describe('dashboardSlice - layout management', () => {
   });
 
   test('removes a widget from layout', () => {
-    const { removeWidget } = require('./dashboardSlice');
     const store = configureStore({ reducer: { dashboard: dashboardReducer } });
 
     store.dispatch(removeWidget('progress-chart'));
@@ -183,7 +186,6 @@ describe('dashboardSlice - layout management', () => {
   });
 
   test('resizes a widget colSpan in layout', () => {
-    const { resizeWidget } = require('./dashboardSlice');
     const store = configureStore({ reducer: { dashboard: dashboardReducer } });
 
     store.dispatch(resizeWidget({ id: 'progress-chart', colSpan: 12 }));
@@ -193,7 +195,6 @@ describe('dashboardSlice - layout management', () => {
   });
 
   test('resets layout to DEFAULT_LAYOUT', () => {
-    const { resetDashboardLayout, removeWidget, DEFAULT_LAYOUT } = require('./dashboardSlice');
     const store = configureStore({ reducer: { dashboard: dashboardReducer } });
 
     store.dispatch(removeWidget('progress-chart'));
