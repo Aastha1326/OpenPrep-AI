@@ -300,6 +300,11 @@ examCountdownPreferences: {
       allowNull: false,
       defaultValue: 'Asia/Kolkata',
     },
+    eloRating: {
+      type: DataTypes.INTEGER,
+      defaultValue: 1200,
+      allowNull: false,
+    },
   },
   {
     timestamps: true,
@@ -318,6 +323,49 @@ examCountdownPreferences: {
 User.prototype.matchPassword = async function (enteredPassword) {
   if (!this.password) return false;
   return await bcrypt.compare(enteredPassword, this.password);
+};
+
+// Calculate and apply post-match ELO changes
+User.adjustRatings = async function (winnerId, loserId, kFactor = 32) {
+  const winner = typeof this.findByPk === 'function' ? await this.findByPk(winnerId) : await this.findById(winnerId);
+  const loser = typeof this.findByPk === 'function' ? await this.findByPk(loserId) : await this.findById(loserId);
+
+  const winnerElo = winner ? (winner.eloRating !== undefined && winner.eloRating !== null ? winner.eloRating : 1200) : 1200;
+  const loserElo = loser ? (loser.eloRating !== undefined && loser.eloRating !== null ? loser.eloRating : 1200) : 1200;
+
+  const expectedWinner = 1 / (1 + Math.pow(10, (loserElo - winnerElo) / 400));
+  const expectedLoser = 1 / (1 + Math.pow(10, (winnerElo - loserElo) / 400));
+
+  const newWinnerElo = Math.round(winnerElo + kFactor * (1 - expectedWinner));
+  const newLoserElo = Math.round(loserElo + kFactor * (0 - expectedLoser));
+
+  if (winner) {
+    if (typeof winner.update === 'function') {
+      await winner.update({ eloRating: newWinnerElo });
+    } else {
+      winner.eloRating = newWinnerElo;
+      if (typeof winner.save === 'function') await winner.save();
+    }
+  } else if (typeof this.findByIdAndUpdate === 'function') {
+    await this.findByIdAndUpdate(winnerId, { eloRating: newWinnerElo });
+  }
+
+  if (loser) {
+    if (typeof loser.update === 'function') {
+      await loser.update({ eloRating: newLoserElo });
+    } else {
+      loser.eloRating = newLoserElo;
+      if (typeof loser.save === 'function') await loser.save();
+    }
+  } else if (typeof this.findByIdAndUpdate === 'function') {
+    await this.findByIdAndUpdate(loserId, { eloRating: newLoserElo });
+  }
+
+  return { newWinnerElo, newLoserElo };
+};
+
+User.statics = {
+  adjustRatings: User.adjustRatings,
 };
 
 module.exports = User;

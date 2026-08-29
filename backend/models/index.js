@@ -1,7 +1,22 @@
 const { sequelize } = require('../config/db');
 
 // Import all models
-const User = require('./User');
+const User = require('./User')(sequelize, DataTypes);
+const Quiz = require('./Quiz')(sequelize, DataTypes);
+const AIUsageLog = require('./AIUsageLog')(sequelize, DataTypes);
+const ProviderHealthStatus = require('./ProviderHealthStatus')(sequelize, DataTypes);
+// ... other models
+module.exports = {
+  User,
+  Quiz,
+  AIUsageLog,
+  ProviderHealthStatus,
+  // ... other exports
+};const SchedulerVersion = require('./SchedulerVersion');
+const FlashcardSchedulingState = require('./FlashcardSchedulingState');
+const FlashcardReviewHistory = require('./FlashcardReviewHistory');
+const ReviewSubmissionToken = require('./ReviewSubmissionToken');
+const QuizValidationLog = require('./QuizValidationLog');
 const Folder = require('./Folder');
 const Exam = require('./Exam');
 const Subject = require('./Subject');
@@ -41,6 +56,9 @@ const Notification = require('./Notification');
 const PushSubscription = require('./PushSubscription');
 const ReadinessSnapshot = require('./ReadinessSnapshot');
 const SubjectGoal = require('./SubjectGoal');
+const StudyHabit = require('./StudyHabit');
+const HabitLog = require('./HabitLog');
+const HabitStreak = require('./HabitStreak');
 const StudySquad = require('./StudySquad');
 const SquadMember = require('./SquadMember');
 const SquadChallenge = require('./SquadChallenge');
@@ -361,11 +379,17 @@ StudyGoalProgress.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 User.hasMany(WeeklyStudyReport, { foreignKey: 'user', onDelete: 'CASCADE' });
 WeeklyStudyReport.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 
-// StudyMilestone & UserMilestone associations
-User.hasMany(UserMilestone, { foreignKey: 'userId', as: 'milestones', onDelete: 'CASCADE' });
-UserMilestone.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
-StudyMilestone.hasMany(UserMilestone, { foreignKey: 'milestoneId', as: 'userProgress', onDelete: 'CASCADE' });
-UserMilestone.belongsTo(StudyMilestone, { foreignKey: 'milestoneId', as: 'milestoneRef' });
+// StudyHabit, HabitLog & HabitStreak associations
+User.hasMany(StudyHabit, { foreignKey: 'userId', as: 'habits', onDelete: 'CASCADE' });
+StudyHabit.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+StudyHabit.hasMany(HabitLog, { foreignKey: 'habitId', as: 'logs', onDelete: 'CASCADE' });
+HabitLog.belongsTo(StudyHabit, { foreignKey: 'habitId', as: 'habitRef' });
+User.hasMany(HabitLog, { foreignKey: 'userId', as: 'habitLogs', onDelete: 'CASCADE' });
+HabitLog.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+StudyHabit.hasOne(HabitStreak, { foreignKey: 'habitId', as: 'streak', onDelete: 'CASCADE' });
+HabitStreak.belongsTo(StudyHabit, { foreignKey: 'habitId', as: 'habitRef' });
+User.hasMany(HabitStreak, { foreignKey: 'userId', as: 'habitStreaks', onDelete: 'CASCADE' });
+HabitStreak.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 
 // WeaknessReport associations
 User.hasMany(WeaknessReport, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -405,6 +429,10 @@ module.exports = {
   QuizAttempt,
   Note,
   Question,
+    SchedulerVersion,
+  FlashcardSchedulingState,
+  FlashcardReviewHistory,
+  ReviewSubmissionToken,
   QuestionComment,
   DoubtSession,
   DoubtSessionMessage,
@@ -422,6 +450,7 @@ module.exports = {
   UsageQuota,
   Achievement,
   FocusSession,
+    QuizValidationLog,
   QuizTelemetryEvent,
   QuizBookmark,
   DeckRating,
@@ -448,6 +477,9 @@ module.exports = {
   SquadAchievement,
   SquadActivity,
   SquadActivityReaction,
+  StudyHabit,
+  HabitLog,
+  HabitStreak,
   Syllabus,
   SyllabusTopic,
   PDFAnnotation,

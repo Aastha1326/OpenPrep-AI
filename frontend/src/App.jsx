@@ -458,6 +458,7 @@ function App() {
           <Route path="/drug-interactions" element={<DrugInteractionChecker />} />
           <Route path="/exam-countdown" element={<ExamCountdownPlanner />} />
           <Route path="/clinical-notes" element={<ClinicalNotesSummarizer />} />
+          <Route path="/patient-simulator" element={<PatientSimulator />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>

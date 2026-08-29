@@ -239,7 +239,15 @@ app.use(compression({
   level: 6, // balanced gzip compression
   threshold: 0,
 }));
+// Existing middleware setup
+app.use(express.json());
+app.use(cors(corsOptions));
+app.use(requestLogger);
 
+// AI Usage Budget middleware
+const { checkAIBudget, recordUsageAfterRequest } = require('./middleware/aiUsageBudgetMiddleware');
+app.use(checkAIBudget);
+app.use(recordUsageAfterRequest);
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
@@ -443,10 +451,8 @@ app.use('/api/learning-path', require('./routes/learningPathRoutes'));
 app.use('/user/learning-path', require('./routes/learningPathRoutes'));
 const studyGoalRoutes = require('./routes/studyGoalRoutes');
 app.use('/api/study-goals', studyGoalRoutes);
-const breakRecommendationRoutes = require('./routes/breakRecommendationRoutes');
-app.use('/api/break-recommendations', breakRecommendationRoutes);
-const milestoneRewardRoutes = require('./routes/milestoneRewardRoutes');
-app.use('/api/milestone-rewards', milestoneRewardRoutes);
+const habitTrackerRoutes = require('./routes/habitTrackerRoutes');
+app.use('/api/habits', habitTrackerRoutes);
 app.use('/api/interviews', mockInterviewRoutes);
 // Serve static assets from frontend build folder in production
 if (process.env.NODE_ENV === 'production') {
