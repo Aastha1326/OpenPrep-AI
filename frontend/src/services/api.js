@@ -401,7 +401,10 @@ export const sendDoubtMessage = (sessionId, message) =>
  * Reveal the next progressive hint for a doubt session.
  * POST /api/doubts/:id/reveal-step
  */
-export const revealDoubtStep = (sessionId) =>
-  API.post(`/doubts/${sessionId}/reveal-step`);
+// ── Smart Focus & Adaptive Pomodoro Timer APIs ──────────────────────
+export const getAdaptiveFocusRecommendation = () => API.get('/focus/recommendation');
+export const logFocusSession = (data) => API.post('/focus/sessions', data);
+export const getFocusStats = () => API.get('/focus/stats');
 
 export default API;
+
