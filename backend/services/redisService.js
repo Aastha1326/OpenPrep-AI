@@ -128,15 +128,29 @@ class RedisService {
       console.warn('Redis ZCard Error:', error.message);
       return 0;
     }
-  }    if (!this.isReady) return;
+  }
+
+  /**
+   * Delete every key matching a glob pattern.
+   *
+   * cacheService.invalidate() calls this with patterns like
+   * `openprep:cache:quiz:*`, so a miss here silently serves stale quiz and
+   * summary payloads rather than failing loudly. Resolves to the number of
+   * keys removed so a caller can log what an invalidation actually did.
+   */
+  async del(keyPattern) {
+    if (!this.isReady) return 0;
+
     try {
       // In a clustered environment, KEYS is bad, but for a single instance it's okay for our scope.
       const keys = await this.client.keys(keyPattern);
       if (keys.length > 0) {
         await this.client.del(keys);
       }
+      return keys.length;
     } catch (error) {
       console.warn('Redis Del Error:', error.message);
+      return 0;
     }
   }
 }
