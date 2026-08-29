@@ -82,6 +82,11 @@ const ExamIntegrityReport = require('./ExamIntegrityReport');
 const { Bounty, initBounty } = require('./Bounty');
 const { BountySolution, initBountySolution } = require('./BountySolution');
 const { BountySolutionVote, initBountySolutionVote } = require('./BountySolutionVote');
+const StudyGoal = require('./StudyGoal');
+const StudyGoalProgress = require('./StudyGoalProgress');
+const WeeklyStudyReport = require('./WeeklyStudyReport');
+const StudyMilestone = require('./StudyMilestone');
+const UserMilestone = require('./UserMilestone');
 const { ModeratorAuditLog, initModeratorAuditLog } = require('./ModeratorAuditLog');
 
 initBounty(sequelize);
@@ -452,6 +457,8 @@ module.exports = {
   StudyGoal,
   StudyGoalProgress,
   WeeklyStudyReport,
+  StudyMilestone,
+  UserMilestone,
   FocusSessionLog,
   UserBadge,
   Badge,
