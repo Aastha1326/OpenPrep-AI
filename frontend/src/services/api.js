@@ -397,11 +397,10 @@ export const startDoubtSession = (formData) =>
 export const sendDoubtMessage = (sessionId, message) =>
   API.post(`/doubts/${sessionId}/message`, { message });
 
-/**
- * Reveal the next progressive hint for a doubt session.
- * POST /api/doubts/:id/reveal-step
- */
-export const revealDoubtStep = (sessionId) =>
-  API.post(`/doubts/${sessionId}/reveal-step`);
+// ── Two-Way Calendar Synchronization APIs ──────────────────────────
+export const getCalendarSyncStatus = () => API.get('/calendar-sync/status');
+export const linkOutlookCalendar = (data) => API.post('/calendar-sync/outlook/link', data);
+export const checkCalendarConflicts = (data) => API.post('/calendar-sync/check-conflicts', data);
 
 export default API;
+

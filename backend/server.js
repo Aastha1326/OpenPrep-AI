@@ -109,6 +109,8 @@ const classroomRoutes = require('./routes/classroomRoutes');
 const studyReminderRoutes = require('./routes/studyReminderRoutes');
 const sessionRoutes = require('./routes/sessionRoutes');
 const recommendationRoutes = require('./routes/recommendationRoutes');
+const calendarSyncRoutes = require('./routes/calendarSyncRoutes');
+
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 const { initNightlyBadgeEvaluatorCron } = require('./services/badgeEvaluationService');
@@ -363,6 +365,8 @@ app.get(['/uploads/:filename', '/uploads/podcasts/:filename'], protect, async (r
 
 // Mount routes
 app.use('/api/auth', authRoutes);
+app.use('/api/calendar-sync', calendarSyncRoutes);
+
 app.use('/api/session', sessionRoutes);
 app.use('/session', sessionRoutes);
 app.post('/api/session/keepalive', protect, require('./controllers/authController').keepalive);
