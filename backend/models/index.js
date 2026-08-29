@@ -58,6 +58,8 @@ const { BountySolutionVote, initBountySolutionVote } = require('./BountySolution
 const StudyGoal = require('./StudyGoal');
 const StudyGoalProgress = require('./StudyGoalProgress');
 const WeeklyStudyReport = require('./WeeklyStudyReport');
+const StudyMilestone = require('./StudyMilestone');
+const UserMilestone = require('./UserMilestone');
 
 initBounty(sequelize);
 initBountySolution(sequelize);
@@ -305,6 +307,13 @@ StudyGoalProgress.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 // WeeklyStudyReport associations
 User.hasMany(WeeklyStudyReport, { foreignKey: 'user', onDelete: 'CASCADE' });
 WeeklyStudyReport.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
+// StudyMilestone & UserMilestone associations
+User.hasMany(UserMilestone, { foreignKey: 'userId', as: 'milestones', onDelete: 'CASCADE' });
+UserMilestone.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+StudyMilestone.hasMany(UserMilestone, { foreignKey: 'milestoneId', as: 'userProgress', onDelete: 'CASCADE' });
+UserMilestone.belongsTo(StudyMilestone, { foreignKey: 'milestoneId', as: 'milestoneRef' });
+
 // DeckRating associations
 DeckRating.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 User.hasMany(DeckRating, { foreignKey: 'userId', as: 'ratings', onDelete: 'CASCADE' });
@@ -341,6 +350,8 @@ module.exports = {
   StudyGoal,
   StudyGoalProgress,
   WeeklyStudyReport,
+  StudyMilestone,
+  UserMilestone,
   UserBadge,
   Badge,
   BattleSession,

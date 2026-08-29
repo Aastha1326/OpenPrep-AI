@@ -412,6 +412,8 @@ const studyGoalRoutes = require('./routes/studyGoalRoutes');
 app.use('/api/study-goals', studyGoalRoutes);
 const breakRecommendationRoutes = require('./routes/breakRecommendationRoutes');
 app.use('/api/break-recommendations', breakRecommendationRoutes);
+const milestoneRoutes = require('./routes/milestoneRoutes');
+app.use('/api/milestones', milestoneRoutes);
 
 // Serve static assets from frontend build folder in production
 if (process.env.NODE_ENV === 'production') {
