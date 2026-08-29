@@ -1,18 +1,14 @@
+const { Sequelize, DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
 
-// Import all models
-const User = require('./User')(sequelize, DataTypes);
-const Quiz = require('./Quiz')(sequelize, DataTypes);
+// User exports a model that is already defined; AIUsageLog and
+// ProviderHealthStatus export a (sequelize, DataTypes) factory instead. Quiz is
+// required further down alongside the rest of the already-defined models.
+const User = require('./User');
 const AIUsageLog = require('./AIUsageLog')(sequelize, DataTypes);
 const ProviderHealthStatus = require('./ProviderHealthStatus')(sequelize, DataTypes);
-// ... other models
-module.exports = {
-  User,
-  Quiz,
-  AIUsageLog,
-  ProviderHealthStatus,
-  // ... other exports
-};const SchedulerVersion = require('./SchedulerVersion');
+
+const SchedulerVersion = require('./SchedulerVersion');
 const FlashcardSchedulingState = require('./FlashcardSchedulingState');
 const FlashcardReviewHistory = require('./FlashcardReviewHistory');
 const ReviewSubmissionToken = require('./ReviewSubmissionToken');
@@ -56,9 +52,9 @@ const Notification = require('./Notification');
 const PushSubscription = require('./PushSubscription');
 const ReadinessSnapshot = require('./ReadinessSnapshot');
 const SubjectGoal = require('./SubjectGoal');
-const StudyHabit = require('./StudyHabit');
-const HabitLog = require('./HabitLog');
-const HabitStreak = require('./HabitStreak');
+const StudyHabit = require('./StudyHabit')(sequelize, DataTypes);
+const HabitLog = require('./HabitLog')(sequelize, DataTypes);
+const HabitStreak = require('./HabitStreak')(sequelize, DataTypes);
 const StudySquad = require('./StudySquad');
 const SquadMember = require('./SquadMember');
 const SquadChallenge = require('./SquadChallenge');
@@ -85,9 +81,38 @@ const { BountySolutionVote, initBountySolutionVote } = require('./BountySolution
 const StudyGoal = require('./StudyGoal');
 const StudyGoalProgress = require('./StudyGoalProgress');
 const WeeklyStudyReport = require('./WeeklyStudyReport');
-const StudyMilestone = require('./StudyMilestone');
-const UserMilestone = require('./UserMilestone');
+const StudyMilestone = require('./StudyMilestone')(sequelize, DataTypes);
+const UserMilestone = require('./UserMilestone')(sequelize, DataTypes);
 const { ModeratorAuditLog, initModeratorAuditLog } = require('./ModeratorAuditLog');
+const FocusSessionLog = require('./FocusSessionLog');
+const StudyReminder = require('./StudyReminder');
+const SkillDependency = require('./SkillDependency');
+const ExamStrategy = require('./ExamStrategy');
+const StudyTip = require('./StudyTip');
+const AlumniMentorProfile = require('./AlumniMentorProfile');
+const ResumeParseSession = require('./ResumeParseSession');
+const MockInterview = require('./MockInterview');
+const SalaryNegotiation = require('./SalaryNegotiation');
+
+// Twelve more models with a file on disk, a consumer in the tree, and no entry
+// in this registry. Each consumer destructures the model straight out of
+// `require('../models')`, so an unregistered name is not a load error — it is
+// `undefined` in a variable until the first query against it throws. Same shape
+// as the ModeratorAuditLog gap noted below.
+const StudySession = require('./StudySession')(sequelize, DataTypes);
+const SharedNote = require('./SharedNote')(sequelize, DataTypes);
+const InterviewAnalytics = require('./InterviewAnalytics')(sequelize, DataTypes);
+const PodcastEpisode = require('./PodcastEpisode');
+const PlanRevisionMetadata = require('./PlanRevisionMetadata');
+const StudyPlanVersion = require('./StudyPlanVersion');
+const StudyTask = require('./StudyTask');
+const SavedSession = require('./SavedSession');
+const VivaSession = require('./VivaSession');
+const { Sponsor, initSponsor } = require('./Sponsor');
+const { JobApplication, initJobApplication } = require('./JobApplication');
+const { JobOpportunity, initJobOpportunity } = require('./JobOpportunity');
+const { AnalyticsEvent, initAnalyticsEvent } = require('./AnalyticsEvent');
+const { BountyClaim, initBountyClaim } = require('./BountyClaim');
 
 initBounty(sequelize);
 initBountySolution(sequelize);
@@ -96,6 +121,11 @@ initBountySolutionVote(sequelize);
 // Without the init and the export below it resolved to undefined, so every
 // moderation-log read and write in that service threw on first call.
 initModeratorAuditLog(sequelize);
+initSponsor(sequelize);
+initJobApplication(sequelize);
+initJobOpportunity(sequelize);
+initAnalyticsEvent(sequelize);
+initBountyClaim(sequelize);
 
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -418,6 +448,9 @@ embeddingsProcessor.registerWorkerHandler({ Note, Quiz });
 
 module.exports = {
   sequelize,
+  // aiUsageBudgetService reaches for `db.Sequelize.Op`; without this the
+  // registry hands it undefined and every budget query throws.
+  Sequelize,
   User,
   Folder,
   Exam,
@@ -429,7 +462,7 @@ module.exports = {
   QuizAttempt,
   Note,
   Question,
-    SchedulerVersion,
+  SchedulerVersion,
   FlashcardSchedulingState,
   FlashcardReviewHistory,
   ReviewSubmissionToken,
@@ -450,7 +483,7 @@ module.exports = {
   UsageQuota,
   Achievement,
   FocusSession,
-    QuizValidationLog,
+  QuizValidationLog,
   QuizTelemetryEvent,
   QuizBookmark,
   DeckRating,
@@ -504,4 +537,20 @@ module.exports = {
   ResumeParseSession,
   MockInterview,
   SalaryNegotiation,
+  AIUsageLog,
+  ProviderHealthStatus,
+  StudySession,
+  SharedNote,
+  InterviewAnalytics,
+  PodcastEpisode,
+  PlanRevisionMetadata,
+  StudyPlanVersion,
+  StudyTask,
+  SavedSession,
+  VivaSession,
+  Sponsor,
+  JobApplication,
+  JobOpportunity,
+  AnalyticsEvent,
+  BountyClaim,
 };
