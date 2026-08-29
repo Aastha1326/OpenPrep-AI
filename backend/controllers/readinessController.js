@@ -189,7 +189,16 @@ exports.recalculateReadiness = async (req, res, next) => {
 exports.getReadinessProjection = async (req, res, next) => {
   try {
     const userId = req.user.id;
-    const payload = await compileReadinessSummary(userId);
+    const { targetExamDate, dailyHours, targetScore } = req.query;
+    const readinessEngine = require('../services/readinessEngine');
+
+    const payload = await readinessEngine.calculateReadinessProjection({
+      userId,
+      targetExamDate,
+      dailyHours: dailyHours !== undefined ? Number(dailyHours) : 2,
+      targetScore: targetScore !== undefined ? Number(targetScore) : 85,
+    });
+
     res.status(200).json({
       success: true,
       data: payload,
