@@ -351,38 +351,6 @@ exports.login = async (req, res, next) => {
   }
 };
 
-/**
- * @swagger
- * /api/auth/logout:
- *   post:
- *     summary: Logout user and clear authentication cookies
- *     tags: [Authentication]
- *     responses:
- *       200:
- *         description: Logged out successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Logged out successfully"
- */
-exports.logout = async (req, res, next) => {
-  try {
-    const cookieOptions = getAuthCookieOptions();
-    res.clearCookie('token', cookieOptions);
-    res.clearCookie('refreshToken', cookieOptions);
-    res.status(200).json({ success: true, message: 'Logged out successfully' });
-  } catch (error) {
-    next(error);
-  }
-};
-
 // ---------------------------------------------------------------------------
 // @desc    Setup 2FA (Generate secret and backup codes)
 // @route   POST /api/auth/2fa/setup
@@ -1371,6 +1339,25 @@ exports.googlePassportCallback = async (req, res, next) => {
 // ---------------------------------------------------------------------------
 exports.logout = async (req, res, next) => {
   try {
+    // Blacklist access token if present
+    let token = req.cookies?.token || req.cookies?.accessToken;
+    if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+    }
+    if (token) {
+      try {
+        const decoded = jwt.decode(token);
+        if (decoded) {
+          const jti = decoded.jti || crypto.createHash('sha256').update(token).digest('hex');
+          const exp = decoded.exp ? Math.max(0, decoded.exp - Math.floor(Date.now() / 1000)) : 3600;
+          const redisSentinelService = require('../services/redisSentinelService');
+          await redisSentinelService.blacklistJwt(jti, exp);
+        }
+      } catch (decodeErr) {
+        logger.warn('Failed to decode token for blacklisting on logout', { error: decodeErr.message });
+      }
+    }
+
     // Support both cookie and body for refresh token
     const rawToken = req.cookies?.refreshToken || req.body?.refreshToken;
 
@@ -1394,7 +1381,7 @@ exports.logout = async (req, res, next) => {
     }
 
     clearRefreshTokenCookie(res);
-    res.clearCookie('token', getAuthCookieOptions());
+    res.clearCookie('token', getAccessTokenCookieOptions());
 
     res.status(200).json({
       success: true,
@@ -1429,6 +1416,25 @@ exports.logout = async (req, res, next) => {
  */
 exports.logoutAll = async (req, res, next) => {
   try {
+    // Blacklist access token if present
+    let token = req.cookies?.token || req.cookies?.accessToken;
+    if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+    }
+    if (token) {
+      try {
+        const decoded = jwt.decode(token);
+        if (decoded) {
+          const jti = decoded.jti || crypto.createHash('sha256').update(token).digest('hex');
+          const exp = decoded.exp ? Math.max(0, decoded.exp - Math.floor(Date.now() / 1000)) : 3600;
+          const redisSentinelService = require('../services/redisSentinelService');
+          await redisSentinelService.blacklistJwt(jti, exp);
+        }
+      } catch (decodeErr) {
+        logger.warn('Failed to decode token for blacklisting on logoutAll', { error: decodeErr.message });
+      }
+    }
+
     // Remove every refresh token belonging to the authenticated user.
     // This invalidates sessions on all devices immediately because the
     // refresh-token endpoint only accepts tokens stored in this array.
