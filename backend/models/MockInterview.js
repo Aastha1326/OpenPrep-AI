@@ -1,6 +1,5 @@
 const { DataTypes, Model } = require('sequelize');
-const sequelize = require('../config/database');
-
+const { sequelize } = require('../config/db');
 /**
  * MockInterview Model
  * Stores telemetry, configuration, and transcript for an AI Mock Interview session.
@@ -66,9 +65,33 @@ MockInterview.init(
             type: DataTypes.TEXT,
             allowNull: true,
         },
-        startedAt: { type: DataTypes.DATE, allowNull: true },
+        feedbackProvenance: {
+            type: DataTypes.JSONB,
+            allowNull: true,
+            comment: 'Evidence, AI model, prompt version, and confidence metadata for interview feedback',
+        },        startedAt: { type: DataTypes.DATE, allowNull: true },
         completedAt: { type: DataTypes.DATE, allowNull: true },
-    },
+        processingState: {
+            type: DataTypes.STRING(30),
+            allowNull: false,
+            defaultValue: 'IDLE',
+        },
+        processingError: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+        },
+        processingUpdatedAt: {
+            type: DataTypes.DATE,
+            allowNull: true,
+        },        evaluationVersionId: {
+            type: DataTypes.UUID,
+            allowNull: true,
+        },
+        evaluationSnapshot: {
+            type: DataTypes.JSONB,
+            allowNull: true,
+            comment: 'Immutable evaluation version configuration used for scoring',
+        },    },
     {
         sequelize,
         modelName: 'MockInterview',
