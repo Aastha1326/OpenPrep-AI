@@ -2,6 +2,10 @@ const { sequelize } = require('../config/db');
 
 // Import all models
 const User = require('./User');
+const SchedulerVersion = require('./SchedulerVersion');
+const FlashcardSchedulingState = require('./FlashcardSchedulingState');
+const FlashcardReviewHistory = require('./FlashcardReviewHistory');
+const ReviewSubmissionToken = require('./ReviewSubmissionToken');
 const QuizValidationLog = require('./QuizValidationLog');
 const Folder = require('./Folder');
 const Exam = require('./Exam');
@@ -395,6 +399,10 @@ module.exports = {
   QuizAttempt,
   Note,
   Question,
+    SchedulerVersion,
+  FlashcardSchedulingState,
+  FlashcardReviewHistory,
+  ReviewSubmissionToken,
   QuestionComment,
   DoubtSession,
   DoubtSessionMessage,
