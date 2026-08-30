@@ -9,7 +9,7 @@ if (!dbUrl) {
 // Bounded connection pool configuration for raw queries and migrations
 const pgPool = new Pool({
   connectionString: dbUrl,
-  max: parseInt(process.env.DB_POOL_MAX, 10) || 20,
+  max: parseInt(process.env.DB_POOL_MAX, 10) || 25,
   min: parseInt(process.env.DB_POOL_MIN, 10) || 5,
   idleTimeoutMillis: parseInt(process.env.DB_POOL_IDLE, 10) || 30000,
   connectionTimeoutMillis: parseInt(process.env.DB_POOL_TIMEOUT, 10) || 2000,
@@ -26,7 +26,7 @@ const sequelize = new Sequelize(
     dialect: 'postgres',
     logging: process.env.NODE_ENV === 'development' ? console.log : false,
     pool: {
-      max: parseInt(process.env.DB_POOL_MAX, 10) || 20,
+      max: parseInt(process.env.DB_POOL_MAX, 10) || 25,
       min: parseInt(process.env.DB_POOL_MIN, 10) || 5,
       acquire: parseInt(process.env.DB_POOL_ACQUIRE, 10) || 30000,
       idle: parseInt(process.env.DB_POOL_IDLE, 10) || 30000,
@@ -65,6 +65,9 @@ sequelize.addHook('afterQuery', (options) => {
     recordDbQueryDuration(duration);
   }
 });
+
+// Register Database Query Profiler and Slow Query Logger
+require('../middleware/queryProfiler').registerQueryProfiler(sequelize);
 
 const connectDB = async () => {
   try {
