@@ -117,6 +117,12 @@ async function callWithTimeout(model, prompt, timeoutMs = 30000) {
 
   try {
     const result = await Promise.race([model.generateContent(prompt), timeoutPromise]);
+    try {
+      const { recordTokens } = require('./metricsService');
+      recordTokens(result, model.model || 'gemini-1.5-flash');
+    } catch (e) {
+      // ignore
+    }
     return result;
   } finally {
     clearTimeout(timeoutId);

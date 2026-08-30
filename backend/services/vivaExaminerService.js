@@ -30,6 +30,9 @@ async function generateInitialQuestion(topic) {
       Keep it clear, concise, and under 2 sentences. Return only the question text.
     `;
     const result = await model.generateContent(prompt);
+    try {
+      require('./metricsService').recordTokens(result, 'gemini-1.5-flash');
+    } catch (e) {}
     return result.response.text().trim().replace(/^["']|["']$/g, '');
   } catch (err) {
     logger.error('[VivaExaminer] First question generation failed:', err);
@@ -80,6 +83,9 @@ async function evaluateVivaResponse(currentQuestion, userAnswer, topic) {
     `;
 
     const result = await model.generateContent(prompt);
+    try {
+      require('./metricsService').recordTokens(result, 'gemini-1.5-flash');
+    } catch (e) {}
     const text = result.response.text().trim();
     const cleanJson = text.replace(/```json|```/g, '').trim();
     return JSON.parse(cleanJson);
@@ -158,6 +164,9 @@ async function generateFinalScorecard(topic, turnsHistory) {
     `;
 
     const result = await model.generateContent(prompt);
+    try {
+      require('./metricsService').recordTokens(result, 'gemini-1.5-flash');
+    } catch (e) {}
     const text = result.response.text().trim();
     const cleanJson = text.replace(/```json|```/g, '').trim();
     return JSON.parse(cleanJson);

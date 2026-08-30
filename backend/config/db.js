@@ -35,6 +35,19 @@ const sequelize = new Sequelize(
   }
 );
 
+// Register database query execution duration hooks
+sequelize.addHook('beforeQuery', (options) => {
+  options.queryStartTime = Date.now();
+});
+
+sequelize.addHook('afterQuery', (options) => {
+  if (options.queryStartTime) {
+    const duration = (Date.now() - options.queryStartTime) / 1000;
+    const { recordDbQueryDuration } = require('../services/metricsService');
+    recordDbQueryDuration(duration);
+  }
+});
+
 const connectDB = async () => {
   try {
     await sequelize.authenticate();
