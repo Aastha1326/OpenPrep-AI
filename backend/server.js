@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Sentry } = require('./config/sentry');
+const { Sentry, requestHandler: sentryRequestHandler, errorHandler: sentryErrorHandler } = require('./utils/sentry');
 const express = require('express');
 const compression = require('compression');
 const cors = require('cors');
@@ -90,6 +90,7 @@ connectDB();
 const redisService = require('./services/redisService');
 redisService.connect();
 const app = express();
+app.use(sentryRequestHandler);
 
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
@@ -347,9 +348,7 @@ app.get(['/api-docs.json', '/api/docs.json'], (req, res) => {
 });
 
 // Error Handler Middleware
-if (process.env.NODE_ENV !== 'test' && process.env.SENTRY_DSN) {
-  Sentry.setupExpressErrorHandler(app);
-}
+app.use(sentryErrorHandler);
 app.use(csrfErrorHandler);
 app.use(errorHandler);
 
