@@ -56,6 +56,7 @@ const AttemptHistoryDashboard = lazy(() => import('./pages/AttemptHistoryDashboa
 const CollaborativeNoteView = lazy(() => import('./pages/CollaborativeNoteView'));
 const SquadsPage = lazy(() => import('./pages/SquadsPage'));
 const BountyBoardPage = lazy(() => import('./pages/BountyBoardPage'));
+const MockExamArena = lazy(() => import('./components/exam/MockExamArena'));
 
 function App() {
 
@@ -267,6 +268,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <CollabNote />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/mock-exam/:examId"
+            element={
+              <ProtectedRoute>
+                <MockExamArena />
               </ProtectedRoute>
             }
           />

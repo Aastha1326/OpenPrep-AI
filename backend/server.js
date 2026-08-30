@@ -94,6 +94,8 @@ const readinessRoutes = require('./routes/readinessRoutes');
 const proctoringRoutes = require('./routes/proctoringRoutes');
 const squadRoutes = require('./routes/squadRoutes');
 const badgeRoutes = require('./routes/badgeRoutes');
+const whiteboardRoutes = require('./routes/whiteboardRoutes');
+const mockExamRoutes = require('./routes/mockExamRoutes');
  feat/omr-pdf-generator
 const visualizerRoutes = require('./routes/visualizerRoutes');
 const weaknessDetectionRoutes = require('./routes/weaknessDetectionRoutes');
@@ -462,6 +464,8 @@ app.use('/api/battles', battleRoutes);
 app.use('/api/folders', folderRoutes);
 app.use('/api/badges', badgeRoutes);
 app.use('/api/bounties', bountyRoutes);
+app.use('/api', whiteboardRoutes);
+app.use('/api', mockExamRoutes);
 
 const leaderboardRoutes = require('./routes/leaderboardRoutes');
 app.use('/api/leaderboard', leaderboardRoutes);app.get('/user/badges', protect, require('./controllers/badgeController').getUserBadges);
