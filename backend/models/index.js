@@ -115,6 +115,11 @@ initBountySolutionVote(sequelize);
 // Without the init and the export below it resolved to undefined, so every
 // moderation-log read and write in that service threw on first call.
 initModeratorAuditLog(sequelize);
+initSponsor(sequelize);
+initJobApplication(sequelize);
+initJobOpportunity(sequelize);
+initAnalyticsEvent(sequelize);
+initBountyClaim(sequelize);
 
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -467,6 +472,9 @@ embeddingsProcessor.registerWorkerHandler({ Note, Quiz });
 
 module.exports = {
   sequelize,
+  // aiUsageBudgetService reaches for `db.Sequelize.Op`; without this the
+  // registry hands it undefined and every budget query throws.
+  Sequelize,
   User,
   StudyAnalyticsSnapshot,
   FlashcardMasterySnapshot,
@@ -484,7 +492,7 @@ module.exports = {
   QuizAttempt,
   Note,
   Question,
-    SchedulerVersion,
+  SchedulerVersion,
   FlashcardSchedulingState,
   FlashcardReviewHistory,
   ReviewSubmissionToken,
@@ -505,7 +513,7 @@ module.exports = {
   UsageQuota,
   Achievement,
   FocusSession,
-    QuizValidationLog,
+  QuizValidationLog,
   QuizTelemetryEvent,
   QuizBookmark,
   DeckRating,
