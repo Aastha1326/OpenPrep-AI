@@ -202,7 +202,7 @@ exports.rateCommunityDeck = async (req, res, next) => {
     const ratings = await DeckRating.findAll({ where: { deckId: id } });
     const count = ratings.length;
     const sum = ratings.reduce((acc, r) => acc + r.stars, 0);
-    const avg = parseFloat((sum / count).toFixed(2));
+    const avg = count > 0 ? parseFloat((sum / count).toFixed(2)) : 0.0;
 
     deck.rating = avg;
     deck.ratingsCount = count;
@@ -215,6 +215,40 @@ exports.rateCommunityDeck = async (req, res, next) => {
         deckRating: avg,
         deckRatingsCount: count,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get reviews and comments for a community deck
+// @route   GET /api/community/decks/:id/reviews
+// @access  Private
+exports.getCommunityDeckReviews = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const deck = await Subject.findByPk(id);
+    if (!deck || !deck.isPublic) {
+      return res.status(404).json({ success: false, error: 'Public community deck not found' });
+    }
+
+    const reviews = await DeckRating.findAll({
+      where: { deckId: id },
+      include: [
+        {
+          model: User,
+          as: 'userRef',
+          attributes: ['id', 'name'],
+        },
+      ],
+      order: [['createdAt', 'DESC']],
+    });
+
+    res.status(200).json({
+      success: true,
+      count: reviews.length,
+      data: reviews,
     });
   } catch (error) {
     next(error);

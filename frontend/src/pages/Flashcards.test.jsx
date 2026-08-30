@@ -6,7 +6,7 @@ import Flashcards from './Flashcards';
 import flashcardReducer from '../store/slices/flashcardSlice';
 import API from '../services/api';
 
-vi.mock('../services/api', () => ({
+vi.mock('../services/api.js', () => ({
   default: {
     get: vi.fn(),
     delete: vi.fn(),
@@ -74,3 +74,4 @@ describe('Flashcards page', () => {
     expect(await screen.findByText('Science Chemistry')).toBeInTheDocument();
   });
 });
+

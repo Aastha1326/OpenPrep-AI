@@ -11,6 +11,10 @@ const {
   exportStudyPlanIcs,
   exportStudyPlanPdf,
   rebalanceStudyPlan,
+  createStudyPlan,
+  getStudyPlan,
+  getBurndown,
+  getReadinessScore,
 } = require('../controllers/studyPlanController');
 const { protect } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
@@ -30,10 +34,24 @@ const router = express.Router();
  */
 
 /**
+ * @route   POST /api/study-plans
+ * @desc    Generate a new AI-powered study plan (Service-based)
+ * @access  Private
+ */
+router.post('/', protect, createStudyPlan);
+
+/**
+ * @route   GET /api/study-plans
+ * @desc    Retrieve the user's current study plan (Service-based)
+ * @access  Private
+ */
+router.get('/', protect, getStudyPlan);
+
+/**
  * @swagger
  * /api/study-plans/generate-ai:
  *   post:
- *     summary: Generate an AI-powered study plan
+ *     summary: Generate an AI-powered study plan (Legacy/Detailed)
  *     tags: [Study Plans]
  *     security:
  *       - bearerAuth: []
@@ -100,6 +118,7 @@ const router = express.Router();
 
 router.post('/generate-ai', protect, aiLimiter, checkAiQuota, validateGenerateAIPlan, generateAIPlan);
 router.get('/:id/export-ics', protect, exportStudyPlanIcs);
+router.get('/:id/ics', protect, exportStudyPlanIcs);
 router.get('/:id/export-pdf', protect, exportStudyPlanPdf);
 
 /**
@@ -268,7 +287,7 @@ router.get('/weakness-analysis', protect, aiLimiter, getWeaknessAnalysis);
  *               $ref: '#/components/schemas/Error'
  */
 
-router.post('/reschedule-adaptive', protect, rescheduleAdaptivePlan);
+router.post('/reschedule-adaptive', protect, aiLimiter, checkAiQuota, rescheduleAdaptivePlan);
 
 /**
  * @swagger
@@ -441,6 +460,8 @@ router.post('/:id/reschedule', protect, aiLimiter, checkAiQuota, rescheduleOverd
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/rebalance', protect, rebalanceStudyPlan);
+router.post('/rebalance', protect, aiLimiter, checkAiQuota, rebalanceStudyPlan);
+router.get('/:id/burndown', protect, getBurndown);
+router.get('/:id/readiness-score', protect, getReadinessScore);
 
 module.exports = router;

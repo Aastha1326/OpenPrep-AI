@@ -6,6 +6,15 @@ try {
     init: () => {},
     captureException: () => {},
     setUser: () => {},
+    withScope: (callback) => {
+      const mockScope = {
+        setUser: () => {},
+        setTag: () => {},
+        setExtra: () => {},
+      };
+      callback(mockScope);
+    },
+    setupExpressErrorHandler: () => {},
   };
 }
 
@@ -73,3 +82,4 @@ module.exports = {
   Sentry,
   isSentryReady,
 };
+

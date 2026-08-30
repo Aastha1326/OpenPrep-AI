@@ -62,5 +62,5 @@ jobs:
         working-directory: frontend
 
       - name: Resolve frontend packages
-        run: node -e "for (const m of ['yjs','mermaid','react-window','react-confetti','@tiptap/react','@tiptap/starter-kit','@tiptap/extension-highlight']) { require.resolve(m); console.log('resolved:', m); }"
+        run: node -e "for (const m of ['yjs','mermaid','react-window','canvas-confetti','@tiptap/react','@tiptap/starter-kit','@tiptap/extension-highlight']) { require.resolve(m); console.log('resolved:', m); }"
         working-directory: frontend

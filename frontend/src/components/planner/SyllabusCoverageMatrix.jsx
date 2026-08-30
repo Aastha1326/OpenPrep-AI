@@ -61,10 +61,16 @@ export default function SyllabusCoverageMatrix({ syllabusName, initialCoverage =
             <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest block">Syllabus Coverage</span>
             <span className="text-2xl font-black text-indigo-400">{coverage}%</span>
           </div>
-          <div className="w-12 h-1.5 bg-neutral-800 rounded-full overflow-hidden shrink-0">
+          <div
+            className="w-12 h-1.5 bg-neutral-800 rounded-full overflow-hidden shrink-0"
+            role="progressbar"
+            aria-valuenow={coverage}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Overall syllabus coverage"
+          >
             <div className="bg-indigo-500 h-full rounded-full" style={{ width: `${coverage}%` }} />
-          </div>
-        </div>
+          </div>        </div>
       </div>
 
       {/* Modules Listings */}
@@ -77,16 +83,16 @@ export default function SyllabusCoverageMatrix({ syllabusName, initialCoverage =
             
             <div className="overflow-x-auto -mx-1 px-1">
               <table className="w-full text-left text-xs border-collapse min-w-[500px]">
+                <caption className="sr-only">{`Topic coverage for ${moduleName}`}</caption>
                 <thead>
                   <tr className="text-stone-400 font-bold border-b border-neutral-850/40">
-                    <th className="py-2.5">Topic</th>
-                    <th className="py-2.5">Sub-topics</th>
-                    <th className="py-2.5 text-center">Weightage</th>
-                    <th className="py-2.5">Status</th>
-                    <th className="py-2.5 text-right">Actions</th>
+                    <th scope="col" className="py-2.5">Topic</th>
+                    <th scope="col" className="py-2.5">Sub-topics</th>
+                    <th scope="col" className="py-2.5 text-center">Weightage</th>
+                    <th scope="col" className="py-2.5">Status</th>
+                    <th scope="col" className="py-2.5 text-right">Actions</th>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-850/20">
+                </thead>                <tbody className="divide-y divide-neutral-850/20">
                   {moduleTopics.map((topic) => {
                     let statusColor = 'text-rose-500 bg-rose-500/10 border-rose-500/20';
                     if (topic.coverageStatus === 'Covered') {
@@ -104,10 +110,9 @@ export default function SyllabusCoverageMatrix({ syllabusName, initialCoverage =
                         <td className="py-3 text-center text-stone-300 font-bold">{topic.weightage || 0}%</td>
                         <td className="py-3">
                           <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${statusColor}`}>
-                            {topic.coverageStatus === 'Covered' && <FaRegCheckCircle />}
-                            {topic.coverageStatus === 'Partially Covered' && <FaExclamationTriangle />}
-                            {topic.coverageStatus}
-                          </span>
+                            {topic.coverageStatus === 'Covered' && <FaRegCheckCircle aria-hidden="true" />}
+                            {topic.coverageStatus === 'Partially Covered' && <FaExclamationTriangle aria-hidden="true" />}
+                            {topic.coverageStatus}                          </span>
                         </td>
                         <td className="py-3 text-right">
                           {topic.coverageStatus === 'Unstudied Gap' && (

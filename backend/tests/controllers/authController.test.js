@@ -483,7 +483,7 @@ describe('Auth Controller - Integration Tests', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.message).toContain('reset link');
+      expect(res.body.message).toContain('reset code');
     });
 
     it('should return 200 even when email does not exist', async () => {
@@ -493,7 +493,7 @@ describe('Auth Controller - Integration Tests', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.message).toBe('If the email exists, a reset link has been sent');
+      expect(res.body.message).toBe('If the email exists, a reset code has been sent');
     });
 
     it('should return same response for existing and non-existing emails', async () => {
@@ -510,7 +510,7 @@ describe('Auth Controller - Integration Tests', () => {
       expect(resExisting.status).toBe(resMissing.status);
       expect(resExisting.body.success).toBe(resMissing.body.success);
       expect(resExisting.body.message).toBe(resMissing.body.message);
-      expect(resExisting.body.message).toBe('If the email exists, a reset link has been sent');
+      expect(resExisting.body.message).toBe('If the email exists, a reset code has been sent');
     });
 
     it('should enforce rate limits of 3 requests per 15 minutes', async () => {
@@ -710,6 +710,39 @@ describe('Auth Controller - Integration Tests', () => {
         .post('/api/auth/refresh-token')
         .send({ refreshToken: secondToken });
       expect(secondReplay.status).toBe(401);
+    });
+
+    it('should prune oldest refresh tokens when count exceeds MAX_ACTIVE_SESSIONS', async () => {
+      const tokens = Array.from({ length: 12 }, (_, i) => ({
+        token: crypto.createHash('sha256').update(`token-${i}`).digest('hex'),
+        family: `family-${i}`,
+        createdAt: new Date(Date.now() - (12 - i) * 60000).toISOString(),
+      }));
+
+      const user = await createVerifiedUser({
+        email: 'prune@example.com',
+        refreshTokens: tokens,
+        refreshTokenExpire: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      });
+
+      const res = await request(app)
+        .post('/api/auth/refresh-token')
+        .send({ refreshToken: 'token-11' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+
+      const updatedUser = await User.findByPk(user.id);
+      expect(updatedUser.refreshTokens.length).toBe(10);
+
+      const containsToken0 = updatedUser.refreshTokens.some(
+        (t) => t.token === crypto.createHash('sha256').update('token-0').digest('hex')
+      );
+      const containsToken1 = updatedUser.refreshTokens.some(
+        (t) => t.token === crypto.createHash('sha256').update('token-1').digest('hex')
+      );
+      expect(containsToken0).toBe(false);
+      expect(containsToken1).toBe(false);
     });
   });
 

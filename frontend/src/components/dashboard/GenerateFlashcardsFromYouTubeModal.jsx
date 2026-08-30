@@ -66,7 +66,7 @@ const GenerateFlashcardsFromYouTubeModal = ({ onClose, onImported }) => {
   };
 
   const handleImport = async () => {
-    const selectedCards = cards.filter((c) => c.selected).map(({ front, back }) => ({ front, back }));
+    const selectedCards = cards.filter((c) => c.selected).map(({ front, back, sourceUrl, timestampSeconds }) => ({ front, back, sourceUrl, timestampSeconds }));
     if (selectedCards.length === 0 || !subjectId) return;
 
     setImporting(true);
@@ -202,6 +202,12 @@ const GenerateFlashcardsFromYouTubeModal = ({ onClose, onImported }) => {
                         onChange={(e) => editCard(idx, 'back', e.target.value)}
                         className="w-full text-sm text-slate-500 bg-transparent border-b border-slate-200 dark:border-slate-600 focus:outline-none focus:border-indigo-500"
                       />
+                      {card.timestampSeconds !== undefined && card.timestampSeconds !== null && (
+                        <div className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                          <Video className="w-3 h-3" />
+                          <span>Timestamp: {Math.floor(card.timestampSeconds / 60)}:{(card.timestampSeconds % 60).toString().padStart(2, '0')}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

@@ -1,39 +1,62 @@
-const { GoogleGenAI } = require('@google/genai');
-const Subject = require('../models/Subject');
-const Topic = require('../models/Topic');
-const prompts = require('../config/prompts');
+const cheatSheetService = require('../services/cheatSheetService');
+const CheatSheet = require('../models/CheatSheet');
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+/**
+ * @desc    Get pre-configured template catalog
+ * @route   GET /api/cheat-sheets/templates
+ * @access  Private
+ */
+exports.getTemplates = (req, res) => {
+  const templates = cheatSheetService.getTemplateCatalog();
+  return res.json({ success: true, data: templates });
+};
 
-exports.generateCheatSheet = async (req, res, next) => {
+/**
+ * @desc    Validate LaTeX syntax
+ * @route   POST /api/cheat-sheets/validate-latex
+ * @access  Private
+ */
+exports.validateLaTeX = (req, res) => {
+  const { latex } = req.body;
+  const result = cheatSheetService.validateLaTeX(latex);
+  return res.json({ success: true, ...result });
+};
+
+/**
+ * @desc    Create or save custom cheat sheet
+ * @route   POST /api/cheat-sheets
+ * @access  Private
+ */
+exports.createCheatSheet = async (req, res) => {
   try {
-    const { subjectId, chapterId } = req.query;
+    const { title, subject, columns, sections, isPublic, tags } = req.body;
 
-    if (!subjectId) {
-      return res.status(400).json({ success: false, error: 'subjectId query parameter is required' });
-    }
-
-    const subject = await Subject.findByPk(subjectId, {
-      include: [{ model: Chapter, as: 'chapters' }],
+    const sheet = await CheatSheet.create({
+      userId: req.user.id,
+      title: title || 'Quick Revision Sheet',
+      subject: subject || 'General',
+      columns: columns || 2,
+      sections: sections || [],
+      isPublic: !!isPublic,
+      tags: tags || [],
     });
 
-    if (!subject) {
-      return res.status(404).json({ success: false, error: 'Subject not found' });
-    }
+    return res.status(201).json({ success: true, data: sheet });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
 
-    let targetChapters = subject.chapters || [];
-    if (chapterId) {
-      targetChapters = targetChapters.filter((c) => c.id.toString() === chapterId.toString());
-    }
-
-    const chapterTitles = targetChapters.map((c) => c.name).join(', ');
-
-    const prompt = prompts.cheatSheet.generateCheatSheet(subject.name, chapterTitles);
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: { responseMimeType: 'application/json' },
+/**
+ * @desc    Get user cheat sheets
+ * @route   GET /api/cheat-sheets
+ * @access  Private
+ */
+exports.getUserCheatSheets = async (req, res) => {
+  try {
+    const sheets = await CheatSheet.findAll({
+      where: { userId: req.user.id },
+      order: [['updatedAt', 'DESC']],
     });
 
     try {
@@ -51,6 +74,6 @@ exports.generateCheatSheet = async (req, res, next) => {
       cheatSheet: cheatSheetData,
     });
   } catch (error) {
-    next(error);
+    return res.status(500).json({ success: false, error: error.message });
   }
 };

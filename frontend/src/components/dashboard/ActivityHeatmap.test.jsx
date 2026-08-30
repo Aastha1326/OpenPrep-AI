@@ -2,7 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import ActivityHeatmap from './ActivityHeatmap';
 import API from '../../services/api';
 
-vi.mock('../../services/api', () => ({
+vi.mock('../../services/api.js', () => ({
   default: {
     get: vi.fn(),
   },
