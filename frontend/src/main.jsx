@@ -10,7 +10,9 @@ import { PomodoroProvider } from './context/PomodoroContext'
 import { SessionTimerProvider } from './context/SessionTimerContext'
 import ErrorBoundary from './components/common/ErrorBoundary'
 import './index.css'
+import './styles/rtl.css';
 import './i18n';
+
 import App from './App.jsx'
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { unregisterLegacyServiceWorker } from './utils/pushNotifications';
