@@ -302,15 +302,15 @@ exports.generateCustomQuiz = async (req, res, next) => {
   }
 };
 
+const { getPaginationParams, formatPaginatedResponse } = require('../utils/paginationParams');
+
 // @desc    Get quizzes for a subject
 // @route   GET /api/quizzes
 // @access  Private
 exports.getQuizzes = async (req, res, next) => {
   try {
     const { subjectId } = req.query;
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
-    const offset = (page - 1) * limit;
+    const { page, limit, offset } = getPaginationParams(req.query);
 
     const filter = { createdBy: req.user.id };
     if (subjectId) filter.subject = subjectId;
@@ -333,14 +333,7 @@ exports.getQuizzes = async (req, res, next) => {
       return json;
     });
 
-    res.status(200).json({
-      success: true,
-      count: populatedQuizzes.length,
-      total,
-      page,
-      totalPages: Math.ceil(total / limit),
-      data: populatedQuizzes,
-    });
+    res.status(200).json(formatPaginatedResponse(populatedQuizzes, total, page, limit));
   } catch (error) {
     next(error);
   }
