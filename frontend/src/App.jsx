@@ -26,6 +26,7 @@ import './App.css';
 
 const Landing = lazy(() => import('./pages/Landing'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
+const PacingCoachDashboard = lazy(() => import('./pages/PacingCoachDashboard'));
 const Register = lazy(() => import('./pages/Register'));
 const Login = lazy(() => import('./pages/Login'));
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
@@ -182,6 +183,7 @@ function App() {
         <Suspense fallback={<PageSkeleton />}>
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/pacing-coach" element={<ProtectedRoute><PacingCoachDashboard /></ProtectedRoute>} />
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
           <Route path="/share/:token" element={<PublicShare />} />
@@ -480,3 +482,4 @@ function App() {
 }
 
 export default App;
+
