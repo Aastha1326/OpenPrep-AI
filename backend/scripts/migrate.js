@@ -1,5 +1,10 @@
 const fs = require('fs');
 const path = require('path');
+require('dotenv').config({
+  path: fs.existsSync(path.join(__dirname, '../.env.test'))
+    ? path.join(__dirname, '../.env.test')
+    : path.join(__dirname, '../.env')
+});
 const { sequelize } = require('../config/db');
 require('../models');
 
