@@ -61,6 +61,7 @@ const noteRoutes = require('./routes/noteRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const searchRoutes = require('./routes/searchRoutes');
 const progressRoutes = require('./routes/progressRoutes');
+const pacingCoachRoutes = require('./routes/pacingCoachRoutes');
 const communityRoutes = require('./routes/communityRoutes');
 const userRoutes = require('./routes/userRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
@@ -280,6 +281,7 @@ app.use('/api/documents', pdfAnnotationRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/study-plans', studyPlanRoutes);
 app.use('/api/quizzes', quizRoutes);
+app.use('/api/pacing-coach', pacingCoachRoutes);
 app.use('/api/quiz', quizRoutes);
 app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/flashcard-decks', flashcardDeckRoutes);
@@ -521,4 +523,5 @@ const gracefulShutdown = (signal) => {
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
 
