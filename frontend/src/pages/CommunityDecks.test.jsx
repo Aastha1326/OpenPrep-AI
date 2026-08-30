@@ -6,7 +6,7 @@ import CommunityDecks from './CommunityDecks';
 import authReducer from '../store/slices/authSlice';
 import API from '../services/api';
 
-vi.mock('../services/api', () => ({
+vi.mock('../services/api.js', () => ({
   default: {
     get: vi.fn(),
     post: vi.fn(),
@@ -78,3 +78,4 @@ describe('CommunityDecks Page', () => {
     expect(screen.getByText('Alice')).toBeInTheDocument();
   });
 });
+

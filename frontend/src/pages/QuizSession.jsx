@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useSelector } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   FaCheckCircle,
@@ -24,6 +25,7 @@ import RevisionSheetModal from '../components/dashboard/RevisionSheetModal';
 import RemediationPlanModal from '../components/dashboard/RemediationPlanModal';
 import QuestionExplanation from '../components/dashboard/QuestionExplanation';
 import SubjectiveQuestionView from '../components/quiz/SubjectiveQuestionView';
+import QuestionDiscussionThread from '../components/quiz/QuestionDiscussionThread';
 import confetti from 'canvas-confetti';
 
 export const getScoreMotivationalMessage = (score) => {
@@ -104,6 +106,7 @@ const buildQuizResultRows = (quiz, answers) =>
 const QuizSession = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const userRole = useSelector((state) => state.auth.user?.role || 'student');
 
   const [quiz, setQuiz] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -127,6 +130,8 @@ const QuizSession = () => {
   const [submitError, setSubmitError] = useState(null);
 
   const [savedSessionBanner, setSavedSessionBanner] = useState(null);
+  
+  const animatedScore = useCountUp(result?.score ?? 0, 1500, submitted);
   const startedAtRef = useRef(Date.now());
 
   const submittingRef = useRef(false);
@@ -522,7 +527,7 @@ const submitQuiz = useCallback(async () => {
     const loadBookmarks = async () => {
       try {
         const res = await API.get(`/quizzes/${id}/bookmarks`);
-        setBookmarkedIds(new Set(res.data?.data || []));
+        setBookmarkedIds(new Set(Array.isArray(res.data?.data) ? res.data.data : []));
       } catch (err) {
         console.error('Failed to load bookmarks:', err);
       }
@@ -651,7 +656,6 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
       return true;
     });
 
-  const animatedScore = useCountUp(result?.score ?? 0, 1500, submitted);
   const motivationalMessage = getScoreMotivationalMessage(result?.score ?? 0);
   return (
     <div className="min-h-screen bg-slate-900 text-white py-6 sm:py-10 px-3 sm:px-6 md:px-20">
@@ -796,6 +800,13 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
               <MathRenderer text={currentQuestion.questionText} />
             </h2>
 
+            <button 
+              onClick={() => alert("Socratic Hint: Remember the core principles and try eliminating options that don't fit the pattern.")}
+              className="mb-4 text-sm text-indigo-400 hover:text-indigo-300 underline"
+            >
+              Get a Hint
+            </button>
+
             <div className="space-y-3 mb-8">
               {(currentQuestion.options || []).map((option, index) => {
                 const isSelected = answers[currentQuestion._id] === option;
@@ -824,6 +835,11 @@ const currentQuestion = quiz.questions[currentQuestionIndex];
             </div>
           </div>
           )}
+
+          <QuestionDiscussionThread
+            questionId={currentQuestion._id || currentQuestion.id}
+            userRole={userRole}
+          />
 
           {/* Global Quiz Question Navigation Bar */}
           <div className="flex justify-between items-center mt-6">

@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import API from '../../services/api';
+import API from '../../services/api.js';
 
 export const fetchFlashcards = createAsyncThunk(
   'flashcards/fetchFlashcards',

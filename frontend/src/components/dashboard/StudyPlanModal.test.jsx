@@ -6,7 +6,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../../store/slices/authSlice';
 import StudyPlanModal from './StudyPlanModal';
 
-vi.mock('../../services/api', () => ({
+vi.mock('../../services/api.js', () => ({
   default: {
     get: vi.fn(),
     post: vi.fn(),
@@ -164,3 +164,4 @@ describe('StudyPlanModal syllabus prefill (issue #623)', () => {
     expect(screen.getByDisplayValue('2026-08-31')).toBeInTheDocument();
   });
 });
+

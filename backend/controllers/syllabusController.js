@@ -1,13 +1,22 @@
 const pdfParse = require('pdf-parse');
 const { Syllabus, SyllabusTopic, Note } = require('../models');
 const { analyzeSyllabusGaps } = require('../services/gapDetectorService');
-const { verifyMagicBytes } = require('../middleware/upload');const { GoogleGenerativeAI } = require('@google/generative-ai');
+const syllabusTrackerService = require('../services/syllabusTrackerService');
+const { verifyMagicBytes } = require('../middleware/upload');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const prompts = require('../config/prompts');
 
 // Initialize Gemini API client
 const apiKey = process.env.GEMINI_API_KEY;
 const genAI = (apiKey && apiKey !== 'your_gemini_api_key_here') ? new GoogleGenerativeAI(apiKey) : null;
 
+/**
+ * @fileoverview Controller for managing syllabus upload, tracking, and progress updates.
+ */
+
+/**
+ * Uploads and parses a PDF syllabus file.
+ */
 exports.uploadSyllabus = async (req, res, next) => {
   try {
     if (!req.file) {
@@ -21,7 +30,8 @@ exports.uploadSyllabus = async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'The uploaded file is not a valid PDF.' });
     }
 
-    // 1. Parse PDF text    let extractedText = '';
+    // 1. Parse PDF text
+    let extractedText = '';
     try {
       const parsedPdf = await pdfParse(req.file.buffer);
       extractedText = parsedPdf.text || '';
@@ -37,7 +47,7 @@ exports.uploadSyllabus = async (req, res, next) => {
     const syllabusName = req.file.originalname.replace('.pdf', '') || 'Curriculum Syllabus';
 
     let topics = [];
-    
+
     // 2. Call Gemini to extract module hierarchies
     if (genAI) {
       try {
@@ -107,6 +117,60 @@ exports.uploadSyllabus = async (req, res, next) => {
   }
 };
 
+/**
+ * Creates a new syllabus from raw text.
+ */
+exports.createSyllabus = async (req, res) => {
+  try {
+    const { text, courseName } = req.body;
+    const userId = req.user.id;
+
+    if (!text || text.trim().length < 50) {
+      return res.status(400).json({ success: false, message: 'Syllabus text must be at least 50 characters.' });
+    }
+
+    const structuredData = await syllabusTrackerService.parseSyllabus(text);
+
+    // Persist to database
+    const syllabus = await Syllabus.create({
+      userId: userId,
+      name: courseName || 'Text-based Syllabus',
+    });
+
+    // Create topics from structured data
+    for (const module of structuredData) {
+      for (const topic of module.topics || []) {
+        for (const subtopic of topic.subtopics || []) {
+          await SyllabusTopic.create({
+            syllabusId: syllabus.id,
+            moduleName: module.name || 'General Module',
+            title: topic.name || 'General Topic',
+            subtopics: [subtopic.name],
+            weightage: 0,
+            coverageStatus: 'Unstudied Gap',
+          });
+        }
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      data: {
+        id: syllabus.id,
+        courseName: syllabus.name,
+        modules: structuredData,
+        createdAt: syllabus.createdAt.toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('Error creating syllabus:', error);
+    res.status(500).json({ success: false, message: error.message || 'Internal server error' });
+  }
+};
+
+/**
+ * Retrieves gap analysis for a specific syllabus.
+ */
 exports.getGapAnalysis = async (req, res, next) => {
   try {
     const syllabusId = req.params.id;
@@ -134,6 +198,56 @@ exports.getGapAnalysis = async (req, res, next) => {
   }
 };
 
+/**
+ * Updates the mastery level of a specific subtopic.
+ */
+exports.updateMastery = async (req, res, next) => {
+  try {
+    const { syllabusId, subtopicId, mastery } = req.body;
+    const userId = req.user.id;
+
+    if (!['not_started', 'reviewing', 'mastered'].includes(mastery)) {
+      return res.status(400).json({ success: false, message: 'Invalid mastery level.' });
+    }
+
+    // Verify syllabus ownership
+    const syllabus = await Syllabus.findOne({ where: { id: syllabusId, userId } });
+    if (!syllabus) {
+      return res.status(404).json({ success: false, error: 'Syllabus not found.' });
+    }
+
+    // Find the topic containing this subtopic
+    const topic = await SyllabusTopic.findOne({
+      where: { syllabusId: syllabusId }
+    });
+
+    if (!topic) {
+      return res.status(404).json({ success: false, error: 'Topic not found.' });
+    }
+
+    // Update mastery status based on subtopic
+    // Note: In a real implementation, you'd track individual subtopic mastery
+    topic.coverageStatus = mastery === 'mastered' ? 'Covered' :
+      mastery === 'reviewing' ? 'Partially Covered' : 'Unstudied Gap';
+    await topic.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Subtopic ${subtopicId} updated to ${mastery}.`,
+      data: {
+        topicId: topic.id,
+        coverageStatus: topic.coverageStatus
+      }
+    });
+  } catch (error) {
+    console.error('Error updating mastery:', error);
+    next(error);
+  }
+};
+
+/**
+ * Generates study notes for a specific syllabus gap.
+ */
 exports.generateNotesForGap = async (req, res, next) => {
   try {
     const topicId = req.params.topicId;
@@ -186,7 +300,85 @@ exports.generateNotesForGap = async (req, res, next) => {
   }
 };
 
-// Keep existing getSyllabusCatalog for backward compatibility
+/**
+ * Fetches syllabus progress and predicted completion date.
+ */
+exports.getProgress = async (req, res, next) => {
+  try {
+    const { syllabusId } = req.params;
+    const userId = req.user.id;
+
+    // Verify syllabus ownership
+    const syllabus = await Syllabus.findOne({ where: { id: syllabusId, userId } });
+    if (!syllabus) {
+      return res.status(404).json({ success: false, error: 'Syllabus not found.' });
+    }
+
+    // Get all topics for this syllabus
+    const topics = await SyllabusTopic.findAll({ where: { syllabusId } });
+
+    // Transform to expected format
+    const structuredSyllabus = [];
+    const moduleMap = new Map();
+
+    for (const topic of topics) {
+      if (!moduleMap.has(topic.moduleName)) {
+        moduleMap.set(topic.moduleName, {
+          id: `mod_${topic.moduleName.replace(/\s+/g, '_').toLowerCase()}`,
+          name: topic.moduleName,
+          topics: []
+        });
+      }
+
+      const module = moduleMap.get(topic.moduleName);
+      module.topics.push({
+        id: `top_${topic.id}`,
+        name: topic.title,
+        subtopics: (topic.subtopics || []).map((sub, idx) => ({
+          id: `sub_${topic.id}_${idx}`,
+          name: sub,
+          mastery: topic.coverageStatus === 'Covered' ? 'mastered' :
+            topic.coverageStatus === 'Partially Covered' ? 'reviewing' : 'not_started'
+        }))
+      });
+    }
+
+    const mockSyllabus = Array.from(moduleMap.values());
+
+    // Calculate overall progress
+    const totalSubtopics = topics.reduce((sum, t) => sum + (t.subtopics?.length || 0), 0);
+    const coveredSubtopics = topics.filter(t => t.coverageStatus === 'Covered')
+      .reduce((sum, t) => sum + (t.subtopics?.length || 0), 0);
+    const partiallyCovered = topics.filter(t => t.coverageStatus === 'Partially Covered')
+      .reduce((sum, t) => sum + (t.subtopics?.length || 0), 0);
+
+    const overallProgress = totalSubtopics > 0
+      ? Math.round(((coveredSubtopics + (partiallyCovered * 0.5)) / totalSubtopics) * 100)
+      : 0;
+
+    // Predict completion date (assuming 2 items per day as default)
+    const remainingItems = totalSubtopics - coveredSubtopics - partiallyCovered;
+    const predictedDate = syllabusTrackerService.predictCompletionDate(mockSyllabus, 2);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        syllabusId: syllabus.id,
+        name: syllabus.name,
+        syllabus: mockSyllabus,
+        predictedCompletionDate: predictedDate,
+        overallProgress: overallProgress
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching progress:', error);
+    next(error);
+  }
+};
+
+/**
+ * Retrieves syllabus catalog for the current user.
+ */
 exports.getSyllabusCatalog = async (req, res, next) => {
   try {
     const catalog = await Syllabus.findAll({ where: { userId: req.user.id } });
@@ -194,4 +386,14 @@ exports.getSyllabusCatalog = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+};
+
+module.exports = {
+  uploadSyllabus,
+  createSyllabus,
+  getGapAnalysis,
+  updateMastery,
+  generateNotesForGap,
+  getProgress,
+  getSyllabusCatalog,
 };

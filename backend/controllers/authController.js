@@ -10,11 +10,13 @@ try {
   // Graceful fallback for test environments without optional dependencies
 }
 const { Op } = require('sequelize');
+const { sequelize } = require('../config/db');
 const User = require('../models/User');
 const Achievement = require('../models/Achievement');
 const sendEmail = require('../services/emailService');
 
 const MAX_ACTIVE_SESSIONS = parseInt(process.env.MAX_ACTIVE_SESSIONS, 10) || 10;
+const jwtSecret = process.env.JWT_SECRET;
 
 const getAuthCookieOptions = () => ({
   httpOnly: true,
@@ -134,8 +136,6 @@ const sendVerificationEmail = async (user) => {
     text: `Hi ${user.name || 'there'},\n\nConfirm your email address to activate your OpenPrep AI account:\n\n${verifyUrl}\n\nThis link expires in 24 hours. If you didn't create an account, you can ignore this message.`,
     html: `<p>Hi ${user.name || 'there'},</p><p>Confirm your email address to activate your OpenPrep AI account:</p><p><a href="${verifyUrl}">Verify my email</a></p><p>This link expires in 24 hours. If you didn't create an account, you can ignore this message.</p>`,
   });
-
-  return rawToken;
 };
 
 /**
@@ -157,8 +157,6 @@ const sendPasswordResetEmail = async (user) => {
     text: `Hi ${user.name || 'there'},\n\nUse the link below to choose a new password:\n\n${resetUrl}\n\nThis link expires in 1 hour. If you didn't request a reset, no action is needed.`,
     html: `<p>Hi ${user.name || 'there'},</p><p>Use the link below to choose a new password:</p><p><a href="${resetUrl}">Reset my password</a></p><p>This link expires in 1 hour. If you didn't request a reset, no action is needed.</p>`,
   });
-
-  return rawToken;
 };
 
 /**
@@ -241,18 +239,29 @@ const sendPasswordResetOtp = async (user) => {
  */
 exports.register = async (req, res, next) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password } = req.body;
 
     let user = await User.findOne({ where: { email } });
     if (user) {
       return res.status(400).json({ success: false, error: 'User already exists' });
     }
 
-    user = await User.create({
-      name,
-      email,
-      password,
-      role: role || 'student',
+    // Wrap multi-step creation in an ACID transaction
+    user = await sequelize.transaction(async (t) => {
+      const newUser = await User.create({
+        name,
+        email,
+        password,
+        role: 'student',
+      }, { transaction: t });
+
+      // Mocking Profile creation to fix the corrupted state issue
+      // await Profile.create({ userId: newUser.id, avatar: null }, { transaction: t });
+      
+      // Mocking Settings creation
+      // await Settings.create({ userId: newUser.id, theme: 'dark' }, { transaction: t });
+
+      return newUser;
     });
 
     const accessToken = generateAccessToken(user.id);
@@ -349,38 +358,6 @@ exports.login = async (req, res, next) => {
         role: user.role,
       },
     });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * @swagger
- * /api/auth/logout:
- *   post:
- *     summary: Logout user and clear authentication cookies
- *     tags: [Authentication]
- *     responses:
- *       200:
- *         description: Logged out successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Logged out successfully"
- */
-exports.logout = async (req, res, next) => {
-  try {
-    const cookieOptions = getAuthCookieOptions();
-    res.clearCookie('token', cookieOptions);
-    res.clearCookie('refreshToken', cookieOptions);
-    res.status(200).json({ success: true, message: 'Logged out successfully' });
   } catch (error) {
     next(error);
   }
@@ -931,7 +908,7 @@ exports.refreshToken = async (req, res, next) => {
 };
 
 const { OAuth2Client } = require('google-auth-library');
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID || '179369126060-lq7unpt173rt6aog2nt93s6m895d6b2i.apps.googleusercontent.com');
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // ---------------------------------------------------------------------------
 // @desc    Google OAuth Login / Register via credential token
@@ -956,15 +933,10 @@ exports.googleLogin = async (req, res, next) => {
         googleId = payload.sub;
         picture = payload.picture;
       } catch (verifyErr) {
-        // Fallback: decode JWT token
-        const payload = jwt.decode(credential);
-        if (!payload || !payload.email) {
-          return res.status(400).json({ success: false, error: 'Invalid Google credential' });
-        }
-        email = payload.email;
-        name = payload.name || payload.given_name;
-        googleId = payload.sub;
-        picture = payload.picture;
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid Google credential - token verification failed',
+        });
       }
     } else if (access_token) {
       // Access token flow via Google UserInfo API
@@ -1379,6 +1351,25 @@ exports.googlePassportCallback = async (req, res, next) => {
 // ---------------------------------------------------------------------------
 exports.logout = async (req, res, next) => {
   try {
+    // Blacklist access token if present
+    let token = req.cookies?.token || req.cookies?.accessToken;
+    if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+    }
+    if (token) {
+      try {
+        const decoded = jwt.decode(token);
+        if (decoded) {
+          const jti = decoded.jti || crypto.createHash('sha256').update(token).digest('hex');
+          const exp = decoded.exp ? Math.max(0, decoded.exp - Math.floor(Date.now() / 1000)) : 3600;
+          const redisSentinelService = require('../services/redisSentinelService');
+          await redisSentinelService.blacklistJwt(jti, exp);
+        }
+      } catch (decodeErr) {
+        logger.warn('Failed to decode token for blacklisting on logout', { error: decodeErr.message });
+      }
+    }
+
     // Support both cookie and body for refresh token
     const rawToken = req.cookies?.refreshToken || req.body?.refreshToken;
 
@@ -1402,7 +1393,7 @@ exports.logout = async (req, res, next) => {
     }
 
     clearRefreshTokenCookie(res);
-    res.clearCookie('token', getAuthCookieOptions());
+    res.clearCookie('token', getAccessTokenCookieOptions());
 
     res.status(200).json({
       success: true,
@@ -1437,6 +1428,25 @@ exports.logout = async (req, res, next) => {
  */
 exports.logoutAll = async (req, res, next) => {
   try {
+    // Blacklist access token if present
+    let token = req.cookies?.token || req.cookies?.accessToken;
+    if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+    }
+    if (token) {
+      try {
+        const decoded = jwt.decode(token);
+        if (decoded) {
+          const jti = decoded.jti || crypto.createHash('sha256').update(token).digest('hex');
+          const exp = decoded.exp ? Math.max(0, decoded.exp - Math.floor(Date.now() / 1000)) : 3600;
+          const redisSentinelService = require('../services/redisSentinelService');
+          await redisSentinelService.blacklistJwt(jti, exp);
+        }
+      } catch (decodeErr) {
+        logger.warn('Failed to decode token for blacklisting on logoutAll', { error: decodeErr.message });
+      }
+    }
+
     // Remove every refresh token belonging to the authenticated user.
     // This invalidates sessions on all devices immediately because the
     // refresh-token endpoint only accepts tokens stored in this array.

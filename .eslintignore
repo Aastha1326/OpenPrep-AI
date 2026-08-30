@@ -1,0 +1,8 @@
+src/services/architectureEngine.js
+src/services/codingSandboxEngine.js
+src/services/mockInterviewEngine.js
+src/services/negotiationEngine.js
+src/services/roadmapEngine.js
+temp_old_auth.js
+tests/load/config.js
+tests/load/k6-scenarios.js

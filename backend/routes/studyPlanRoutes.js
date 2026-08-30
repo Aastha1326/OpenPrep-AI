@@ -13,6 +13,8 @@ const {
   rebalanceStudyPlan,
   createStudyPlan,
   getStudyPlan,
+  getBurndown,
+  getReadinessScore,
 } = require('../controllers/studyPlanController');
 const { protect } = require('../middleware/auth');
 const { aiLimiter } = require('../middleware/rateLimiter');
@@ -459,5 +461,7 @@ router.post('/:id/reschedule', protect, aiLimiter, checkAiQuota, rescheduleOverd
  *               $ref: '#/components/schemas/Error'
  */
 router.post('/rebalance', protect, aiLimiter, checkAiQuota, rebalanceStudyPlan);
+router.get('/:id/burndown', protect, getBurndown);
+router.get('/:id/readiness-score', protect, getReadinessScore);
 
 module.exports = router;

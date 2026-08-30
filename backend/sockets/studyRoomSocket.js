@@ -8,6 +8,19 @@ const redisService = require('../services/redisService');
 // Local fallback state
 const localRooms = new Map();
 
+// Every event this module registers on a client socket. cleanupSocket() tears
+// all of them down, so a new listener added below must be listed here too.
+const ROOM_EVENTS = [
+  'join_room',
+  'study:room:join',
+  'study:room:leave',
+  'study:room:heartbeat',
+  'draw_stroke',
+  'clear_whiteboard',
+  'send_chat_message',
+  'disconnect',
+];
+
 // Helper to get participants
 async function getRoomParticipants(roomId) {
   const key = `room:${roomId}:participants`;
@@ -137,10 +150,31 @@ const initializeStudyRoomSockets = (io) => {
         console.log(`[Socket] User connected: ${socket.id}`);
 
         /**
-         * Event: User joins a specific study room.
-         * Payload: { roomId, username }
+         * Cleans up room membership state and removes event listeners
+         * from a client socket to prevent memory and listener leaks.
          */
-        socket.on('join_room', async ({ roomId, username }) => {
+        const cleanupSocket = () => {
+            for (const event of ROOM_EVENTS) {
+                socket.removeAllListeners(event);
+            }
+
+            if (socket.heartbeatInterval) {
+                clearInterval(socket.heartbeatInterval);
+                socket.heartbeatInterval = null;
+            }
+
+            socket.data.roomId = null;
+            socket.data.username = null;
+        };
+
+        /**
+         * Adds the socket to a study room, records it as a participant, and
+         * hands the joiner the current participant list and whiteboard.
+         *
+         * Named rather than inline so the same handler can serve both the
+         * legacy `join_room` event and the namespaced `study:room:join`.
+         */
+        const handleJoinRoom = async ({ roomId, username }) => {
             socket.join(roomId);
             socket.data.roomId = roomId;
             socket.data.username = username;
@@ -170,7 +204,35 @@ const initializeStudyRoomSockets = (io) => {
             });
 
             console.log(`[Socket] User ${username} joined room ${roomId}`);
-        });
+        };
+
+        const handleLeaveRoom = async () => {
+            const roomId = socket.data.roomId;
+            const username = socket.data.username;
+
+            if (roomId) {
+                socket.leave(roomId);
+
+                // Without this the participant survives in Redis after an
+                // explicit leave and shows as a ghost in every later join.
+                await removeRoomParticipant(roomId, socket.id);
+
+                if (username) {
+                    socket.to(roomId).emit('user_left', {
+                        username,
+                        message: `${username} has left the study room.`
+                    });
+                }
+                cleanupSocket();
+            }
+        };
+
+        /**
+         * Event: User joins a specific study room.
+         * Payload: { roomId, username }
+         */
+        socket.on('join_room', handleJoinRoom);
+        socket.on('study:room:join', handleJoinRoom);
 
         /**
          * Event: Broadcast a whiteboard drawing stroke to the room.
@@ -219,10 +281,20 @@ const initializeStudyRoomSockets = (io) => {
                 message: message.trim(),
                 timestamp,
             };
-
-            // Broadcast to the entire room, including sender for consistency
             io.to(roomId).emit('receive_chat_message', chatPayload);
         });
+
+        /**
+         * Event: Heartbeat checks for socket connectivity
+         */
+        socket.on('study:room:heartbeat', () => {
+            socket.emit('study:room:heartbeat_ack');
+        });
+
+        /**
+         * Event: Explicit study room leave
+         */
+        socket.on('study:room:leave', handleLeaveRoom);
 
         /**
          * Event: User disconnects or leaves the room.
@@ -242,9 +314,13 @@ const initializeStudyRoomSockets = (io) => {
                     });
                 }
             }
+            cleanupSocket();
             console.log(`[Socket] User disconnected: ${socket.id}`);
         });
     });
 };
 
 module.exports = initializeStudyRoomSockets;
+// The in-memory fallback map was renamed to localRooms; keep exposing it under
+// the original `activeRooms` name so the public surface stays stable.
+module.exports.activeRooms = localRooms;

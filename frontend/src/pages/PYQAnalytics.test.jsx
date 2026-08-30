@@ -3,7 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import PYQAnalytics from './PYQAnalytics';
 import API from '../services/api';
 
-vi.mock('../services/api', () => ({
+vi.mock('../services/api.js', () => ({
   default: {
     get: vi.fn(),
     post: vi.fn(),
@@ -53,3 +53,4 @@ describe('PYQAnalytics Page', () => {
     });
   });
 });
+

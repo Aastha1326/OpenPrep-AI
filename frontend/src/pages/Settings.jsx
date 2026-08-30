@@ -20,10 +20,13 @@ import {
   CalendarDays,
   Volume2,
   Palette,
-} from 'lucide-react';import LeatherBoard from '../components/dashboard/LeatherBoard';
+} from 'lucide-react';
+import LeatherBoard from '../components/dashboard/LeatherBoard.jsx';
 import VintagePaper from '../components/dashboard/VintagePaper';
 import ThemeToggle from '../components/ThemeToggle';
+import TwoWayCalendarSyncManager from '../components/calendar/TwoWayCalendarSyncManager';
 import API from '../services/api';
+
 import {
   getVapidPublicKey,
   subscribeToPush,
@@ -32,9 +35,10 @@ import {
 } from '../services/notificationApi';
 import { loadUser } from '../store/slices/authSlice';
 import { validateAvatarFile } from '../utils/fileValidation';
-import { BADGE_LIST, BADGE_ICONS } from '../config/badges';
+import { BADGE_LIST, BADGE_ICONS } from '../config/badges.js';
 import LazyImage from '../components/common/LazyImage';
 import ThemeCustomizerDrawer from '../components/ThemeCustomizerDrawer';
+import BadgeCarousel from '../components/badges/BadgeCarousel';
 import { useTheme } from '../context/ThemeContext';
 import { THEME_PRESETS } from '../themePresets';
 
@@ -738,6 +742,28 @@ const Settings = () => {
               </div>
             </div>
           </div>
+        </VintagePaper>
+
+        {/* --- TWO-WAY CALENDAR SYNCHRONIZATION HUB --- */}
+        <VintagePaper className="border-t-4 border-t-indigo-600">
+          <TwoWayCalendarSyncManager />
+        </VintagePaper>
+
+
+        {/* --- PROGRESS BADGES & ACHIEVEMENTS --- */}
+        <VintagePaper className="border-t-4 border-t-amber-600">
+          <div className="flex items-center gap-3 mb-2">
+            <Award className="w-7 h-7 text-amber-600" />
+            <div>
+              <h2 className="text-2xl font-bold font-playfair text-neutral-800 dark:text-neutral-100">
+                Progress Badges & Achievements
+              </h2>
+              <p className="text-xs text-neutral-500 italic">
+                Track your study milestones, streaks, and gamified achievements in real time.
+              </p>
+            </div>
+          </div>
+          <BadgeCarousel userId={user?.id} />
         </VintagePaper>
 
         {/* --- GOOGLE CALENDAR SYNC --- */}

@@ -4,6 +4,8 @@ const {
   SquadMember,
   User,
 } = require('../models');
+const { Op } = require('sequelize');
+const redisService = require('./redisService');
 
 /**
  * Emojis a member may react with. Anything else is rejected rather than stored,
@@ -66,12 +68,35 @@ async function logSquadActivity(userId, type, message, metadata = {}, deps = {})
     return { posted: 0, skipped: true };
   }
 
+  const lockService = require('./lockService');
+  const lockValue = await lockService.acquireLock(`squad:activity:${userId}`, 5000);
+  if (!lockValue) {
+    return { posted: 0, skipped: true, error: 'Concurrent activity logging locked.' };
+  }
+
   try {
     const memberships = await squadMemberModel.findAll({ where: { userId } });
     if (memberships.length === 0) {
       return { posted: 0, skipped: false };
     }
 
+    // Try storing to Redis Stream CDC first
+    if (redisService.isReady && redisService.client) {
+      try {
+        const eventData = {
+          userId,
+          activityType: type,
+          message,
+          metadata: JSON.stringify(metadata)
+        };
+        await redisService.client.xadd('squad:stream', '*', 'data', JSON.stringify(eventData));
+        return { posted: memberships.length, skipped: false, queued: true };
+      } catch (redisErr) {
+        console.warn('[squadActivityService] Redis Stream push failed. Falling back to DB write.', redisErr.message);
+      }
+    }
+
+    // Local Fallback: Synchronous Database Write
     let posted = 0;
 
     for (const member of memberships) {
@@ -103,6 +128,8 @@ async function logSquadActivity(userId, type, message, metadata = {}, deps = {})
   } catch (error) {
     console.error('Failed to post squad activity:', error.message);
     return { posted: 0, skipped: false, error: error.message };
+  } finally {
+    await lockService.releaseLock(`squad:activity:${userId}`, lockValue);
   }
 }
 
@@ -112,14 +139,27 @@ async function logSquadActivity(userId, type, message, metadata = {}, deps = {})
  * Ordered by `createdAt` — the column `timestamps: true` actually creates. The
  * caller is responsible for checking squad membership before calling.
  */
-async function getActivityFeed(squadId, requestingUserId, limit = 50, offset = 0, deps = {}) {
+async function getActivityFeed(squadId, requestingUserId, limit = 50, offset = 0, filters = {}, deps = {}) {
   const { squadActivityModel, reactionModel, userModel } = resolve(deps);
 
   const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 100);
   const safeOffset = Math.max(Number(offset) || 0, 0);
 
+  const where = { squadId };
+  if (filters.activityType) {
+    where.activityType = filters.activityType;
+  }
+  if (filters.userId) {
+    where.userId = filters.userId;
+  }
+  if (filters.dateFrom || filters.dateTo) {
+    where.createdAt = {};
+    if (filters.dateFrom) where.createdAt[Op.gte] = new Date(filters.dateFrom);
+    if (filters.dateTo) where.createdAt[Op.lte] = new Date(filters.dateTo);
+  }
+
   const activities = await squadActivityModel.findAll({
-    where: { squadId },
+    where,
     order: [['createdAt', 'DESC']],
     limit: safeLimit,
     offset: safeOffset,

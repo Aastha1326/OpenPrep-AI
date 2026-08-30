@@ -28,6 +28,14 @@ exports.processHandwrittenNote = async (req, res, next) => {
       contents: [prompt, imagePart],
     });
 
+    try {
+      require('../services/metricsService').recordTokensConsumed(
+        'gemini-2.5-flash',
+        response.usageMetadata?.promptTokenCount,
+        response.usageMetadata?.candidatesTokenCount
+      );
+    } catch (e) {}
+
     // Clean up temporary uploaded file
     fs.unlinkSync(filePath);
 

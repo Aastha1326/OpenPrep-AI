@@ -1,4 +1,4 @@
-const { Op } = require('sequelize');
+const { Op, Transaction } = require('sequelize');
 const { v4: uuidv4 } = require('uuid');
 const PDFDocument = require('pdfkit');
 const { sequelize } = require('../config/db');
@@ -13,6 +13,12 @@ const ActivityLog = require('../models/ActivityLog');
 const Progress = require('../models/Progress');
 const QuizTelemetryEvent = require('../models/QuizTelemetryEvent');
 const QuizBookmark = require('../models/QuizBookmark');
+
+// Refactored Services
+const quizGenerationService = require('../services/quizGenerationService');
+const quizEvaluationService = require('../services/quizEvaluationService');
+const quizAnalyticsService = require('../services/quizAnalyticsService');
+
 const geminiService = require('../services/geminiService');
 const cacheService = require('../services/cacheService');
 const { GeminiRateLimitError, GeminiServerError } = require('../services/geminiService');
@@ -28,6 +34,7 @@ try {
   // Graceful fallback if firebase storage service is omitted or missing
 }
 const { checkAndAwardBadges } = require('../services/achievementService');
+const { createNotification } = require('../services/notificationService');
 
 // Window (ms) during which duplicate quiz submissions for the same quiz are ignored.
 // Prevents double-click on "Submit Quiz" from creating duplicate attempt records.
@@ -67,6 +74,15 @@ exports.generateAIQuiz = async (req, res, next) => {
     const { subjectId, topicId, count, language, questionType = 'MCQ' } = req.body;
     const normalizedLanguage = normalizeQuizLanguage(language);
 
+    const MAX_QUIZ_COUNT = 50;
+    const requestedCount = parseInt(count, 10) || 5;
+    if (requestedCount < 1 || requestedCount > MAX_QUIZ_COUNT) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid count parameter. Must be between 1 and ${MAX_QUIZ_COUNT}.`,
+      });
+    }
+
     const subject = await Subject.findByPk(subjectId);
     if (!subject) {
       return res.status(404).json({ success: false, error: 'Subject not found' });
@@ -97,7 +113,7 @@ exports.generateAIQuiz = async (req, res, next) => {
     const cacheKey = cacheService.hashPayload('quiz', {
       subject: subject.name,
       topic: topicName,
-      count: count || 5,
+      count: requestedCount,
       language: normalizedLanguage,
       difficulty: difficultyLevel,
       questionType,
@@ -119,7 +135,7 @@ exports.generateAIQuiz = async (req, res, next) => {
         subject.name,
         topicName,
         notesText,
-        count || 5,
+        requestedCount,
         isRefresh,
         normalizedLanguage,
         difficultyLevel,
@@ -155,14 +171,21 @@ exports.generateAIQuiz = async (req, res, next) => {
       };
     });
 
-    const quiz = await Quiz.create({
-      title: aiQuiz.title || `${topicName} AI Practice Quiz`,
-      subject: subjectId,
-      topic: topicId || null,
-      questions: questionsWithIds,
-      type: 'AI_Generated',
-      language: normalizedLanguage,
-      createdBy: req.user.id,
+    const quiz = await sequelize.transaction(async (t) => {
+      const createdQuiz = await Quiz.create({
+        title: aiQuiz.title || `${topicName} AI Practice Quiz`,
+        subject: subjectId,
+        topic: topicId || null,
+        questions: questionsWithIds,
+        type: 'AI_Generated',
+        language: normalizedLanguage,
+        createdBy: req.user.id,
+      }, { transaction: t });
+      
+      // Mocking associated QuizSettings or QuizMetadata creation
+      // await QuizSettings.create({ quizId: createdQuiz.id, timer: 300 }, { transaction: t });
+
+      return createdQuiz;
     });
 
     await createNotification(
@@ -202,6 +225,15 @@ exports.generateCustomQuiz = async (req, res, next) => {
   try {
     const { subjectId, topics = [], difficulty = 'medium', years = [], count = 5, timeLimit = 20, language = 'english' } = req.body;
 
+    const MAX_QUIZ_COUNT = 50;
+    const requestedCount = parseInt(count, 10) || 5;
+    if (requestedCount < 1 || requestedCount > MAX_QUIZ_COUNT) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid count parameter. Must be between 1 and ${MAX_QUIZ_COUNT}.`,
+      });
+    }
+
     const subject = await Subject.findByPk(subjectId);
     if (!subject) {
       return res.status(404).json({ success: false, error: 'Subject not found' });
@@ -228,13 +260,12 @@ exports.generateCustomQuiz = async (req, res, next) => {
       .join('\n\n');
 
     const difficultyLevel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
-
     // Call Gemini Service
     const aiQuiz = await geminiService.generateCustomQuiz(
       subject.name,
       topics,
       difficultyLevel,
-      count,
+      requestedCount,
       pyqQuestionsText,
       language
     );
@@ -278,15 +309,15 @@ exports.generateCustomQuiz = async (req, res, next) => {
   }
 };
 
+const { getPaginationParams, formatPaginatedResponse } = require('../utils/paginationParams');
+
 // @desc    Get quizzes for a subject
 // @route   GET /api/quizzes
 // @access  Private
 exports.getQuizzes = async (req, res, next) => {
   try {
     const { subjectId } = req.query;
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
-    const offset = (page - 1) * limit;
+    const { page, limit, offset } = getPaginationParams(req.query);
 
     const filter = { createdBy: req.user.id };
     if (subjectId) filter.subject = subjectId;
@@ -309,14 +340,7 @@ exports.getQuizzes = async (req, res, next) => {
       return json;
     });
 
-    res.status(200).json({
-      success: true,
-      count: populatedQuizzes.length,
-      total,
-      page,
-      totalPages: Math.ceil(total / limit),
-      data: populatedQuizzes,
-    });
+    res.status(200).json(formatPaginatedResponse(populatedQuizzes, total, page, limit));
   } catch (error) {
     next(error);
   }
@@ -1464,4 +1488,53 @@ exports.getNextAdaptiveQuestionEndpoint = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Evaluate question distractors quality & plausibility metrics
+// @route   POST /api/quiz/evaluate-distractors
+// @access  Private
+exports.evaluateDistractors = async (req, res, next) => {
+  try {
+    const { evaluateDistractors } = require('../services/distractorScorerService');
+    const { question, options, correctAnswerIndex = 0, context } = req.body;
+
+    if (!question || !Array.isArray(options) || options.length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid input. "question" string and "options" array (min 2 choices) are required.',
+      });
+    }
+
+    const result = await evaluateDistractors({
+      question,
+      options,
+      correctAnswerIndex: parseInt(correctAnswerIndex, 10) || 0,
+      context,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Generate misconception-based distractors
+// @route   POST /api/quizzes/generate-distractors
+// @access  Private
+exports.generateDistractors = async (req, res, next) => {
+  try {
+    const { generateDistractors } = require('../services/distractorGeneratorService');
+    const { question, correctAnswer, context = '', language = 'english' } = req.body;
+    const result = await generateDistractors({ question, correctAnswer, context, language });
+    return res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    if (error.status === 400 || error.status === 502) {
+      return res.status(error.status).json({ success: false, error: error.message });
+    }
+    next(error);
+  }
+};
+
 

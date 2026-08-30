@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Sentry } = require('./config/sentry');
+const { Sentry, requestHandler: sentryRequestHandler, errorHandler: sentryErrorHandler } = require('./utils/sentry');
 const express = require('express');
 const compression = require('compression');
 const cors = require('cors');
@@ -11,6 +11,7 @@ const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
 const { connectDB } = require('./config/db');
+const { Op } = require('sequelize');
 const errorHandler = require('./middleware/error');
 const logger = require('./utils/logger');
 const requestLogger = require('./middleware/requestLogger');
@@ -21,7 +22,13 @@ const PYQ = require('./models/PYQ');
 const Note = require('./models/Note');
 const Achievement = require('./models/Achievement');
 const swaggerSpec = require('./config/swagger');
-const { apiReference } = require('@scalar/express-api-reference');
+const mockInterviewRoutes = require('./routes/mockInterviewRoutes');
+let apiReference;
+try {
+  apiReference = require('@scalar/express-api-reference').apiReference;
+} catch (e) {
+  apiReference = null;
+}
 const passport = require('./config/passport');
 const { getCorsMiddleware, getSocketCorsOrigin } = require('./middleware/corsHandler');
 const { metricsMiddleware, getMetrics } = require('./middleware/metricsMiddleware');
@@ -53,7 +60,11 @@ const authRoutes = require('./routes/authRoutes');
 const academicRoutes = require('./routes/academicRoutes');
 const pyqRoutes = require('./routes/pyqRoutes');
 const studyPlanRoutes = require('./routes/studyPlanRoutes');
+const milestoneRoutes = require('./routes/milestoneRoutes');
+const streakRoutes = require('./routes/streakRoutes');
 const quizRoutes = require('./routes/quizRoutes');
+const questionDiscussionRoutes = require('./routes/questionDiscussionRoutes');
+const commentRoutes = require('./routes/commentRoutes');
 const flashcardRoutes = require('./routes/flashcardRoutes');
 const flashcardDeckRoutes = require('./routes/flashcardDeckRoutes');
 const shareRoutes = require('./routes/shareRoutes');
@@ -62,9 +73,11 @@ const adminRoutes = require('./routes/adminRoutes');
 const searchRoutes = require('./routes/searchRoutes');
 const progressRoutes = require('./routes/progressRoutes');
 const pacingCoachRoutes = require('./routes/pacingCoachRoutes');
+const handwrittenSubmissionRoutes = require('./routes/handwrittenSubmissionRoutes');
 const communityRoutes = require('./routes/communityRoutes');
 const userRoutes = require('./routes/userRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const doubtSessionRoutes = require('./routes/doubtSessionRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const aiEditorRoutes = require('./routes/aiEditorRoutes');
 const quizBattleRoutes = require('./routes/quizBattleRoutes');
@@ -79,13 +92,38 @@ const calendarRoutes = require('./routes/calendarRoutes');
 const gamificationRoutes = require('./routes/gamificationRoutes');
 const battleRoutes = require('./routes/battleRoutes');
 const readinessRoutes = require('./routes/readinessRoutes');
+const proctoringRoutes = require('./routes/proctoringRoutes');
 const squadRoutes = require('./routes/squadRoutes');
 const badgeRoutes = require('./routes/badgeRoutes');
+ feat/omr-pdf-generator
 const visualizerRoutes = require('./routes/visualizerRoutes');
+const weaknessDetectionRoutes = require('./routes/weaknessDetectionRoutes');
+const pyqIntelligenceRoutes = require('./routes/pyqIntelligenceRoutes');
+const adaptivePlannerRoutes = require('./routes/adaptivePlannerRoutes');
+const communityResourceRoutes = require('./routes/communityResourceRoutes');
+const attemptHistoryRoutes = require('./routes/attemptHistoryRoutes');
+const learningInsightsRoutes = require('./routes/learningInsightsRoutes');
+const studyGoalSchedulerRoutes = require('./routes/studyGoalSchedulerRoutes');
 const analyticsInsightsRoutes = require('./routes/analyticsInsightsRoutes');
+const adaptiveExamRoutes = require('./routes/adaptiveExamRoutes');
+const diagramQuestionRoutes = require('./routes/diagramQuestionRoutes');
+const classroomRoutes = require('./routes/classroomRoutes');
+const studyReminderRoutes = require('./routes/studyReminderRoutes');
+const sessionRoutes = require('./routes/sessionRoutes');
+const recommendationRoutes = require('./routes/recommendationRoutes');
+const examStrategyRoutes = require('./routes/examStrategyRoutes');
+const studyTipRoutes = require('./routes/studyTipRoutes');
+
+const vivaRoutes = require('./routes/vivaRoutes');
+const bountyRoutes = require('./routes/bountyRoutes');
+ main
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
+const { initNightlyBadgeEvaluatorCron } = require('./services/badgeEvaluationService');
+const { initNotificationScheduler } = require('./services/notificationSchedulerService');
 initDifficultyCalibratorCron();
+initNightlyBadgeEvaluatorCron();
+initNotificationScheduler();
 
 const cron = require('node-cron');
 const calendarService = require('./services/calendarService');
@@ -102,11 +140,29 @@ cron.schedule('0 0 * * *', async () => {
 
 // Connect to Database
 connectDB();
+const { verifyMigrations } = require('./services/migrationVerifier');
+verifyMigrations().catch(err => console.error('Migration verification check failed:', err.message));
 
 // Connect to Redis
 const redisService = require('./services/redisService');
 redisService.connect();
 const app = express();
+app.use(sentryRequestHandler);
+
+// Prometheus HTTP request duration tracking middleware
+app.use((req, res, next) => {
+  const start = process.hrtime();
+  res.on('finish', () => {
+    const diff = process.hrtime(start);
+    const duration = diff[0] + diff[1] / 1e9;
+    let route = req.route ? req.route.path : req.path;
+    if (route !== '/metrics' && route !== '/api/metrics' && !route.startsWith('/uploads')) {
+      const { recordHttpRequest } = require('./services/metricsService');
+      recordHttpRequest(req.method, route, res.statusCode, duration);
+    }
+  });
+  next();
+});
 
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
@@ -209,7 +265,15 @@ app.use(compression({
   level: 6, // balanced gzip compression
   threshold: 0,
 }));
+// Existing middleware setup
+app.use(express.json());
+app.use(cors(corsOptions));
+app.use(requestLogger);
 
+// AI Usage Budget middleware
+const { checkAIBudget, recordUsageAfterRequest } = require('./middleware/aiUsageBudgetMiddleware');
+app.use(checkAIBudget);
+app.use(recordUsageAfterRequest);
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
@@ -228,11 +292,24 @@ app.use('/uploads/avatars', express.static(path.join(__dirname, 'uploads/avatars
 // Set Static Folder for File Uploads (Protected)
 // protect, Note, PYQ already imported at top of file
 
-app.get('/uploads/:filename', protect, async (req, res, next) => {
+// Helper to extract filename from a stored URL (handles full URLs and different path formats)
+const extractFilename = (url) => {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    return path.basename(parsed.pathname);
+  } catch {
+    // Not a full URL, treat as path
+    return path.basename(url);
+  }
+};
+
+app.get(['/uploads/:filename', '/uploads/podcasts/:filename'], protect, async (req, res, next) => {
   try {
     const filename = req.params.filename;
-    const fileUrl = `/uploads/${filename}`;
+    const fileUrl = req.path;
 
+    // Direct match first (fast path for standard format)
     let record = await Note.findOne({ where: { fileUrl } });
     let isPublic = false;
     let owner = null;
@@ -253,6 +330,41 @@ app.get('/uploads/:filename', protect, async (req, res, next) => {
       }
     }
 
+    // Fallback: fuzzy match by extracting filename from stored URLs
+    // Handles cases where stored URL is a full URL or has different path format
+    if (!record) {
+      const allNotes = await Note.findAll({ where: { fileUrl: { [Op.ne]: null } } });
+      for (const note of allNotes) {
+        if (extractFilename(note.fileUrl) === filename) {
+          record = note;
+          isPublic = note.isPublic;
+          owner = note.user;
+          break;
+        }
+      }
+    }
+    if (!record) {
+      const allPyqs = await PYQ.findAll({ where: { fileUrl: { [Op.ne]: null } } });
+      for (const pyq of allPyqs) {
+        if (extractFilename(pyq.fileUrl) === filename) {
+          record = pyq;
+          owner = pyq.user;
+          break;
+        }
+      }
+    }
+    if (!record) {
+      const { PodcastEpisode } = require('./models');
+      const allEpisodes = await PodcastEpisode.findAll({ where: { audioUrl: { [Op.ne]: null } } });
+      for (const episode of allEpisodes) {
+        if (extractFilename(episode.audioUrl) === filename) {
+          record = episode;
+          owner = episode.userId;
+          break;
+        }
+      }
+    }
+
     if (!record) {
       return res.status(404).json({ success: false, error: 'File not found' });
     }
@@ -262,7 +374,14 @@ app.get('/uploads/:filename', protect, async (req, res, next) => {
     }
 
     res.set('Cache-Control', 'private, max-age=86400'); // 1 day cache for protected assets
-    res.sendFile(path.join(__dirname, 'uploads', filename));
+    let filePath = path.join(__dirname, 'uploads', filename);
+    if (!fs.existsSync(filePath)) {
+      const podcastPath = path.join(__dirname, 'uploads', 'podcasts', filename);
+      if (fs.existsSync(podcastPath)) {
+        filePath = podcastPath;
+      }
+    }
+    res.sendFile(filePath);
   } catch (error) {
     next(error);
   }
@@ -270,49 +389,118 @@ app.get('/uploads/:filename', protect, async (req, res, next) => {
 
 // Mount routes
 app.use('/api/auth', authRoutes);
+app.use('/api/molecular', molecularRoutes);
+
+app.use('/api/session', sessionRoutes);
+app.use('/session', sessionRoutes);
 app.post('/api/session/keepalive', protect, require('./controllers/authController').keepalive);
 app.use('/api/academic', academicRoutes);
+// 1. Mount the Previous Year Questions (PYQ) Router on the canonical plural path
 app.use('/api/pyqs', pyqRoutes);
-app.use('/api/pyq', pyqRoutes);
+
+// 2. Intercept legacy singular endpoint calls and redirect with proper HTTP semantics
+app.use('/api/pyq', (req, res) => {
+  // Construct the new path maintaining any nested sub-routes and query parameters
+  const canonicalPath = req.originalUrl.replace(/^\/api\/pyq/, '/api/pyqs');
+  
+  res.status(301).redirect(canonicalPath);
+});
 app.use('/api/community', communityRoutes);
+app.use('/api/circuits', require('./routes/circuitRoutes'));
+app.use('/api/language', require('./routes/languageRoutes'));
+app.use('/api/bounties', require('./routes/bountyRoutes'));
 app.use('/api/squads', squadRoutes);
 app.use('/api/study', fatigueRoutes);
 app.use('/api/documents', pdfAnnotationRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/study-plans', studyPlanRoutes);
+app.use('/api/milestones', milestoneRoutes);
+app.use('/api/streaks', streakRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/pacing-coach', pacingCoachRoutes);
+app.use('/api/questions', questionDiscussionRoutes);
+app.use('/api/comments', commentRoutes);
 app.use('/api/quiz', quizRoutes);
+app.use('/api/recommendations', recommendationRoutes);
+app.use('/recommendations', recommendationRoutes);
 app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/flashcard-decks', flashcardDeckRoutes);
 app.use('/api/decks', require('./routes/publicDeckRoutes'));
 app.use('/api/share', shareRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/db', require('./routes/dbAdminRoutes'));
 app.use('/api/search', searchRoutes);
+app.use('/api/submissions', handwrittenSubmissionRoutes);
 app.use('/api/progress', progressRoutes);
 app.use('/api/users', userRoutes);
 app.get('/api/user/quota', protect, require('./controllers/userController').getQuota);
 app.put('/api/user/preferences/timezone', protect, require('./controllers/userController').updateTimezone);
+app.get('/api/user/notifications/settings', protect, require('./controllers/userController').getNotificationSettings);
+app.put('/api/user/notifications/settings', protect, require('./controllers/userController').updateNotificationSettings);
+app.get('/api/user/dashboard', protect, require('./controllers/userController').getDashboardLayout);
+app.post('/api/user/dashboard', protect, require('./controllers/userController').updateDashboardLayout);
 app.use('/api/ai', aiRoutes);
-app.use('/api/ai-editor', aiEditorRoutes);
 app.use('/api/quiz-battles', quizBattleRoutes);
+app.use('/api/adaptive-exams', adaptiveExamRoutes);
+app.use('/api/quizzes/diagram-hotspot', diagramQuestionRoutes);
+app.use('/api/diagram-hotspots', diagramQuestionRoutes);
+app.use('/api/classrooms', classroomRoutes);
+app.use('/api/reminders', studyReminderRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/doubts', doubtSessionRoutes);
 app.use('/api/readiness', readinessRoutes);
+app.use('/api/viva', vivaRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/dashboard', analyticsRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/integrations/google-calendar', calendarRoutes);
+app.use('/api/graphs', require('./routes/graphRoutes'));
+app.use('/api/deck-versioning', require('./routes/deckVersionRoutes'));
+app.use('/api/integrations', require('./routes/integrationRoutes'));
 app.use('/api/gamification', gamificationRoutes);
 app.use('/api/battles', battleRoutes);
 app.use('/api/folders', folderRoutes);
-app.use('/api/squads', squadRoutes);
 app.use('/api/badges', badgeRoutes);
-app.use('/api/community', communityRoutes);
-app.use('/api/visualizer', visualizerRoutes);
-app.use('/api/analytics-insights', analyticsInsightsRoutes);
+app.use('/api/bounties', bountyRoutes);
 
+const leaderboardRoutes = require('./routes/leaderboardRoutes');
+app.use('/api/leaderboard', leaderboardRoutes);app.get('/user/badges', protect, require('./controllers/badgeController').getUserBadges);
+app.get('/api/user/badges', protect, require('./controllers/badgeController').getUserBadges);
+app.get('/api/leaderboard', protect, require('./controllers/badgeController').getLeaderboardData);
+app.get('/leaderboard', protect, require('./controllers/badgeController').getLeaderboardData);
+app.use('/api/visualizer', visualizerRoutes);
+const revisionSchedulerRoutes = require('./routes/revisionSchedulerRoutes');
+app.use('/api/revision-schedules', revisionSchedulerRoutes);
+app.use('/api/analytics-insights', analyticsInsightsRoutes);
+const examStrategyRoutes = require('./routes/examStrategyRoutes');
+const studyTipRoutes = require('./routes/studyTipRoutes');
+app.use('/api/exam-strategies', examStrategyRoutes);
+app.use('/api/study-tips', studyTipRoutes);
+app.use('/api/learning-path', require('./routes/learningPathRoutes'));
+app.use('/user/learning-path', require('./routes/learningPathRoutes'));
+const studyGoalRoutes = require('./routes/studyGoalRoutes');
+app.use('/api/study-goals', studyGoalRoutes);
+const studyPlaylistRoutes = require('./routes/studyPlaylistRoutes');
+app.use('/api/study-playlists', studyPlaylistRoutes);
+const resourceBookmarkRoutes = require('./routes/resourceBookmarkRoutes');
+app.use('/api/bookmarks', resourceBookmarkRoutes);
+const studyHeatmapRoutes = require('./routes/studyHeatmapRoutes');
+app.use('/api/study-heatmap', studyHeatmapRoutes);
+const studyAnalyticsRoutes = require('./routes/studyAnalyticsRoutes');
+app.use('/api/study-analytics', studyAnalyticsRoutes);
+const topicDifficultyEstimatorRoutes = require('./routes/topicDifficultyEstimatorRoutes');
+app.use('/api/topic-difficulty', topicDifficultyEstimatorRoutes);
+const flashcardMasteryRoutes = require('./routes/flashcardMasteryRoutes');
+app.use('/api/flashcard-mastery', flashcardMasteryRoutes);
+const habitTrackerRoutes = require('./routes/habitTrackerRoutes');
+app.use('/api/habits', habitTrackerRoutes);
+const learningJournalRoutes = require('./routes/learningJournalRoutes');
+app.use('/api/learning-journal', learningJournalRoutes);
+const studyPlanVersioningRoutes = require('./routes/studyPlanVersioningRoutes');
+app.use('/api/study-plans/:planId', studyPlanVersioningRoutes);
+app.use('/api/interviews', mockInterviewRoutes);
 // Serve static assets from frontend build folder in production
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../frontend/dist')));
@@ -348,6 +536,29 @@ app.get(['/api/v1/health', '/api/health'], async (req, res) => {
       db: 'disconnected',
       error: error.message,
     });
+  }
+});
+
+// Secured metrics endpoint exposing Prometheus scrapable formatting
+app.get(['/metrics', '/api/metrics'], async (req, res) => {
+  const authHeader = req.headers.authorization;
+  const metricsToken = process.env.METRICS_TOKEN;
+  const isLocalhost = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1';
+
+  if (metricsToken && authHeader === `Bearer ${metricsToken}`) {
+    // Approved
+  } else if (isLocalhost) {
+    // Approved
+  } else {
+    return res.status(403).json({ error: 'Forbidden: Access to metrics endpoint is denied.' });
+  }
+
+  try {
+    const { register } = require('./services/metricsService');
+    res.set('Content-Type', register.contentType);
+    res.end(await register.metrics());
+  } catch (err) {
+    res.status(500).end(err);
   }
 });
 
@@ -388,9 +599,7 @@ app.use(['/api-docs', '/api/docs'], (req, res, next) => {
 }));
 
 // Error Handler Middleware
-if (process.env.NODE_ENV !== 'test' && process.env.SENTRY_DSN) {
-  Sentry.setupExpressErrorHandler(app);
-}
+app.use(sentryErrorHandler);
 app.use(csrfErrorHandler);
 app.use(errorHandler);
 
@@ -433,8 +642,7 @@ require('./sockets/chatHandler')(io);
 require('./sockets/crdtHandler')(io);
 require('./sockets/squadHandler')(io);
 require('./sockets/flashcardCollaborationHandler')(io);
-require('./sockets/focusRoomHandler')(io);
-require('./sockets/studyRoomSocket')(io);
+require('./services/audioSignalingSocket').init(io);
 // Authenticate Socket.io connections
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
@@ -453,16 +661,27 @@ io.use((socket, next) => {
   }
 });
 
-// User notification room listener
+// User notification room listener & WebSocket active connections gauge tracking
+const { activeWebsocketConnections } = require('./services/metricsService');
+
 io.on('connection', (socket) => {
+  activeWebsocketConnections.inc();
+  
   if (socket.user && socket.user.id) {
     socket.join(`user:${socket.user.id}`);
   }
+
+  socket.on('disconnect', () => {
+    activeWebsocketConnections.dec();
+  });
 });
 
 // Start background schedulers
 const { startScheduler } = require('./services/weeklyDigestService');
 startScheduler();
+
+const { startReconciliationScheduler } = require('./services/otSyncService');
+startReconciliationScheduler();
 
 const { initStudyReminderCron } = require('./jobs/studyReminderCron');
 const { initStreakReminderCron } = require('./jobs/streakReminderCron');
@@ -471,7 +690,27 @@ initStudyReminderCron(io);
 initStreakReminderCron(io);
 initBackupScheduler();
 
+const { startWorker } = require('./workers/squadActivityWorker');
+startWorker();
 
+const { startWorker: startTaskWorker } = require('./workers/taskQueueWorker');
+startTaskWorker();
+
+const { startMatchmakerDaemon } = require('./workers/matchmakerDaemon');
+startMatchmakerDaemon();
+
+const {
+  registerWorker: registerInterviewProcessingWorker,
+  recoverStaleJobs,
+} = require('./services/interviewProcessingService');
+
+registerInterviewProcessingWorker();
+
+recoverStaleJobs().catch((error) => {
+  logger.error('failed to recover stale interview processing jobs', {
+    err: error,
+  });
+});
 if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   server.listen(PORT, () => {
     logger.info('server started', {
@@ -483,7 +722,32 @@ if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
 }
 
 module.exports = app;
+const {
+  validatePartition,
+} = require('./services/candidateRankingService');
 
+// Validate the global candidate ranking cache once every night.
+// This does not run for every interview.
+cron.schedule('0 2 * * *', async () => {
+  try {
+    const result = await validatePartition(
+      'global',
+      'all'
+    );
+
+    logger.info(
+      'candidate ranking consistency check completed',
+      result
+    );
+  } catch (error) {
+    logger.error(
+      'candidate ranking consistency check failed',
+      {
+        error: error.message,
+      }
+    );
+  }
+});
 
 // Graceful Shutdown Logic
 const gracefulShutdown = (signal) => {
@@ -498,6 +762,41 @@ const gracefulShutdown = (signal) => {
   server.close(async () => {
     logger.info('HTTP connections drained, closing resource pools');
     clearTimeout(forceExitTimeout);
+
+    try {
+      const { stopReconciliationScheduler } = require('./services/otSyncService');
+      stopReconciliationScheduler();
+      logger.info('OT reconciliation scheduler stopped');
+    } catch (otErr) {
+      logger.error('error stopping OT reconciliation scheduler', { err: otErr });
+    }
+
+    try {
+      const { stopWorker } = require('./workers/squadActivityWorker');
+      stopWorker();
+      logger.info('squad activity worker stopped');
+    } catch (workerErr) {
+      logger.error('error stopping squad activity worker', { err: workerErr });
+    }
+
+    try {
+      const { stopWorker: stopTaskWorker } = require('./workers/taskQueueWorker');
+      stopTaskWorker();
+      logger.info('task queue worker stopped');
+    } catch (taskWorkerErr) {
+      logger.error('error stopping task queue worker', { err: taskWorkerErr });
+    }
+
+    try {
+      // Drain queued search-index writes before the pools close, so an
+      // in-flight embedding does not fire against a shutting-down process.
+      const searchIndex = require('./services/searchIndexService');
+      await searchIndex.drain();
+      searchIndex.shutdown();
+      logger.info('search index queue drained');
+    } catch (indexErr) {
+      logger.error('error draining search index queue', { err: indexErr });
+    }
 
     try {
       const { sequelize } = require('./config/db');
