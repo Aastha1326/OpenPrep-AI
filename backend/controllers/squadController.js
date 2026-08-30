@@ -97,10 +97,30 @@ async function getMySquads(req, res, next) {
   }
 }
 
+async function getAudioStatus(req, res, next) {
+  try {
+    const { id } = req.params;
+
+    // Verify squad membership
+    const member = await SquadMember.findOne({ where: { squadId: id, userId: req.user.id } });
+    if (!member) {
+      return res.status(403).json({ error: 'Not authorized to access this squad' });
+    }
+
+    const audioSignalingSocket = require('../services/audioSignalingSocket');
+    const participants = audioSignalingSocket.getParticipants(id);
+
+    res.status(200).json({ success: true, participants });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   createSquad,
   joinSquad,
   leaveSquad,
   getSquadDashboard,
-  getMySquads
+  getMySquads,
+  getAudioStatus,
 };

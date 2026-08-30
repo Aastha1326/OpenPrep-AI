@@ -37,7 +37,10 @@ const StudyPlan = sequelize.define(
       type: DataTypes.ENUM('active', 'completed', 'archived'),
       defaultValue: 'active',
     },
-  },
+    currentVersionNumber: {
+      type: DataTypes.INTEGER,
+      defaultValue: 1,
+    },  },
   {
     timestamps: true,
     indexes: [
