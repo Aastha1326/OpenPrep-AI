@@ -109,6 +109,8 @@ const classroomRoutes = require('./routes/classroomRoutes');
 const studyReminderRoutes = require('./routes/studyReminderRoutes');
 const sessionRoutes = require('./routes/sessionRoutes');
 const recommendationRoutes = require('./routes/recommendationRoutes');
+const examStrategyRoutes = require('./routes/examStrategyRoutes');
+const studyTipRoutes = require('./routes/studyTipRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 const { initNightlyBadgeEvaluatorCron } = require('./services/badgeEvaluationService');
@@ -132,6 +134,8 @@ cron.schedule('0 0 * * *', async () => {
 
 // Connect to Database
 connectDB();
+const { verifyMigrations } = require('./services/migrationVerifier');
+verifyMigrations().catch(err => console.error('Migration verification check failed:', err.message));
 
 // Connect to Redis
 const redisService = require('./services/redisService');
@@ -392,6 +396,7 @@ app.use('/api/decks', require('./routes/publicDeckRoutes'));
 app.use('/api/share', shareRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/db', require('./controllers/dbAdminController'));
 app.use('/api/search', searchRoutes);
 app.use('/api/submissions', handwrittenSubmissionRoutes);
 app.use('/api/progress', progressRoutes);
