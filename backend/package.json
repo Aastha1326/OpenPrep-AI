@@ -16,7 +16,8 @@
     "seed:synthetic": "node scripts/seedSyntheticData.js",
     "db:migrate:test": "node scripts/migrate.js --force",
     "db:backup": "node scripts/db-backup.js",
-    "db:restore": "node scripts/db-restore.js"
+    "db:restore": "node scripts/db-restore.js",
+    "check:server": "node scripts/check-server-wiring.js"
   },
   "dependencies": {
     "@google/genai": "^2.16.0",

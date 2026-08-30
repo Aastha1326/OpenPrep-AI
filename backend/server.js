@@ -95,7 +95,7 @@ const readinessRoutes = require('./routes/readinessRoutes');
 const proctoringRoutes = require('./routes/proctoringRoutes');
 const squadRoutes = require('./routes/squadRoutes');
 const badgeRoutes = require('./routes/badgeRoutes');
- feat/omr-pdf-generator
+const molecularRoutes = require('./routes/molecularRoutes');
 const visualizerRoutes = require('./routes/visualizerRoutes');
 const weaknessDetectionRoutes = require('./routes/weaknessDetectionRoutes');
 const pyqIntelligenceRoutes = require('./routes/pyqIntelligenceRoutes');
@@ -116,7 +116,7 @@ const studyTipRoutes = require('./routes/studyTipRoutes');
 
 const vivaRoutes = require('./routes/vivaRoutes');
 const bountyRoutes = require('./routes/bountyRoutes');
- main
+const learningPathRoutes = require('./routes/learningPathRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 const { initNightlyBadgeEvaluatorCron } = require('./services/badgeEvaluationService');
@@ -408,7 +408,6 @@ app.use('/api/pyq', (req, res) => {
 app.use('/api/community', communityRoutes);
 app.use('/api/circuits', require('./routes/circuitRoutes'));
 app.use('/api/language', require('./routes/languageRoutes'));
-app.use('/api/bounties', require('./routes/bountyRoutes'));
 app.use('/api/squads', squadRoutes);
 app.use('/api/study', fatigueRoutes);
 app.use('/api/documents', pdfAnnotationRoutes);
@@ -474,16 +473,12 @@ app.use('/api/visualizer', visualizerRoutes);
 const revisionSchedulerRoutes = require('./routes/revisionSchedulerRoutes');
 app.use('/api/revision-schedules', revisionSchedulerRoutes);
 app.use('/api/analytics-insights', analyticsInsightsRoutes);
-const examStrategyRoutes = require('./routes/examStrategyRoutes');
-const studyTipRoutes = require('./routes/studyTipRoutes');
 app.use('/api/exam-strategies', examStrategyRoutes);
 app.use('/api/study-tips', studyTipRoutes);
-app.use('/api/learning-path', require('./routes/learningPathRoutes'));
-app.use('/user/learning-path', require('./routes/learningPathRoutes'));
+app.use('/api/learning-path', learningPathRoutes);
+app.use('/user/learning-path', learningPathRoutes);
 const studyGoalRoutes = require('./routes/studyGoalRoutes');
 app.use('/api/study-goals', studyGoalRoutes);
-const studyPlaylistRoutes = require('./routes/studyPlaylistRoutes');
-app.use('/api/study-playlists', studyPlaylistRoutes);
 const resourceBookmarkRoutes = require('./routes/resourceBookmarkRoutes');
 app.use('/api/bookmarks', resourceBookmarkRoutes);
 const studyHeatmapRoutes = require('./routes/studyHeatmapRoutes');
