@@ -397,10 +397,16 @@ export const startDoubtSession = (formData) =>
 export const sendDoubtMessage = (sessionId, message) =>
   API.post(`/doubts/${sessionId}/message`, { message });
 
-// ── Two-Way Calendar Synchronization APIs ──────────────────────────
-export const getCalendarSyncStatus = () => API.get('/calendar-sync/status');
-export const linkOutlookCalendar = (data) => API.post('/calendar-sync/outlook/link', data);
-export const checkCalendarConflicts = (data) => API.post('/calendar-sync/check-conflicts', data);
+/**
+ * Reveal the next progressive hint for a doubt session.
+ * POST /api/doubts/:id/reveal-step
+ */
+// ── Spaced Repetition Flashcard Analytics APIs ──────────────────────────
+export const getLeitnerDistribution = (deckId = null) =>
+  API.get('/flashcards/analytics/leitner-distribution', { params: { deckId } });
+
+export const getDueForecast = (deckId = null) =>
+  API.get('/flashcards/analytics/due-forecast', { params: { deckId } });
 
 export default API;
 
