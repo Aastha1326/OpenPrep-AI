@@ -109,6 +109,13 @@ jobs:
         run: npm install --no-audit
         working-directory: backend
 
+      # A test file matching neither runner's glob is never executed, and the
+      # run below still prints a healthy pass count. 94 files are in that
+      # state; this fails on a 95th.
+      - name: Check Test Discovery
+        run: node scripts/check-test-discovery.js
+        working-directory: backend
+
       - name: Run Backend Tests with Coverage
         run: npm run test:coverage
         working-directory: backend
