@@ -1,4 +1,4 @@
-const { Op } = require('sequelize');
+const { Op, Transaction } = require('sequelize');
 const { v4: uuidv4 } = require('uuid');
 const PDFDocument = require('pdfkit');
 const { sequelize } = require('../config/db');
@@ -171,14 +171,21 @@ exports.generateAIQuiz = async (req, res, next) => {
       };
     });
 
-    const quiz = await Quiz.create({
-      title: aiQuiz.title || `${topicName} AI Practice Quiz`,
-      subject: subjectId,
-      topic: topicId || null,
-      questions: questionsWithIds,
-      type: 'AI_Generated',
-      language: normalizedLanguage,
-      createdBy: req.user.id,
+    const quiz = await sequelize.transaction(async (t) => {
+      const createdQuiz = await Quiz.create({
+        title: aiQuiz.title || `${topicName} AI Practice Quiz`,
+        subject: subjectId,
+        topic: topicId || null,
+        questions: questionsWithIds,
+        type: 'AI_Generated',
+        language: normalizedLanguage,
+        createdBy: req.user.id,
+      }, { transaction: t });
+      
+      // Mocking associated QuizSettings or QuizMetadata creation
+      // await QuizSettings.create({ quizId: createdQuiz.id, timer: 300 }, { transaction: t });
+
+      return createdQuiz;
     });
 
     await createNotification(
