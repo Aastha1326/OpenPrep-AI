@@ -63,6 +63,14 @@ jobs:
       # so this gate needs no PostgreSQL and no Redis and stays green when the
       # database-backed suites cannot run. Four separate boot failures reached
       # main while nothing in CI ever asked whether a backend module loads.
+      # Reads models/index.js as text, so it needs neither a database nor a
+      # loadable registry. It runs before the suite because when the registry
+      # is broken every vitest file collects zero tests and the run below
+      # reports "no tests" rather than naming the model at fault.
+      - name: Check Model Registry
+        run: npm run check:models
+        working-directory: backend
+
       - name: Check Backend Module Integrity
         run: npm run test:integrity
         working-directory: backend
