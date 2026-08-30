@@ -94,8 +94,28 @@ const readinessRoutes = require('./routes/readinessRoutes');
 const proctoringRoutes = require('./routes/proctoringRoutes');
 const squadRoutes = require('./routes/squadRoutes');
 const badgeRoutes = require('./routes/badgeRoutes');
+ feat/omr-pdf-generator
+const visualizerRoutes = require('./routes/visualizerRoutes');
+const weaknessDetectionRoutes = require('./routes/weaknessDetectionRoutes');
+const pyqIntelligenceRoutes = require('./routes/pyqIntelligenceRoutes');
+const adaptivePlannerRoutes = require('./routes/adaptivePlannerRoutes');
+const communityResourceRoutes = require('./routes/communityResourceRoutes');
+const attemptHistoryRoutes = require('./routes/attemptHistoryRoutes');
+const learningInsightsRoutes = require('./routes/learningInsightsRoutes');
+const studyGoalSchedulerRoutes = require('./routes/studyGoalSchedulerRoutes');
+const analyticsInsightsRoutes = require('./routes/analyticsInsightsRoutes');
+const adaptiveExamRoutes = require('./routes/adaptiveExamRoutes');
+const diagramQuestionRoutes = require('./routes/diagramQuestionRoutes');
+const classroomRoutes = require('./routes/classroomRoutes');
+const studyReminderRoutes = require('./routes/studyReminderRoutes');
+const sessionRoutes = require('./routes/sessionRoutes');
+const recommendationRoutes = require('./routes/recommendationRoutes');
+const examStrategyRoutes = require('./routes/examStrategyRoutes');
+const studyTipRoutes = require('./routes/studyTipRoutes');
+
 const vivaRoutes = require('./routes/vivaRoutes');
 const bountyRoutes = require('./routes/bountyRoutes');
+ main
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 const { initNightlyBadgeEvaluatorCron } = require('./services/badgeEvaluationService');
@@ -119,6 +139,8 @@ cron.schedule('0 0 * * *', async () => {
 
 // Connect to Database
 connectDB();
+const { verifyMigrations } = require('./services/migrationVerifier');
+verifyMigrations().catch(err => console.error('Migration verification check failed:', err.message));
 
 // Connect to Redis
 const redisService = require('./services/redisService');
@@ -405,6 +427,7 @@ app.use('/api/decks', require('./routes/publicDeckRoutes'));
 app.use('/api/share', shareRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/db', require('./routes/dbAdminRoutes'));
 app.use('/api/search', searchRoutes);
 app.use('/api/submissions', handwrittenSubmissionRoutes);
 app.use('/api/progress', progressRoutes);
