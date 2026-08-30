@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Sentry } = require('./config/sentry');
+const { Sentry, requestHandler: sentryRequestHandler, errorHandler: sentryErrorHandler } = require('./utils/sentry');
 const express = require('express');
 const compression = require('compression');
 const cors = require('cors');
@@ -95,6 +95,7 @@ const proctoringRoutes = require('./routes/proctoringRoutes');
 const squadRoutes = require('./routes/squadRoutes');
 const badgeRoutes = require('./routes/badgeRoutes');
 const vivaRoutes = require('./routes/vivaRoutes');
+const bountyRoutes = require('./routes/bountyRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 const { initNightlyBadgeEvaluatorCron } = require('./services/badgeEvaluationService');
@@ -123,6 +124,22 @@ connectDB();
 const redisService = require('./services/redisService');
 redisService.connect();
 const app = express();
+app.use(sentryRequestHandler);
+
+// Prometheus HTTP request duration tracking middleware
+app.use((req, res, next) => {
+  const start = process.hrtime();
+  res.on('finish', () => {
+    const diff = process.hrtime(start);
+    const duration = diff[0] + diff[1] / 1e9;
+    let route = req.route ? req.route.path : req.path;
+    if (route !== '/metrics' && route !== '/api/metrics' && !route.startsWith('/uploads')) {
+      const { recordHttpRequest } = require('./services/metricsService');
+      recordHttpRequest(req.method, route, res.statusCode, duration);
+    }
+  });
+  next();
+});
 
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
@@ -421,6 +438,7 @@ app.use('/api/gamification', gamificationRoutes);
 app.use('/api/battles', battleRoutes);
 app.use('/api/folders', folderRoutes);
 app.use('/api/badges', badgeRoutes);
+app.use('/api/bounties', bountyRoutes);
 
 const leaderboardRoutes = require('./routes/leaderboardRoutes');
 app.use('/api/leaderboard', leaderboardRoutes);app.get('/user/badges', protect, require('./controllers/badgeController').getUserBadges);
@@ -496,6 +514,29 @@ app.get(['/api/v1/health', '/api/health'], async (req, res) => {
   }
 });
 
+// Secured metrics endpoint exposing Prometheus scrapable formatting
+app.get(['/metrics', '/api/metrics'], async (req, res) => {
+  const authHeader = req.headers.authorization;
+  const metricsToken = process.env.METRICS_TOKEN;
+  const isLocalhost = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1';
+
+  if (metricsToken && authHeader === `Bearer ${metricsToken}`) {
+    // Approved
+  } else if (isLocalhost) {
+    // Approved
+  } else {
+    return res.status(403).json({ error: 'Forbidden: Access to metrics endpoint is denied.' });
+  }
+
+  try {
+    const { register } = require('./services/metricsService');
+    res.set('Content-Type', register.contentType);
+    res.end(await register.metrics());
+  } catch (err) {
+    res.status(500).end(err);
+  }
+});
+
 app.get('/healthz', (req, res) => {
   res.status(200).send('OK');
 });
@@ -533,9 +574,7 @@ app.use(['/api-docs', '/api/docs'], (req, res, next) => {
 }));
 
 // Error Handler Middleware
-if (process.env.NODE_ENV !== 'test' && process.env.SENTRY_DSN) {
-  Sentry.setupExpressErrorHandler(app);
-}
+app.use(sentryErrorHandler);
 app.use(csrfErrorHandler);
 app.use(errorHandler);
 
@@ -597,11 +636,19 @@ io.use((socket, next) => {
   }
 });
 
-// User notification room listener
+// User notification room listener & WebSocket active connections gauge tracking
+const { activeWebsocketConnections } = require('./services/metricsService');
+
 io.on('connection', (socket) => {
+  activeWebsocketConnections.inc();
+  
   if (socket.user && socket.user.id) {
     socket.join(`user:${socket.user.id}`);
   }
+
+  socket.on('disconnect', () => {
+    activeWebsocketConnections.dec();
+  });
 });
 
 // Start background schedulers
