@@ -401,7 +401,12 @@ export const sendDoubtMessage = (sessionId, message) =>
  * Reveal the next progressive hint for a doubt session.
  * POST /api/doubts/:id/reveal-step
  */
-export const revealDoubtStep = (sessionId) =>
-  API.post(`/doubts/${sessionId}/reveal-step`);
+// ── Spaced Repetition Flashcard Analytics APIs ──────────────────────────
+export const getLeitnerDistribution = (deckId = null) =>
+  API.get('/flashcards/analytics/leitner-distribution', { params: { deckId } });
+
+export const getDueForecast = (deckId = null) =>
+  API.get('/flashcards/analytics/due-forecast', { params: { deckId } });
 
 export default API;
+
