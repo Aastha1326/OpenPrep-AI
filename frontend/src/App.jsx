@@ -13,7 +13,7 @@ import SessionRestoreModal from './components/SessionRestoreModal';
 import API from './services/api';
 import QuotaExceededModal from './components/dashboard/QuotaExceededModal';
 import GlobalSearchModal from './components/search/GlobalSearchModal';
-import OfflineBanner from './components/common/OfflineBanner';
+import OfflineBanner from './components/OfflineBanner';
 import OfflineStatusBanner from './components/common/OfflineStatusBanner';
 import PwaInstallPrompt from './components/common/PwaInstallPrompt';
 import OfflineIndicator from './components/common/OfflineIndicator';
@@ -485,6 +485,8 @@ function App() {
       </Suspense>
       </main>
       <MobileBottomNav />
+      <OfflineBanner />
+
       {savedSessionPrompt && (
         <SessionRestoreModal
           savedSession={savedSessionPrompt}
