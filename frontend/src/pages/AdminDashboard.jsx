@@ -5,9 +5,12 @@ import API from '../services/api';
 import MetricCard from '../components/admin/MetricCard';
 import UsageChart from '../components/admin/UsageChart';
 import UserTable from '../components/admin/UserTable';
+import AdminBadgeManager from '../components/admin/AdminBadgeManager';
+import AdminAnalytics from './AdminAnalytics';
 
 const AdminDashboard = () => {
   const { user } = useSelector((state) => state.auth);
+  const [activeTab, setActiveTab] = useState('overview');
 
   // States
   const [stats, setStats] = useState(null);
@@ -147,13 +150,53 @@ const AdminDashboard = () => {
           </button>
         </header>
 
+        {/* ADMIN TAB NAVIGATION */}
+        <div className="flex items-center gap-2 mb-6 border-b border-neutral-200 dark:border-neutral-800 pb-2">
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition ${
+              activeTab === 'overview'
+                ? 'bg-amber-600 text-white shadow'
+                : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+            }`}
+          >
+            System Overview
+          </button>
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition ${
+              activeTab === 'analytics'
+                ? 'bg-amber-600 text-white shadow'
+                : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+            }`}
+          >
+            Usage Analytics
+          </button>
+          <button
+            onClick={() => setActiveTab('badges')}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition ${
+              activeTab === 'badges'
+                ? 'bg-amber-600 text-white shadow'
+                : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+            }`}
+          >
+            Badge Criteria Manager
+          </button>
+        </div>
+
         {error && (
           <div className="p-4 mb-6 bg-red-100 dark:bg-red-950/20 border border-red-200 dark:border-red-800 text-red-750 dark:text-red-400 rounded-2xl flex items-center gap-2 text-sm font-medium">
             <AlertCircle className="w-5 h-5 shrink-0" /> {error}
           </div>
         )}
 
-        {/* METRICS CARDS GRID */}
+        {activeTab === 'analytics' ? (
+          <AdminAnalytics />
+        ) : activeTab === 'badges' ? (
+          <AdminBadgeManager />
+        ) : (
+          <>
+            {/* METRICS CARDS GRID */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 mb-8">
           <MetricCard
             title="Total Users"
@@ -218,6 +261,8 @@ const AdminDashboard = () => {
           </div>
 
         </div>
+        </>
+        )}
 
       </div>
     </div>

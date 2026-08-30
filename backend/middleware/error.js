@@ -1,5 +1,5 @@
 const logger = require('../utils/logger');
-const { Sentry, isSentryReady } = require('../config/sentry');
+const sentryConfig = require('../config/sentry');
 
 /**
  * Attach the correlation ID to an error payload so a user can quote it in a
@@ -131,11 +131,18 @@ const errorHandler = (err, req, res, next) => {
 
   const statusCode = error.statusCode || 500;
 
-  if (isSentryReady && statusCode >= 500) {
-    if (req.user) {
-      Sentry.setUser({ id: req.user.id, email: req.user.email });
-    }
-    Sentry.captureException(err);
+  if (sentryConfig.isSentryReady && statusCode >= 500) {
+    sentryConfig.Sentry.withScope((scope) => {
+      if (req.user) {
+        scope.setUser({ id: req.user.id, email: req.user.email });
+      }
+      if (req) {
+        scope.setTag('method', req.method);
+        scope.setTag('url', req.originalUrl || req.url);
+        scope.setExtra('requestId', req.id);
+      }
+      sentryConfig.Sentry.captureException(err);
+    });
   }
 
   const responseMessage = statusCode === 500 ? 'Internal Server Error' : (error.message || 'Server Error');
@@ -151,3 +158,4 @@ const errorHandler = (err, req, res, next) => {
 
 module.exports = errorHandler;
 module.exports.withRequestId = withRequestId;
+

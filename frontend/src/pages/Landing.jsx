@@ -19,8 +19,8 @@ import { useTheme } from '../context/ThemeContext';
 const Landing = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useSelector((state) => state.auth);
-  const { theme } = useTheme();
-  const isDark = theme === 'dark' || theme === 'oled';
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark' || resolvedTheme === 'high-contrast';
 
   // Fade-in animation variants
   const containerVariants = {
@@ -106,9 +106,15 @@ const Landing = () => {
             <BookOpen className="h-5 w-5 sm:h-6 sm:w-6 text-[#FFFBE9] dark:text-[#E1DCC9]" />
           </div>
           <div>
-            <h1 className="font-playfair text-lg sm:text-xl font-bold tracking-tight flex items-center gap-1.5" style={{ color: isDark ? '#E1DCC9' : '#000000' }}>
+            <h1
+              className="font-playfair text-lg sm:text-xl font-bold tracking-tight flex items-center gap-1.5"
+              style={{ color: isDark ? '#E1DCC9' : '#000000' }}
+            >
               OpenPrep{' '}
-              <span className="text-xs sm:text-sm px-1.5 sm:px-2 py-0.5 bg-[#AD8B73]/20 text-[#000000] dark:bg-[#412D15] dark:text-[#E1DCC9] rounded-md font-mono border border-[#CEAB93]/50 dark:border-[#412D15]" style={{ color: isDark ? '#E1DCC9' : '#000000' }}>
+              <span
+                className="text-xs sm:text-sm px-1.5 sm:px-2 py-0.5 bg-[#AD8B73]/20 text-[#000000] dark:bg-[#412D15] dark:text-[#E1DCC9] rounded-md font-mono border border-[#CEAB93]/50 dark:border-[#412D15]"
+                style={{ color: isDark ? '#E1DCC9' : '#000000' }}
+              >
                 AI
               </span>
             </h1>
@@ -167,7 +173,8 @@ const Landing = () => {
             className="mb-6 px-4 py-1.5 rounded-full bg-[#E3CAA5] dark:bg-[#1F150C] border border-[#CEAB93] dark:border-[#412D15] text-sm font-bold flex items-center gap-2 shadow-sm"
             style={{ color: isDark ? '#E1DCC9' : '#000000' }}
           >
-            <Sparkles className="h-4 w-4" style={{ color: isDark ? '#E1DCC9' : '#000000' }} /> Exam Preparation Reimagined with AI
+            <Sparkles className="h-4 w-4" style={{ color: isDark ? '#E1DCC9' : '#000000' }} /> Exam
+            Preparation Reimagined with AI
           </motion.div>
 
           <motion.h2
@@ -179,7 +186,12 @@ const Landing = () => {
           >
             Study Smarter. Analyze PYQs.
             <br />
-            <span className="underline decoration-[#CEAB93] underline-offset-8" style={{ color: isDark ? '#E1DCC9' : '#000000' }}>Master Your Exam Planner.</span>
+            <span
+              className="underline decoration-[#CEAB93] underline-offset-8"
+              style={{ color: isDark ? '#E1DCC9' : '#000000' }}
+            >
+              Master Your Exam Planner.
+            </span>
           </motion.h2>
 
           <motion.p
@@ -312,8 +324,12 @@ const Landing = () => {
                           🔥
                         </div>
                         <div>
-                          <h6 className="text-sm font-bold text-[#1F150C] dark:text-[#E1DCC9]">14 Day Streak</h6>
-                          <p className="text-[10px] text-[#412D15] dark:text-[#C4BA9D]">120 XP earned today</p>
+                          <h6 className="text-sm font-bold text-[#1F150C] dark:text-[#E1DCC9]">
+                            14 Day Streak
+                          </h6>
+                          <p className="text-[10px] text-[#412D15] dark:text-[#C4BA9D]">
+                            120 XP earned today
+                          </p>
                         </div>
                       </div>
                       <Check className="h-5 w-5 text-[#AD8B73] dark:text-[#E1DCC9]" />
@@ -538,6 +554,14 @@ const Landing = () => {
           </div>
           <p>© {new Date().getFullYear()} OpenPrep AI. Built with ❤️ for students worldwide.</p>
           <div className="flex gap-4">
+            <a
+              href="/api/docs"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-amber-800 dark:hover:text-amber-400"
+            >
+              API Docs
+            </a>
             <Link to="/login" className="hover:text-amber-800 dark:hover:text-amber-400">
               Login
             </Link>

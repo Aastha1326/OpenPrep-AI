@@ -6,6 +6,7 @@ import CreateDeckModal from '../components/dashboard/CreateDeckModal';
 import CreateFlashcardDeckModal from '../components/flashcards/CreateFlashcardDeckModal';
 import YouTubeFlashcardImporter from '../components/flashcards/YouTubeFlashcardImporter';
 import DeckCollaboratorsModal from '../components/flashcards/DeckCollaboratorsModal';
+import MathRenderer from '../components/common/MathRenderer';
 import { Search, Trash2, Plus, ChevronLeft, ChevronRight, PlaySquare as Youtube, Share2, Copy, Check, BookOpen, Layers, Globe, Lock, Users } from 'lucide-react';
 
 const Flashcards = () => {
@@ -495,9 +496,11 @@ const Flashcards = () => {
                       </button>
                     </div>
                     <h3 className="text-lg font-bold text-neutral-900 dark:text-neutral-100 mb-2">
-                      {card.front}
+                      <MathRenderer text={card.front} />
                     </h3>
-                    <p className="text-sm text-neutral-600 dark:text-neutral-300">{card.back}</p>
+                    <p className="text-sm text-neutral-600 dark:text-neutral-300">
+                      <MathRenderer text={card.back} />
+                    </p>
                   </div>
                   <div className="mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-850 flex justify-between items-center text-xs text-neutral-400">
                     <span>Reps: {card.repetitions || 0}</span>

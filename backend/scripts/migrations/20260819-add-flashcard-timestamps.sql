@@ -1,0 +1,3 @@
+ALTER TABLE "Flashcards" 
+ADD COLUMN IF NOT EXISTS "sourceUrl" VARCHAR(255),
+ADD COLUMN IF NOT EXISTS "timestampSeconds" INTEGER;

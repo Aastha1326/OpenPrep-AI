@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
+const searchIndex = require('../services/searchIndexService');
 
 const Note = sequelize.define(
   'Note',
@@ -66,6 +67,22 @@ const Note = sequelize.define(
       type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
+    isOcrExtracted: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
+    ocrConfidence: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+    },
+    originalImageUrl: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    embedding: {
+      type: DataTypes.ARRAY(DataTypes.FLOAT),
+      allowNull: true,
+    },
   },
   {
     timestamps: true,
@@ -88,7 +105,10 @@ const Note = sequelize.define(
       },
     ],
     hooks: {
+      afterSave: (note) => searchIndex.enqueueIndex('note', note),
+      afterUpdate: (note) => searchIndex.enqueueIndex('note', note),
       afterDestroy: (note) => {
+        searchIndex.removeRecord('note', note);
         if (!note.fileUrl) return;
 
         const uploadsDir = path.resolve(path.join(__dirname, '../uploads'));

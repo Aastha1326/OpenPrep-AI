@@ -6,11 +6,14 @@ import * as Sentry from '@sentry/react'
 import { store } from './store'
 import { ThemeProvider } from './context/ThemeContext'
 import { SyncProvider } from './context/SyncContext'
+import { PomodoroProvider } from './context/PomodoroContext'
+import { SessionTimerProvider } from './context/SessionTimerContext'
 import ErrorBoundary from './components/common/ErrorBoundary'
 import './index.css'
 import './i18n';
 import App from './App.jsx'
 import { GoogleOAuthProvider } from '@react-oauth/google';
+import { unregisterLegacyServiceWorker } from './utils/pushNotifications';
 
 if (import.meta.env.MODE !== 'test' && import.meta.env.VITE_SENTRY_DSN) {
   Sentry.init({
@@ -43,7 +46,19 @@ window.addEventListener('unhandledrejection', (event) => {
   }
 });
 
-
+// Register Service Worker for offline asset & API response caching
+if ('serviceWorker' in navigator && import.meta.env.MODE !== 'test') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('/service-worker.js')
+      .then((reg) => {
+        console.log('✅ Service Worker registered successfully:', reg.scope);
+      })
+      .catch((err) => {
+        console.warn('⚠️ Service Worker registration failed:', err);
+      });
+  });
+}
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '179369126060-lq7unpt173rt6aog2nt93s6m895d6b2i.apps.googleusercontent.com';
 
@@ -54,9 +69,13 @@ createRoot(document.getElementById('root')).render(
         <Provider store={store}>
           <ThemeProvider>
             <SyncProvider>
-              <BrowserRouter>
-                <App />
-              </BrowserRouter>
+              <PomodoroProvider>
+                <BrowserRouter>
+                  <SessionTimerProvider>
+                    <App />
+                  </SessionTimerProvider>
+                </BrowserRouter>
+              </PomodoroProvider>
             </SyncProvider>
           </ThemeProvider>
         </Provider>

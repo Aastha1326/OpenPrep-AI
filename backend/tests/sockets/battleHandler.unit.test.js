@@ -94,13 +94,53 @@ describe('Real-Time Quiz Battle Sockets', () => {
   });
 
   describe('Connection & Lobby Join Flow', () => {
-    it('fails to join if the room does not exist in roomManager', async () => {
+    it('fails to join if the room does not exist in roomManager and database find returns null', async () => {
+      BattleSession.findOne.mockResolvedValue(null);
       const { connect, invoke } = setup();
       const socket = connect('s1');
 
       const res = await invoke(socket, 'join-room', { roomId: 'PREP99' });
       expect(res.success).toBe(false);
       expect(res.message).toMatch(/not found/);
+    });
+
+    it('attempts to load the room configuration and quiz from database if not present in memory', async () => {
+      const { connect, invoke } = setup();
+      const socket = connect('s1', 'Database Loader User');
+
+      // Mock database calls
+      BattleSession.findOne.mockResolvedValue({
+        id: 'session-123',
+        roomCode: 'PREP55',
+        hostUserId: 'host-123',
+        roomName: 'DB Biology Room',
+        password: '',
+        questionCount: 5,
+        timePerQuestion: 15,
+        status: 'waiting',
+        quizRef: {
+          id: 'quiz-123',
+          title: 'Biology Live Quiz',
+          questions: [
+            {
+              questionText: 'What is a cell?',
+              options: ['A unit of life', 'A phone'],
+              correctAnswer: 0,
+            }
+          ],
+        },
+      });
+
+      const res = await invoke(socket, 'join-room', { roomId: 'PREP55' });
+      
+      expect(res.success).toBe(true);
+      expect(res.room.name).toBe('DB Biology Room');
+      expect(socket.joinedRooms).toContain('PREP55');
+      
+      const memoryRoom = roomManager.getRoom('PREP55');
+      expect(memoryRoom).toBeDefined();
+      expect(memoryRoom.roomName).toBe('DB Biology Room');
+      expect(memoryRoom.quiz.title).toBe('Biology Live Quiz');
     });
 
     it('successfully joins a waiting room and broadcasts update to peers', async () => {

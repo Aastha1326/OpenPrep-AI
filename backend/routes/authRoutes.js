@@ -21,11 +21,13 @@ const {
   resetSM2Settings,
   oauthSuccessCallback,
   registerOAuthEmail,
+  keepalive,
 } = require('../controllers/authController');
 
 const { protect } = require('../middleware/auth');
 const passport = require('passport');
 const verifyCaptcha = require('../middleware/captchaMiddleware');
+const { smartRateLimiter } = require('../middleware/smartRateLimiter');
 
 const {
   validateRegister,
@@ -193,8 +195,15 @@ router.post('/register', registerLimiter, verifyCaptcha, validateRegister, regis
  *               $ref: '#/components/schemas/Error'
  */
 
+const loginSmartLimiter = smartRateLimiter({
+  cost: 10,
+  maxTokens: 50,
+  replenishRate: 1,
+  eventType: 'user_login'
+});
+
 // Authenticate a user and issue access/refresh tokens
-router.post('/login', loginLimiter, verifyCaptcha, validateLogin, login);
+router.post('/login', loginSmartLimiter, verifyCaptcha, validateLogin, login);
 
 // Request a password reset email
 router.post(
@@ -250,6 +259,8 @@ router.post(
 );
 
 // Log out the current user
+router.post('/logout', logout);
+
 // Log out the authenticated user from all devices
 router.post('/logout-all', protect, logoutAll);
 // Retrieve the authenticated user's profile
@@ -279,9 +290,8 @@ router.get(
 // Finalize OAuth registration (e.g. if email was private/missing)
 router.post('/oauth/register-email', registerOAuthEmail);
 
-// User settings routes
-router.patch('/settings', protect, updateSettings);
-router.put('/sm2-settings', protect, updateSM2Settings);
-router.post('/sm2-settings/reset', protect, resetSM2Settings);
+// Session keepalive routes
+router.post('/session/keepalive', protect, keepalive);
+router.post('/keepalive', protect, keepalive);
 
 module.exports = router;

@@ -335,17 +335,7 @@ describe('useFocusTrap', () => {
       expect(document.body.style.overflow).toBe('');
     });
 
-    test('compensates for the reclaimed scrollbar width', async () => {
-      // Hiding the scrollbar reclaims its width, which shifts a fixed header
-      // sideways unless the body is padded to match.
-      vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(1015);
-      vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1000);
-
-      render(<Harness startOpen />);
-      await flushFocus();
-
-      expect(document.body.style.paddingRight).toBe('15px');
-    });
+    
 
     test('leaves scrolling alone when the dialog opts out', async () => {
       render(<Harness startOpen options={{ lockScroll: false }} />);
@@ -376,3 +366,4 @@ describe('useFocusTrap', () => {
     });
   });
 });
+

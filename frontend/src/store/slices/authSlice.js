@@ -1,9 +1,25 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import API from '../../services/api';
+import API from '../../services/api.js';
 
-// ── Helper: read tokens from localStorage ──
-const getInitialToken = () => localStorage.getItem('token');
-const getInitialRefreshToken = () => localStorage.getItem('refreshToken');
+const getInitialToken = () => {
+  try {
+    return typeof localStorage !== 'undefined' && localStorage && typeof localStorage.getItem === 'function'
+      ? localStorage.getItem('token')
+      : null;
+  } catch (_e) {
+    return null;
+  }
+};
+
+const getInitialRefreshToken = () => {
+  try {
+    return typeof localStorage !== 'undefined' && localStorage && typeof localStorage.getItem === 'function'
+      ? localStorage.getItem('refreshToken')
+      : null;
+  } catch (_e) {
+    return null;
+  }
+};
 
 // ── Async Thunks ──
 

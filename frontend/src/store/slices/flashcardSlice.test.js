@@ -4,9 +4,9 @@ import flashcardReducer, {
   createFlashcard,
   deleteFlashcard,
 } from './flashcardSlice';
-import API from '../../services/api';
+import API from '../../services/api.js';
 
-vi.mock('../../services/api', () => ({
+vi.mock('../../services/api.js', () => ({
   default: {
     get: vi.fn(),
     post: vi.fn(),
@@ -81,3 +81,4 @@ describe('flashcardSlice thunks', () => {
     expect(state.pagination.total).toBe(0);
   });
 });
+

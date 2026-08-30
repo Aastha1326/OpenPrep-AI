@@ -35,6 +35,7 @@ Most students waste critical preparation hours trying to figure out:
 - **📅 Smart Study Planner**: Input your exam date, syllabus scope, and study hours to generate a customized, calendarized study schedule.
 - **🎯 Weakness Detection**: Tracks performance across quiz attempts to dynamically highlight weak subjects and adapt study goals.
 - **📚 Spaced Repetition Flashcards**: Memorize complex concepts using flashcards backed by the SuperMemo SM-2 adaptation algorithm.
+- **💻 Live Collaborative Coding Interview Room**: Real-time pair-programming space with Monaco editor, multi-cursor presence, instant code execution sandbox, chat, and WebRTC video. [Read Guide](./docs/collaborative-interview.md)
 
 ---
 
@@ -47,6 +48,37 @@ Most students waste critical preparation hours trying to figure out:
 | **Database**       | PostgreSQL, Sequelize ORM                              |
 | **AI Integration** | Gemini API (`gemini-1.5-flash`)                        |
 | **DevOps & CI**    | Docker, Docker Compose, GitHub Actions                 |
+
+---
+
+## 🏛️ System Architecture
+
+OpenPrep AI is structured as a multi-tier system separating client presentation, server business logic, persistent data storage, and external AI processing.
+
+```mermaid
+graph TD
+    User["👤 Student / Client Browser"] <-->|"HTTP / REST API / JWT"| ReactUI["📱 React UI (Vite + Redux)"]
+    
+    subgraph Frontend["Client Layer (Frontend)"]
+        ReactUI -->|"Axios Client"| APIClient["API Service Layer"]
+    end
+    
+    APIClient <-->|"JSON Payloads & Bearer Auth"| ExpressBackend["⚙️ Express.js Server"]
+    
+    subgraph Backend["Server Layer (Backend)"]
+        ExpressBackend -->|"Auth Middleware"| Middleware["JWT Protection"]
+        Middleware -->|"Route Request"| Controller["Express Controllers"]
+        Controller -->|"ORM Abstraction"| Sequelize["Sequelize ORM"]
+        Controller -->|"AI Generation"| GeminiService["Gemini AI Service"]
+    end
+    
+    subgraph Storage["Data & AI Layer"]
+        Sequelize <-->|"SQL Queries"| PostgresDB[("🐘 PostgreSQL Database")]
+        GeminiService <-->|"NLP Analysis & Summaries"| GoogleGemini["✨ Google Gemini API (gemini-1.5-flash)"]
+    end
+```
+
+For detailed architectural decision records (ADRs) and sequence diagrams, review the [System Architecture Documentation](./docs/architecture.md).
 
 ---
 

@@ -14,6 +14,16 @@ const { toDateOnlyString, toLocalDateString } = require('../utils/dateUtils');
 const { generateMilestones } = require('../services/milestoneGeneratorService');
 const calendarService = require('../services/calendarService');
 const schedulePredictorService = require('../services/schedulePredictorService');
+const studyPlanService = require('../services/studyPlanService');
+
+const triggerBackgroundCalendarSync = (plan, user) => {
+  if (user && user.syncGoogleCalendar && user.googleCalendarRefreshToken) {
+    calendarService.syncToGoogleCalendar(plan, user).catch((err) => {
+      console.error('[Calendar Sync] Background calendar sync failed:', err.message);
+    });
+  }
+};
+
 // @desc    Generate AI Study Plan
 // @route   POST /api/study-plans/generate-ai
 // @access  Private
@@ -121,6 +131,8 @@ exports.generateAIPlan = async (req, res, next) => {
     });
 
     await cacheService.del(`study_plan:active:${req.user.id}`);
+
+    triggerBackgroundCalendarSync(studyPlan, req.user);
 
     res.status(201).json({
       success: true,
@@ -274,13 +286,14 @@ exports.toggleTaskCompletion = async (req, res, next) => {
       const gamificationService = require('../services/gamificationService');
       progression = await gamificationService.awardXP(req.user.id, 50, 'task_complete');
 
-      const timezoneOffset = Number(req.headers['x-timezone-offset']) || 0;
-      await gamificationService.updateStreak(req.user.id, timezoneOffset);
+      const timeZoneParam = req.headers['x-timezone'] || (req.headers['x-timezone-offset'] !== undefined ? Number(req.headers['x-timezone-offset']) : null);
+      await gamificationService.updateStreak(req.user.id, timeZoneParam);
 
       const user = await User.findByPk(req.user.id);
-      const newBadges = await gamificationService.checkAndUnlockBadges(user, 'task_complete', {
-        timezoneOffsetMinutes: timezoneOffset
-      });
+      const badgeDetails = req.headers['x-timezone']
+        ? { timeZone: req.headers['x-timezone'] }
+        : { timezoneOffsetMinutes: Number(req.headers['x-timezone-offset']) || 0 };
+      const newBadges = await gamificationService.checkAndUnlockBadges(user, 'task_complete', badgeDetails);
       progression.newBadges = newBadges;
     }
 
@@ -309,6 +322,8 @@ exports.toggleTaskCompletion = async (req, res, next) => {
     recalculateReadinessInBackground(req.user.id).catch((err) => console.error('Background readiness recalculation error:', err));
 
     await cacheService.del(`study_plan:active:${req.user.id}`);
+
+    triggerBackgroundCalendarSync(plan, req.user);
 
     res.status(200).json({ success: true, data: plan, progression });
   } catch (error) {
@@ -368,6 +383,8 @@ exports.moveTaskDate = async (req, res, next) => {
 
     await cacheService.del(`study_plan:active:${req.user.id}`);
 
+    triggerBackgroundCalendarSync(plan, req.user);
+
     res.status(200).json({ success: true, data: plan });
   } catch (error) {
     next(error);
@@ -377,7 +394,8 @@ exports.moveTaskDate = async (req, res, next) => {
 // @desc    Get all Study Plans
 // @route   GET /api/study-plans/plans
 // @access  Private
-exports.getPlans = async (req, res, next) => {  try {
+exports.getPlans = async (req, res, next) => {
+  try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
     const offset = (page - 1) * limit;
@@ -410,11 +428,11 @@ exports.rescheduleOverdueTasks = async (req, res, next) => {
     const { id } = req.params;
     const { useAIRebalance } = req.body;
 
-    const plan = await StudyPlan.findOne({ 
+    const plan = await StudyPlan.findOne({
       where: { id, user: req.user.id },
       include: [{ model: Exam, as: 'examRef' }]
     });
-    
+
     if (!plan) {
       return res.status(404).json({ success: false, error: 'Study plan not found' });
     }
@@ -643,11 +661,14 @@ exports.rescheduleAdaptivePlan = async (req, res, next) => {
 
     await cacheService.del(`study_plan:active:${req.user.id}`);
 
+    triggerBackgroundCalendarSync(result, req.user);
+
     res.status(200).json({ success: true, data: result, message: 'Adaptive study plan rescheduled successfully' });
   } catch (error) {
     next(error);
   }
 };
+
 // @desc    Export Study Plan as RFC 5545 .ics calendar file
 // @route   GET /api/study-plans/:id/export-ics
 // @access  Private
@@ -680,8 +701,6 @@ exports.exportStudyPlanIcs = async (req, res, next) => {
       });
     }
 
-    const calendarService = require('../services/calendarService');
-
     const icsContent = calendarService.generateStudyPlanIcs(
       plan,
       timeZone
@@ -702,6 +721,7 @@ exports.exportStudyPlanIcs = async (req, res, next) => {
     next(error);
   }
 };
+
 // @desc    Predict syllabus completion date and evenly rebalance pending tasks
 //          across the remaining study days
 // @route   POST /api/study-plans/rebalance
@@ -769,6 +789,8 @@ exports.rebalanceStudyPlan = async (req, res, next) => {
     }
 
     await cacheService.del(`study_plan:active:${req.user.id}`);
+
+    triggerBackgroundCalendarSync(plan, req.user);
 
     res.status(200).json({ success: true, data: plan, forecast, rebalanced, reason, message });
   } catch (error) {
@@ -894,3 +916,111 @@ exports.exportStudyPlanPdf = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Generates a new study plan based on user constraints using the studyPlanService.
+ * 
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ * @param {Function} next - Express next middleware function.
+ */
+exports.createStudyPlan = async (req, res, next) => {
+  try {
+    const { examDate, topics, dailyHours } = req.body;
+
+    if (!examDate || !Array.isArray(topics) || topics.length === 0 || !dailyHours) {
+      return res.status(400).json({
+        success: false,
+        message: 'examDate, topics (array), and dailyHours are required.'
+      });
+    }
+
+    if (new Date(examDate) <= new Date()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Exam date must be in the future.'
+      });
+    }
+
+    const plan = await studyPlanService.generateStudyPlan(examDate, topics, dailyHours);
+
+    // Save plan to database associated with req.user.id
+    // TODO: Implement actual save logic when StudyPlan model integration is ready
+
+    res.status(201).json({
+      success: true,
+      data: plan,
+    });
+  } catch (error) {
+    console.error('Error creating study plan:', error);
+    next(error);
+  }
+};
+
+/**
+ * Retrieves a user's saved study plan.
+ * 
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ * @param {Function} next - Express next middleware function.
+ */
+exports.getStudyPlan = async (req, res, next) => {
+  try {
+    // TODO: Implement actual retrieval logic when StudyPlan model integration is ready
+    // For now, return mock response for demonstration
+    res.status(200).json({
+      success: true,
+      data: {
+        totalDays: 0,
+        schedule: [],
+        overallStrategy: "No plan found. Please generate a new one."
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching study plan:', error);
+    next(error);
+  }
+};
+
+// @desc    Get daily burndown chart datapoints and projected completion
+// @route   GET /api/study-plans/:id/burndown
+// @access  Private
+exports.getBurndown = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { calculateBurndownData } = require('../services/readinessScoreService');
+    const data = await calculateBurndownData(id, req.user.id);
+
+    res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    if (error.message.includes('not found')) {
+      return res.status(404).json({ success: false, error: error.message });
+    }
+    next(error);
+  }
+};
+
+// @desc    Get AI Exam Readiness Score & actionable recovery recommendations
+// @route   GET /api/study-plans/:id/readiness-score
+// @access  Private
+exports.getReadinessScore = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { calculateReadinessScore } = require('../services/readinessScoreService');
+    const data = await calculateReadinessScore(id, req.user.id);
+
+    res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    if (error.message.includes('not found')) {
+      return res.status(404).json({ success: false, error: error.message });
+    }
+    next(error);
+  }
+};
+

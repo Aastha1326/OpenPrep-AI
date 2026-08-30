@@ -108,3 +108,28 @@ export function toSentenceSegments(text) {
 
   return segments;
 }
+
+/**
+ * Strip Markdown formatting syntax from text so SpeechSynthesis reads natural spoken prose.
+ * Removes bold asterisks (**text**), italics (*text*), inline code (`code`), headers (#), links, and LaTeX math.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+export function stripMarkdown(text) {
+  if (!text || typeof text !== 'string') return '';
+  return text
+    .replace(/(\$\$[\s\S]+?\$\$|\$[^$\n]+?\$)/g, '')
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/^\s*\d+\.\s+/gm, '')
+    .replace(/^\s*>\s+/gm, '')
+    .trim();
+}

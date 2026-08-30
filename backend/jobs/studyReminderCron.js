@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const { Op } = require('sequelize');
 const StudyPlan = require('../models/StudyPlan');
+const User = require('../models/User');
 const { createNotification } = require('../services/notificationService');
 
 /**
@@ -11,41 +12,71 @@ function initStudyReminderCron(io) {
   cron.schedule('*/15 * * * *', async () => {
     try {
       const now = new Date();
-      const next15Mins = new Date(now.getTime() + 15 * 60 * 1000);
 
       // Find active study plans
       const activePlans = await StudyPlan.findAll({
         where: {
           startDate: { [Op.lte]: now },
           endDate: { [Op.gte]: now },
+          status: 'active',
         },
       });
 
       for (const plan of activePlans) {
-        if (!plan.plan || !Array.isArray(plan.plan)) continue;
+        if (!plan.dailyGoals || !Array.isArray(plan.dailyGoals)) continue;
 
-        for (const item of plan.plan) {
-          if (!item.tasks || !Array.isArray(item.tasks)) continue;
+        // Load the user to read their dailyReminderTime preference
+        const user = await User.findByPk(plan.user);
+        if (!user) continue;
 
-          for (const task of item.tasks) {
-            // Check if task is scheduled for today and not completed
-            if (!task.completed && task.scheduledTime) {
-              const taskTime = new Date(task.scheduledTime);
-              // Notify 1 hour in advance
+        const reminderTime = user.dailyReminderTime || '09:00';
+        const [remHour, remMin] = reminderTime.split(':').map(Number);
+
+        // Find today's goals
+        const todayStr = now.toISOString().split('T')[0];
+
+        for (const day of plan.dailyGoals) {
+          if (!day.date || !day.tasks || !Array.isArray(day.tasks)) continue;
+
+          // Convert day.date to YYYY-MM-DD
+          let dayDateStr;
+          try {
+            dayDateStr = new Date(day.date).toISOString().split('T')[0];
+          } catch (e) {
+            continue;
+          }
+
+          if (dayDateStr !== todayStr) continue;
+
+          let currentMinutes = remHour * 60 + remMin;
+
+          for (const task of day.tasks) {
+            const duration = task.duration || 60;
+
+            const taskHour = Math.floor(currentMinutes / 60);
+            const taskMinute = currentMinutes % 60;
+
+            const [year, month, dateNum] = day.date.split('-').map(Number);
+            const taskTime = new Date(year, month - 1, dateNum, taskHour, taskMinute);
+
+            if (!task.completed) {
               const timeDiffMs = taskTime - now;
               const timeDiffMins = Math.floor(timeDiffMs / 60000);
 
-              if (timeDiffMins > 0 && timeDiffMins <= 60) {
+              // Notify exactly within 15 minutes before the task begins
+              if (timeDiffMins >= 0 && timeDiffMins <= 15) {
                 await createNotification(
                   plan.user,
                   '⏰ Task Due Soon!',
-                  `Your scheduled task "${task.title || 'Study Session'}" is due in 1 hour.`,
+                  `Your scheduled task "${task.title || 'Study Session'}" starts in 15 minutes.`,
                   'task_due',
                   '/study-planner',
                   io
                 );
               }
             }
+
+            currentMinutes += duration;
           }
         }
       }

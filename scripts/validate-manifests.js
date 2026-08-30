@@ -92,7 +92,7 @@ function validateManifests(files = walk(REPO_ROOT)) {
   const failures = [];
 
   for (const file of files) {
-    const relativePath = path.relative(REPO_ROOT, file);
+    const relativePath = path.relative(REPO_ROOT, file).replace(/\\/g, '/');
     const contents = fs.readFileSync(file, 'utf8');
 
     try {

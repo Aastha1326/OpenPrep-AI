@@ -37,7 +37,10 @@ const StudyPlan = sequelize.define(
       type: DataTypes.ENUM('active', 'completed', 'archived'),
       defaultValue: 'active',
     },
-  },
+    currentVersionNumber: {
+      type: DataTypes.INTEGER,
+      defaultValue: 1,
+    },  },
   {
     timestamps: true,
     indexes: [
@@ -67,8 +70,10 @@ const StudyPlan = sequelize.define(
 );
 
 const cacheManager = require('../utils/cacheManager');
+const { emitUserChanged } = require('../services/cacheInvalidationService');
 
 StudyPlan.afterSave(async (studyPlan, options) => {
+  emitUserChanged(studyPlan.user);
   try {
     const pattern = `user_${studyPlan.user}:*`;
     await cacheManager.invalidate(pattern);
@@ -80,6 +85,7 @@ StudyPlan.afterSave(async (studyPlan, options) => {
 });
 
 StudyPlan.afterDestroy(async (studyPlan, options) => {
+  emitUserChanged(studyPlan.user);
   try {
     const pattern = `user_${studyPlan.user}:*`;
     await cacheManager.invalidate(pattern);

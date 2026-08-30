@@ -1,0 +1,61 @@
+/* --- Global Base Transitions --- */
+body {
+  transition: background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1), 
+              color 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* --- Theme 1: Light Aurora (Daylight Study) --- */
+html[data-theme="light-aurora"] {
+  --bg-canvas: #ffffff;
+  --bg-panel: #f8fafc;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --border-subtle: #e2e8f0;
+  --accent-glow: #3b82f6;
+  --focus-ring: #2563eb;
+}
+
+/* --- Theme 2: Dark Slate (Standard Dark) --- */
+html[data-theme="dark-slate"] {
+  --bg-canvas: #0f172a;
+  --bg-panel: #1e293b;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --border-subtle: #334155;
+  --accent-glow: #38bdf8;
+  --focus-ring: #0ea5e9;
+}
+
+/* --- Theme 3: Midnight OLED (True Black Matrix) --- */
+html[data-theme="midnight-oled"] {
+  --bg-canvas: #000000;
+  --bg-panel: #121212;
+  --text-primary: #ffffff;
+  --text-secondary: #a3a3a3;
+  --border-subtle: #262626;
+  --accent-glow: #a855f7;
+  --focus-ring: #d946ef;
+}
+
+/* --- Theme 4: Solarized Warm (Circadian Sepia) --- */
+html[data-theme="solarized-warm"] {
+  --bg-canvas: #fdf6e3;
+  --bg-panel: #eee8d5;
+  --text-primary: #002b36;
+  --text-secondary: #586e75;
+  --border-subtle: #93a1a1;
+  --accent-glow: #b58900;
+  --focus-ring: #cb4b16;
+}
+
+/* --- Theme 5: High-Contrast AAA (7:1 Minimum Ratio Compliance) --- */
+html[data-theme="high-contrast-aaa"] {
+  --bg-canvas: #000000;
+  --bg-panel: #000000;
+  --text-primary: #ffffff;
+  --text-secondary: #ffff00; /* High visibility pure contrast yellow */
+  --border-subtle: #ffffff;
+  --accent-glow: #00ffff;
+  --focus-ring: #00ff00;
+}

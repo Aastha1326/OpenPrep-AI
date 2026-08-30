@@ -200,6 +200,9 @@ const EXPORT_CSS = `
   .math-block { text-align: center; margin: 8px 0; overflow-x: auto; }
   .math-inline { display: inline-block; }
   blockquote { border-left: 3px solid #bbb; margin: 6px 0; padding-left: 10px; color: #444; }
+  .ai-summary-box { background: #fcf8f2; border: 1px solid #e2d7c5; border-radius: 6px; padding: 12px; margin-top: 16px; page-break-inside: avoid; break-inside: avoid; }
+  .ai-summary-title { font-size: 12px; font-weight: bold; text-transform: uppercase; color: #854d0e; margin-bottom: 6px; letter-spacing: 0.04em; }
+  .concept-tag { display: inline-block; background: #fef3c7; color: #78350f; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 3px; margin-right: 4px; margin-bottom: 4px; }
 `;
 
 const EPUB_CSS = `
@@ -328,6 +331,68 @@ function noteMarkup(note, index) {
     .filter(Boolean)
     .join(' · ');
   return `<div class="note-block"><h2>${index + 1}. ${escapeHtml(note.title || 'Untitled Note')}</h2>${meta ? `<div class="note-meta">${escapeHtml(meta)}</div>` : ''}<div>${textToHTMLForPDF(note.content || '')}</div></div>`;
+}
+
+/**
+ * Build the PDF HTML document for a single study note (including AI summary if available).
+ */
+export function buildSingleNoteDocument({ note = {}, summary = null, title = null }) {
+  const noteTitle = title || note.title || 'Study Note';
+  const subjectName =
+    note.subject && typeof note.subject === 'object'
+      ? note.subject.name
+      : note.subjectRef?.name || note.subject || '';
+  const category = note.category || '';
+  const metaParts = [subjectName, category].filter(Boolean);
+  if (note.tags && Array.isArray(note.tags) && note.tags.length > 0) {
+    metaParts.push(`Tags: ${note.tags.join(', ')}`);
+  }
+  const meta = metaParts.join(' · ');
+
+  let contentHtml = '';
+  if (note.content) {
+    contentHtml = `<div class="note-content">${textToHTMLForPDF(note.content)}</div>`;
+  }
+
+  const summaryObj = summary?.data || summary || note.aiSummary;
+  let summaryHtml = '';
+  if (summaryObj) {
+    const summaryText = typeof summaryObj === 'string' ? summaryObj : summaryObj.summary || '';
+    const keyConcepts = Array.isArray(summaryObj.keyConcepts) ? summaryObj.keyConcepts : [];
+    const examTips = Array.isArray(summaryObj.examTips) ? summaryObj.examTips : [];
+
+    const conceptsMarkup =
+      keyConcepts.length > 0
+        ? `<div style="margin-top: 8px;"><strong>Key Concepts:</strong> ${keyConcepts
+            .map((c) => `<span class="concept-tag">${escapeHtml(c)}</span>`)
+            .join(' ')}</div>`
+        : '';
+
+    const tipsMarkup =
+      examTips.length > 0
+        ? `<div style="margin-top: 8px;"><strong>Exam Tips:</strong><ul>${examTips
+            .map((tip) => `<li>${textToHTMLForPDF(tip)}</li>`)
+            .join('')}</ul></div>`
+        : '';
+
+    summaryHtml = `
+      <div class="ai-summary-box">
+        <div class="ai-summary-title">⚡ AI Revision Summary</div>
+        ${summaryText ? `<div>${textToHTMLForPDF(summaryText)}</div>` : ''}
+        ${conceptsMarkup}
+        ${tipsMarkup}
+      </div>
+    `;
+  }
+
+  const body = `
+    <div class="note-block">
+      ${contentHtml}
+      ${summaryHtml}
+    </div>
+  `;
+
+  return buildHTMLDocument(noteTitle, meta, body);
 }
 
 /**
