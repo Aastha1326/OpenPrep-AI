@@ -7,10 +7,11 @@ export default function () {
     headers: {
       'Authorization': 'Bearer dummy_token',
     },
+    // Dummy token intentionally returns 401 — expected, not a real error.
+    responseCallback: http.expectedStatuses(200, 401),
   };
 
   const res = http.get(`${BASE_URL}/api/flashcards`, params);
-
   check(res, {
     'flashcard retrieval is status 200 or 401': (r) => [200, 401].includes(r.status),
   });

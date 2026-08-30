@@ -6,6 +6,9 @@ const {
   getQuota,
   getExamCountdownPreferences,
   updateExamCountdownPreferences,
+  updateTimezone,
+  getDashboardLayout,
+  updateDashboardLayout,
 } = require('../controllers/userController');
 const { exportAccountData, deleteAccount } = require('../controllers/accountDataController');
 const { protect } = require('../middleware/auth');
@@ -134,6 +137,11 @@ router.get('/quota', protect, getQuota);
 // Exam countdown preferences
 router.get('/exam-countdown', protect, getExamCountdownPreferences);
 router.put('/exam-countdown', protect, updateExamCountdownPreferences);
+// Timezone preference (IANA)
+router.put('/preferences/timezone', protect, updateTimezone);
+// Dashboard custom layout persistence
+router.get('/dashboard', protect, getDashboardLayout);
+router.post('/dashboard', protect, updateDashboardLayout);
 // Upload/replace the authenticated user's avatar
 router.put('/avatar', protect, avatarUpload.single('avatar'), updateAvatar);
 

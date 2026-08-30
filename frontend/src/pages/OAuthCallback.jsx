@@ -13,9 +13,10 @@ const OAuthCallback = () => {
   // State for missing/private email flow
   const [promptEmail, setPromptEmail] = useState(false);
   const [email, setEmail] = useState('');
-  const [githubId, setGithubId] = useState('');
-  const [name, setName] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState('');
+  // Signed proof of the provider identity, issued by the OAuth callback. The
+  // raw githubId used to travel in the query string and be trusted on the way
+  // back, which let anyone claim any identity without visiting the provider.
+  const [pendingToken, setPendingToken] = useState('');
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -40,9 +41,10 @@ const OAuthCallback = () => {
         navigate('/dashboard');
       });
     } else if (isPromptEmail) {
-      setGithubId(searchParams.get('githubId') || '');
-      setName(searchParams.get('name') || '');
-      setAvatarUrl(searchParams.get('avatarUrl') || '');
+      // The display name and avatar are inside the signed token now, so the
+      // server reads them from the provider's own data rather than from
+      // whatever the browser sends back.
+      setPendingToken(searchParams.get('pendingToken') || '');
       setPromptEmail(true);
       setLoading(false);
     } else {
@@ -61,9 +63,7 @@ const OAuthCallback = () => {
 
       const res = await API.post('/auth/oauth/register-email', {
         email,
-        githubId,
-        name,
-        avatarUrl,
+        pendingToken,
       });
 
       if (res.data?.success && res.data?.token) {

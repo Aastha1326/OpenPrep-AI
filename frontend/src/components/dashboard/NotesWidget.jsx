@@ -13,13 +13,15 @@ import {
   Play,
   Pause,
   Users,
+  Download,
 } from 'lucide-react';
-import API from '../../services/api';
+import API from '../../services/api.js';
 import VintagePaper from './VintagePaper';
 import AudioReader from '../AudioReader';
 import HighlightedText from '../HighlightedText';
 import GenerateFlashcardsFromNoteModal from './GenerateFlashcardsFromNoteModal';
 import ImportExportNotes from './ImportExportNotes';
+import { buildSingleNoteDocument, exportHTMLToPDF } from '../../utils/exportDocs';
 const VoiceNoteRecorderModal = lazy(() => import('../notes/VoiceNoteRecorderModal'));
 
 const Shimmer = ({ className = '' }) => (
@@ -114,6 +116,27 @@ const NotesWidget = ({ limit = 5 }) => {
   const [flashcardNote, setFlashcardNote] = useState(null);
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
   const [tagFilter, setTagFilter] = useState('');
+  const [exportingNoteId, setExportingNoteId] = useState(null);
+
+  const handleExportNotePDF = useCallback(async (note, summaryData) => {
+    setExportingNoteId(note.id);
+    try {
+      const title = note.title || 'Study Note';
+      const safeFilename =
+        title
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)/g, '') || 'note';
+
+      const html = buildSingleNoteDocument({ note, summary: summaryData, title });
+      await exportHTMLToPDF(html, `openprep-${safeFilename}.pdf`);
+    } catch (err) {
+      console.error('Failed to export note PDF:', err);
+      alert('Failed to export note as PDF.');
+    } finally {
+      setExportingNoteId(null);
+    }
+  }, []);
 
   const loadNotes = useCallback(async () => {
     setLoading(true);
@@ -273,6 +296,20 @@ const NotesWidget = ({ limit = 5 }) => {
                       className="flex items-center gap-1 px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-bold rounded transition-colors"
                     >
                       <Users className="w-3.5 h-3.5" /> Collaborate
+                    </button>
+                    <button
+                      type="button"
+                      disabled={exportingNoteId === note.id}
+                      onClick={() => handleExportNotePDF(note, summary)}
+                      className="flex items-center gap-1 px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-bold rounded transition-colors disabled:opacity-60"
+                      title="Download as PDF"
+                    >
+                      {exportingNoteId === note.id ? (
+                        <Loader className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Download className="w-3.5 h-3.5" />
+                      )}
+                      <span>Download PDF</span>
                     </button>
                   </div>
                 </div>

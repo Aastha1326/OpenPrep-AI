@@ -3,7 +3,7 @@ import CreateNoteModal from './CreateNoteModal';
 
 const mockPost = vi.fn();
 
-vi.mock('../../services/api', () => ({
+vi.mock('../../services/api.js', () => ({
   default: {
     post: (...args) => mockPost(...args),
     put: vi.fn(() => Promise.resolve({ data: { success: true } })),
@@ -156,3 +156,4 @@ describe('CreateNoteModal', () => {
     expect(onClose).toHaveBeenCalled();
   });
 });
+

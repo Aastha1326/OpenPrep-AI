@@ -1,25 +1,47 @@
+const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
 
-// Import all models
+
 const User = require('./User');
+const Quiz = require('./Quiz');
+const AIUsageLog = require('./AIUsageLog');
+const ProviderHealthStatus = require('./ProviderHealthStatus');
+const SchedulerVersion = require('./SchedulerVersion');
+
+const FlashcardSchedulingState = require('./FlashcardSchedulingState');
+const FlashcardReviewHistory = require('./FlashcardReviewHistory');
+const ReviewSubmissionToken = require('./ReviewSubmissionToken');
+const QuizValidationLog = require('./QuizValidationLog');
 const Folder = require('./Folder');
 const Exam = require('./Exam');
 const Subject = require('./Subject');
 const Topic = require('./Topic');
+const SkillDependency = require('./SkillDependency');
 const PYQ = require('./PYQ');
+
 const StudyPlan = require('./StudyPlan');
-const Quiz = require('./Quiz');
 const QuizAttempt = require('./QuizAttempt');
+
 const Note = require('./Note');
+const Question = require('./Question');
+const QuestionComment = require('./QuestionComment');
+const DoubtSession = require('./DoubtSession');
+const DoubtSessionMessage = require('./DoubtSessionMessage');
+const CommentVote = require('./CommentVote');
+const CommentFlag = require('./CommentFlag');
 const Flashcard = require('./Flashcard');
 const FlashcardDeck = require('./FlashcardDeck');
 const DeckCollaborator = require('./DeckCollaborator');
 const Progress = require('./Progress');
+const UserProgress = require('./UserProgress');
 const Feedback = require('./Feedback');
 const ActivityLog = require('./ActivityLog');
+const AuditLog = require('./AuditLog');
 const UsageQuota = require('./UsageQuota');
 const Achievement = require('./Achievement');
 const FocusSession = require('./FocusSession');
+const FocusSessionLog = require('./FocusSessionLog');
+
 const QuizTelemetryEvent = require('./QuizTelemetryEvent');
 const QuizBookmark = require('./QuizBookmark');
 const DeckRating = require('./DeckRating');
@@ -33,7 +55,12 @@ const Notification = require('./Notification');
 const PushSubscription = require('./PushSubscription');
 const ReadinessSnapshot = require('./ReadinessSnapshot');
 const SubjectGoal = require('./SubjectGoal');
-const StudySquad = require('./StudySquad');const SquadMember = require('./SquadMember');
+const StudyHabit = require('./StudyHabit')(sequelize, DataTypes);
+const HabitLog = require('./HabitLog')(sequelize, DataTypes);
+const HabitStreak = require('./HabitStreak')(sequelize, DataTypes);
+
+const StudySquad = require('./StudySquad');
+const SquadMember = require('./SquadMember');
 const SquadChallenge = require('./SquadChallenge');
 const SquadChallengeContribution = require('./SquadChallengeContribution');
 const SquadAchievement = require('./SquadAchievement');
@@ -48,11 +75,40 @@ User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Subject, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Topic, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(PYQ, { foreignKey: 'user', onDelete: 'CASCADE' });
+User.hasMany(Bounty, { foreignKey: 'authorId', as: 'bounties', onDelete: 'CASCADE' });
+Bounty.belongsTo(User, { foreignKey: 'authorId', as: 'author' });
+Bounty.belongsTo(User, { foreignKey: 'winnerId', as: 'winner' });
+
+Bounty.hasMany(BountySolution, { foreignKey: 'bountyId', as: 'solutions', onDelete: 'CASCADE' });
+BountySolution.belongsTo(Bounty, { foreignKey: 'bountyId', as: 'bounty' });
+BountySolution.belongsTo(User, { foreignKey: 'authorId', as: 'author' });
+
+BountySolution.hasMany(BountySolutionVote, { foreignKey: 'solutionId', as: 'votes', onDelete: 'CASCADE' });
+BountySolutionVote.belongsTo(BountySolution, { foreignKey: 'solutionId', as: 'solution' });
 User.hasMany(StudyPlan, { foreignKey: 'user', onDelete: 'CASCADE' });
+User.hasMany(LearningPath, { foreignKey: 'userId', onDelete: 'CASCADE' });
+LearningPath.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 User.hasMany(Quiz, { foreignKey: 'createdBy', onDelete: 'CASCADE' });
 User.hasMany(QuizAttempt, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Note, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Flashcard, { foreignKey: 'user', onDelete: 'CASCADE' });
+User.hasMany(Question, { foreignKey: 'user', onDelete: 'CASCADE' });
+Question.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+User.hasMany(QuestionComment, { foreignKey: 'authorId', onDelete: 'CASCADE' });
+QuestionComment.belongsTo(User, { foreignKey: 'authorId', as: 'author' });
+QuestionComment.hasMany(QuestionComment, { foreignKey: 'parentCommentId', as: 'replies', onDelete: 'CASCADE' });
+QuestionComment.belongsTo(QuestionComment, { foreignKey: 'parentCommentId', as: 'parent' });
+QuestionComment.hasMany(CommentVote, { foreignKey: 'commentId', onDelete: 'CASCADE' });
+CommentVote.belongsTo(QuestionComment, { foreignKey: 'commentId', as: 'comment' });
+QuestionComment.hasMany(CommentFlag, { foreignKey: 'commentId', onDelete: 'CASCADE' });
+CommentFlag.belongsTo(QuestionComment, { foreignKey: 'commentId', as: 'comment' });
+CommentFlag.belongsTo(User, { foreignKey: 'reporterId', as: 'reporter' });
+User.hasMany(DoubtSession, { foreignKey: 'studentId', onDelete: 'CASCADE' });
+DoubtSession.belongsTo(User, { foreignKey: 'studentId', as: 'student' });
+DoubtSession.hasMany(DoubtSessionMessage, { foreignKey: 'sessionId', as: 'messages', onDelete: 'CASCADE' });
+DoubtSessionMessage.belongsTo(DoubtSession, { foreignKey: 'sessionId', as: 'session' });
+Note.hasMany(Question, { foreignKey: 'noteId', onDelete: 'CASCADE' });
+Question.belongsTo(Note, { foreignKey: 'noteId', as: 'noteRef' });
 User.hasMany(FlashcardDeck, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Progress, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Feedback, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -105,6 +161,28 @@ Topic.hasMany(Note, { foreignKey: 'topic', onDelete: 'CASCADE' });
 Topic.hasMany(Flashcard, { foreignKey: 'topic', onDelete: 'CASCADE' });
 Topic.hasMany(Progress, { foreignKey: 'topic', onDelete: 'CASCADE' });
 
+Topic.hasMany(SkillDependency, {
+  foreignKey: 'skillId',
+  as: 'dependencies',
+  onDelete: 'CASCADE',
+});
+
+Topic.hasMany(SkillDependency, {
+  foreignKey: 'prerequisiteSkillId',
+  as: 'dependents',
+  onDelete: 'CASCADE',
+});
+
+SkillDependency.belongsTo(Topic, {
+  foreignKey: 'skillId',
+  as: 'skill',
+});
+
+SkillDependency.belongsTo(Topic, {
+  foreignKey: 'prerequisiteSkillId',
+  as: 'prerequisite',
+});
+
 // PYQ associations
 PYQ.belongsTo(Exam, { foreignKey: 'exam', as: 'examRef' });
 PYQ.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'CASCADE' });
@@ -124,6 +202,9 @@ Quiz.hasMany(QuizTelemetryEvent, { foreignKey: 'quiz', onDelete: 'CASCADE' });
 // QuizAttempt associations
 QuizAttempt.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 QuizAttempt.belongsTo(Quiz, { foreignKey: 'quiz', as: 'quizRef', onDelete: 'CASCADE' });
+QuizAttempt.hasOne(ExamIntegrityReport, { foreignKey: 'quizAttemptId', as: 'integrityReport', onDelete: 'CASCADE' });
+ExamIntegrityReport.belongsTo(QuizAttempt, { foreignKey: 'quizAttemptId', as: 'attemptRef' });
+ExamIntegrityReport.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 
 // Note associations
 Note.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'CASCADE' });
@@ -158,6 +239,9 @@ UserBadge.belongsTo(Badge, { foreignKey: 'badgeCode', targetKey: 'id', as: 'badg
 
 // FocusSession associations
 FocusSession.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
+// FocusSessionLog associations
+FocusSessionLog.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 
 // QuizTelemetryEvent associations
 QuizTelemetryEvent.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
@@ -248,9 +332,107 @@ Syllabus.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 Syllabus.hasMany(SyllabusTopic, { foreignKey: 'syllabusId', onDelete: 'CASCADE' });
 SyllabusTopic.belongsTo(Syllabus, { foreignKey: 'syllabusId', as: 'syllabusRef' });
 
-SyllabusTopic.belongsTo(Note, { foreignKey: 'linkedNoteId', as: 'linkedNote', onDelete: 'SET NULL' });
+// PDFAnnotation associations
+User.hasMany(PDFAnnotation, { foreignKey: 'userId', onDelete: 'CASCADE' });
+PDFAnnotation.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 
-module.exports = {  sequelize,  User,  Exam,
+// StudyGoal associations
+User.hasMany(StudyGoal, { foreignKey: 'user', onDelete: 'CASCADE' });
+StudyGoal.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+StudyGoal.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'SET NULL' });
+Subject.hasMany(StudyGoal, { foreignKey: 'subject', onDelete: 'SET NULL' });
+
+// StudyAnalyticsSnapshot associations
+User.hasMany(StudyAnalyticsSnapshot, { foreignKey: 'user', onDelete: 'CASCADE' });
+StudyAnalyticsSnapshot.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
+// StudyHabit, HabitLog & HabitStreak associations
+User.hasMany(StudyHabit, { foreignKey: 'userId', as: 'habits', onDelete: 'CASCADE' });
+StudyHabit.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+StudyHabit.hasMany(HabitLog, { foreignKey: 'habitId', as: 'logs', onDelete: 'CASCADE' });
+HabitLog.belongsTo(StudyHabit, { foreignKey: 'habitId', as: 'habitRef' });
+User.hasMany(HabitLog, { foreignKey: 'userId', as: 'habitLogs', onDelete: 'CASCADE' });
+HabitLog.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+StudyHabit.hasOne(HabitStreak, { foreignKey: 'habitId', as: 'streak', onDelete: 'CASCADE' });
+HabitStreak.belongsTo(StudyHabit, { foreignKey: 'habitId', as: 'habitRef' });
+User.hasMany(HabitStreak, { foreignKey: 'userId', as: 'habitStreaks', onDelete: 'CASCADE' });
+HabitStreak.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+
+// LearningJournal associations
+User.hasMany(LearningJournal, { foreignKey: 'user', onDelete: 'CASCADE' });
+LearningJournal.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
+// FlashcardMasterySnapshot associations
+User.hasMany(FlashcardMasterySnapshot, { foreignKey: 'user', onDelete: 'CASCADE' });
+FlashcardMasterySnapshot.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
+// StudyGoalProgress associations
+StudyGoal.hasMany(StudyGoalProgress, { foreignKey: 'goalId', onDelete: 'CASCADE' });
+StudyGoalProgress.belongsTo(StudyGoal, { foreignKey: 'goalId', as: 'goalRef' });
+User.hasMany(StudyGoalProgress, { foreignKey: 'user', onDelete: 'CASCADE' });
+StudyGoalProgress.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
+// WeeklyStudyReport associations
+User.hasMany(WeeklyStudyReport, { foreignKey: 'user', onDelete: 'CASCADE' });
+WeeklyStudyReport.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
+// WeaknessReport associations
+User.hasMany(WeaknessReport, { foreignKey: 'user', onDelete: 'CASCADE' });
+WeaknessReport.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+Subject.hasMany(WeaknessReport, { foreignKey: 'subject', onDelete: 'SET NULL' });
+WeaknessReport.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef' });
+
+// ExamStrategy associations
+User.hasMany(ExamStrategy, { foreignKey: 'user', onDelete: 'CASCADE' });
+ExamStrategy.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+Exam.hasMany(ExamStrategy, { foreignKey: 'exam', onDelete: 'CASCADE' });ExamStrategy.belongsTo(Exam, { foreignKey: 'exam', as: 'examRef' });
+
+// StudyTip associations
+User.hasMany(StudyTip, { foreignKey: 'user', onDelete: 'CASCADE' });
+StudyTip.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
+// StudyPlaylist associations
+User.hasMany(StudyPlaylist, { foreignKey: 'user', onDelete: 'CASCADE' });
+StudyPlaylist.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+Subject.hasMany(StudyPlaylist, { foreignKey: 'subject', onDelete: 'SET NULL' });
+StudyPlaylist.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef' });
+StudyPlaylist.hasMany(StudyPlaylistItem, { foreignKey: 'playlistId', as: 'items', onDelete: 'CASCADE' });
+StudyPlaylistItem.belongsTo(StudyPlaylist, { foreignKey: 'playlistId', as: 'playlistRef' });
+User.hasMany(StudyPlaylistItem, { foreignKey: 'user', onDelete: 'CASCADE' });
+StudyPlaylistItem.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
+// ResourceBookmark & BookmarkCollection associations
+User.hasMany(BookmarkCollection, { foreignKey: 'user', onDelete: 'CASCADE' });
+BookmarkCollection.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+BookmarkCollection.hasMany(ResourceBookmark, { foreignKey: 'collectionId', as: 'bookmarks', onDelete: 'SET NULL' });
+ResourceBookmark.belongsTo(BookmarkCollection, { foreignKey: 'collectionId', as: 'collectionRef' });
+User.hasMany(ResourceBookmark, { foreignKey: 'user', onDelete: 'CASCADE' });
+ResourceBookmark.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
+// DeckRating associations
+DeckRating.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+User.hasMany(DeckRating, { foreignKey: 'userId', as: 'ratings', onDelete: 'CASCADE' });
+DeckRating.belongsTo(Subject, { foreignKey: 'deckId', as: 'deckRef', onDelete: 'CASCADE' });
+Subject.hasMany(DeckRating, { foreignKey: 'deckId', as: 'ratings', onDelete: 'CASCADE' });
+
+const embeddingsProcessor = require('../services/embeddingsProcessor');
+embeddingsProcessor.attachHooks({ Note, Quiz });
+embeddingsProcessor.registerWorkerHandler({ Note, Quiz });
+
+module.exports = {
+  sequelize,
+  // aiUsageBudgetService reaches for `db.Sequelize.Op`; without this the
+  // registry hands it undefined and every budget query throws.
+  Sequelize,
+  User,
+  StudyAnalyticsSnapshot,
+  FlashcardMasterySnapshot,
+  StudyHabit,
+  HabitLog,
+  HabitStreak,
+  LearningJournal,
+  Folder,
+  Exam,
   Subject,
   Topic,
   PYQ,
@@ -258,16 +440,38 @@ module.exports = {  sequelize,  User,  Exam,
   Quiz,
   QuizAttempt,
   Note,
+  Question,
+  SchedulerVersion,
+  FlashcardSchedulingState,
+  FlashcardReviewHistory,
+  ReviewSubmissionToken,
+  QuestionComment,
+  DoubtSession,
+  DoubtSessionMessage,
+  CommentVote,
+  CommentFlag,
+  ModeratorAuditLog,
   Flashcard,
+  FlashcardDeck,
+  DeckCollaborator,
   Progress,
+  UserProgress,
   Feedback,
   ActivityLog,
+  AuditLog,
   UsageQuota,
   Achievement,
   FocusSession,
+  QuizValidationLog,
   QuizTelemetryEvent,
   QuizBookmark,
   DeckRating,
+  StudyGoal,
+  StudyGoalProgress,
+  WeeklyStudyReport,
+  StudyMilestone,
+  UserMilestone,
+  FocusSessionLog,
   UserBadge,
   Badge,
   BattleSession,
@@ -278,7 +482,8 @@ module.exports = {  sequelize,  User,  Exam,
   PushSubscription,
   ReadinessSnapshot,
   SubjectGoal,
-  StudySquad,  SquadMember,
+  StudySquad,
+  SquadMember,
   SquadChallenge,
   SquadChallengeContribution,
   SquadAchievement,

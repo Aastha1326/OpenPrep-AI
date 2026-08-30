@@ -27,6 +27,7 @@ const Login = () => {
   const [twoFaError, setTwoFaError] = useState('');
 
   const [oauthError, setOauthError] = useState(null);
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) navigate('/dashboard', { replace: true });
@@ -149,9 +150,13 @@ const Login = () => {
                     <label htmlFor="login-password" className="block text-xs font-bold text-[#1F150C] dark:text-[#E1DCC9]">
                       Password
                     </label>
-                    <Link to="/forgot-password" className="text-xs font-semibold text-[#AD8B73] hover:underline dark:text-[#E1DCC9]">
+                    <button
+                      type="button"
+                      onClick={() => setIsForgotPasswordOpen(true)}
+                      className="text-xs font-semibold text-[#AD8B73] hover:underline dark:text-[#E1DCC9] bg-transparent border-none cursor-pointer p-0"
+                    >
                       Forgot password?
-                    </Link>
+                    </button>
                   </div>
                   <div className="relative">
                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8C6A53] dark:text-[#C4BA9D]" />

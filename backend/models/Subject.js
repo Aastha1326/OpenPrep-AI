@@ -76,6 +76,14 @@ const Subject = sequelize.define(
         name: 'subject_user_idx',
         fields: ['user'],
       },
+      {
+        name: 'subject_is_public_rating_idx',
+        fields: ['isPublic', 'rating'],
+      },
+      {
+        name: 'subject_is_public_clone_count_idx',
+        fields: ['isPublic', 'cloneCount'],
+      },
     ],
   }
 );

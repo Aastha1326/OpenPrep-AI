@@ -1,36 +1,60 @@
 import React from 'react';
 
-const SelectionContextMenu = ({ onHighlight }) => {
+const HIGHLIGHT_COLORS = [
+  { name: 'Yellow', value: '#FFE900' },
+  { name: 'Green', value: '#90EE90' },
+  { name: 'Pink', value: '#FF9EDB' },
+  { name: 'Blue', value: '#8AC7FF' },
+];
+
+const SelectionContextMenu = ({ position, onHighlight, onAddNote, onConvertToFlashcard }) => {
+  if (!position) return null;
+
   return (
-    <div 
+    <div
       className="selection-context-menu"
+      role="menu"
       style={{
-        display: 'inline-flex',
-        gap: '5px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
         backgroundColor: '#333',
-        padding: '5px',
-        borderRadius: '4px',
+        padding: '6px',
+        borderRadius: '6px',
         position: 'absolute',
-        top: '20px', // Example positioning
-        left: '200px',
-        zIndex: 100
+        top: position.top,
+        left: position.left,
+        zIndex: 100,
       }}
     >
-      <button 
-        style={{ backgroundColor: '#FFE900', width: '20px', height: '20px', border: 'none', cursor: 'pointer' }}
-        onClick={() => onHighlight('#FFE900')}
-        title="Highlight Yellow"
-      />
-      <button 
-        style={{ backgroundColor: '#FF8A8A', width: '20px', height: '20px', border: 'none', cursor: 'pointer' }}
-        onClick={() => onHighlight('#FF8A8A')}
-        title="Highlight Red"
-      />
-      <button 
-        style={{ backgroundColor: '#90EE90', width: '20px', height: '20px', border: 'none', cursor: 'pointer' }}
-        onClick={() => onHighlight('#90EE90')}
-        title="Highlight Green"
-      />
+      {HIGHLIGHT_COLORS.map((c) => (
+        <button
+          key={c.value}
+          type="button"
+          role="menuitem"
+          style={{ backgroundColor: c.value, width: '20px', height: '20px', borderRadius: '3px', border: 'none', cursor: 'pointer' }}
+          onClick={() => onHighlight(c.value)}
+          title={`Highlight ${c.name}`}
+          aria-label={`Highlight ${c.name}`}
+        />
+      ))}
+      <div style={{ width: '1px', height: '20px', backgroundColor: '#555' }} />
+      <button
+        type="button"
+        role="menuitem"
+        onClick={onAddNote}
+        className="px-2 py-1 text-xs text-white rounded hover:bg-neutral-700"
+      >
+        Add Note
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        onClick={onConvertToFlashcard}
+        className="px-2 py-1 text-xs text-white rounded hover:bg-neutral-700"
+      >
+        Convert to Flashcard
+      </button>
     </div>
   );
 };

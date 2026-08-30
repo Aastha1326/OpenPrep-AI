@@ -2,7 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import SubjectMasteryWidget from './SubjectMasteryWidget';
 import API from '../../services/api';
 
-vi.mock('../../services/api', () => ({
+vi.mock('../../services/api.js', () => ({
   default: {
     get: vi.fn(),
   },
@@ -98,3 +98,4 @@ describe('SubjectMasteryWidget', () => {
     expect(await screen.findByText('Mathematics')).toBeInTheDocument();
   });
 });
+

@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Controller for managing Oral Viva sessions and evaluations.
+ */
 const { VivaSession, Subject } = require('../models');
 const vivaExaminerService = require('../services/vivaExaminerService');
 const logger = require('../utils/logger');

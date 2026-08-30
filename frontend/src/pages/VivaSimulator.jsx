@@ -185,14 +185,13 @@ export default function VivaSimulator() {
           />
         )}
 
-        {/* Evaluation Scorecard Modal */}
+        {/* Evaluation Scorecard Modal (Retained for future end-session evaluation) */}
         <VivaScorecardModal
           isOpen={isScorecardOpen}
           onClose={() => setIsScorecardOpen(false)}
           scorecard={scorecard}
           onRestart={handleRestart}
         />
-
       </div>
     </div>
   );
