@@ -69,6 +69,8 @@ const SquadActivityReaction = require('./SquadActivityReaction');
 const Syllabus = require('./Syllabus');
 const SyllabusTopic = require('./SyllabusTopic');
 const VivaSession = require('./VivaSession');
+const BountyQuestion = require('./BountyQuestion');
+const BountyAnswer = require('./BountyAnswer');
 
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -332,107 +334,22 @@ Syllabus.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 Syllabus.hasMany(SyllabusTopic, { foreignKey: 'syllabusId', onDelete: 'CASCADE' });
 SyllabusTopic.belongsTo(Syllabus, { foreignKey: 'syllabusId', as: 'syllabusRef' });
 
-// PDFAnnotation associations
-User.hasMany(PDFAnnotation, { foreignKey: 'userId', onDelete: 'CASCADE' });
-PDFAnnotation.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+SyllabusTopic.belongsTo(Note, { foreignKey: 'linkedNoteId', as: 'linkedNote', onDelete: 'SET NULL' });
 
-// StudyGoal associations
-User.hasMany(StudyGoal, { foreignKey: 'user', onDelete: 'CASCADE' });
-StudyGoal.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
-StudyGoal.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'SET NULL' });
-Subject.hasMany(StudyGoal, { foreignKey: 'subject', onDelete: 'SET NULL' });
+// Bounty associations
+User.hasMany(BountyQuestion, { foreignKey: 'userId', as: 'bountyQuestions', onDelete: 'CASCADE' });
+BountyQuestion.belongsTo(User, { foreignKey: 'userId', as: 'creator' });
 
-// StudyAnalyticsSnapshot associations
-User.hasMany(StudyAnalyticsSnapshot, { foreignKey: 'user', onDelete: 'CASCADE' });
-StudyAnalyticsSnapshot.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+Subject.hasMany(BountyQuestion, { foreignKey: 'subjectId', as: 'bountyQuestions', onDelete: 'SET NULL' });
+BountyQuestion.belongsTo(Subject, { foreignKey: 'subjectId', as: 'subjectRef' });
 
-// StudyHabit, HabitLog & HabitStreak associations
-User.hasMany(StudyHabit, { foreignKey: 'userId', as: 'habits', onDelete: 'CASCADE' });
-StudyHabit.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
-StudyHabit.hasMany(HabitLog, { foreignKey: 'habitId', as: 'logs', onDelete: 'CASCADE' });
-HabitLog.belongsTo(StudyHabit, { foreignKey: 'habitId', as: 'habitRef' });
-User.hasMany(HabitLog, { foreignKey: 'userId', as: 'habitLogs', onDelete: 'CASCADE' });
-HabitLog.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
-StudyHabit.hasOne(HabitStreak, { foreignKey: 'habitId', as: 'streak', onDelete: 'CASCADE' });
-HabitStreak.belongsTo(StudyHabit, { foreignKey: 'habitId', as: 'habitRef' });
-User.hasMany(HabitStreak, { foreignKey: 'userId', as: 'habitStreaks', onDelete: 'CASCADE' });
-HabitStreak.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
+BountyQuestion.hasMany(BountyAnswer, { foreignKey: 'questionId', as: 'answers', onDelete: 'CASCADE' });
+BountyAnswer.belongsTo(BountyQuestion, { foreignKey: 'questionId', as: 'question' });
 
-// LearningJournal associations
-User.hasMany(LearningJournal, { foreignKey: 'user', onDelete: 'CASCADE' });
-LearningJournal.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+User.hasMany(BountyAnswer, { foreignKey: 'userId', as: 'bountyAnswers', onDelete: 'CASCADE' });
+BountyAnswer.belongsTo(User, { foreignKey: 'userId', as: 'author' });
 
-// FlashcardMasterySnapshot associations
-User.hasMany(FlashcardMasterySnapshot, { foreignKey: 'user', onDelete: 'CASCADE' });
-FlashcardMasterySnapshot.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
-
-// StudyGoalProgress associations
-StudyGoal.hasMany(StudyGoalProgress, { foreignKey: 'goalId', onDelete: 'CASCADE' });
-StudyGoalProgress.belongsTo(StudyGoal, { foreignKey: 'goalId', as: 'goalRef' });
-User.hasMany(StudyGoalProgress, { foreignKey: 'user', onDelete: 'CASCADE' });
-StudyGoalProgress.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
-
-// WeeklyStudyReport associations
-User.hasMany(WeeklyStudyReport, { foreignKey: 'user', onDelete: 'CASCADE' });
-WeeklyStudyReport.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
-
-// WeaknessReport associations
-User.hasMany(WeaknessReport, { foreignKey: 'user', onDelete: 'CASCADE' });
-WeaknessReport.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
-Subject.hasMany(WeaknessReport, { foreignKey: 'subject', onDelete: 'SET NULL' });
-WeaknessReport.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef' });
-
-// ExamStrategy associations
-User.hasMany(ExamStrategy, { foreignKey: 'user', onDelete: 'CASCADE' });
-ExamStrategy.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
-Exam.hasMany(ExamStrategy, { foreignKey: 'exam', onDelete: 'CASCADE' });ExamStrategy.belongsTo(Exam, { foreignKey: 'exam', as: 'examRef' });
-
-// StudyTip associations
-User.hasMany(StudyTip, { foreignKey: 'user', onDelete: 'CASCADE' });
-StudyTip.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
-
-// StudyPlaylist associations
-User.hasMany(StudyPlaylist, { foreignKey: 'user', onDelete: 'CASCADE' });
-StudyPlaylist.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
-Subject.hasMany(StudyPlaylist, { foreignKey: 'subject', onDelete: 'SET NULL' });
-StudyPlaylist.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef' });
-StudyPlaylist.hasMany(StudyPlaylistItem, { foreignKey: 'playlistId', as: 'items', onDelete: 'CASCADE' });
-StudyPlaylistItem.belongsTo(StudyPlaylist, { foreignKey: 'playlistId', as: 'playlistRef' });
-User.hasMany(StudyPlaylistItem, { foreignKey: 'user', onDelete: 'CASCADE' });
-StudyPlaylistItem.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
-
-// ResourceBookmark & BookmarkCollection associations
-User.hasMany(BookmarkCollection, { foreignKey: 'user', onDelete: 'CASCADE' });
-BookmarkCollection.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
-BookmarkCollection.hasMany(ResourceBookmark, { foreignKey: 'collectionId', as: 'bookmarks', onDelete: 'SET NULL' });
-ResourceBookmark.belongsTo(BookmarkCollection, { foreignKey: 'collectionId', as: 'collectionRef' });
-User.hasMany(ResourceBookmark, { foreignKey: 'user', onDelete: 'CASCADE' });
-ResourceBookmark.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
-
-// DeckRating associations
-DeckRating.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
-User.hasMany(DeckRating, { foreignKey: 'userId', as: 'ratings', onDelete: 'CASCADE' });
-DeckRating.belongsTo(Subject, { foreignKey: 'deckId', as: 'deckRef', onDelete: 'CASCADE' });
-Subject.hasMany(DeckRating, { foreignKey: 'deckId', as: 'ratings', onDelete: 'CASCADE' });
-
-const embeddingsProcessor = require('../services/embeddingsProcessor');
-embeddingsProcessor.attachHooks({ Note, Quiz });
-embeddingsProcessor.registerWorkerHandler({ Note, Quiz });
-
-module.exports = {
-  sequelize,
-  // aiUsageBudgetService reaches for `db.Sequelize.Op`; without this the
-  // registry hands it undefined and every budget query throws.
-  Sequelize,
-  User,
-  StudyAnalyticsSnapshot,
-  FlashcardMasterySnapshot,
-  StudyHabit,
-  HabitLog,
-  HabitStreak,
-  LearningJournal,
-  Folder,
-  Exam,
+module.exports = {  sequelize,  User,  Exam,
   Subject,
   Topic,
   PYQ,
@@ -492,4 +409,6 @@ module.exports = {
   FlashcardDeck,
   DeckCollaborator,
   VivaSession,
+  BountyQuestion,
+  BountyAnswer,
 };
