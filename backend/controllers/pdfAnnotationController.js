@@ -1,5 +1,5 @@
 const PDFAnnotation = require('../models/PDFAnnotation');
-
+const sanitizeHtml = require('sanitize-html');
 exports.getAnnotations = async (req, res, next) => {
   try {
     const { id: documentId } = req.params;
@@ -21,6 +21,9 @@ exports.saveAnnotation = async (req, res, next) => {
   try {
     const { id: documentId } = req.params;
     const { pageNumber, rectsData, color, commentText } = req.body;
+    const safeCommentText = commentText
+      ? sanitizeHtml(commentText, { allowedTags: [], allowedAttributes: {} })
+      : commentText;
 
     const annotation = await PDFAnnotation.create({
       documentId,
@@ -28,9 +31,8 @@ exports.saveAnnotation = async (req, res, next) => {
       pageNumber,
       rectsData,
       color: color || '#FFE900',
-      commentText,
+      commentText: safeCommentText,
     });
-
     res.status(201).json({ success: true, data: annotation });
   } catch (error) {
     next(error);

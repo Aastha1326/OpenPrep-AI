@@ -6,11 +6,24 @@ import API from '../../services/api';
 const DeckPreviewModal = ({ deck, onClose, onFork, currentUserId }) => {
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [reviews, setReviews] = useState([]);
+  const [loadingReviews, setLoadingReviews] = useState(true);
   const [stars, setStars] = useState(5);
   const [comment, setComment] = useState('');
   const [submittingRating, setSubmittingRating] = useState(false);
   const [ratingError, setRatingError] = useState(null);
   const [ratingSuccess, setRatingSuccess] = useState(false);
+
+  const fetchReviews = async () => {
+    try {
+      const res = await API.get(`/community/decks/${deck.id}/reviews`);
+      setReviews(res.data.data || []);
+    } catch (err) {
+      console.error('Failed to load reviews', err);
+    } finally {
+      setLoadingReviews(false);
+    }
+  };
 
   useEffect(() => {
     const fetchSampleCards = async () => {
@@ -27,6 +40,7 @@ const DeckPreviewModal = ({ deck, onClose, onFork, currentUserId }) => {
       }
     };
     fetchSampleCards();
+    fetchReviews();
   }, [deck.id]);
 
   const handleRate = async (e) => {
@@ -39,6 +53,7 @@ const DeckPreviewModal = ({ deck, onClose, onFork, currentUserId }) => {
       await API.post(`/community/decks/${deck.id}/rate`, { stars, comment });
       setRatingSuccess(true);
       setComment('');
+      fetchReviews();
     } catch (err) {
       setRatingError(err.response?.data?.error || 'Failed to submit rating');
     } finally {
@@ -107,6 +122,42 @@ const DeckPreviewModal = ({ deck, onClose, onFork, currentUserId }) => {
                     <div className="text-neutral-600 dark:text-neutral-400 flex-1 text-right">
                       {card.back}
                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Reviews List */}
+          <div className="border-t border-neutral-200 dark:border-neutral-700 pt-5">
+            <h4 className="text-sm font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-3">
+              Community Reviews ({reviews.length})
+            </h4>
+            {loadingReviews ? (
+              <div className="h-10 bg-neutral-100 dark:bg-neutral-700 animate-pulse rounded-lg" />
+            ) : reviews.length === 0 ? (
+              <p className="text-sm text-neutral-500 italic">No reviews yet. Be the first to rate!</p>
+            ) : (
+              <div className="space-y-3 max-h-48 overflow-y-auto">
+                {reviews.map((rev) => (
+                  <div
+                    key={rev.id}
+                    className="p-3 bg-neutral-50 dark:bg-neutral-900/50 rounded-xl border border-neutral-100 dark:border-neutral-700/50"
+                  >
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+                        {rev.userRef?.name || 'Peer Student'}
+                      </span>
+                      <StarRating rating={rev.stars} readOnly />
+                    </div>
+                    {rev.comment && (
+                      <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                        {rev.comment}
+                      </p>
+                    )}
+                    <span className="text-[10px] text-neutral-400 dark:text-neutral-500 block mt-1">
+                      {new Date(rev.createdAt).toLocaleDateString()}
+                    </span>
                   </div>
                 ))}
               </div>

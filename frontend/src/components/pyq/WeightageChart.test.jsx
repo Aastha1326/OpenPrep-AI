@@ -12,7 +12,7 @@ describe('WeightageChart Component', () => {
   test('renders chart title and container', () => {
     render(<WeightageChart data={mockData} title="Physics Topic Weightage" />);
     expect(screen.getByText('Physics Topic Weightage')).toBeInTheDocument();
-    expect(screen.getByText('Sorted Descending')).toBeInTheDocument();
+    expect(screen.getByText('Highest First')).toBeInTheDocument();
   });
 
   test('displays empty notice when data is empty', () => {

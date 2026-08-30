@@ -1,6 +1,7 @@
 const { awardXP } = require('../../services/gamificationService');
 const models = require('../../models');
 const cacheService = require('../../services/cacheService');
+const xpRateLimiter = require('../../services/xpRateLimiter');
 
 describe('Squad Gamification Unit Tests', () => {
   let userSpy, squadMemberSpy, squadChallengeSpy, squadContribSpy, squadAchievementSpy;
@@ -98,7 +99,15 @@ describe('Squad Gamification Unit Tests', () => {
   });
 
   it('should not award XP if hourly limit reached (duplicate activity exploit)', async () => {
-    vi.spyOn(cacheService, 'get').mockResolvedValueOnce('500'); // Hourly limit
+    // Hourly allowance already spent — the limiter grants nothing, so no XP
+    // reaches the squad challenges.
+    vi.spyOn(xpRateLimiter, 'consume').mockResolvedValue({
+      granted: 0,
+      usage: xpRateLimiter.HOURLY_XP_CAP,
+      remaining: 0,
+      capped: true,
+      degraded: false,
+    });
 
     const mockUser = {
       id: 'user-123',

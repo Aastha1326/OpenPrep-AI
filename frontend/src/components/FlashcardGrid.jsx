@@ -51,13 +51,41 @@ const FlashcardGrid = ({ flashcards = [], searchVal = '' }) => {
         key={flashcard.id || cardIndex}
         flashcard={flashcard}
         style={style}
+        rowIndex={rowIndex}
+        columnIndex={columnIndex}
+        cardIndex={cardIndex}
       />
     );
   };
 
+  // Arrow-key navigation between virtualized cards (Tab already works via tabIndex)
+  const handleGridKeyDown = (e) => {
+    const arrowKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+    if (!arrowKeys.includes(e.key)) return;
+    const current = document.activeElement;
+    const currentIndex = current?.getAttribute?.('data-card-index');
+    if (currentIndex === null || currentIndex === undefined) return;
+
+    e.preventDefault();
+    let nextIndex = parseInt(currentIndex, 10);
+    if (e.key === 'ArrowRight') nextIndex += 1;
+    else if (e.key === 'ArrowLeft') nextIndex -= 1;
+    else if (e.key === 'ArrowDown') nextIndex += columnCount;
+    else if (e.key === 'ArrowUp') nextIndex -= columnCount;
+
+    if (nextIndex < 0 || nextIndex >= filteredCards.length) return;
+    const nextEl = containerRef.current?.querySelector(`[data-card-index="${nextIndex}"]`);
+    nextEl?.focus();
+  };
   return (
-    <div ref={containerRef} className="w-full h-full min-h-[500px]">
-      {filteredCards.length === 0 ? (
+    <div
+      ref={containerRef}
+      className="w-full h-full min-h-[500px]"
+      role="grid"
+      aria-rowcount={rowCount}
+      aria-colcount={columnCount}
+      onKeyDown={handleGridKeyDown}
+    >      {filteredCards.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-64 text-neutral-500">
           <p className="text-sm italic">No flashcards found matching search query.</p>
         </div>

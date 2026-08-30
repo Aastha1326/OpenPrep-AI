@@ -19,7 +19,8 @@
     "db:backup": "npm run db:backup --prefix backend",
     "db:restore": "npm run db:restore --prefix backend",
     "validate:manifests": "node scripts/validate-manifests.js",
-    "test:scripts": "node --test scripts/*.test.js"
+    "test:scripts": "node --test scripts/*.test.js",
+    "test": "jest"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.1",
@@ -29,6 +30,7 @@
     "eslint": "^8.56.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "prettier": "^3.2.5"
+    "prettier": "^3.2.5",
+    "jest": "^29.7.0"
   }
 }

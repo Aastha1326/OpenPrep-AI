@@ -31,6 +31,14 @@ exports.protect = async (req, res, next) => {
       return res.status(401).json({ success: false, error: 'Not authorized to access this route' });
     }
 
+    const crypto = require('crypto');
+    const redisSentinelService = require('../services/redisSentinelService');
+    const jti = decoded.jti || crypto.createHash('sha256').update(token).digest('hex');
+    const isBlacklisted = await redisSentinelService.isJwtBlacklisted(jti);
+    if (isBlacklisted) {
+      return res.status(401).json({ success: false, error: 'Token has been revoked' });
+    }
+
     const user = await User.findByPk(decoded.id, {
       attributes: {
         exclude: [
@@ -50,7 +58,10 @@ exports.protect = async (req, res, next) => {
     }
 
     req.user = user;
-    next();
+    const { rlsStorage } = require('./rlsContext');
+    rlsStorage.run({ userId: user.id, isAdmin: user.role === 'admin' }, () => {
+      next();
+    });
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
       return res.status(401).json({ success: false, message: 'Token expired', error: 'Token expired' });

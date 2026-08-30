@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { socket, connectSocket } from '../services/socket';
-import API from '../services/api';
+import API from '../services/api.js';
 import {
   FaPlay,
   FaCheck,

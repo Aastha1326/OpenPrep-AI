@@ -31,7 +31,19 @@ window.addEventListener('unhandledrejection', (event) => {
   }
 });
 
-
+// Register Service Worker for offline asset & API response caching
+if ('serviceWorker' in navigator && import.meta.env.MODE !== 'test') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('/service-worker.js')
+      .then((reg) => {
+        console.log('✅ Service Worker registered successfully:', reg.scope);
+      })
+      .catch((err) => {
+        console.warn('⚠️ Service Worker registration failed:', err);
+      });
+  });
+}
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '179369126060-lq7unpt173rt6aog2nt93s6m895d6b2i.apps.googleusercontent.com';
 
@@ -42,9 +54,13 @@ createRoot(document.getElementById('root')).render(
         <Provider store={store}>
           <ThemeProvider>
             <SyncProvider>
-              <BrowserRouter>
-                <App />
-              </BrowserRouter>
+              <PomodoroProvider>
+                <BrowserRouter>
+                  <SessionTimerProvider>
+                    <App />
+                  </SessionTimerProvider>
+                </BrowserRouter>
+              </PomodoroProvider>
             </SyncProvider>
           </ThemeProvider>
         </Provider>
