@@ -401,10 +401,12 @@ export const sendDoubtMessage = (sessionId, message) =>
  * Reveal the next progressive hint for a doubt session.
  * POST /api/doubts/:id/reveal-step
  */
-// ── Smart Focus & Adaptive Pomodoro Timer APIs ──────────────────────
-export const getAdaptiveFocusRecommendation = () => API.get('/focus/recommendation');
-export const logFocusSession = (data) => API.post('/focus/sessions', data);
-export const getFocusStats = () => API.get('/focus/stats');
+// ── Spaced Repetition Flashcard Analytics APIs ──────────────────────────
+export const getLeitnerDistribution = (deckId = null) =>
+  API.get('/flashcards/analytics/leitner-distribution', { params: { deckId } });
+
+export const getDueForecast = (deckId = null) =>
+  API.get('/flashcards/analytics/due-forecast', { params: { deckId } });
 
 export default API;
 
