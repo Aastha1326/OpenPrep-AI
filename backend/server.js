@@ -95,7 +95,6 @@ const readinessRoutes = require('./routes/readinessRoutes');
 const proctoringRoutes = require('./routes/proctoringRoutes');
 const squadRoutes = require('./routes/squadRoutes');
 const badgeRoutes = require('./routes/badgeRoutes');
-const whiteboardRoutes = require('./routes/whiteboardRoutes');
  feat/omr-pdf-generator
 const visualizerRoutes = require('./routes/visualizerRoutes');
 const weaknessDetectionRoutes = require('./routes/weaknessDetectionRoutes');
@@ -465,7 +464,6 @@ app.use('/api/battles', battleRoutes);
 app.use('/api/folders', folderRoutes);
 app.use('/api/badges', badgeRoutes);
 app.use('/api/bounties', bountyRoutes);
-app.use('/api', whiteboardRoutes);
 
 const leaderboardRoutes = require('./routes/leaderboardRoutes');
 app.use('/api/leaderboard', leaderboardRoutes);app.get('/user/badges', protect, require('./controllers/badgeController').getUserBadges);
@@ -645,7 +643,6 @@ require('./sockets/crdtHandler')(io);
 require('./sockets/squadHandler')(io);
 require('./sockets/flashcardCollaborationHandler')(io);
 require('./services/audioSignalingSocket').init(io);
-require('./services/whiteboardSocketService').initializeWhiteboardSockets(io);
 // Authenticate Socket.io connections
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
