@@ -72,6 +72,7 @@ const noteRoutes = require('./routes/noteRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const searchRoutes = require('./routes/searchRoutes');
 const progressRoutes = require('./routes/progressRoutes');
+const pacingCoachRoutes = require('./routes/pacingCoachRoutes');
 const handwrittenSubmissionRoutes = require('./routes/handwrittenSubmissionRoutes');
 const communityRoutes = require('./routes/communityRoutes');
 const userRoutes = require('./routes/userRoutes');
@@ -94,7 +95,8 @@ const readinessRoutes = require('./routes/readinessRoutes');
 const proctoringRoutes = require('./routes/proctoringRoutes');
 const squadRoutes = require('./routes/squadRoutes');
 const badgeRoutes = require('./routes/badgeRoutes');
- feat/db-health-dashboard
+const whiteboardRoutes = require('./routes/whiteboardRoutes');
+ feat/omr-pdf-generator
 const visualizerRoutes = require('./routes/visualizerRoutes');
 const weaknessDetectionRoutes = require('./routes/weaknessDetectionRoutes');
 const pyqIntelligenceRoutes = require('./routes/pyqIntelligenceRoutes');
@@ -416,6 +418,7 @@ app.use('/api/study-plans', studyPlanRoutes);
 app.use('/api/milestones', milestoneRoutes);
 app.use('/api/streaks', streakRoutes);
 app.use('/api/quizzes', quizRoutes);
+app.use('/api/pacing-coach', pacingCoachRoutes);
 app.use('/api/questions', questionDiscussionRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/quiz', quizRoutes);
@@ -427,7 +430,7 @@ app.use('/api/decks', require('./routes/publicDeckRoutes'));
 app.use('/api/share', shareRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/admin/db', require('./controllers/dbAdminController'));
+app.use('/api/admin/db', require('./routes/dbAdminRoutes'));
 app.use('/api/search', searchRoutes);
 app.use('/api/submissions', handwrittenSubmissionRoutes);
 app.use('/api/progress', progressRoutes);
@@ -462,6 +465,7 @@ app.use('/api/battles', battleRoutes);
 app.use('/api/folders', folderRoutes);
 app.use('/api/badges', badgeRoutes);
 app.use('/api/bounties', bountyRoutes);
+app.use('/api', whiteboardRoutes);
 
 const leaderboardRoutes = require('./routes/leaderboardRoutes');
 app.use('/api/leaderboard', leaderboardRoutes);app.get('/user/badges', protect, require('./controllers/badgeController').getUserBadges);
@@ -641,6 +645,7 @@ require('./sockets/crdtHandler')(io);
 require('./sockets/squadHandler')(io);
 require('./sockets/flashcardCollaborationHandler')(io);
 require('./services/audioSignalingSocket').init(io);
+require('./services/whiteboardSocketService').initializeWhiteboardSockets(io);
 // Authenticate Socket.io connections
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
@@ -820,4 +825,5 @@ const gracefulShutdown = (signal) => {
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
 
