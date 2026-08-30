@@ -7,5 +7,6 @@ const router = express.Router();
 router.post('/start', protect, startSession);
 router.post('/respond', protect, respondSession);
 router.post('/evaluate', protect, evaluateSession);
+router.post('/finish', protect, evaluateSession);
 
 module.exports = router;

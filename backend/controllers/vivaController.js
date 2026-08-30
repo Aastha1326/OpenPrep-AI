@@ -1,42 +1,82 @@
 const { VivaSession, Subject } = require('../models');
-const { generateFirstQuestion, generateFollowUp, generateFinalScorecard } = require('../services/vivaService');
+const vivaExaminerService = require('../services/vivaExaminerService');
+const logger = require('../utils/logger');
 
+/**
+ * Starts a new viva session by generating an initial question.
+ */
 exports.startSession = async (req, res, next) => {
   try {
-    const { subjectId } = req.body;
-    if (!subjectId) {
-      return res.status(400).json({ success: false, error: 'Please select a subject.' });
+    const { subjectId, topic } = req.body;
+    let topicName = 'General Studies';
+    let resolvedSubjectId = null;
+
+    if (subjectId) {
+      const subject = await Subject.findByPk(subjectId);
+      if (subject) {
+        topicName = subject.name;
+        resolvedSubjectId = subject.id;
+      }
+    } else if (topic && typeof topic === 'string' && topic.trim().length >= 3) {
+      topicName = topic.trim();
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'A valid subjectId or topic string (min 3 chars) is required.',
+      });
     }
 
-    const subject = await Subject.findByPk(subjectId);
-    const subjectName = subject ? subject.name : 'General Studies';
+    const initialQuestion = await vivaExaminerService.generateInitialQuestion(topicName);
 
-    const firstQuestion = await generateFirstQuestion(subjectName);
-
+    // Save session to database (turns starts with the opening question)
     const session = await VivaSession.create({
       userId: req.user.id,
-      subjectId,
-      turns: [{ speaker: 'AI', text: firstQuestion }],
+      subjectId: resolvedSubjectId || '00000000-0000-0000-0000-000000000000',
+      turns: [
+        {
+          speaker: 'AI',
+          text: initialQuestion,
+        },
+      ],
     });
 
     res.status(201).json({
       success: true,
       data: {
         sessionId: session.id,
+        topic: topicName,
+        currentQuestion: initialQuestion,
+        nextQuestion: initialQuestion, // Support integration tests expecting nextQuestion
+        conversationHistory: session.turns,
         turns: session.turns,
-        nextQuestion: firstQuestion,
       },
     });
   } catch (error) {
+    logger.error('Error starting viva session:', error);
     next(error);
   }
 };
 
+/**
+ * Evaluates a user's answer and returns feedback + next question.
+ */
 exports.respondSession = async (req, res, next) => {
   try {
-    const { sessionId, studentAnswer } = req.body;
-    if (!sessionId || !studentAnswer) {
-      return res.status(400).json({ success: false, error: 'Provide sessionId and studentAnswer.' });
+    const { sessionId, studentAnswer, userAnswer, currentQuestion } = req.body;
+    const answer = studentAnswer || userAnswer;
+
+    if (!sessionId || !answer) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: sessionId and studentAnswer/userAnswer.',
+      });
+    }
+
+    if (answer.trim().length < 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'Answer is too short to evaluate.',
+      });
     }
 
     const session = await VivaSession.findOne({
@@ -44,41 +84,81 @@ exports.respondSession = async (req, res, next) => {
     });
 
     if (!session) {
-      return res.status(404).json({ success: false, error: 'Viva session not found.' });
+      return res.status(404).json({
+        success: false,
+        message: 'Viva session not found.',
+      });
     }
 
-    const subject = await Subject.findByPk(session.subjectId);
-    const subjectName = subject ? subject.name : 'General Studies';
+    // Determine what subjectName/topic name to pass to evaluator
+    let topicName = 'General Studies';
+    if (session.subjectId && session.subjectId !== '00000000-0000-0000-0000-000000000000') {
+      const subject = await Subject.findByPk(session.subjectId);
+      if (subject) topicName = subject.name;
+    }
 
-    // 1. Append student response
-    const currentTurns = [...session.turns, { speaker: 'student', text: studentAnswer }];
+    // Use last turn as the question context if available
+    const lastTurn = session.turns && session.turns[session.turns.length - 1];
+    const questionText = lastTurn ? lastTurn.text : (currentQuestion || 'Please answer the question.');
 
-    // 2. Generate next question
-    const nextQuestion = await generateFollowUp(subjectName, currentTurns, studentAnswer);
+    const evaluation = await vivaExaminerService.evaluateVivaResponse(
+      questionText,
+      answer.trim(),
+      topicName
+    );
 
-    // 3. Append examiner follow-up question
-    const updatedTurns = [...currentTurns, { speaker: 'AI', text: nextQuestion }];
+    // Update conversation history
+    const updatedHistory = [
+      ...session.turns,
+      {
+        speaker: 'student',
+        text: answer.trim(),
+        score: evaluation.score,
+        feedback: evaluation.feedback,
+      },
+      {
+        speaker: 'AI',
+        text: evaluation.nextQuestion,
+      },
+    ];
 
-    session.turns = updatedTurns;
+    session.turns = updatedHistory;
     await session.save();
 
     res.status(200).json({
       success: true,
       data: {
-        turns: updatedTurns,
-        nextQuestion,
+        sessionId: session.id,
+        evaluation,
+        conversationHistory: updatedHistory,
+        turns: updatedHistory,
+        nextQuestion: evaluation.nextQuestion,
       },
     });
   } catch (error) {
+    logger.error('Error evaluating viva answer:', error);
     next(error);
   }
 };
 
+/**
+ * Evaluates the entire viva session and generates a final scorecard.
+ */
 exports.evaluateSession = async (req, res, next) => {
   try {
-    const { sessionId } = req.body;
+    const { sessionId, userAnswer, studentAnswer } = req.body;
+    const answer = userAnswer || studentAnswer;
+
+    if (answer) {
+      // Delegate to respondSession if user answer is sent to evaluate endpoint
+      return exports.respondSession(req, res, next);
+    }
+
     if (!sessionId) {
-      return res.status(400).json({ success: false, error: 'Provide sessionId.' });
+      return res.status(400).json({
+        success: false,
+        message: 'Provide sessionId.',
+      });
     }
 
     const session = await VivaSession.findOne({
@@ -86,13 +166,20 @@ exports.evaluateSession = async (req, res, next) => {
     });
 
     if (!session) {
-      return res.status(404).json({ success: false, error: 'Viva session not found.' });
+      return res.status(404).json({
+        success: false,
+        message: 'Viva session not found.',
+      });
     }
 
-    const subject = await Subject.findByPk(session.subjectId);
-    const subjectName = subject ? subject.name : 'General Studies';
+    // Resolve subject / topic name
+    let topicName = 'General Studies';
+    if (session.subjectId && session.subjectId !== '00000000-0000-0000-0000-000000000000') {
+      const subject = await Subject.findByPk(session.subjectId);
+      if (subject) topicName = subject.name;
+    }
 
-    const scorecard = await generateFinalScorecard(subjectName, session.turns);
+    const scorecard = await vivaExaminerService.generateFinalScorecard(topicName, session.turns);
 
     session.score = scorecard.score;
     session.feedback = scorecard;
@@ -103,6 +190,7 @@ exports.evaluateSession = async (req, res, next) => {
       data: scorecard,
     });
   } catch (error) {
+    logger.error('Error evaluating viva session:', error);
     next(error);
   }
 };

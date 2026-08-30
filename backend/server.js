@@ -77,6 +77,7 @@ const battleRoutes = require('./routes/battleRoutes');
 const readinessRoutes = require('./routes/readinessRoutes');
 const squadRoutes = require('./routes/squadRoutes');
 const badgeRoutes = require('./routes/badgeRoutes');
+const vivaRoutes = require('./routes/vivaRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 
@@ -268,6 +269,7 @@ app.get('/api/user/quota', protect, require('./controllers/userController').getQ
 app.use('/api/ai', aiRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/readiness', readinessRoutes);
+app.use('/api/viva', vivaRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/dashboard', analyticsRoutes);

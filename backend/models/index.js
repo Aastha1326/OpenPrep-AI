@@ -41,6 +41,7 @@ const SquadActivity = require('./SquadActivity');
 const SquadActivityReaction = require('./SquadActivityReaction');
 const Syllabus = require('./Syllabus');
 const SyllabusTopic = require('./SyllabusTopic');
+const VivaSession = require('./VivaSession');
 
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -58,7 +59,9 @@ User.hasMany(Feedback, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(ActivityLog, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Achievement, { foreignKey: 'userId', as: 'achievements', onDelete: 'CASCADE' });
 User.hasMany(UserBadge, { foreignKey: 'userId', as: 'badgesRef', onDelete: 'CASCADE' });
-User.hasMany(Folder, { foreignKey: 'userId', onDelete: 'CASCADE' });
+User.hasMany(UsageQuota, { foreignKey: 'userId', onDelete: 'CASCADE' });
+User.hasMany(VivaSession, { foreignKey: 'userId', as: 'vivaSessions', onDelete: 'CASCADE' });
+VivaSession.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 
 // Exam associations
 Exam.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
@@ -76,6 +79,8 @@ Subject.hasMany(Note, { foreignKey: 'subject', onDelete: 'CASCADE' });
 Subject.hasMany(Flashcard, { foreignKey: 'subject', onDelete: 'CASCADE' });
 Subject.hasMany(FlashcardDeck, { foreignKey: 'subject', onDelete: 'SET NULL' });
 Subject.hasMany(Progress, { foreignKey: 'subject', onDelete: 'CASCADE' });
+Subject.hasMany(VivaSession, { foreignKey: 'subjectId', as: 'vivaSessions', onDelete: 'CASCADE' });
+VivaSession.belongsTo(Subject, { foreignKey: 'subjectId', as: 'subjectRef' });
 
 // FlashcardDeck associations
 FlashcardDeck.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
@@ -281,4 +286,5 @@ module.exports = {  sequelize,  User,  Exam,
   SquadActivityReaction,
   FlashcardDeck,
   DeckCollaborator,
+  VivaSession,
 };
