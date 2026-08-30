@@ -9,6 +9,7 @@
     "test": "vitest run --config vitest.config.unit.js",
     "test:unit": "vitest run --config vitest.config.unit.js",
     "test:integrity": "vitest run --config vitest.config.unit.js tests/integrity",
+    "check:models": "node scripts/check-model-registry.js",
     "test:jest": "jest --config jest.config.js --runInBand --forceExit",
     "test:integration": "jest --config jest.config.js --runInBand --forceExit",
     "test:coverage": "vitest run --config vitest.config.unit.js --coverage",
@@ -16,7 +17,8 @@
     "seed:synthetic": "node scripts/seedSyntheticData.js",
     "db:migrate:test": "node scripts/migrate.js --force",
     "db:backup": "node scripts/db-backup.js",
-    "db:restore": "node scripts/db-restore.js"
+    "db:restore": "node scripts/db-restore.js",
+    "check:server": "node scripts/check-server-wiring.js"
   },
   "dependencies": {
     "@google/genai": "^2.16.0",

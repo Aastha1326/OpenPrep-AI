@@ -5,6 +5,8 @@ import { Provider } from 'react-redux'
 import { store } from './store'
 import { ThemeProvider } from './context/ThemeContext'
 import { SyncProvider } from './context/SyncContext'
+import { PomodoroProvider } from './context/PomodoroContext'
+import { SessionTimerProvider } from './context/SessionTimerContext'
 import SentryErrorBoundary from './components/common/SentryErrorBoundary'
 import './index.css'
 import './styles/rtl.css';
