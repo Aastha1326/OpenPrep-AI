@@ -1681,3 +1681,10 @@ exports.getPodcastEpisodeById = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Generate AI flashcards from YouTube lecture video transcript
+// @route   POST /api/flashcards/generate-from-youtube, POST /api/flashcards/from-youtube
+// @access  Private
+const { generateFromYoutube: youtubeGen } = require('./youtubeFlashcardController');
+exports.generateFlashcardsFromYouTube = youtubeGen;
+

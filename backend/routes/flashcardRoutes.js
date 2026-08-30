@@ -391,6 +391,20 @@ router.post(
   validateGenerateFlashcardsFromYouTube,
   generateFlashcardsFromYouTube
 );
+router.post(
+  '/generate-from-youtube',
+  protect,
+  aiLimiter,
+  checkQuota,
+  validateGenerateFlashcardsFromYouTube,
+  generateFlashcardsFromYouTube
+);
+const { saveYoutubeDeck } = require('../controllers/youtubeFlashcardController');
+router.post(
+  '/save-youtube-deck',
+  protect,
+  saveYoutubeDeck
+);
 
 /**
  * @swagger
