@@ -55,11 +55,7 @@ const VivaSimulator = lazy(() => import('./pages/VivaSimulator'));
 const AttemptHistoryDashboard = lazy(() => import('./pages/AttemptHistoryDashboard'));
 const CollaborativeNoteView = lazy(() => import('./pages/CollaborativeNoteView'));
 const SquadsPage = lazy(() => import('./pages/SquadsPage'));
-const StudySquadDashboard = lazy(() => import('./pages/SquadsPage'));
-const CollabNote = lazy(() => import('./pages/CollaborativeNoteView'));
-const LiveQuizSession = lazy(() => import('./pages/LiveQuizSession'));
-const InterviewRoomPage = lazy(() => import('./pages/InterviewRoomPage'));
-const StreakDashboard = lazy(() => import('./pages/StreakDashboard'));
+const BountyBoardPage = lazy(() => import('./pages/BountyBoardPage'));
 
 function App() {
 
@@ -376,7 +372,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/analytics"
             element={
@@ -385,18 +380,8 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/exam-planner"
-            element={
-              <ProtectedRoute>
-                <ExamCountdownPlanner />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/tools/calculator"
             element={
               <ProtectedRoute>
                 <FormulaScratchpad />
@@ -432,24 +417,6 @@ function App() {
           />
 
           <Route
-            path="/squads"
-            element={
-              <ProtectedRoute>
-                <SquadsPage />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/focus-analytics"
-            element={
-              <ProtectedRoute>
-                <FocusSessionAnalyticsPage />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
             path="/interview"
             element={
               <ProtectedRoute>
@@ -475,11 +442,25 @@ function App() {
             }
           />
 
+          <Route
+            path="/bounties"
+            element={
+              <ProtectedRoute>
+                <BountyBoardPage />
+              </ProtectedRoute>
+            }
+          />
+
           <Route element={<AdminRoute />}>
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/analytics" element={<AdminAnalytics />} />
           </Route>
 
+          <Route path="/medical-cases" element={<MedicalCaseSimulator />} />
+          <Route path="/drug-interactions" element={<DrugInteractionChecker />} />
+          <Route path="/exam-countdown" element={<ExamCountdownPlanner />} />
+          <Route path="/clinical-notes" element={<ClinicalNotesSummarizer />} />
+          <Route path="/patient-simulator" element={<PatientSimulator />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
