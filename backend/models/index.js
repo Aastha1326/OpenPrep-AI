@@ -42,6 +42,8 @@ const SquadActivityReaction = require('./SquadActivityReaction');
 const Syllabus = require('./Syllabus');
 const SyllabusTopic = require('./SyllabusTopic');
 const VivaSession = require('./VivaSession');
+const BountyQuestion = require('./BountyQuestion');
+const BountyAnswer = require('./BountyAnswer');
 
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -250,6 +252,19 @@ SyllabusTopic.belongsTo(Syllabus, { foreignKey: 'syllabusId', as: 'syllabusRef' 
 
 SyllabusTopic.belongsTo(Note, { foreignKey: 'linkedNoteId', as: 'linkedNote', onDelete: 'SET NULL' });
 
+// Bounty associations
+User.hasMany(BountyQuestion, { foreignKey: 'userId', as: 'bountyQuestions', onDelete: 'CASCADE' });
+BountyQuestion.belongsTo(User, { foreignKey: 'userId', as: 'creator' });
+
+Subject.hasMany(BountyQuestion, { foreignKey: 'subjectId', as: 'bountyQuestions', onDelete: 'SET NULL' });
+BountyQuestion.belongsTo(Subject, { foreignKey: 'subjectId', as: 'subjectRef' });
+
+BountyQuestion.hasMany(BountyAnswer, { foreignKey: 'questionId', as: 'answers', onDelete: 'CASCADE' });
+BountyAnswer.belongsTo(BountyQuestion, { foreignKey: 'questionId', as: 'question' });
+
+User.hasMany(BountyAnswer, { foreignKey: 'userId', as: 'bountyAnswers', onDelete: 'CASCADE' });
+BountyAnswer.belongsTo(User, { foreignKey: 'userId', as: 'author' });
+
 module.exports = {  sequelize,  User,  Exam,
   Subject,
   Topic,
@@ -287,4 +302,6 @@ module.exports = {  sequelize,  User,  Exam,
   FlashcardDeck,
   DeckCollaborator,
   VivaSession,
+  BountyQuestion,
+  BountyAnswer,
 };

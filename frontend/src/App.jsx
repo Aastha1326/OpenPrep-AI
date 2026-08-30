@@ -41,6 +41,7 @@ const StudyPlanner = lazy(() => import('./pages/StudyPlanner'));
 const VivaSimulator = lazy(() => import('./pages/VivaSimulator'));
 const CollaborativeNoteView = lazy(() => import('./pages/CollaborativeNoteView'));
 const SquadsPage = lazy(() => import('./pages/SquadsPage'));
+const BountyBoardPage = lazy(() => import('./pages/BountyBoardPage'));
 
 function App() {
   const dispatch = useDispatch();
@@ -282,6 +283,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <SquadsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/bounties"
+            element={
+              <ProtectedRoute>
+                <BountyBoardPage />
               </ProtectedRoute>
             }
           />

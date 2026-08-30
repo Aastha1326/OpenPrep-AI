@@ -78,6 +78,7 @@ const readinessRoutes = require('./routes/readinessRoutes');
 const squadRoutes = require('./routes/squadRoutes');
 const badgeRoutes = require('./routes/badgeRoutes');
 const vivaRoutes = require('./routes/vivaRoutes');
+const bountyRoutes = require('./routes/bountyRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 
@@ -295,6 +296,7 @@ app.use('/api/battles', battleRoutes);
 app.use('/api/folders', folderRoutes);
 app.use('/api/squads', squadRoutes);
 app.use('/api/badges', badgeRoutes);
+app.use('/api/bounties', bountyRoutes);
 
 // Serve static assets from frontend build folder in production
 if (process.env.NODE_ENV === 'production') {
