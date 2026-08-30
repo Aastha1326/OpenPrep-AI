@@ -43,7 +43,13 @@ export const useVoiceControl = ({
 }) => {  const [isSupported, setIsSupported] = useState(true);
   const [isEnabled, setIsEnabled] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [status, setStatus] = useState('IDLE'); // IDLE, LISTENING, PROCESSING, SPEAKING, ERROR
+  const [status, _setStatus] = useState('IDLE'); // IDLE, LISTENING, PROCESSING, SPEAKING, ERROR
+  const statusRef = useRef('IDLE');
+  const setStatus = useCallback((newStatus) => {
+    statusRef.current = newStatus;
+    _setStatus(newStatus);
+  }, []);
+  const errorMsgRef = useRef('');
   const [errorMsg, setErrorMsg] = useState('');
 
   const recognitionRef = useRef(null);
@@ -64,18 +70,30 @@ export const useVoiceControl = ({
 recognition.lang = language;
     recognition.onstart = () => {
       isListeningRef.current = true;
-      if (!isSpeakingRef.current && status !== 'PROCESSING') {
+      if (!isSpeakingRef.current && statusRef.current !== 'PROCESSING') {
         setStatus('LISTENING');
       }
     };
 
     recognition.onresult = (event) => {
-      if (isSpeakingRef.current || isPaused) return; // Prevent collision
+      if (isSpeakingRef.current) return; // Prevent collision
       
-      setStatus('PROCESSING');
       const lastResult = event.results[event.results.length - 1];
       const transcript = lastResult[0].transcript;
       const confidence = lastResult[0].confidence;
+      
+      if (confidence > CONFIDENCE_THRESHOLD) {
+        const command = parseCommand(transcript);
+        if (command === 'RESUME') {
+          setIsPaused(false);
+          setStatus('LISTENING');
+          return;
+        }
+      }
+
+      if (isPaused) return;
+
+      setStatus('PROCESSING');
       if (confidence > CONFIDENCE_THRESHOLD && onTranscript) {
         onTranscript(transcript.trim(), confidence);
       }
@@ -85,10 +103,7 @@ recognition.lang = language;
           if (command === 'PAUSE') {
             setIsPaused(true);
             setStatus('IDLE');
-          } else if (command === 'RESUME') {
-            setIsPaused(false);
-            setStatus('LISTENING');
-          } else if (!isPaused && onCommand) {
+          } else if (onCommand) {
             onCommand(command);
           }
         }
@@ -160,7 +175,7 @@ recognition.lang = language;
       recognition.abort();
       if (synthRef.current) synthRef.current.cancel();
     };
-  }, [isEnabled, isPaused, onCommand, onTranscript, language, status]);
+  }, [isEnabled, isPaused, onCommand, onTranscript, language]);
   const toggleVoiceMode = useCallback(() => {
     if (!isSupported) return;
     

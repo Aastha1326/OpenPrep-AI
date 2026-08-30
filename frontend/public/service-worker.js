@@ -1,68 +1,130 @@
-self.addEventListener('push', function(event) {
-  if (event.data) {
-    let payload = {
-      title: 'OpenPrep AI Reminder',
-      body: 'Time to study!',
-      icon: '/favicon.svg'
-    };
+// Service Worker for OpenPrep AI - Precaching static assets and caching GET API responses for offline access
 
-    try {
-      payload = event.data.json();
-    } catch (e) {
-      payload.body = event.data.text();
-    }
+const CACHE_NAME = 'openprep-cache-v1';
+const API_CACHE_NAME = 'openprep-api-cache-v1';
 
-    const options = {
-      body: payload.body,
-      icon: payload.icon || '/favicon.svg',
-      badge: payload.badge || '/favicon.svg',
-      vibrate: [100, 50, 100],
-      data: payload.data || {
-        dateOfArrival: Date.now(),
-        primaryKey: '1',
-        url: '/'
-      },
-      actions: [
-        {
-          action: 'explore',
-          title: 'Start Studying'
-        },
-        {
-          action: 'close',
-          title: 'Close'
-        },
-      ]
-    };
+// Static assets to precache
+const PRECACHE_ASSETS = [
+  '/',
+  '/index.html',
+  '/favicon.svg',
+  '/icons.svg',
+  '/manifest.webmanifest',
+];
 
-    event.waitUntil(
-      self.registration.showNotification(payload.title, options)
-    );
-  }
+// Import Web Push handlers if present
+try {
+  importScripts('/push-sw.js');
+} catch (e) {
+  console.warn('Push service worker script import skipped:', e);
+}
+
+// ── Install Event ──
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(PRECACHE_ASSETS).catch((err) => {
+        console.warn('Precache addAll encountered minor issue:', err);
+      });
+    })
+  );
+  self.skipWaiting();
 });
 
-self.addEventListener('notificationclick', function(event) {
-  event.notification.close();
-
-  if (event.action !== 'close') {
-    const urlToOpen = event.notification.data?.url || '/';
-    
-    event.waitUntil(
-      clients.matchAll({
-        type: 'window',
-        includeUncontrolled: true
-      }).then(function(windowClients) {
-        // Check if there is already a window/tab open with the target URL
-        for (var i = 0; i < windowClients.length; i++) {
-          var client = windowClients[i];
-          if (client.url.indexOf(urlToOpen) >= 0 && 'focus' in client) {
-            return client.focus();
+// ── Activate Event ──
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((name) => {
+          if (name !== CACHE_NAME && name !== API_CACHE_NAME) {
+            return caches.delete(name);
           }
-        }
-        // If not, open a new one
-        if (clients.openWindow) {
-          return clients.openWindow(urlToOpen);
-        }
-      })
-    );
+          return null;
+        })
+      );
+    })
+  );
+  self.clients.claim();
+});
+
+// ── Fetch Event (Network-First for API GET requests, Cache-First for static assets) ──
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
+  const url = new URL(request.url);
+
+  // Skip non-GET requests for caching (POST/PUT/DELETE handled by app queue)
+  if (request.method !== 'GET') {
+    return;
   }
+
+  // API Requests: Network-First with Cache Fallback
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const responseToCache = response.clone();
+            caches.open(API_CACHE_NAME).then((cache) => {
+              cache.put(request, responseToCache);
+            });
+          }
+          return response;
+        })
+        .catch(() => {
+          return caches.match(request).then((cachedResponse) => {
+            if (cachedResponse) {
+              return cachedResponse;
+            }
+            return new Response(
+              JSON.stringify({
+                success: false,
+                offline: true,
+                error: 'Network connection unavailable. Operating in offline mode.',
+              }),
+              {
+                status: 503,
+                headers: { 'Content-Type': 'application/json' },
+              }
+            );
+          });
+        })
+    );
+    return;
+  }
+
+  // Static Assets / Navigation: Stale-While-Revalidate or Cache-First
+  event.respondWith(
+    caches.match(request).then((cachedResponse) => {
+      if (cachedResponse) {
+        // Fetch background update for cache refresh
+        fetch(request)
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              caches.open(CACHE_NAME).then((cache) => cache.put(request, networkResponse));
+            }
+          })
+          .catch(() => {/* offline */});
+        return cachedResponse;
+      }
+
+      return fetch(request)
+        .then((response) => {
+          if (!response || response.status !== 200 || response.type !== 'basic') {
+            return response;
+          }
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(request, responseToCache);
+          });
+          return response;
+        })
+        .catch(() => {
+          // If HTML navigation fails, fallback to index.html
+          if (request.headers.get('accept')?.includes('text/html')) {
+            return caches.match('/index.html');
+          }
+        });
+    })
+  );
 });

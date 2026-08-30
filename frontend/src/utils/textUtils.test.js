@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { splitSentences, findSentenceAt, toSentenceSegments } from './textUtils';
+import { splitSentences, findSentenceAt, toSentenceSegments, stripMarkdown } from './textUtils';
 
 describe('splitSentences', () => {
   it('returns an empty array for unusable input', () => {
@@ -143,5 +143,31 @@ describe('toSentenceSegments', () => {
     expect(toSentenceSegments(source).map((s) => s.text)).toEqual(
       splitSentences(source).map((s) => s.text)
     );
+  });
+});
+
+describe('stripMarkdown', () => {
+  it('handles empty or non-string inputs', () => {
+    expect(stripMarkdown('')).toBe('');
+    expect(stripMarkdown(null)).toBe('');
+    expect(stripMarkdown(123)).toBe('');
+  });
+
+  it('strips bold asterisks and underscores', () => {
+    expect(stripMarkdown('This is **bold** and __also bold__')).toBe('This is bold and also bold');
+  });
+
+  it('strips italic asterisks and underscores', () => {
+    expect(stripMarkdown('This is *italic* and _also italic_')).toBe('This is italic and also italic');
+  });
+
+  it('strips headers, inline code, and math equations', () => {
+    expect(stripMarkdown('# Header 1\n\nUse `const x = 1` and equation $$E=mc^2$$')).toBe(
+      'Header 1\n\nUse const x = 1 and equation'
+    );
+  });
+
+  it('strips markdown links and bullet lists', () => {
+    expect(stripMarkdown('- [OpenPrep](https://openprep.ai)\n- Bullet item')).toBe('OpenPrep\nBullet item');
   });
 });

@@ -271,6 +271,10 @@ Here is what happens after you submit a Pull Request:
 
 ---
 
+## 👥 Community
+
+Please read our [Code of Conduct](./CODE_OF_CONDUCT.md) before contributing to maintain a respectful and maintaining community.
+
 ## ❓ Getting Help
 
 If you encounter any issues or have questions:

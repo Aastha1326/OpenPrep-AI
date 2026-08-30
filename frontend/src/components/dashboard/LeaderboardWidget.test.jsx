@@ -2,7 +2,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import LeaderboardWidget from './LeaderboardWidget';
 import API from '../../services/api';
 
-vi.mock('../../services/api', () => ({
+vi.mock('../../services/api.js', () => ({
   default: {
     get: vi.fn(),
   },
@@ -101,3 +101,4 @@ describe('LeaderboardWidget', () => {
     expect(await screen.findByText('No study activity this week yet')).toBeInTheDocument();
   });
 });
+

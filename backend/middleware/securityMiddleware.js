@@ -1,7 +1,13 @@
 const { doubleCsrf } = require('csrf-csrf');
 
 const doubleCsrfOptions = {
-  getSecret: () => process.env.CSRF_SECRET || 'super_secret_csrf_key_12345!',
+  getSecret: () => {
+    const secret = process.env.CSRF_SECRET;
+    if (!secret) {
+      throw new Error('CSRF_SECRET environment variable is required');
+    }
+    return secret;
+  },
   cookieName: 'x-csrf-token',
   cookieOptions: {
     httpOnly: true,
@@ -35,4 +41,5 @@ module.exports = {
   doubleCsrfProtection,
   generateCsrfToken,
   csrfErrorHandler,
+  doubleCsrfOptions,
 };

@@ -17,6 +17,13 @@ vi.mock('../services/socket', () => ({
   },
 }));
 
+vi.mock('../services/api.js', () => ({
+  default: {
+    get: vi.fn().mockResolvedValue({ data: { data: [{ _id: 'subj1', name: 'Computer Science', topicCount: 5 }] } }),
+    post: vi.fn(),
+  },
+}));
+
 vi.mock('react-redux', () => ({
   useSelector: vi.fn(() => ({ user: { name: 'TestPlayer' } })),
 }));

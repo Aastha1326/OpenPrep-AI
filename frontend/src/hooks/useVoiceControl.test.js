@@ -1,13 +1,16 @@
 import { renderHook, act } from '@testing-library/react';
 import useVoiceControl from './useVoiceControl';
+import { describe, it, expect, vi, beforeEach, afterEach, test } from 'vitest';
 
 describe('useVoiceControl', () => {
   let MockRecognition;
   let mockRecognitionInstance;
   let mockSynth;
   let mockOnCommand;
+  let instances = [];
 
   beforeEach(() => {
+    vi.useFakeTimers();
     mockRecognitionInstance = {
       start: vi.fn(),
       abort: vi.fn(),
@@ -16,7 +19,11 @@ describe('useVoiceControl', () => {
       lang: '',
     };
     
-    MockRecognition = vi.fn(() => mockRecognitionInstance);
+    instances = [];
+    MockRecognition = vi.fn(function () {
+      instances.push(mockRecognitionInstance);
+      return mockRecognitionInstance;
+    });
     window.SpeechRecognition = MockRecognition;
 
     mockSynth = {
@@ -24,14 +31,23 @@ describe('useVoiceControl', () => {
       cancel: vi.fn(),
     };
     window.speechSynthesis = mockSynth;
+    window.SpeechSynthesisUtterance = vi.fn(function(text) {
+      this.text = text;
+      this.rate = 1;
+      this.lang = '';
+      this.onend = null;
+      this.onerror = null;
+    });
     
     mockOnCommand = vi.fn();
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     delete window.SpeechRecognition;
     delete window.speechSynthesis;
+    delete window.SpeechSynthesisUtterance;
   });
 
   it('handles unsupported browsers', () => {
@@ -84,10 +100,6 @@ describe('useVoiceControl', () => {
 
     expect(result.current.status).toBe('PROCESSING');
     expect(mockOnCommand).toHaveBeenCalledWith('FLIP');
-
-    act(() => {
-      vi.advanceTimersByTime?.(500);
-    });
   });
 
   it('ignores commands below confidence threshold', () => {
@@ -172,63 +184,90 @@ describe('useVoiceControl', () => {
     expect(mockRecognitionInstance.abort).toHaveBeenCalled();
     expect(mockSynth.cancel).toHaveBeenCalled();
   });
+
   test('passes recognized transcript to the answer handler', async () => {
-  const onTranscript = vi.fn();
+    const onTranscript = vi.fn();
 
-  const { result } = renderHook(() =>
-    useVoiceControl({
-      onCommand: vi.fn(),
-      onTranscript,
-    })
-  );
+    const { result } = renderHook(() =>
+      useVoiceControl({
+        onCommand: vi.fn(),
+        onTranscript,
+      })
+    );
 
-  act(() => {
-    result.current.toggleVoiceMode();
-  });
-
-  const recognition = MockSpeechRecognition.instances[0];
-
-  act(() => {
-    recognition.onstart();
-    recognition.onresult({
-      results: [
-        [
-          {
-            transcript: 'A component is a reusable UI building block',
-            confidence: 0.9,
-          },
-        ],
-      ],
+    act(() => {
+      result.current.toggleVoiceMode();
     });
-  });
 
-  expect(onTranscript).toHaveBeenCalledWith(
-    'A component is a reusable UI building block',
-    0.9
-  );
-});
+    const recognition = instances[0];
 
-test('reports microphone permission errors without trapping the user in voice mode', async () => {
-  const { result } = renderHook(() =>
-    useVoiceControl({
-      onCommand: vi.fn(),
-      onTranscript: vi.fn(),
-    })
-  );
-
-  act(() => {
-    result.current.toggleVoiceMode();
-  });
-
-  const recognition = MockSpeechRecognition.instances[0];
-
-  act(() => {
-    recognition.onerror({
-      error: 'not-allowed',
+    act(() => {
+      recognition.onstart();
+      recognition.onresult({
+        results: [
+          [
+            {
+              transcript: 'A component is a reusable UI building block',
+              confidence: 0.9,
+            },
+          ]
+        ]
+      });
     });
+
+    expect(onTranscript).toHaveBeenCalledWith(
+      'A component is a reusable UI building block',
+      0.9
+    );
   });
 
-  expect(result.current.isEnabled).toBe(false);
-  expect(result.current.errorMsg).toMatch(/microphone permission/i);
-});
+  test('reports microphone permission errors without trapping the user in voice mode', async () => {
+    const { result } = renderHook(() =>
+      useVoiceControl({
+        onCommand: vi.fn(),
+        onTranscript: vi.fn(),
+      })
+    );
+
+    act(() => {
+      result.current.toggleVoiceMode();
+    });
+
+    const recognition = instances[0];
+
+    act(() => {
+      recognition.onerror({
+        error: 'not-allowed',
+      });
+    });
+
+    expect(result.current.isEnabled).toBe(false);
+    expect(result.current.errorMsg).toMatch(/microphone permission/i);
+  });
+
+  it('keeps the recognition session alive while a command is being processed', () => {
+    const { result } = renderHook(() => useVoiceControl({ onCommand: mockOnCommand }));
+
+    act(() => {
+      result.current.toggleVoiceMode();
+      mockRecognitionInstance.onstart();
+    });
+
+    // Enabling voice mode re-runs the effect, and its cleanup aborts the
+    // recognition object created on the initial (disabled) render. Every
+    // constructor call hands back the same mock, so clear the calls here to
+    // scope the assertion below to the session that is actually live.
+    mockRecognitionInstance.abort.mockClear();
+
+    // Trigger onresult which transitions status to PROCESSING
+    act(() => {
+      mockRecognitionInstance.onresult({
+        results: [[{ transcript: 'flip', confidence: 0.9 }]]
+      });
+    });
+
+    expect(result.current.status).toBe('PROCESSING');
+    // Ensure it was not aborted during the status transition
+    expect(mockRecognitionInstance.abort).not.toHaveBeenCalled();
+  });
 });

@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const BattleSession = require('../models/BattleSession');
 const BattleParticipant = require('../models/BattleParticipant');
+const Quiz = require('../models/Quiz');
 const roomManager = require('../utils/roomManager');
 const { awardXP } = require('../services/gamificationService');
 
@@ -105,10 +106,15 @@ module.exports = (io) => {
   };
 
   const finishBattle = async (roomCode) => {
-    const room = roomManager.getRoom(roomCode);
-    if (!room) return;
+    const lockService = require('../services/lockService');
+    const lockValue = await lockService.acquireLock(`battle:finish:${roomCode}`, 10000);
+    if (!lockValue) return;
 
-    room.status = 'finished';
+    try {
+      const room = roomManager.getRoom(roomCode);
+      if (!room || room.status === 'finished') return;
+
+      room.status = 'finished';
     if (room.timerInterval) clearInterval(room.timerInterval);
 
     try {
@@ -136,6 +142,33 @@ module.exports = (io) => {
 
         dbSession.scores = finalScores;
         await dbSession.save();
+
+        // Standard ELO ranking calculations for 1v1 battle matching
+        const playersArray = Object.values(room.players);
+        if (playersArray.length === 2) {
+          const p1 = playersArray[0];
+          const p2 = playersArray[1];
+          const u1 = await User.findByPk(p1.userId);
+          const u2 = await User.findByPk(p2.userId);
+          if (u1 && u2) {
+            let outcome = 0.5;
+            if (p1.score > p2.score) outcome = 1;
+            else if (p1.score < p2.score) outcome = 0;
+
+            const matchmakingService = require('../services/matchmakingService');
+            const { newEloA, newEloB } = matchmakingService.calculateEloChange(u1.eloRating, u2.eloRating, outcome);
+
+            u1.eloRating = newEloA;
+            u2.eloRating = newEloB;
+            await u1.save();
+            await u2.save();
+
+            io.to(roomCode).emit('elo_updated', {
+              [p1.userId]: newEloA,
+              [p2.userId]: newEloB,
+            });
+          }
+        }
 
         // Create participant logs & award gamification XP
         for (const socketId in room.players) {
@@ -166,20 +199,47 @@ module.exports = (io) => {
     });
 
     roomManager.removeRoom(roomCode);
+    } finally {
+      await lockService.releaseLock(`battle:finish:${roomCode}`, lockValue);
+    }
   };
 
   io.on('connection', (socket) => {
     console.log(`Battle socket connection established: ${socket.id} (user: ${socket.user.name})`);
 
-    socket.on('join-room', (payload, callback) => {
+    socket.on('join-room', async (payload, callback) => {
       const roomCode = (payload?.roomId || '').trim().toUpperCase();
       if (!roomCode) {
         return callback && callback({ success: false, message: 'Room code is required.' });
       }
 
-      const room = roomManager.getRoom(roomCode);
+      let room = roomManager.getRoom(roomCode);
       if (!room) {
-        return callback && callback({ success: false, message: 'Lobby room not found.' });
+        try {
+          const dbSession = await BattleSession.findOne({
+            where: { roomCode },
+            include: [{ model: Quiz, as: 'quizRef' }]
+          });
+
+          if (!dbSession || dbSession.status === 'finished') {
+            return callback && callback({ success: false, message: 'Lobby room not found.' });
+          }
+
+          room = roomManager.createRoom(roomCode, dbSession.hostUserId, {
+            roomName: dbSession.roomName,
+            password: dbSession.password,
+            questionCount: dbSession.questionCount,
+            timePerQuestion: dbSession.timePerQuestion,
+            quiz: dbSession.quizRef,
+          });
+
+          if (!room) {
+            return callback && callback({ success: false, message: 'Failed to initialize lobby room.' });
+          }
+        } catch (err) {
+          console.error('Error loading battle session from database:', err);
+          return callback && callback({ success: false, message: 'Database error loading room.' });
+        }
       }
 
       if (room.status !== 'waiting') {
@@ -341,4 +401,26 @@ module.exports = (io) => {
       }
     });
   });
+
+  // Subscribe to Redis matchmaking match channels
+  try {
+    const redisService = require('../services/redisService');
+    if (redisService.isReady && redisService.client) {
+      const subClient = redisService.client.duplicate();
+      subClient.subscribe('matchmaking:matched');
+      subClient.on('message', (channel, message) => {
+        if (channel === 'matchmaking:matched') {
+          const { player1, player2, roomCode } = JSON.parse(message);
+          // Search local connected socket clients and emit notification matches
+          io.sockets.sockets.forEach((s) => {
+            if (s.user && (s.user.id === player1 || s.user.id === player2)) {
+              s.emit('match_found', { roomCode });
+            }
+          });
+        }
+      });
+    }
+  } catch (pubSubErr) {
+    console.warn('Matchmaking Pub/Sub setup skipped or failed:', pubSubErr.message);
+  }
 };

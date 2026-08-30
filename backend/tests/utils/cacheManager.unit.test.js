@@ -1,28 +1,39 @@
-const cacheStore = new Map();
+const mockCacheStore = new Map();
 
-vi.mock('../../config/redis', () => ({
-  getCache: vi.fn(async (key) => cacheStore.get(key) || null),
-  setCache: vi.fn(async (key, value) => {
-    cacheStore.set(key, value);
-    return true;
-  }),
-  invalidateCache: vi.fn(async (pattern) => {
-    if (pattern.endsWith('*')) {
-      const prefix = pattern.slice(0, -1);
-      for (const key of cacheStore.keys()) {
-        if (key.startsWith(prefix)) {
-          cacheStore.delete(key);
-        }
-      }
-    } else {
-      cacheStore.delete(pattern);
+function clearRequireCache(pathSubstr) {
+  const normalizedSubstr = pathSubstr.replace(/\\/g, '/').toLowerCase();
+  for (const key of Object.keys(require.cache)) {
+    if (key.replace(/\\/g, '/').toLowerCase().includes(normalizedSubstr)) {
+      delete require.cache[key];
     }
-    return true;
-  }),
-}));
+  }
+}
+
+// Clear cache case-insensitively on Windows to avoid casing mismatch bugs
+clearRequireCache('config/redis');
+clearRequireCache('utils/cacheManager');
+
+const redisConfig = require('../../config/redis');
+redisConfig.getCache = vi.fn(async (key) => mockCacheStore.get(key) || null);
+redisConfig.setCache = vi.fn(async (key, value) => {
+  mockCacheStore.set(key, value);
+  return true;
+});
+redisConfig.invalidateCache = vi.fn(async (pattern) => {
+  if (pattern.endsWith('*')) {
+    const prefix = pattern.slice(0, -1);
+    for (const key of mockCacheStore.keys()) {
+      if (key.startsWith(prefix)) {
+        mockCacheStore.delete(key);
+      }
+    }
+  } else {
+    mockCacheStore.delete(pattern);
+  }
+  return true;
+});
 
 const cacheManager = require('../../utils/cacheManager');
-const { getCache, setCache, invalidateCache } = require('../../config/redis');
 
 describe('cacheManager unit tests', () => {
   it('should generate a correct cache key', () => {

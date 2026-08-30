@@ -1,6 +1,6 @@
 import axios from 'axios';
-import { store } from '../store';
-import { logout } from '../store/slices/authSlice';
+
+
 import {
   DEFAULT_TIMEOUT_MS,
   getRetryDelay,
@@ -11,11 +11,11 @@ import {
   shouldRetry,
   wait,
   waitForOnline,
-} from '../utils/retry';
+} from '../utils/retry.js';
 
 const getBaseUrl = () => {
-  if (import.meta.env.VITE_API_URL) {
-    const url = import.meta.env.VITE_API_URL.replace(/\/$/, '');
+  if ((import.meta && import.meta.env && import.meta.env.VITE_API_URL)) {
+    const url = (import.meta && import.meta.env && import.meta.env.VITE_API_URL).replace(/\/$/, '');
     return url.endsWith('/api') ? url : `${url}/api`;
   }
   if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
@@ -107,6 +107,12 @@ API.interceptors.request.use(async (config) => {
 
   // Issue #1176: Attach client timezone offset to headers
   config.headers['X-Timezone-Offset'] = new Date().getTimezoneOffset();
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (tz) config.headers['X-Timezone'] = tz;
+  } catch (_e) {
+    /* ignore */
+  }
 
   return config;
 }, (error) => {
@@ -145,8 +151,10 @@ const showBackgroundErrorToast = (message) => {
     <svg class="w-4 h-4 text-yellow-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
     </svg>
-    <span>${message}</span>
   `;
+  const span = document.createElement('span');
+  span.textContent = message || '';
+  toast.appendChild(span);
 
   container.appendChild(toast);
 
@@ -162,9 +170,41 @@ const showBackgroundErrorToast = (message) => {
   }, 4000);
 };
 
-// Response interceptor: on 401, attempt silent token refresh before failing
+// ── Offline Response Cache Helpers ──
+const API_OFFLINE_CACHE_KEY = 'openprep_api_get_cache';
+
+const saveResponseToOfflineCache = (url, data) => {
+  try {
+    if (typeof localStorage === 'undefined' || !localStorage) return;
+    const existingStr = localStorage.getItem(API_OFFLINE_CACHE_KEY);
+    const cache = existingStr ? JSON.parse(existingStr) : {};
+    cache[url] = { data, cachedAt: Date.now() };
+    localStorage.setItem(API_OFFLINE_CACHE_KEY, JSON.stringify(cache));
+  } catch (_e) {
+    // ignore quota/storage errors
+  }
+};
+
+const getResponseFromOfflineCache = (url) => {
+  try {
+    if (typeof localStorage === 'undefined' || !localStorage) return null;
+    const existingStr = localStorage.getItem(API_OFFLINE_CACHE_KEY);
+    if (!existingStr) return null;
+    const cache = JSON.parse(existingStr);
+    return cache[url]?.data || null;
+  } catch (_e) {
+    return null;
+  }
+};
+
+// Response interceptor: cache GET responses & attempt offline fallback
 API.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (response.config && response.config.method && response.config.method.toLowerCase() === 'get') {
+      saveResponseToOfflineCache(response.config.url, response.data);
+    }
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
 
@@ -182,6 +222,22 @@ API.interceptors.response.use(
           detail: { retryInSeconds, message: errorMsg },
         })
       );
+    }
+
+    // ── Offline GET Cache Fallback ──
+    if (originalRequest && originalRequest.method && originalRequest.method.toLowerCase() === 'get' && (isNetworkError(error) || isTimeoutError(error) || !isOnline())) {
+      emitConnectivity(false);
+      const cachedData = getResponseFromOfflineCache(originalRequest.url);
+      if (cachedData) {
+        return Promise.resolve({
+          data: cachedData,
+          status: 200,
+          statusText: 'OK (Offline Cache)',
+          headers: {},
+          config: originalRequest,
+          isOfflineCached: true,
+        });
+      }
     }
 
     // ── Transient failure retry ──────────────────────────────────────────
@@ -270,6 +326,9 @@ API.interceptors.response.use(
       localStorage.setItem('token', newToken);
       localStorage.setItem('refreshToken', newRefreshToken);
 
+      const { store } = await import('../store/index.js');
+      store.dispatch({ type: 'auth/refreshToken/fulfilled', payload: response.data });
+
       API.defaults.headers.common.Authorization = `Bearer ${newToken}`;
       originalRequest.headers.Authorization = `Bearer ${newToken}`;
 
@@ -277,6 +336,8 @@ API.interceptors.response.use(
       return API(originalRequest);
     } catch (refreshError) {
       processQueue(refreshError, null);
+      const { store } = await import('../store/index.js');
+      const { logout } = await import('../store/slices/authSlice.js');
       store.dispatch(logout());
       if (originalRequest?.isBackground) {
         showBackgroundErrorToast('Session expired. Auto-save disabled.');
@@ -288,6 +349,7 @@ API.interceptors.response.use(
     }
   }
 );
+
 
 export const getReadinessProjection = (params) => API.get('/dashboard/readiness-projection', { params });
 
@@ -307,4 +369,44 @@ export const generateRemediationQuiz = (payload) =>
 export const evaluateSubjectiveAnswer = (payload) =>
   API.post('/quizzes/evaluate-subjective', payload);
 
+export const generateDistractors = (payload) =>
+  API.post('/quizzes/generate-distractors', payload);
+
+export const getQuizRecommendations = (userId, params) =>
+  API.get(`/recommendations/${userId}`, { params });
+
+export const logRecommendationHit = (userId, payload) =>
+  API.post(`/recommendations/${userId}/hit`, payload);
+
+// ── Doubt Session (Socratic Hint) APIs ──────────────────────────────
+/**
+ * Start a new doubt-solving session.
+ * POST /api/doubts/start
+ * @param {FormData} formData – must include "question"; optionally "image" file.
+ */
+export const startDoubtSession = (formData) =>
+  API.post('/doubts/start', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 60000,
+  });
+
+/**
+ * Send a follow-up message in an existing doubt session.
+ * POST /api/doubts/:id/message
+ */
+export const sendDoubtMessage = (sessionId, message) =>
+  API.post(`/doubts/${sessionId}/message`, { message });
+
+/**
+ * Reveal the next progressive hint for a doubt session.
+ * POST /api/doubts/:id/reveal-step
+ */
+// ── Spaced Repetition Flashcard Analytics APIs ──────────────────────────
+export const getLeitnerDistribution = (deckId = null) =>
+  API.get('/flashcards/analytics/leitner-distribution', { params: { deckId } });
+
+export const getDueForecast = (deckId = null) =>
+  API.get('/flashcards/analytics/due-forecast', { params: { deckId } });
+
 export default API;
+

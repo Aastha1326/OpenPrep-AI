@@ -9,47 +9,60 @@ const { SyllabusTopic, Note, Topic, Quiz, QuizAttempt } = require('../models');
  */
 const analyzeSyllabusGaps = async (userId, syllabusId) => {
   const topics = await SyllabusTopic.findAll({ where: { syllabusId } });
+  if (topics.length === 0) {
+    return { coveragePercentage: 0, topics: [] };
+  }
+
+  // Fetch the user's notes and quiz history once, up front, instead of
+  // issuing up to 4 queries per syllabus topic (previously N+1).
+  const [notes, dbTopics] = await Promise.all([
+    Note.findAll({ where: { user: userId }, attributes: ['id', 'title', 'content'] }),
+    Topic.findAll({ where: { user: userId }, attributes: ['id', 'name'] }),
+  ]);
+
+  const dbTopicIds = dbTopics.map((t) => t.id);
+  const quizzes = dbTopicIds.length
+    ? await Quiz.findAll({ where: { topic: dbTopicIds }, attributes: ['id', 'topic'] })
+    : [];
+  const quizIdsByTopic = new Map();
+  quizzes.forEach((q) => {
+    if (!quizIdsByTopic.has(q.topic)) quizIdsByTopic.set(q.topic, []);
+    quizIdsByTopic.get(q.topic).push(q.id);
+  });
+
+  const allQuizIds = quizzes.map((q) => q.id);
+  const attempts = allQuizIds.length
+    ? await QuizAttempt.findAll({ where: { user: userId, quiz: allQuizIds }, attributes: ['quiz', 'score', 'totalQuestions'] })
+    : [];
+  const attemptsByQuiz = new Map();
+  attempts.forEach((a) => {
+    if (!attemptsByQuiz.has(a.quiz)) attemptsByQuiz.set(a.quiz, []);
+    attemptsByQuiz.get(a.quiz).push(a);
+  });
+
   const results = [];
+  const topicsToUpdate = [];
   let coveredCount = 0;
   let partialCount = 0;
 
   for (const topic of topics) {
-    // 1. Try finding a matching note by user
-    const note = await Note.findOne({
-      where: {
-        user: userId,
-        [Op.or]: [
-          { title: { [Op.iLike]: `%${topic.title}%` } },
-          { content: { [Op.iLike]: `%${topic.title}%` } },
-        ],
-      },
-    });
-
-    // 2. Try finding matching database topic and corresponding quiz attempts
-    const dbTopic = await Topic.findOne({
-      where: {
-        user: userId,
-        name: { [Op.iLike]: `%${topic.title}%` },
-      },
-    });
+    const lowerTitle = topic.title.toLowerCase();
+    const note = notes.find(
+      (n) => n.title?.toLowerCase().includes(lowerTitle) || n.content?.toLowerCase().includes(lowerTitle)
+    );
+    const dbTopic = dbTopics.find((t) => t.name?.toLowerCase().includes(lowerTitle));
 
     let avgQuizScore = null;
     if (dbTopic) {
-      const quizzes = await Quiz.findAll({ where: { topic: dbTopic.id } });
-      const quizIds = quizzes.map((q) => q.id);
-      if (quizIds.length > 0) {
-        const attempts = await QuizAttempt.findAll({
-          where: { user: userId, quiz: quizIds },
-        });
-        if (attempts.length > 0) {
-          const totalCorrect = attempts.reduce((sum, a) => sum + (a.score || 0), 0);
-          const totalQs = attempts.reduce((sum, a) => sum + (a.totalQuestions || 1), 0);
-          avgQuizScore = totalQs > 0 ? (totalCorrect / totalQs) * 100 : null;
-        }
+      const quizIds = quizIdsByTopic.get(dbTopic.id) || [];
+      const topicAttempts = quizIds.flatMap((qid) => attemptsByQuiz.get(qid) || []);
+      if (topicAttempts.length > 0) {
+        const totalCorrect = topicAttempts.reduce((sum, a) => sum + (a.score || 0), 0);
+        const totalQs = topicAttempts.reduce((sum, a) => sum + (a.totalQuestions || 1), 0);
+        avgQuizScore = totalQs > 0 ? (totalCorrect / totalQs) * 100 : null;
       }
     }
 
-    // 3. Determine Coverage Status
     let status = 'Unstudied Gap'; // default: Red
     if (note && avgQuizScore !== null && avgQuizScore >= 70) {
       status = 'Covered'; // Green
@@ -59,12 +72,11 @@ const analyzeSyllabusGaps = async (userId, syllabusId) => {
       partialCount++;
     }
 
-    // Update in database
-    topic.coverageStatus = status;
-    if (note) {
-      topic.linkedNoteId = note.id;
+    if (topic.coverageStatus !== status || (note && topic.linkedNoteId !== note.id)) {
+      topic.coverageStatus = status;
+      if (note) topic.linkedNoteId = note.id;
+      topicsToUpdate.push(topic);
     }
-    await topic.save();
 
     results.push({
       id: topic.id,
@@ -73,23 +85,21 @@ const analyzeSyllabusGaps = async (userId, syllabusId) => {
       subtopics: topic.subtopics,
       weightage: topic.weightage,
       coverageStatus: status,
-      linkedNoteId: note ? note.id : null,
+      linkedNoteId: note ? note.id : topic.linkedNoteId,
       avgQuizScore: avgQuizScore ? Math.round(avgQuizScore) : null,
     });
   }
 
-  // ERI overall coverage percentage formula
+  await Promise.all(topicsToUpdate.map((t) => t.save()));
+
   const totalTopics = topics.length;
-  const coveragePercentage = totalTopics > 0 
-    ? Math.round(((coveredCount + (partialCount * 0.5)) / totalTopics) * 100) 
-    : 0;
+  const coveragePercentage = Math.round(((coveredCount + (partialCount * 0.5)) / totalTopics) * 100);
 
   return {
     coveragePercentage,
     topics: results,
   };
 };
-
 module.exports = {
   analyzeSyllabusGaps,
 };

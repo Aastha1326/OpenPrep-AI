@@ -1,14 +1,43 @@
+delete require.cache[require.resolve('../../services/redisService')];
+delete require.cache[require.resolve('../../config/redis')];
+delete require.cache[require.resolve('../../utils/cacheManager')];
+delete require.cache[require.resolve('../../middleware/cacheMiddleware')];
+
 const express = require('express');
 const request = require('supertest');
 const cacheMiddleware = require('../../middleware/cacheMiddleware');
 const cacheManager = require('../../utils/cacheManager');
+const redisService = require('../../services/redisService');
 
 describe('cacheMiddleware Integration Tests', () => {
   let app;
   let callCount;
+  let mockStore;
 
   beforeEach(async () => {
     callCount = 0;
+    mockStore = new Map();
+    
+    redisService.isReady = true;
+    vi.spyOn(redisService, 'get').mockImplementation(async (key) => mockStore.get(key) || null);
+    vi.spyOn(redisService, 'set').mockImplementation(async (key, value) => {
+      mockStore.set(key, value);
+      return true;
+    });
+    vi.spyOn(redisService, 'del').mockImplementation(async (pattern) => {
+      if (pattern.endsWith('*')) {
+        const prefix = pattern.slice(0, -1);
+        for (const key of mockStore.keys()) {
+          if (key.startsWith(prefix)) {
+            mockStore.delete(key);
+          }
+        }
+      } else {
+        mockStore.delete(pattern);
+      }
+      return true;
+    });
+
     // Invalidate everything to start clean
     await cacheManager.invalidate('user_testUser:*');
 
