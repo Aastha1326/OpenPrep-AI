@@ -55,14 +55,7 @@ const VivaSimulator = lazy(() => import('./pages/VivaSimulator'));
 const AttemptHistoryDashboard = lazy(() => import('./pages/AttemptHistoryDashboard'));
 const CollaborativeNoteView = lazy(() => import('./pages/CollaborativeNoteView'));
 const SquadsPage = lazy(() => import('./pages/SquadsPage'));
-const StudySquadDashboard = lazy(() => import('./pages/SquadsPage'));
-const CollabNote = lazy(() => import('./pages/CollaborativeNoteView'));
-const LiveQuizSession = lazy(() => import('./pages/LiveQuizSession'));
-const MedicalCaseSimulator = lazy(() => import('./pages/MedicalCaseSimulator'));
-const InterviewRoomPage = lazy(() => import('./pages/InterviewRoomPage'));
-const StudyAnalytics = lazy(() => import('./pages/StudyAnalytics'));
-const ExamCountdownPlanner = lazy(() => import('./pages/ExamCountdownPlanner'));
-const FormulaScratchpad = lazy(() => import('./pages/FormulaScratchpad'));
+const BountyBoardPage = lazy(() => import('./pages/BountyBoardPage'));
 
 function App() {
 
@@ -445,6 +438,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <StreakDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/bounties"
+            element={
+              <ProtectedRoute>
+                <BountyBoardPage />
               </ProtectedRoute>
             }
           />
