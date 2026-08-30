@@ -90,6 +90,10 @@ const WeeklyStudyReport = require('./WeeklyStudyReport');
 const StudyMilestone = require('./StudyMilestone');
 const UserMilestone = require('./UserMilestone');
 const { ModeratorAuditLog, initModeratorAuditLog } = require('./ModeratorAuditLog');
+const StudyPlaylist = require('./StudyPlaylist');
+const StudyPlaylistItem = require('./StudyPlaylistItem');
+const ResourceBookmark = require('./ResourceBookmark');
+const BookmarkCollection = require('./BookmarkCollection');
 
 initBounty(sequelize);
 initBountySolution(sequelize);
@@ -420,6 +424,24 @@ Exam.hasMany(ExamStrategy, { foreignKey: 'exam', onDelete: 'CASCADE' });ExamStra
 User.hasMany(StudyTip, { foreignKey: 'user', onDelete: 'CASCADE' });
 StudyTip.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 
+// StudyPlaylist associations
+User.hasMany(StudyPlaylist, { foreignKey: 'user', onDelete: 'CASCADE' });
+StudyPlaylist.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+Subject.hasMany(StudyPlaylist, { foreignKey: 'subject', onDelete: 'SET NULL' });
+StudyPlaylist.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef' });
+StudyPlaylist.hasMany(StudyPlaylistItem, { foreignKey: 'playlistId', as: 'items', onDelete: 'CASCADE' });
+StudyPlaylistItem.belongsTo(StudyPlaylist, { foreignKey: 'playlistId', as: 'playlistRef' });
+User.hasMany(StudyPlaylistItem, { foreignKey: 'user', onDelete: 'CASCADE' });
+StudyPlaylistItem.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
+// ResourceBookmark & BookmarkCollection associations
+User.hasMany(BookmarkCollection, { foreignKey: 'user', onDelete: 'CASCADE' });
+BookmarkCollection.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+BookmarkCollection.hasMany(ResourceBookmark, { foreignKey: 'collectionId', as: 'bookmarks', onDelete: 'SET NULL' });
+ResourceBookmark.belongsTo(BookmarkCollection, { foreignKey: 'collectionId', as: 'collectionRef' });
+User.hasMany(ResourceBookmark, { foreignKey: 'user', onDelete: 'CASCADE' });
+ResourceBookmark.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
 // DeckRating associations
 DeckRating.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 User.hasMany(DeckRating, { foreignKey: 'userId', as: 'ratings', onDelete: 'CASCADE' });
@@ -521,4 +543,8 @@ module.exports = {
   ResumeParseSession,
   MockInterview,
   SalaryNegotiation,
+  StudyPlaylist,
+  StudyPlaylistItem,
+  ResourceBookmark,
+  BookmarkCollection,
 };
