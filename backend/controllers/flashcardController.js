@@ -678,7 +678,6 @@ exports.reviewFlashcard = async (req, res, next) => {
         .status(400)
         .json({ success: false, error: 'Provide a quality score between 0 and 5' });
     }
-
     const card = await Flashcard.findOne({ where: { id: req.params.id, user: req.user.id } });
     if (!card) {
       return res.status(404).json({ success: false, error: 'Flashcard not found' });

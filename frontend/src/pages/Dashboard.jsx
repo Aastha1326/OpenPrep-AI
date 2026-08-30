@@ -563,6 +563,12 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           onClick={() => navigate('/squads')}
         />
         <GoldTabButton
+          icon={Award}
+          label="Bounty Board"
+          delay={0.47}
+          onClick={() => navigate('/bounties')}
+        />
+        <GoldTabButton
           icon={Globe}
           label="Community Decks"
           delay={0.48}
