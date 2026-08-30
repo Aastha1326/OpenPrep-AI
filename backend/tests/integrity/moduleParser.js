@@ -53,10 +53,11 @@ function collectSourceFiles(root = BACKEND_ROOT, dirs = SOURCE_DIRS) {
       if (entry.isDirectory()) {
         walk(absolute);
       } else if (entry.isFile() && entry.name.endsWith('.js')) {
-        found.push(relative);
+        found.push(relative.replace(/\\/g, '/'));
       }
     }
   };
+
 
   for (const dir of dirs) {
     walk(path.join(root, dir));
@@ -301,6 +302,8 @@ function requiredSpecifiers(source) {
   return specifiers;
 }
 
+
+
 /** Node builtins, with or without the `node:` prefix. */
 function isBuiltinModule(specifier) {
   const bare = specifier.startsWith('node:') ? specifier.slice(5) : specifier;
@@ -437,13 +440,14 @@ function collectBootReachableFiles(entry = 'server.js', root = BACKEND_ROOT) {
       }
 
       if (resolved.includes(`${path.sep}node_modules${path.sep}`)) continue;
-      const next = path.relative(root, resolved);
+      const next = path.relative(root, resolved).replace(/\\/g, '/');
       if (!next.startsWith('..') && !seen.has(next)) queue.push(next);
     }
   }
 
   return [...seen].sort();
 }
+
 
 /**
  * Relative `require()` targets that do not resolve.

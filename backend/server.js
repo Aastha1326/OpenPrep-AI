@@ -94,7 +94,7 @@ const readinessRoutes = require('./routes/readinessRoutes');
 const proctoringRoutes = require('./routes/proctoringRoutes');
 const squadRoutes = require('./routes/squadRoutes');
 const badgeRoutes = require('./routes/badgeRoutes');
- feat/i18n-localization-framework
+ feat/omr-pdf-generator
 const visualizerRoutes = require('./routes/visualizerRoutes');
 const weaknessDetectionRoutes = require('./routes/weaknessDetectionRoutes');
 const pyqIntelligenceRoutes = require('./routes/pyqIntelligenceRoutes');
@@ -427,7 +427,7 @@ app.use('/api/decks', require('./routes/publicDeckRoutes'));
 app.use('/api/share', shareRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/admin/db', require('./controllers/dbAdminController'));
+app.use('/api/admin/db', require('./routes/dbAdminRoutes'));
 app.use('/api/search', searchRoutes);
 app.use('/api/submissions', handwrittenSubmissionRoutes);
 app.use('/api/progress', progressRoutes);

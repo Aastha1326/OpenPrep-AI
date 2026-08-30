@@ -656,4 +656,9 @@ router.get('/:id/bookmarks', protect, checkOwnership('Quiz'), getQuizBookmarks);
  */
 router.post('/:id/bookmarks/toggle', protect, checkOwnership('Quiz'), toggleQuizBookmark);
 
+const { getOmrSheetPdf, getAnswerKeyPdf } = require('../controllers/omrController');
+router.get('/:id/omr-sheet.pdf', getOmrSheetPdf);
+router.get('/:id/answer-key.pdf', getAnswerKeyPdf);
+
 module.exports = router;
+
