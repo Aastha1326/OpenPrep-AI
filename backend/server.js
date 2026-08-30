@@ -455,8 +455,24 @@ app.use('/api/learning-path', require('./routes/learningPathRoutes'));
 app.use('/user/learning-path', require('./routes/learningPathRoutes'));
 const studyGoalRoutes = require('./routes/studyGoalRoutes');
 app.use('/api/study-goals', studyGoalRoutes);
+const studyPlaylistRoutes = require('./routes/studyPlaylistRoutes');
+app.use('/api/study-playlists', studyPlaylistRoutes);
+const resourceBookmarkRoutes = require('./routes/resourceBookmarkRoutes');
+app.use('/api/bookmarks', resourceBookmarkRoutes);
+const studyHeatmapRoutes = require('./routes/studyHeatmapRoutes');
+app.use('/api/study-heatmap', studyHeatmapRoutes);
+const studyAnalyticsRoutes = require('./routes/studyAnalyticsRoutes');
+app.use('/api/study-analytics', studyAnalyticsRoutes);
+const topicDifficultyEstimatorRoutes = require('./routes/topicDifficultyEstimatorRoutes');
+app.use('/api/topic-difficulty', topicDifficultyEstimatorRoutes);
+const flashcardMasteryRoutes = require('./routes/flashcardMasteryRoutes');
+app.use('/api/flashcard-mastery', flashcardMasteryRoutes);
 const habitTrackerRoutes = require('./routes/habitTrackerRoutes');
 app.use('/api/habits', habitTrackerRoutes);
+const learningJournalRoutes = require('./routes/learningJournalRoutes');
+app.use('/api/learning-journal', learningJournalRoutes);
+const studyPlanVersioningRoutes = require('./routes/studyPlanVersioningRoutes');
+app.use('/api/study-plans/:planId', studyPlanVersioningRoutes);
 app.use('/api/interviews', mockInterviewRoutes);
 // Serve static assets from frontend build folder in production
 if (process.env.NODE_ENV === 'production') {

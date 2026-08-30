@@ -397,10 +397,16 @@ export const startDoubtSession = (formData) =>
 export const sendDoubtMessage = (sessionId, message) =>
   API.post(`/doubts/${sessionId}/message`, { message });
 
-// ── 3D Molecular & Biology Structure APIs ──────────────────────────
-export const getMolecularStructures = () => API.get('/molecular/structures');
-export const getMolecularStructureById = (id) => API.get(`/molecular/structures/${id}`);
-export const explainMolecularStructure = (payload) => API.post('/molecular/explain', payload);
+/**
+ * Reveal the next progressive hint for a doubt session.
+ * POST /api/doubts/:id/reveal-step
+ */
+// ── Spaced Repetition Flashcard Analytics APIs ──────────────────────────
+export const getLeitnerDistribution = (deckId = null) =>
+  API.get('/flashcards/analytics/leitner-distribution', { params: { deckId } });
+
+export const getDueForecast = (deckId = null) =>
+  API.get('/flashcards/analytics/due-forecast', { params: { deckId } });
 
 export default API;
 
