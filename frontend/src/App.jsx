@@ -50,6 +50,7 @@ const QuizSession = lazy(() => import('./pages/QuizSession'));
 const MindMapViewer = lazy(() => import('./pages/MindMapViewer'));
 const WeaknessDetectionDashboard = lazy(() => import('./pages/WeaknessDetectionDashboard'));
 const StudyPlanner = lazy(() => import('./pages/StudyPlanner'));
+const StudyGoals = lazy(() => import('./pages/StudyGoals'));
 const VivaSimulator = lazy(() => import('./pages/VivaSimulator'));
 const AttemptHistoryDashboard = lazy(() => import('./pages/AttemptHistoryDashboard'));
 const CollaborativeNoteView = lazy(() => import('./pages/CollaborativeNoteView'));
@@ -57,6 +58,7 @@ const SquadsPage = lazy(() => import('./pages/SquadsPage'));
 const StudySquadDashboard = lazy(() => import('./pages/SquadsPage'));
 const CollabNote = lazy(() => import('./pages/CollaborativeNoteView'));
 const LiveQuizSession = lazy(() => import('./pages/LiveQuizSession'));
+const MedicalCaseSimulator = lazy(() => import('./pages/MedicalCaseSimulator'));
 const InterviewRoomPage = lazy(() => import('./pages/InterviewRoomPage'));
 const StudyAnalytics = lazy(() => import('./pages/StudyAnalytics'));
 const ExamCountdownPlanner = lazy(() => import('./pages/ExamCountdownPlanner'));
@@ -321,6 +323,15 @@ function App() {
           />
 
           <Route
+            path="/revision-scheduler"
+            element={
+              <ProtectedRoute>
+                <RevisionScheduler />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/viva-simulator"
             element={
               <ProtectedRoute>
@@ -380,16 +391,16 @@ function App() {
             path="/exam-planner"
             element={
               <ProtectedRoute>
-                <ExamCountdownPlanner />
+                <FormulaScratchpad />
               </ProtectedRoute>
             }
           />
 
           <Route
-            path="/tools/calculator"
+            path="/study-goals"
             element={
               <ProtectedRoute>
-                <FormulaScratchpad />
+                <StudyGoals />
               </ProtectedRoute>
             }
           />
@@ -429,11 +440,25 @@ function App() {
             }
           />
 
+          <Route
+            path="/streak-dashboard"
+            element={
+              <ProtectedRoute>
+                <StreakDashboard />
+              </ProtectedRoute>
+            }
+          />
+
           <Route element={<AdminRoute />}>
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/analytics" element={<AdminAnalytics />} />
           </Route>
 
+          <Route path="/medical-cases" element={<MedicalCaseSimulator />} />
+          <Route path="/drug-interactions" element={<DrugInteractionChecker />} />
+          <Route path="/exam-countdown" element={<ExamCountdownPlanner />} />
+          <Route path="/clinical-notes" element={<ClinicalNotesSummarizer />} />
+          <Route path="/patient-simulator" element={<PatientSimulator />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>

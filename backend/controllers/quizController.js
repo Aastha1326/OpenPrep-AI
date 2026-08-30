@@ -253,7 +253,6 @@ exports.generateCustomQuiz = async (req, res, next) => {
       .join('\n\n');
 
     const difficultyLevel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
-
     // Call Gemini Service
     const aiQuiz = await geminiService.generateCustomQuiz(
       subject.name,

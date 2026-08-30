@@ -20,7 +20,13 @@ const {
   starCommunityDeck,
   batchSyncOfflineReviews,
   generateClozeFlashcards,
+  generateDeckPodcast,
+  getPodcastEpisodeById,
 } = require('../controllers/flashcardController');
+const {
+  getLeitnerDistribution,
+  getDueForecast,
+} = require('../controllers/flashcardAnalyticsController');
 const { protect } = require('../middleware/auth');
 const cacheMiddleware = require('../middleware/cacheMiddleware');
 const { aiLimiter } = require('../middleware/rateLimiter');
@@ -36,6 +42,11 @@ validateGenerateAIFlashcards,
   validateExportFlashcards,
   validateImportFlashcards,
 } = require('../middleware/validators');const router = express.Router();
+
+// Spaced Repetition Analytics Routes
+router.get('/analytics/leitner-distribution', protect, getLeitnerDistribution);
+router.get('/analytics/due-forecast', protect, getDueForecast);
+
 
 /**
  * @swagger

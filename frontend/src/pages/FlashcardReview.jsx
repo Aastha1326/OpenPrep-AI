@@ -13,6 +13,9 @@ import {
   Settings,
   FileAudio,
   Keyboard,
+  Play,
+  Video,
+  X,
 } from 'lucide-react';
 import MathRenderer from '../components/common/MathRenderer';
 import API from '../services/api';
@@ -24,6 +27,8 @@ import GenerateFlashcardsFromAudioModal from '../components/dashboard/GenerateFl
 import RemediationQuizModal from '../components/flashcards/RemediationQuizModal';
 import KeyboardShortcutsModal from '../components/flashcards/KeyboardShortcutsModal';
 import PomodoroTimer from '../components/dashboard/PomodoroTimer';
+import MobileBottomSheet from '../components/common/MobileBottomSheet';
+import offlineSyncService from '../services/offlineSyncService';
 const STORAGE_KEY = 'flashcardReviewSession';
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -686,21 +691,6 @@ useEffect(() => {
 
   // --- Active Review Queue Screen ---
   const progressPercent = Math.round((currentIndex / cards.length) * 100);
-
-  const bind = useDrag(({ down, movement: [mx], cancel }) => {
-    if (down && Math.abs(mx) > 120) {
-      cancel();
-      if (mx < 0) {
-        // Swipe Left
-        if (!isFlipped) handleCardFlip();
-        else handleReview(1); // Mark as Wrong
-      } else {
-        // Swipe Right
-        if (!isFlipped) handleCardFlip();
-        else handleReview(5); // Mark as Easy
-      }
-    }
-  });
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-6 px-4 flex flex-col items-center">
