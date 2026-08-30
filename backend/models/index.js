@@ -60,7 +60,6 @@ const HabitLog = require('./HabitLog')(sequelize, DataTypes);
 const HabitStreak = require('./HabitStreak')(sequelize, DataTypes);
 
 const StudySquad = require('./StudySquad');
-const Whiteboard = require('./Whiteboard');
 const SquadMember = require('./SquadMember');
 const SquadChallenge = require('./SquadChallenge');
 const SquadChallengeContribution = require('./SquadChallengeContribution');
@@ -301,9 +300,6 @@ StudySquad.belongsTo(User, { foreignKey: 'adminUserId', as: 'adminRef' });
 StudySquad.hasMany(SquadMember, { foreignKey: 'squadId', onDelete: 'CASCADE' });
 SquadMember.belongsTo(StudySquad, { foreignKey: 'squadId', as: 'squadRef' });
 
-StudySquad.hasMany(Whiteboard, { foreignKey: 'squadId', onDelete: 'CASCADE' });
-Whiteboard.belongsTo(StudySquad, { foreignKey: 'squadId', as: 'squadRef' });
-
 User.hasMany(SquadMember, { foreignKey: 'userId', onDelete: 'CASCADE' });
 SquadMember.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 
@@ -415,5 +411,4 @@ module.exports = {  sequelize,  User,  Exam,
   VivaSession,
   BountyQuestion,
   BountyAnswer,
-  Whiteboard,
 };
