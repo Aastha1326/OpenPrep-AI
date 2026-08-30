@@ -72,11 +72,12 @@ function resolveUserTier(req) {
   return TIER_LIMITS.authenticated_standard;
 }
 
-/**
- * Sliding Window Token Bucket Middleware Matrix Core
- */
 async function rateLimiterMiddleware(req, res, next) {
+  if (shouldSkip(req)) return next();
+
   const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown_client_ip';
+
+
   const userId = req.user ? req.user.id : 'anon';
   const trackingKey = `ratelimit:${userId}:${ip}:${req.path}`;
 

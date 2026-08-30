@@ -427,7 +427,7 @@ app.use('/api/decks', require('./routes/publicDeckRoutes'));
 app.use('/api/share', shareRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/admin/db', require('./controllers/dbAdminController'));
+app.use('/api/admin/db', require('./routes/dbAdminRoutes'));
 app.use('/api/search', searchRoutes);
 app.use('/api/submissions', handwrittenSubmissionRoutes);
 app.use('/api/progress', progressRoutes);
