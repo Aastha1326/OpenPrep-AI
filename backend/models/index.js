@@ -1,18 +1,13 @@
+const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
 
-// Import all models
-const User = require('./User')(sequelize, DataTypes);
-const Quiz = require('./Quiz')(sequelize, DataTypes);
-const AIUsageLog = require('./AIUsageLog')(sequelize, DataTypes);
-const ProviderHealthStatus = require('./ProviderHealthStatus')(sequelize, DataTypes);
-// ... other models
-module.exports = {
-  User,
-  Quiz,
-  AIUsageLog,
-  ProviderHealthStatus,
-  // ... other exports
-};const SchedulerVersion = require('./SchedulerVersion');
+
+const User = require('./User');
+const Quiz = require('./Quiz');
+const AIUsageLog = require('./AIUsageLog');
+const ProviderHealthStatus = require('./ProviderHealthStatus');
+const SchedulerVersion = require('./SchedulerVersion');
+
 const FlashcardSchedulingState = require('./FlashcardSchedulingState');
 const FlashcardReviewHistory = require('./FlashcardReviewHistory');
 const ReviewSubmissionToken = require('./ReviewSubmissionToken');
@@ -21,10 +16,12 @@ const Folder = require('./Folder');
 const Exam = require('./Exam');
 const Subject = require('./Subject');
 const Topic = require('./Topic');
+const SkillDependency = require('./SkillDependency');
 const PYQ = require('./PYQ');
+
 const StudyPlan = require('./StudyPlan');
-const Quiz = require('./Quiz');
 const QuizAttempt = require('./QuizAttempt');
+
 const Note = require('./Note');
 const Question = require('./Question');
 const QuestionComment = require('./QuestionComment');
@@ -43,6 +40,8 @@ const AuditLog = require('./AuditLog');
 const UsageQuota = require('./UsageQuota');
 const Achievement = require('./Achievement');
 const FocusSession = require('./FocusSession');
+const FocusSessionLog = require('./FocusSessionLog');
+
 const QuizTelemetryEvent = require('./QuizTelemetryEvent');
 const QuizBookmark = require('./QuizBookmark');
 const DeckRating = require('./DeckRating');
@@ -56,9 +55,10 @@ const Notification = require('./Notification');
 const PushSubscription = require('./PushSubscription');
 const ReadinessSnapshot = require('./ReadinessSnapshot');
 const SubjectGoal = require('./SubjectGoal');
-const StudyHabit = require('./StudyHabit');
-const HabitLog = require('./HabitLog');
-const HabitStreak = require('./HabitStreak');
+const StudyHabit = require('./StudyHabit')(sequelize, DataTypes);
+const HabitLog = require('./HabitLog')(sequelize, DataTypes);
+const HabitStreak = require('./HabitStreak')(sequelize, DataTypes);
+
 const StudySquad = require('./StudySquad');
 const SquadMember = require('./SquadMember');
 const SquadChallenge = require('./SquadChallenge');
@@ -79,6 +79,10 @@ const WeaknessReport = require('./WeaknessReport');
 const SecurityAuditLog = require('./SecurityAuditLog');
 const MockInterviewSession = require('./MockInterviewSession');
 const ExamIntegrityReport = require('./ExamIntegrityReport');
+const ExamStrategy = require('./ExamStrategy');
+const StudyReminder = require('./StudyReminder');
+
+
 const { Bounty, initBounty } = require('./Bounty');
 const { BountySolution, initBountySolution } = require('./BountySolution');
 const { BountySolutionVote, initBountySolutionVote } = require('./BountySolutionVote');
@@ -88,7 +92,16 @@ const FlashcardMasterySnapshot = require('./FlashcardMasterySnapshot');
 const StudyGoalProgress = require('./StudyGoalProgress');
 const WeeklyStudyReport = require('./WeeklyStudyReport');
 const StudyMilestone = require('./StudyMilestone');
+
+
 const UserMilestone = require('./UserMilestone');
+const StudyTip = require('./StudyTip');
+const AlumniMentorProfile = require('./AlumniMentorProfile');
+const ResumeParseSession = require('./ResumeParseSession');
+const MockInterview = require('./MockInterview');
+const SalaryNegotiation = require('./SalaryNegotiation');
+
+
 const { ModeratorAuditLog, initModeratorAuditLog } = require('./ModeratorAuditLog');
 const StudyPlaylist = require('./StudyPlaylist');
 const StudyPlaylistItem = require('./StudyPlaylistItem');

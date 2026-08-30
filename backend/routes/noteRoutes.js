@@ -9,6 +9,7 @@ const {
   updateNote,
   uploadOcrNote,
   exportNotes,
+  verifyNotePdfSignature,
   importNotes,
   shareCollaboration,
   getNote,
@@ -315,6 +316,7 @@ router.get(
 );
 
 router.get('/export', protect, exportNotes);
+router.post('/verify-signature', verifyNotePdfSignature);
 
 router.post(
   '/import',
