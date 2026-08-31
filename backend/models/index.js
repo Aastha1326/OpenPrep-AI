@@ -90,6 +90,7 @@ const SkillDependency = require('./SkillDependency');
 const SquadAchievement = require('./SquadAchievement');
 const SquadActivity = require('./SquadActivity');
 const SquadActivityReaction = require('./SquadActivityReaction');
+const SquadAuditLog = require('./SquadAuditLog');
 const SquadChallenge = require('./SquadChallenge');
 const SquadChallengeContribution = require('./SquadChallengeContribution');
 const SquadMember = require('./SquadMember');
@@ -290,6 +291,10 @@ Note.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 // CodeRoom associations
 CodeRoom.belongsTo(User, { foreignKey: 'userId', as: 'creator' });
 User.hasMany(CodeRoom, { foreignKey: 'userId' });
+
+// SquadAuditLog associations
+SquadAuditLog.belongsTo(User, { foreignKey: 'userId', as: 'actor' });
+SquadAuditLog.belongsTo(StudySquad, { foreignKey: 'squadId', as: 'squad' });
 
 // Flashcard associations
 Flashcard.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
@@ -506,6 +511,7 @@ module.exports = {
   SquadAchievement,
   SquadActivity,
   SquadActivityReaction,
+  SquadAuditLog,
   SquadChallenge,
   SquadChallengeContribution,
   SquadMember,
