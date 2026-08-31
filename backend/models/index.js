@@ -38,6 +38,7 @@ const BattleParticipant = require('./BattleParticipant');
 const BattleSession = require('./BattleSession');
 const BountyAnswer = require('./BountyAnswer');
 const BountyQuestion = require('./BountyQuestion');
+const CodeRoom = require('./CodeRoom');
 const CommentFlag = require('./CommentFlag');
 const CommentVote = require('./CommentVote');
 const DeckCollaborator = require('./DeckCollaborator');
@@ -89,6 +90,7 @@ const SkillDependency = require('./SkillDependency');
 const SquadAchievement = require('./SquadAchievement');
 const SquadActivity = require('./SquadActivity');
 const SquadActivityReaction = require('./SquadActivityReaction');
+const SquadAuditLog = require('./SquadAuditLog');
 const SquadChallenge = require('./SquadChallenge');
 const SquadChallengeContribution = require('./SquadChallengeContribution');
 const SquadMember = require('./SquadMember');
@@ -288,6 +290,14 @@ Note.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'CA
 Note.belongsTo(Topic, { foreignKey: 'topic', as: 'topicRef', onDelete: 'CASCADE' });
 Note.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 
+// CodeRoom associations
+CodeRoom.belongsTo(User, { foreignKey: 'userId', as: 'creator' });
+User.hasMany(CodeRoom, { foreignKey: 'userId' });
+
+// SquadAuditLog associations
+SquadAuditLog.belongsTo(User, { foreignKey: 'userId', as: 'actor' });
+SquadAuditLog.belongsTo(StudySquad, { foreignKey: 'squadId', as: 'squad' });
+
 // Flashcard associations
 Flashcard.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 Flashcard.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'CASCADE' });
@@ -444,6 +454,7 @@ module.exports = {
   BountyQuestion,
   BountySolution,
   BountySolutionVote,
+  CodeRoom,
   CommentFlag,
   CommentVote,
   DeckCollaborator,
@@ -502,6 +513,7 @@ module.exports = {
   SquadAchievement,
   SquadActivity,
   SquadActivityReaction,
+  SquadAuditLog,
   SquadChallenge,
   SquadChallengeContribution,
   SquadMember,
