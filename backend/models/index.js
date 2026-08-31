@@ -58,8 +58,8 @@ const Folder = require('./Folder');
 const HabitLog = require('./HabitLog');
 const HabitStreak = require('./HabitStreak');
 const HandwrittenSubmission = require('./HandwrittenSubmission');
-const LearningPath = require('./LearningPath');
-const MockInterview = require('./MockInterview');
+const LearningEvent = require('./LearningEvent');
+const LearningPath = require('./LearningPath');const MockInterview = require('./MockInterview');
 const MockInterviewSession = require('./MockInterviewSession');
 const Note = require('./Note');
 const Notification = require('./Notification');
@@ -467,9 +467,9 @@ module.exports = {
   InterviewAnalytics,
   JobApplication,
   JobOpportunity,
+  LearningEvent,
   LearningPath,
-  MockInterview,
-  MockInterviewSession,
+  MockInterview,  MockInterviewSession,
   ModeratorAuditLog,
   Note,
   Notification,
