@@ -106,6 +106,7 @@ const squadRoutes = require('./routes/squadRoutes');
 const badgeRoutes = require('./routes/badgeRoutes');
 const whiteboardRoutes = require('./routes/whiteboardRoutes');
 const mockExamRoutes = require('./routes/mockExamRoutes');
+const aiGatewayRoutes = require('./routes/aiGatewayRoutes');
 const visualizerRoutes = require('./routes/visualizerRoutes');
 const weaknessDetectionRoutes = require('./routes/weaknessDetectionRoutes');
 const pyqIntelligenceRoutes = require('./routes/pyqIntelligenceRoutes');
@@ -451,6 +452,7 @@ app.use('/api/decks', require('./routes/publicDeckRoutes'));
 app.use('/api/share', shareRoutes);
 app.use('/api', whiteboardRoutes);
 app.use('/api', mockExamRoutes);
+app.use('/api', aiGatewayRoutes);
 app.use('/api', securityRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/admin', adminRoutes);
@@ -704,6 +706,9 @@ io.on('connection', (socket) => {
 });
 
 // Start background schedulers
+const { initQueue } = require('./services/aiRequestQueue');
+initQueue();
+
 const { startScheduler } = require('./services/weeklyDigestService');
 startScheduler();
 
