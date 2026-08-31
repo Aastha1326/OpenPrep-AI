@@ -153,7 +153,8 @@ User.hasMany(PYQ, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Bounty, { foreignKey: 'authorId', as: 'bounties', onDelete: 'CASCADE' });
 Bounty.belongsTo(User, { foreignKey: 'authorId', as: 'author' });
 Bounty.belongsTo(User, { foreignKey: 'winnerId', as: 'winner' });
-
+AIWorkflowContract: require('./AIWorkflowContract'),
+AIArtifactVersion: require('./AIArtifactVersion'),
 Bounty.hasMany(BountySolution, { foreignKey: 'bountyId', as: 'solutions', onDelete: 'CASCADE' });
 BountySolution.belongsTo(Bounty, { foreignKey: 'bountyId', as: 'bounty' });
 BountySolution.belongsTo(User, { foreignKey: 'authorId', as: 'author' });

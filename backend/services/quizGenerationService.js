@@ -9,7 +9,8 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
 const MAX_RETRIES = 3;
-
+const geminiService = require('./geminiService');
+const AIContractVersioningService = require('./aiContractVersioningService');
 /**
  * Generates a single quiz question with validation and retry logic
  * @param {string} topic - Topic for the question

@@ -191,3 +191,12 @@ exports.generateQuestions = async (req, res, next) => {
 };
 
 
+exports.getArtifactHistory = async (req, res) => {
+  try {
+    const { artifactId } = req.params;
+    const history = await AIContractVersioningService.getArtifactHistory(artifactId);
+    res.json({ success: true, data: history });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};

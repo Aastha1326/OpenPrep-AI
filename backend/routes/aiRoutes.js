@@ -215,5 +215,5 @@ router.post(
   aiSanitizer,
   generateQuestions
 );
-
+router.get('/artifacts/:artifactId/history', aiController.getArtifactHistory);
 module.exports = router;
