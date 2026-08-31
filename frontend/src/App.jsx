@@ -71,6 +71,7 @@ const CollaborativeNoteView = lazy(() => import('./pages/CollaborativeNoteView')
 const SquadsPage = lazy(() => import('./pages/SquadsPage'));
 const BountyBoardPage = lazy(() => import('./pages/BountyBoardPage'));
 const CodeSandboxPage = lazy(() => import('./pages/code/CodeSandboxPage'));
+const RewardsShop = lazy(() => import('./components/gamification/RewardsShop'));
 
 function App() {
 
@@ -300,6 +301,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <CodeSandboxPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/rewards-shop"
+            element={
+              <ProtectedRoute>
+                <RewardsShop />
               </ProtectedRoute>
             }
           />
