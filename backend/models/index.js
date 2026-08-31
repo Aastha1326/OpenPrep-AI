@@ -90,6 +90,8 @@ const WeeklyStudyReport = require('./WeeklyStudyReport');
 const StudyMilestone = require('./StudyMilestone');
 const UserMilestone = require('./UserMilestone');
 const { ModeratorAuditLog, initModeratorAuditLog } = require('./ModeratorAuditLog');
+const StudyPlaylist = require('./StudyPlaylist');
+const StudyPlaylistItem = require('./StudyPlaylistItem');
 
 initBounty(sequelize);
 initBountySolution(sequelize);
@@ -420,6 +422,18 @@ Exam.hasMany(ExamStrategy, { foreignKey: 'exam', onDelete: 'CASCADE' });ExamStra
 User.hasMany(StudyTip, { foreignKey: 'user', onDelete: 'CASCADE' });
 StudyTip.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 
+// StudyPlaylist associations
+User.hasMany(StudyPlaylist, { foreignKey: 'user', onDelete: 'CASCADE' });
+StudyPlaylist.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+Subject.hasMany(StudyPlaylist, { foreignKey: 'subjectId', onDelete: 'SET NULL' });
+StudyPlaylist.belongsTo(Subject, { foreignKey: 'subjectId', as: 'subjectRef' });
+
+// StudyPlaylistItem associations
+StudyPlaylist.hasMany(StudyPlaylistItem, { foreignKey: 'playlistId', onDelete: 'CASCADE' });
+StudyPlaylistItem.belongsTo(StudyPlaylist, { foreignKey: 'playlistId', as: 'playlistRef' });
+User.hasMany(StudyPlaylistItem, { foreignKey: 'user', onDelete: 'CASCADE' });
+StudyPlaylistItem.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
 // DeckRating associations
 DeckRating.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 User.hasMany(DeckRating, { foreignKey: 'userId', as: 'ratings', onDelete: 'CASCADE' });
@@ -521,4 +535,6 @@ module.exports = {
   ResumeParseSession,
   MockInterview,
   SalaryNegotiation,
+  StudyPlaylist,
+  StudyPlaylistItem,
 };
