@@ -38,6 +38,7 @@ const BattleParticipant = require('./BattleParticipant');
 const BattleSession = require('./BattleSession');
 const BountyAnswer = require('./BountyAnswer');
 const BountyQuestion = require('./BountyQuestion');
+const CodeRoom = require('./CodeRoom');
 const CommentFlag = require('./CommentFlag');
 const CommentVote = require('./CommentVote');
 const DeckCollaborator = require('./DeckCollaborator');
@@ -55,13 +56,14 @@ const FlashcardSchedulingState = require('./FlashcardSchedulingState');
 const FocusSession = require('./FocusSession');
 const FocusSessionLog = require('./FocusSessionLog');
 const Folder = require('./Folder');
-const HabitLog = require('./HabitLog');
-const HabitStreak = require('./HabitStreak');
 const HandwrittenSubmission = require('./HandwrittenSubmission');
-const LearningEvent = require('./LearningEvent');
-const LearningPath = require('./LearningPath');const MockInterview = require('./MockInterview');
+const LearningPath = require('./LearningPath');
+const MistakeLogEntry = require('./MistakeLogEntry');
+const MockExamSession = require('./MockExamSession');
+const MockInterview = require('./MockInterview');
 const MockInterviewSession = require('./MockInterviewSession');
 const Note = require('./Note');
+const NoteLink = require('./NoteLink');
 const Notification = require('./Notification');
 const NotificationSettings = require('./NotificationSettings');
 const PYQ = require('./PYQ');
@@ -89,12 +91,12 @@ const SkillDependency = require('./SkillDependency');
 const SquadAchievement = require('./SquadAchievement');
 const SquadActivity = require('./SquadActivity');
 const SquadActivityReaction = require('./SquadActivityReaction');
+const SquadAuditLog = require('./SquadAuditLog');
 const SquadChallenge = require('./SquadChallenge');
 const SquadChallengeContribution = require('./SquadChallengeContribution');
 const SquadMember = require('./SquadMember');
 const StudyGoal = require('./StudyGoal');
 const StudyGoalProgress = require('./StudyGoalProgress');
-const StudyHabit = require('./StudyHabit');
 const StudyPlan = require('./StudyPlan');
 const StudyPlanVersion = require('./StudyPlanVersion');
 const StudyReminder = require('./StudyReminder');
@@ -109,15 +111,19 @@ const Topic = require('./Topic');
 const UsageQuota = require('./UsageQuota');
 const User = require('./User');
 const UserBadge = require('./UserBadge');
+const UserPasskey = require('./UserPasskey');
 const UserProgress = require('./UserProgress');
 const VivaSession = require('./VivaSession');
 const WeeklyStudyReport = require('./WeeklyStudyReport');
 
 // Models exporting a (sequelize, DataTypes) factory.
 const AIUsageLog = require('./AIUsageLog')(sequelize, DataTypes);
+const HabitLog = require('./HabitLog')(sequelize, DataTypes);
+const HabitStreak = require('./HabitStreak')(sequelize, DataTypes);
 const InterviewAnalytics = require('./InterviewAnalytics')(sequelize, DataTypes);
 const ProviderHealthStatus = require('./ProviderHealthStatus')(sequelize, DataTypes);
 const SharedNote = require('./SharedNote')(sequelize, DataTypes);
+const StudyHabit = require('./StudyHabit')(sequelize, DataTypes);
 const StudyMilestone = require('./StudyMilestone')(sequelize, DataTypes);
 const StudySession = require('./StudySession')(sequelize, DataTypes);
 const UserMilestone = require('./UserMilestone')(sequelize, DataTypes);
@@ -153,12 +159,11 @@ User.hasMany(PYQ, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Bounty, { foreignKey: 'authorId', as: 'bounties', onDelete: 'CASCADE' });
 Bounty.belongsTo(User, { foreignKey: 'authorId', as: 'author' });
 Bounty.belongsTo(User, { foreignKey: 'winnerId', as: 'winner' });
-AIWorkflowContract: require('./AIWorkflowContract'),
-AIArtifactVersion: require('./AIArtifactVersion'),
+
 Bounty.hasMany(BountySolution, { foreignKey: 'bountyId', as: 'solutions', onDelete: 'CASCADE' });
 BountySolution.belongsTo(Bounty, { foreignKey: 'bountyId', as: 'bounty' });
 BountySolution.belongsTo(User, { foreignKey: 'authorId', as: 'author' });
-AIGenerationCache: require('./AIGenerationCache'),
+
 BountySolution.hasMany(BountySolutionVote, { foreignKey: 'solutionId', as: 'votes', onDelete: 'CASCADE' });
 BountySolutionVote.belongsTo(BountySolution, { foreignKey: 'solutionId', as: 'solution' });
 User.hasMany(StudyPlan, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -192,10 +197,16 @@ User.hasMany(ActivityLog, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Achievement, { foreignKey: 'userId', as: 'achievements', onDelete: 'CASCADE' });
 User.hasMany(UserBadge, { foreignKey: 'userId', as: 'badgesRef', onDelete: 'CASCADE' });
 User.hasMany(UsageQuota, { foreignKey: 'userId', onDelete: 'CASCADE' });
+User.hasMany(UserPasskey, { foreignKey: 'userId', as: 'passkeys', onDelete: 'CASCADE' });
+UserPasskey.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 User.hasMany(VivaSession, { foreignKey: 'userId', as: 'vivaSessions', onDelete: 'CASCADE' });
 VivaSession.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
-DocumentProcessingLog: require('./DocumentProcessingLog'),
-DocumentProcessingStage: require('./DocumentProcessingStage'),
+
+Note.hasMany(NoteLink, { foreignKey: 'sourceNoteId', as: 'outgoingLinks', onDelete: 'CASCADE' });
+Note.hasMany(NoteLink, { foreignKey: 'targetNoteId', as: 'incomingLinks', onDelete: 'CASCADE' });
+NoteLink.belongsTo(Note, { foreignKey: 'sourceNoteId', as: 'sourceNote' });
+NoteLink.belongsTo(Note, { foreignKey: 'targetNoteId', as: 'targetNote' });
+
 // Exam associations
 Exam.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 Exam.hasMany(Subject, { foreignKey: 'exam', onDelete: 'CASCADE' });
@@ -287,6 +298,14 @@ ExamIntegrityReport.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 Note.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'CASCADE' });
 Note.belongsTo(Topic, { foreignKey: 'topic', as: 'topicRef', onDelete: 'CASCADE' });
 Note.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+
+// CodeRoom associations
+CodeRoom.belongsTo(User, { foreignKey: 'userId', as: 'creator' });
+User.hasMany(CodeRoom, { foreignKey: 'userId' });
+
+// SquadAuditLog associations
+SquadAuditLog.belongsTo(User, { foreignKey: 'userId', as: 'actor' });
+SquadAuditLog.belongsTo(StudySquad, { foreignKey: 'squadId', as: 'squad' });
 
 // Flashcard associations
 Flashcard.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
@@ -444,6 +463,7 @@ module.exports = {
   BountyQuestion,
   BountySolution,
   BountySolutionVote,
+  CodeRoom,
   CommentFlag,
   CommentVote,
   DeckCollaborator,
@@ -469,9 +489,13 @@ module.exports = {
   JobOpportunity,
   LearningEvent,
   LearningPath,
-  MockInterview,  MockInterviewSession,
+  MistakeLogEntry,
+  MockExamSession,
+  MockInterview,
+  MockInterviewSession,
   ModeratorAuditLog,
   Note,
+  NoteLink,
   Notification,
   NotificationSettings,
   PYQ,
@@ -502,6 +526,7 @@ module.exports = {
   SquadAchievement,
   SquadActivity,
   SquadActivityReaction,
+  SquadAuditLog,
   SquadChallenge,
   SquadChallengeContribution,
   SquadMember,
@@ -525,6 +550,7 @@ module.exports = {
   User,
   UserBadge,
   UserMilestone,
+  UserPasskey,
   UserProgress,
   VivaSession,
   WeeklyStudyReport,

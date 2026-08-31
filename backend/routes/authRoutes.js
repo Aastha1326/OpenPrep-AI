@@ -294,4 +294,21 @@ router.post('/oauth/register-email', registerOAuthEmail);
 router.post('/session/keepalive', protect, keepalive);
 router.post('/keepalive', protect, keepalive);
 
+// ── Passkey / WebAuthn Routes ──
+const {
+  getRegisterChallenge,
+  verifyRegister,
+  getLoginChallenge,
+  verifyLogin,
+  listPasskeys,
+  deletePasskey,
+} = require('../controllers/passkeyController');
+
+router.post('/passkey/register-challenge', protect, getRegisterChallenge);
+router.post('/passkey/register-verify', protect, verifyRegister);
+router.post('/passkey/login-challenge', getLoginChallenge);
+router.post('/passkey/login-verify', verifyLogin);
+router.get('/passkey/list', protect, listPasskeys);
+router.delete('/passkey/:id', protect, deletePasskey);
+
 module.exports = router;
