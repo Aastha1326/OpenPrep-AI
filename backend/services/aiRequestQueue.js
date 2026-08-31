@@ -17,6 +17,9 @@ const initQueue = () => {
   if (aiQueue) return { queue: aiQueue, worker: aiWorker };
 
   const connection = redisService.connect();
+  if (connection && typeof connection.on === 'function') {
+    connection.on('error', () => {});
+  }
 
   aiQueue = new Queue(QUEUE_NAME, {
     connection,
