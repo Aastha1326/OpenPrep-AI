@@ -194,7 +194,8 @@ User.hasMany(UserBadge, { foreignKey: 'userId', as: 'badgesRef', onDelete: 'CASC
 User.hasMany(UsageQuota, { foreignKey: 'userId', onDelete: 'CASCADE' });
 User.hasMany(VivaSession, { foreignKey: 'userId', as: 'vivaSessions', onDelete: 'CASCADE' });
 VivaSession.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
-
+DocumentProcessingLog: require('./DocumentProcessingLog'),
+DocumentProcessingStage: require('./DocumentProcessingStage'),
 // Exam associations
 Exam.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 Exam.hasMany(Subject, { foreignKey: 'exam', onDelete: 'CASCADE' });
