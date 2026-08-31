@@ -487,6 +487,7 @@ module.exports = {
   InterviewAnalytics,
   JobApplication,
   JobOpportunity,
+  LearningEvent,
   LearningPath,
   MistakeLogEntry,
   MockExamSession,
