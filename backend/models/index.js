@@ -158,7 +158,7 @@ AIArtifactVersion: require('./AIArtifactVersion'),
 Bounty.hasMany(BountySolution, { foreignKey: 'bountyId', as: 'solutions', onDelete: 'CASCADE' });
 BountySolution.belongsTo(Bounty, { foreignKey: 'bountyId', as: 'bounty' });
 BountySolution.belongsTo(User, { foreignKey: 'authorId', as: 'author' });
-
+AIGenerationCache: require('./AIGenerationCache'),
 BountySolution.hasMany(BountySolutionVote, { foreignKey: 'solutionId', as: 'votes', onDelete: 'CASCADE' });
 BountySolutionVote.belongsTo(BountySolution, { foreignKey: 'solutionId', as: 'solution' });
 User.hasMany(StudyPlan, { foreignKey: 'user', onDelete: 'CASCADE' });

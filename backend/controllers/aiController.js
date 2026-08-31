@@ -200,3 +200,28 @@ exports.getArtifactHistory = async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 };
+
+/**
+ * Get cache statistics for current user
+ */
+exports.getCacheStats = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const stats = await AIGenerationCacheService.getCacheStats(userId);
+    res.json({ success: true, data: stats });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * Clear expired cache entries (admin endpoint)
+ */
+exports.clearExpiredCache = async (req, res) => {
+  try {
+    const count = await AIGenerationCacheService.clearExpiredCache();
+    res.json({ success: true, message: `Cleared ${count} expired entries` });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
