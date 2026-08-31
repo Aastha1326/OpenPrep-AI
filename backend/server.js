@@ -29,10 +29,18 @@ try {
 } catch (e) {
   apiReference = null;
 }
+const { initializeDocumentProcessingRetryWorker } = require('./jobs/documentProcessingRetryWorker');
+
+// Initialize document processing retry worker
+initializeDocumentProcessingRetryWorker();
 const passport = require('./config/passport');
 const { getCorsMiddleware, getSocketCorsOrigin } = require('./middleware/corsHandler');
 const { metricsMiddleware, getMetrics } = require('./middleware/metricsMiddleware');
-
+const { initializeCacheCleanupCron } = require('./jobs/cacheCleanupCron');
+const documentProcessingRoutes = require('./routes/documentProcessingRoutes');
+app.use('/api/documents/processing', documentProcessingRoutes);
+// Initialize scheduled jobs
+initializeCacheCleanupCron();
 // Validate the whole environment against the schema in config/env.js before
 // anything else loads. Reports every problem at once and exits in production;
 // in development it warns and continues on defaults so the API still boots.

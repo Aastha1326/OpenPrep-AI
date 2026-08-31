@@ -153,11 +153,12 @@ User.hasMany(PYQ, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Bounty, { foreignKey: 'authorId', as: 'bounties', onDelete: 'CASCADE' });
 Bounty.belongsTo(User, { foreignKey: 'authorId', as: 'author' });
 Bounty.belongsTo(User, { foreignKey: 'winnerId', as: 'winner' });
-
+AIWorkflowContract: require('./AIWorkflowContract'),
+AIArtifactVersion: require('./AIArtifactVersion'),
 Bounty.hasMany(BountySolution, { foreignKey: 'bountyId', as: 'solutions', onDelete: 'CASCADE' });
 BountySolution.belongsTo(Bounty, { foreignKey: 'bountyId', as: 'bounty' });
 BountySolution.belongsTo(User, { foreignKey: 'authorId', as: 'author' });
-
+AIGenerationCache: require('./AIGenerationCache'),
 BountySolution.hasMany(BountySolutionVote, { foreignKey: 'solutionId', as: 'votes', onDelete: 'CASCADE' });
 BountySolutionVote.belongsTo(BountySolution, { foreignKey: 'solutionId', as: 'solution' });
 User.hasMany(StudyPlan, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -193,7 +194,8 @@ User.hasMany(UserBadge, { foreignKey: 'userId', as: 'badgesRef', onDelete: 'CASC
 User.hasMany(UsageQuota, { foreignKey: 'userId', onDelete: 'CASCADE' });
 User.hasMany(VivaSession, { foreignKey: 'userId', as: 'vivaSessions', onDelete: 'CASCADE' });
 VivaSession.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
-
+DocumentProcessingLog: require('./DocumentProcessingLog'),
+DocumentProcessingStage: require('./DocumentProcessingStage'),
 // Exam associations
 Exam.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 Exam.hasMany(Subject, { foreignKey: 'exam', onDelete: 'CASCADE' });
