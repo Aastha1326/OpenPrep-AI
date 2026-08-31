@@ -74,6 +74,8 @@ const BountyBoardPage = lazy(() => import('./pages/BountyBoardPage'));
 const CodeSandboxPage = lazy(() => import('./pages/code/CodeSandboxPage'));
 const RewardsShop = lazy(() => import('./components/gamification/RewardsShop'));
 const OcrSolverPage = lazy(() => import('./pages/ocr/OcrSolverPage'));
+const MarkdownNotesEditor = lazy(() => import('./components/notes/MarkdownNotesEditor'));
+const KnowledgeGraphView = lazy(() => import('./components/notes/KnowledgeGraphView'));
 
 function App() {
 
@@ -286,6 +288,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <CollabNote />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/notes/editor"
+            element={
+              <ProtectedRoute>
+                <MarkdownNotesEditor />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/notes/graph"
+            element={
+              <ProtectedRoute>
+                <KnowledgeGraphView />
               </ProtectedRoute>
             }
           />
