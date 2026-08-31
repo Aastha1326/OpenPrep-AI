@@ -546,6 +546,11 @@ exports.submitQuizAttempt = async (req, res, next) => {
       .then(() => weaknessAggregatorService.rescheduleAdaptivePlanner(req.user.id))
       .catch((err) => console.error('Background weakness aggregation error:', err));
 
+    // Issue #2003: Log mistakes with error-taxonomy classification into Mistake Notebook
+    const mistakeNotebookService = require('../services/mistakeNotebookService');
+    mistakeNotebookService.logAttemptMistakes(attempt, quiz)
+      .catch((err) => console.error('Error logging mistake notebook entries:', err));
+
     // Update Progress (supports both topic-level and subject-level quizzes)
     const progressWhere = {
       user: req.user.id,

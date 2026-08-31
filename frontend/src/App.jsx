@@ -63,6 +63,7 @@ const PYQIntelligenceDashboard = lazy(() => import('./pages/PYQIntelligenceDashb
 const QuizSession = lazy(() => import('./pages/QuizSession'));
 const MindMapViewer = lazy(() => import('./pages/MindMapViewer'));
 const WeaknessDetectionDashboard = lazy(() => import('./pages/WeaknessDetectionDashboard'));
+const MistakeNotebook = lazy(() => import('./pages/MistakeNotebook'));
 const StudyPlanner = lazy(() => import('./pages/StudyPlanner'));
 const StudyGoals = lazy(() => import('./pages/StudyGoals'));
 const VivaSimulator = lazy(() => import('./pages/VivaSimulator'));
@@ -361,6 +362,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <PYQIntelligenceDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/mistake-notebook"
+            element={
+              <ProtectedRoute>
+                <MistakeNotebook />
               </ProtectedRoute>
             }
           />
