@@ -504,6 +504,7 @@ app.use('/api/learning-journal', learningJournalRoutes);
 const studyPlanVersioningRoutes = require('./routes/studyPlanVersioningRoutes');
 app.use('/api/study-plans/:planId', studyPlanVersioningRoutes);
 app.use('/api/interviews', mockInterviewRoutes);
+app.use('/api/pdf', require('./routes/pdfParserRoutes'));
 // Serve static assets from frontend build folder in production
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../frontend/dist')));
