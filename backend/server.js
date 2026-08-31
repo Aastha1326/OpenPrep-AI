@@ -72,6 +72,7 @@ const noteRoutes = require('./routes/noteRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const searchRoutes = require('./routes/searchRoutes');
 const progressRoutes = require('./routes/progressRoutes');
+const pacingCoachRoutes = require('./routes/pacingCoachRoutes');
 const handwrittenSubmissionRoutes = require('./routes/handwrittenSubmissionRoutes');
 const communityRoutes = require('./routes/communityRoutes');
 const userRoutes = require('./routes/userRoutes');
@@ -94,8 +95,31 @@ const readinessRoutes = require('./routes/readinessRoutes');
 const proctoringRoutes = require('./routes/proctoringRoutes');
 const squadRoutes = require('./routes/squadRoutes');
 const badgeRoutes = require('./routes/badgeRoutes');
+const whiteboardRoutes = require('./routes/whiteboardRoutes');
+const mockExamRoutes = require('./routes/mockExamRoutes');
+const securityRoutes = require('./routes/securityRoutes');
+const molecularRoutes = require('./routes/molecularRoutes');
+const visualizerRoutes = require('./routes/visualizerRoutes');
+const weaknessDetectionRoutes = require('./routes/weaknessDetectionRoutes');
+const pyqIntelligenceRoutes = require('./routes/pyqIntelligenceRoutes');
+const adaptivePlannerRoutes = require('./routes/adaptivePlannerRoutes');
+const communityResourceRoutes = require('./routes/communityResourceRoutes');
+const attemptHistoryRoutes = require('./routes/attemptHistoryRoutes');
+const learningInsightsRoutes = require('./routes/learningInsightsRoutes');
+const studyGoalSchedulerRoutes = require('./routes/studyGoalSchedulerRoutes');
+const analyticsInsightsRoutes = require('./routes/analyticsInsightsRoutes');
+const adaptiveExamRoutes = require('./routes/adaptiveExamRoutes');
+const diagramQuestionRoutes = require('./routes/diagramQuestionRoutes');
+const classroomRoutes = require('./routes/classroomRoutes');
+const studyReminderRoutes = require('./routes/studyReminderRoutes');
+const sessionRoutes = require('./routes/sessionRoutes');
+const recommendationRoutes = require('./routes/recommendationRoutes');
+const examStrategyRoutes = require('./routes/examStrategyRoutes');
+const studyTipRoutes = require('./routes/studyTipRoutes');
+
 const vivaRoutes = require('./routes/vivaRoutes');
 const bountyRoutes = require('./routes/bountyRoutes');
+const learningPathRoutes = require('./routes/learningPathRoutes');
 const { initNotificationCron } = require('./services/notificationService');
 const { initDifficultyCalibratorCron } = require('./services/difficultyCalibrator');
 const { initNightlyBadgeEvaluatorCron } = require('./services/badgeEvaluationService');
@@ -119,6 +143,8 @@ cron.schedule('0 0 * * *', async () => {
 
 // Connect to Database
 connectDB();
+const { verifyMigrations } = require('./services/migrationVerifier');
+verifyMigrations().catch(err => console.error('Migration verification check failed:', err.message));
 
 // Connect to Redis
 const redisService = require('./services/redisService');
@@ -385,7 +411,6 @@ app.use('/api/pyq', (req, res) => {
 app.use('/api/community', communityRoutes);
 app.use('/api/circuits', require('./routes/circuitRoutes'));
 app.use('/api/language', require('./routes/languageRoutes'));
-app.use('/api/bounties', require('./routes/bountyRoutes'));
 app.use('/api/squads', squadRoutes);
 app.use('/api/study', fatigueRoutes);
 app.use('/api/documents', pdfAnnotationRoutes);
@@ -394,6 +419,7 @@ app.use('/api/study-plans', studyPlanRoutes);
 app.use('/api/milestones', milestoneRoutes);
 app.use('/api/streaks', streakRoutes);
 app.use('/api/quizzes', quizRoutes);
+app.use('/api/pacing-coach', pacingCoachRoutes);
 app.use('/api/questions', questionDiscussionRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/quiz', quizRoutes);
@@ -403,8 +429,12 @@ app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/flashcard-decks', flashcardDeckRoutes);
 app.use('/api/decks', require('./routes/publicDeckRoutes'));
 app.use('/api/share', shareRoutes);
+app.use('/api', whiteboardRoutes);
+app.use('/api', mockExamRoutes);
+app.use('/api', securityRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/db', require('./routes/dbAdminRoutes'));
 app.use('/api/search', searchRoutes);
 app.use('/api/submissions', handwrittenSubmissionRoutes);
 app.use('/api/progress', progressRoutes);
@@ -449,16 +479,12 @@ app.use('/api/visualizer', visualizerRoutes);
 const revisionSchedulerRoutes = require('./routes/revisionSchedulerRoutes');
 app.use('/api/revision-schedules', revisionSchedulerRoutes);
 app.use('/api/analytics-insights', analyticsInsightsRoutes);
-const examStrategyRoutes = require('./routes/examStrategyRoutes');
-const studyTipRoutes = require('./routes/studyTipRoutes');
 app.use('/api/exam-strategies', examStrategyRoutes);
 app.use('/api/study-tips', studyTipRoutes);
-app.use('/api/learning-path', require('./routes/learningPathRoutes'));
-app.use('/user/learning-path', require('./routes/learningPathRoutes'));
+app.use('/api/learning-path', learningPathRoutes);
+app.use('/user/learning-path', learningPathRoutes);
 const studyGoalRoutes = require('./routes/studyGoalRoutes');
 app.use('/api/study-goals', studyGoalRoutes);
-const studyPlaylistRoutes = require('./routes/studyPlaylistRoutes');
-app.use('/api/study-playlists', studyPlaylistRoutes);
 const resourceBookmarkRoutes = require('./routes/resourceBookmarkRoutes');
 app.use('/api/bookmarks', resourceBookmarkRoutes);
 const studyHeatmapRoutes = require('./routes/studyHeatmapRoutes');
@@ -467,6 +493,8 @@ const studyAnalyticsRoutes = require('./routes/studyAnalyticsRoutes');
 app.use('/api/study-analytics', studyAnalyticsRoutes);
 const topicDifficultyEstimatorRoutes = require('./routes/topicDifficultyEstimatorRoutes');
 app.use('/api/topic-difficulty', topicDifficultyEstimatorRoutes);
+const studyPlaylistRoutes = require('./routes/studyPlaylistRoutes');
+app.use('/api/study-playlists', studyPlaylistRoutes);
 const flashcardMasteryRoutes = require('./routes/flashcardMasteryRoutes');
 app.use('/api/flashcard-mastery', flashcardMasteryRoutes);
 const habitTrackerRoutes = require('./routes/habitTrackerRoutes');
@@ -797,4 +825,5 @@ const gracefulShutdown = (signal) => {
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
 

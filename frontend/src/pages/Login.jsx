@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, Eye, EyeOff, AlertCircle, BookOpen } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, AlertCircle, BookOpen, ShieldCheck } from 'lucide-react';
 import GoogleLoginButton from '../components/auth/GoogleLoginButton';
 import GitHubLoginButton from '../components/auth/GitHubLoginButton';
 import { loginUser, loadUser, clearError } from '../store/slices/authSlice';
 import ThemeToggle from '../components/ThemeToggle';
 import SoundToggle from '../components/SoundToggle';
 import ForgotPasswordModal from '../components/auth/ForgotPasswordModal';
+import { useReCaptcha } from '../hooks/useReCaptcha';
 import LazyImage from '../components/common/LazyImage';
 
 const Login = () => {

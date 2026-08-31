@@ -1,6 +1,7 @@
-const { DataTypes } = require('sequelize');
+const { DataTypes, Sequelize } = require('sequelize');
 const { sequelize } = require('../config/db');
 
+ feature/ai-distractor-quality-gate
 
 const User = require('./User');
 const Quiz = require('./Quiz');
@@ -34,35 +35,87 @@ const QuizAttempt = require('./QuizAttempt');
 const Note = require('./Note');
 const Question = require('./Question');
 const QuestionComment = require('./QuestionComment');
+
+/**
+ * The model registry: every Sequelize model the backend can reach, wired to
+ * the single shared instance and associated in one place.
+ *
+ * Three export shapes coexist under backend/models, and each has to be
+ * imported the way it was written.
+ *
+ *   instance  the file defines the model at load and exports the model
+ *             itself, so the import must not be invoked.
+ *   factory   the file exports a function taking (sequelize, DataTypes) and
+ *             returning the model, so the import must be invoked.
+ *   pair      the file exports the Model subclass alongside an init function,
+ *             so the import is destructured and the init called below. A
+ *             subclass is not usable until init has run.
+ *
+ * Importing one shape as another does not fail where it is written. Invoking
+ * an instance throws "Class constructor model cannot be invoked without
+ * 'new'" while this file loads, which takes the whole backend down; failing to
+ * invoke a factory leaves a bare function in the registry, so the first query
+ * against it throws "findAll is not a function" from a stack that points at a
+ * controller rather than at here. Both were live in this file at once.
+ *
+ * Each group below is alphabetical. scripts/check-model-registry.js reads
+ * every entry back against the file it names and fails on a mismatch, so a
+ * model added to the wrong group is caught before it can boot.
+ */
+
+// Models exporting a defined instance.
+const Achievement = require('./Achievement');
+const ActivityLog = require('./ActivityLog');
+const AlumniMentorProfile = require('./AlumniMentorProfile');
+const AuditLog = require('./AuditLog');
+const Badge = require('./Badge');
+const BattleParticipant = require('./BattleParticipant');
+const BattleSession = require('./BattleSession');
+const BountyAnswer = require('./BountyAnswer');
+const BountyQuestion = require('./BountyQuestion');
+const CommentFlag = require('./CommentFlag');
+const CommentVote = require('./CommentVote');
+const DeckCollaborator = require('./DeckCollaborator');
+const DeckRating = require('./DeckRating');
+ main
 const DoubtSession = require('./DoubtSession');
 const DoubtSessionMessage = require('./DoubtSessionMessage');
-const CommentVote = require('./CommentVote');
-const CommentFlag = require('./CommentFlag');
+const Exam = require('./Exam');
+const ExamIntegrityReport = require('./ExamIntegrityReport');
+const ExamStrategy = require('./ExamStrategy');
+const Feedback = require('./Feedback');
 const Flashcard = require('./Flashcard');
 const FlashcardDeck = require('./FlashcardDeck');
-const DeckCollaborator = require('./DeckCollaborator');
-const Progress = require('./Progress');
-const UserProgress = require('./UserProgress');
-const Feedback = require('./Feedback');
-const ActivityLog = require('./ActivityLog');
-const AuditLog = require('./AuditLog');
-const UsageQuota = require('./UsageQuota');
-const Achievement = require('./Achievement');
+const FlashcardReviewHistory = require('./FlashcardReviewHistory');
+const FlashcardSchedulingState = require('./FlashcardSchedulingState');
 const FocusSession = require('./FocusSession');
 const FocusSessionLog = require('./FocusSessionLog');
-
-const QuizTelemetryEvent = require('./QuizTelemetryEvent');
-const QuizBookmark = require('./QuizBookmark');
-const DeckRating = require('./DeckRating');
-const UserBadge = require('./UserBadge');
-const Badge = require('./Badge');
-const BattleSession = require('./BattleSession');
-const BattleParticipant = require('./BattleParticipant');
+const Folder = require('./Folder');
+const HabitLog = require('./HabitLog');
+const HabitStreak = require('./HabitStreak');
+const HandwrittenSubmission = require('./HandwrittenSubmission');
+const LearningPath = require('./LearningPath');
+const MockInterview = require('./MockInterview');
+const MockInterviewSession = require('./MockInterviewSession');
+const Note = require('./Note');
+const Notification = require('./Notification');
+const NotificationSettings = require('./NotificationSettings');
+const PYQ = require('./PYQ');
 const PYQAnalysis = require('./PYQAnalysis');
 const PYQQuestion = require('./PYQQuestion');
-const Notification = require('./Notification');
+const PlanRevisionMetadata = require('./PlanRevisionMetadata');
+const PodcastEpisode = require('./PodcastEpisode');
+const Progress = require('./Progress');
 const PushSubscription = require('./PushSubscription');
+const Question = require('./Question');
+const QuestionComment = require('./QuestionComment');
+const Quiz = require('./Quiz');
+const QuizAttempt = require('./QuizAttempt');
+const QuizBookmark = require('./QuizBookmark');
+const QuizTelemetryEvent = require('./QuizTelemetryEvent');
+const QuizValidationLog = require('./QuizValidationLog');
 const ReadinessSnapshot = require('./ReadinessSnapshot');
+ feature/ai-distractor-quality-gate
 const SubjectGoal = require('./SubjectGoal');
 const StudyHabit = require('./StudyHabit')(sequelize, DataTypes);
 const HabitLog = require('./HabitLog')(sequelize, DataTypes);
@@ -74,12 +127,41 @@ const StudySquad = require('./StudySquad');
 const SquadMember = require('./SquadMember');
 const SquadChallenge = require('./SquadChallenge');
 const SquadChallengeContribution = require('./SquadChallengeContribution');
+
+const ResumeParseSession = require('./ResumeParseSession');
+const ReviewSubmissionToken = require('./ReviewSubmissionToken');
+const SalaryNegotiation = require('./SalaryNegotiation');
+const SavedSession = require('./SavedSession');
+const SchedulerVersion = require('./SchedulerVersion');
+const SecurityAuditLog = require('./SecurityAuditLog');
+const SkillDependency = require('./SkillDependency');
+ main
 const SquadAchievement = require('./SquadAchievement');
 const SquadActivity = require('./SquadActivity');
 const SquadActivityReaction = require('./SquadActivityReaction');
+const SquadChallenge = require('./SquadChallenge');
+const SquadChallengeContribution = require('./SquadChallengeContribution');
+const SquadMember = require('./SquadMember');
+const StudyGoal = require('./StudyGoal');
+const StudyGoalProgress = require('./StudyGoalProgress');
+const StudyHabit = require('./StudyHabit');
+const StudyPlan = require('./StudyPlan');
+const StudyPlanVersion = require('./StudyPlanVersion');
+const StudyReminder = require('./StudyReminder');
+const StudySquad = require('./StudySquad');
+const StudyTask = require('./StudyTask');
+const StudyTip = require('./StudyTip');
+const Subject = require('./Subject');
+const SubjectGoal = require('./SubjectGoal');
 const Syllabus = require('./Syllabus');
 const SyllabusTopic = require('./SyllabusTopic');
+const Topic = require('./Topic');
+const UsageQuota = require('./UsageQuota');
+const User = require('./User');
+const UserBadge = require('./UserBadge');
+const UserProgress = require('./UserProgress');
 const VivaSession = require('./VivaSession');
+ feature/ai-distractor-quality-gate
 const BountyQuestion = require('./BountyQuestion');
 const BountyAnswer = require('./BountyAnswer');
 const ExamIntegrityReport = require('./ExamIntegrityReport');
@@ -100,6 +182,41 @@ initBounty(sequelize);
 initBountySolution(sequelize);
 initBountySolutionVote(sequelize);
 
+
+const WeeklyStudyReport = require('./WeeklyStudyReport');
+
+// Models exporting a (sequelize, DataTypes) factory.
+const AIUsageLog = require('./AIUsageLog')(sequelize, DataTypes);
+const InterviewAnalytics = require('./InterviewAnalytics')(sequelize, DataTypes);
+const ProviderHealthStatus = require('./ProviderHealthStatus')(sequelize, DataTypes);
+const SharedNote = require('./SharedNote')(sequelize, DataTypes);
+const StudyMilestone = require('./StudyMilestone')(sequelize, DataTypes);
+const StudySession = require('./StudySession')(sequelize, DataTypes);
+const UserMilestone = require('./UserMilestone')(sequelize, DataTypes);
+
+// Models exporting a { Model, initModel } pair.
+const { AnalyticsEvent, initAnalyticsEvent } = require('./AnalyticsEvent');
+const { Bounty, initBounty } = require('./Bounty');
+const { BountyClaim, initBountyClaim } = require('./BountyClaim');
+const { BountySolution, initBountySolution } = require('./BountySolution');
+const { BountySolutionVote, initBountySolutionVote } = require('./BountySolutionVote');
+const { JobApplication, initJobApplication } = require('./JobApplication');
+const { JobOpportunity, initJobOpportunity } = require('./JobOpportunity');
+const { ModeratorAuditLog, initModeratorAuditLog } = require('./ModeratorAuditLog');
+const { Sponsor, initSponsor } = require('./Sponsor');
+
+// A Model subclass is not usable until init() has run against the shared
+// instance. Nothing else in the tree calls these, so the registry must.
+initAnalyticsEvent(sequelize);
+initBounty(sequelize);
+initBountyClaim(sequelize);
+initBountySolution(sequelize);
+initBountySolutionVote(sequelize);
+initJobApplication(sequelize);
+initJobOpportunity(sequelize);
+initModeratorAuditLog(sequelize);
+initSponsor(sequelize);
+ main
 
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -378,6 +495,7 @@ BountyAnswer.belongsTo(BountyQuestion, { foreignKey: 'questionId', as: 'question
 User.hasMany(BountyAnswer, { foreignKey: 'userId', as: 'bountyAnswers', onDelete: 'CASCADE' });
 BountyAnswer.belongsTo(User, { foreignKey: 'userId', as: 'author' });
 
+ feature/ai-distractor-quality-gate
 const { Sequelize } = require('sequelize');
 
 module.exports = {
@@ -399,52 +517,112 @@ module.exports = {
   FlashcardReviewHistory,
   ReviewSubmissionToken,
   QuestionComment,
+
+module.exports = {
+  sequelize,
+  // The library namespace, so callers can reach Sequelize.Op without a
+  // second require. Distinct from the instance above.
+  Sequelize,
+  AIUsageLog,
+  Achievement,
+  ActivityLog,
+  AlumniMentorProfile,
+  AnalyticsEvent,
+  AuditLog,
+  Badge,
+  BattleParticipant,
+  BattleSession,
+  Bounty,
+  BountyAnswer,
+  BountyClaim,
+  BountyQuestion,
+  BountySolution,
+  BountySolutionVote,
+  CommentFlag,
+  CommentVote,
+  DeckCollaborator,
+  DeckRating,
+ main
   DoubtSession,
   DoubtSessionMessage,
-  CommentVote,
-  CommentFlag,
-  ModeratorAuditLog,
+  Exam,
+  ExamIntegrityReport,
+  ExamStrategy,
+  Feedback,
   Flashcard,
   FlashcardDeck,
-  DeckCollaborator,
-  Progress,
-  UserProgress,
-  Feedback,
-  ActivityLog,
-  AuditLog,
-  UsageQuota,
-  Achievement,
+  FlashcardReviewHistory,
+  FlashcardSchedulingState,
   FocusSession,
-  QuizValidationLog,
-  QuizTelemetryEvent,
-  QuizBookmark,
-  DeckRating,
-  StudyGoal,
-  StudyGoalProgress,
-  WeeklyStudyReport,
-  StudyMilestone,
-  UserMilestone,
   FocusSessionLog,
-  UserBadge,
-  Badge,
-  BattleSession,
-  BattleParticipant,
+  Folder,
+  HabitLog,
+  HabitStreak,
+  HandwrittenSubmission,
+  InterviewAnalytics,
+  JobApplication,
+  JobOpportunity,
+  LearningPath,
+  MockInterview,
+  MockInterviewSession,
+  ModeratorAuditLog,
+  Note,
+  Notification,
+  NotificationSettings,
+  PYQ,
   PYQAnalysis,
   PYQQuestion,
-  Notification,
+  PlanRevisionMetadata,
+  PodcastEpisode,
+  Progress,
+  ProviderHealthStatus,
   PushSubscription,
+  Question,
+  QuestionComment,
+  Quiz,
+  QuizAttempt,
+  QuizBookmark,
+  QuizTelemetryEvent,
+  QuizValidationLog,
   ReadinessSnapshot,
-  SubjectGoal,
-  StudySquad,
-  SquadMember,
-  SquadChallenge,
-  SquadChallengeContribution,
+  ResumeParseSession,
+  ReviewSubmissionToken,
+  SalaryNegotiation,
+  SavedSession,
+  SchedulerVersion,
+  SecurityAuditLog,
+  SharedNote,
+  SkillDependency,
+  Sponsor,
   SquadAchievement,
   SquadActivity,
   SquadActivityReaction,
-  FlashcardDeck,
-  DeckCollaborator,
+  SquadChallenge,
+  SquadChallengeContribution,
+  SquadMember,
+  StudyGoal,
+  StudyGoalProgress,
+  StudyHabit,
+  StudyMilestone,
+  StudyPlan,
+  StudyPlanVersion,
+  StudyReminder,
+  StudySession,
+  StudySquad,
+  StudyTask,
+  StudyTip,
+  Subject,
+  SubjectGoal,
+  Syllabus,
+  SyllabusTopic,
+  Topic,
+  UsageQuota,
+  User,
+  UserBadge,
+  UserMilestone,
+  UserProgress,
   VivaSession,
+ feature/ai-distractor-quality-gate
   BountyQuestion,
   BountyAnswer,
   StudyHabit,
@@ -465,6 +643,9 @@ module.exports = {
   ResumeParseSession,
   MockInterview,
   SalaryNegotiation,
+
+  WeeklyStudyReport,
+ main
 };
 
 

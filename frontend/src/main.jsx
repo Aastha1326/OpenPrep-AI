@@ -5,9 +5,13 @@ import { Provider } from 'react-redux'
 import { store } from './store'
 import { ThemeProvider } from './context/ThemeContext'
 import { SyncProvider } from './context/SyncContext'
+import { PomodoroProvider } from './context/PomodoroContext'
+import { SessionTimerProvider } from './context/SessionTimerContext'
 import SentryErrorBoundary from './components/common/SentryErrorBoundary'
 import './index.css'
+import './styles/rtl.css';
 import './i18n';
+
 import App from './App.jsx'
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { initSentry } from './utils/sentry'

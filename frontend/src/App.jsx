@@ -13,7 +13,7 @@ import SessionRestoreModal from './components/SessionRestoreModal';
 import API from './services/api';
 import QuotaExceededModal from './components/dashboard/QuotaExceededModal';
 import GlobalSearchModal from './components/search/GlobalSearchModal';
-import OfflineBanner from './components/common/OfflineBanner';
+import OfflineBanner from './components/OfflineBanner';
 import OfflineStatusBanner from './components/common/OfflineStatusBanner';
 import PwaInstallPrompt from './components/common/PwaInstallPrompt';
 import OfflineIndicator from './components/common/OfflineIndicator';
@@ -26,6 +26,7 @@ import './App.css';
 
 const Landing = lazy(() => import('./pages/Landing'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
+const PacingCoachDashboard = lazy(() => import('./pages/PacingCoachDashboard'));
 const Register = lazy(() => import('./pages/Register'));
 const Login = lazy(() => import('./pages/Login'));
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
@@ -42,6 +43,19 @@ const PublicShare = lazy(() => import('./pages/PublicShare'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const AdminAnalytics = lazy(() => import('./pages/AdminAnalytics'));
 const StudyGroupChat = lazy(() => import('./pages/StudyGroupChat'));
+const StudySquadDashboard = lazy(() => import('./pages/StudySquadDashboard'));
+const CollabNote = lazy(() => import('./pages/CollabNote'));
+const RevisionScheduler = lazy(() => import('./pages/RevisionScheduler'));
+const LiveQuizSession = lazy(() => import('./pages/LiveQuizSession'));
+const StudyAnalytics = lazy(() => import('./pages/StudyAnalytics'));
+const FormulaScratchpad = lazy(() => import('./pages/FormulaScratchpad'));
+const InterviewRoomPage = lazy(() => import('./pages/InterviewRoomPage'));
+const StreakDashboard = lazy(() => import('./pages/StreakDashboard'));
+const MedicalCaseSimulator = lazy(() => import('./pages/MedicalCaseSimulator'));
+const DrugInteractionChecker = lazy(() => import('./pages/DrugInteractionChecker'));
+const ExamCountdownPlanner = lazy(() => import('./pages/ExamCountdownPlanner'));
+const ClinicalNotesSummarizer = lazy(() => import('./pages/ClinicalNotesSummarizer'));
+const PatientSimulator = lazy(() => import('./pages/PatientSimulator'));
 const AiAssistant = lazy(() => import('./pages/AiAssistant'));
 const OAuthCallback = lazy(() => import('./pages/OAuthCallback'));
 const PYQAnalytics = lazy(() => import('./pages/PYQAnalytics'));
@@ -182,6 +196,7 @@ function App() {
         <Suspense fallback={<PageSkeleton />}>
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/pacing-coach" element={<ProtectedRoute><PacingCoachDashboard /></ProtectedRoute>} />
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
           <Route path="/share/:token" element={<PublicShare />} />
@@ -466,6 +481,8 @@ function App() {
       </Suspense>
       </main>
       <MobileBottomNav />
+      <OfflineBanner />
+
       {savedSessionPrompt && (
         <SessionRestoreModal
           savedSession={savedSessionPrompt}
@@ -478,3 +495,4 @@ function App() {
 }
 
 export default App;
+
