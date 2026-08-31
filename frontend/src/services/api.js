@@ -462,5 +462,13 @@ export const linkOutlookCalendar = (payload) => API.post('/calendar-sync/outlook
 export const checkCalendarConflicts = (payload) =>
   API.post('/calendar-sync/check-conflicts', payload);
 
+// ── WebAuthn / Passkey APIs ─────────────────────────────────────────────
+export const getPasskeyRegisterChallenge = () => API.post('/auth/passkey/register-challenge');
+export const verifyPasskeyRegister = (payload) => API.post('/auth/passkey/register-verify', payload);
+export const getPasskeyLoginChallenge = (payload) => API.post('/auth/passkey/login-challenge', payload);
+export const verifyPasskeyLogin = (payload) => API.post('/auth/passkey/login-verify', payload);
+export const listUserPasskeys = () => API.get('/auth/passkey/list');
+export const deleteUserPasskey = (id) => API.delete(`/auth/passkey/${id}`);
+
 export default API;
 
