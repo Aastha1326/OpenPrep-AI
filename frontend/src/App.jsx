@@ -322,6 +322,14 @@ function App() {
             }
           />
           <Route
+            path="/mock-exam/:examId"
+            element={
+              <ProtectedRoute>
+                <MockExamArena />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/ai-assistant"
             element={
               <ProtectedRoute>
