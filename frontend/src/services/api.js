@@ -114,6 +114,14 @@ API.interceptors.request.use(async (config) => {
     /* ignore */
   }
 
+  // Issue #2211: Inject W3C Trace Context traceparent header for distributed tracing
+  try {
+    const { getW3CTraceParent } = await import('../config/telemetry.js');
+    config.headers['traceparent'] = getW3CTraceParent();
+  } catch (_e) {
+    /* ignore */
+  }
+
   return config;
 }, (error) => {
   return Promise.reject(error);
