@@ -111,6 +111,7 @@ const Topic = require('./Topic');
 const UsageQuota = require('./UsageQuota');
 const User = require('./User');
 const UserBadge = require('./UserBadge');
+const UserPasskey = require('./UserPasskey');
 const UserProgress = require('./UserProgress');
 const VivaSession = require('./VivaSession');
 const WeeklyStudyReport = require('./WeeklyStudyReport');
@@ -196,6 +197,8 @@ User.hasMany(ActivityLog, { foreignKey: 'user', onDelete: 'CASCADE' });
 User.hasMany(Achievement, { foreignKey: 'userId', as: 'achievements', onDelete: 'CASCADE' });
 User.hasMany(UserBadge, { foreignKey: 'userId', as: 'badgesRef', onDelete: 'CASCADE' });
 User.hasMany(UsageQuota, { foreignKey: 'userId', onDelete: 'CASCADE' });
+User.hasMany(UserPasskey, { foreignKey: 'userId', as: 'passkeys', onDelete: 'CASCADE' });
+UserPasskey.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 User.hasMany(VivaSession, { foreignKey: 'userId', as: 'vivaSessions', onDelete: 'CASCADE' });
 VivaSession.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 
@@ -546,6 +549,7 @@ module.exports = {
   User,
   UserBadge,
   UserMilestone,
+  UserPasskey,
   UserProgress,
   VivaSession,
   WeeklyStudyReport,
