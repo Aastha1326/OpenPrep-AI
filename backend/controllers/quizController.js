@@ -534,6 +534,12 @@ exports.submitQuizAttempt = async (req, res, next) => {
       return res.status(200).json({ success: true, data: attempt, duplicate: true });
     }
 
+    if (score >= 80) {
+      const gamificationService = require('../services/gamificationService');
+      await gamificationService.awardCoins(req.user.id, 25, 'High quiz score bonus')
+        .catch(err => console.error('Error awarding PrepCoins for quiz:', err));
+    }
+
     // Trigger AI weakness aggregation and adaptive planner rescheduling in background
     const weaknessAggregatorService = require('../services/weaknessAggregatorService');
     weaknessAggregatorService.aggregateUserWeakness(req.user.id)

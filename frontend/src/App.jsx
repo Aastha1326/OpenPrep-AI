@@ -71,6 +71,9 @@ const AttemptHistoryDashboard = lazy(() => import('./pages/AttemptHistoryDashboa
 const CollaborativeNoteView = lazy(() => import('./pages/CollaborativeNoteView'));
 const SquadsPage = lazy(() => import('./pages/SquadsPage'));
 const BountyBoardPage = lazy(() => import('./pages/BountyBoardPage'));
+const CodeSandboxPage = lazy(() => import('./pages/code/CodeSandboxPage'));
+const RewardsShop = lazy(() => import('./components/gamification/RewardsShop'));
+const OcrSolverPage = lazy(() => import('./pages/ocr/OcrSolverPage'));
 
 function App() {
 
@@ -283,6 +286,39 @@ function App() {
             element={
               <ProtectedRoute>
                 <CollabNote />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/code/sandbox"
+            element={
+              <ProtectedRoute>
+                <CodeSandboxPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/code/room/:inviteCode"
+            element={
+              <ProtectedRoute>
+                <CodeSandboxPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/rewards-shop"
+            element={
+              <ProtectedRoute>
+                <RewardsShop />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/ocr/solver"
+            element={
+              <ProtectedRoute>
+                <OcrSolverPage />
               </ProtectedRoute>
             }
           />
