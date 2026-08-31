@@ -38,6 +38,7 @@ import {
   Box,
   Headphones,
   Network,
+  Code,
 } from 'lucide-react';
 import API from '../services/api';
 import { toDateOnlyString } from '../utils/dateUtils';
@@ -576,6 +577,12 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           label="Community Decks"
           delay={0.48}
           onClick={() => setIsCommunityDecksOpen(true)}
+        />
+        <GoldTabButton
+          icon={Code}
+          label="Code Sandbox"
+          delay={0.49}
+          onClick={() => navigate('/code/sandbox')}
         />
         <GoldTabButton
           icon={Bot}

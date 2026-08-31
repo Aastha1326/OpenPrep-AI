@@ -38,6 +38,7 @@ const BattleParticipant = require('./BattleParticipant');
 const BattleSession = require('./BattleSession');
 const BountyAnswer = require('./BountyAnswer');
 const BountyQuestion = require('./BountyQuestion');
+const CodeRoom = require('./CodeRoom');
 const CommentFlag = require('./CommentFlag');
 const CommentVote = require('./CommentVote');
 const DeckCollaborator = require('./DeckCollaborator');
@@ -286,6 +287,10 @@ Note.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'CA
 Note.belongsTo(Topic, { foreignKey: 'topic', as: 'topicRef', onDelete: 'CASCADE' });
 Note.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 
+// CodeRoom associations
+CodeRoom.belongsTo(User, { foreignKey: 'userId', as: 'creator' });
+User.hasMany(CodeRoom, { foreignKey: 'userId' });
+
 // Flashcard associations
 Flashcard.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
 Flashcard.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'CASCADE' });
@@ -442,6 +447,7 @@ module.exports = {
   BountyQuestion,
   BountySolution,
   BountySolutionVote,
+  CodeRoom,
   CommentFlag,
   CommentVote,
   DeckCollaborator,
