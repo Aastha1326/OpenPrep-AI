@@ -4,8 +4,9 @@ const { sequelize } = require('../config/db');
 
 const User = require('./User');
 const Quiz = require('./Quiz');
-const AIUsageLog = require('./AIUsageLog');
-const ProviderHealthStatus = require('./ProviderHealthStatus');
+const AIUsageLog = require('./AIUsageLog')(sequelize, DataTypes);
+const ProviderHealthStatus = require('./ProviderHealthStatus')(sequelize, DataTypes);
+
 const SchedulerVersion = require('./SchedulerVersion');
 
 const FlashcardSchedulingState = require('./FlashcardSchedulingState');
@@ -17,7 +18,15 @@ const Exam = require('./Exam');
 const Subject = require('./Subject');
 const Topic = require('./Topic');
 const SkillDependency = require('./SkillDependency');
+const ExamStrategy = require('./ExamStrategy');
+const StudyTip = require('./StudyTip');
+const StudyReminder = require('./StudyReminder');
+const AlumniMentorProfile = require('./AlumniMentorProfile');
+const ResumeParseSession = require('./ResumeParseSession');
+const MockInterview = require('./MockInterview');
+const SalaryNegotiation = require('./SalaryNegotiation');
 const PYQ = require('./PYQ');
+
 
 const StudyPlan = require('./StudyPlan');
 const QuizAttempt = require('./QuizAttempt');
@@ -59,6 +68,8 @@ const StudyHabit = require('./StudyHabit')(sequelize, DataTypes);
 const HabitLog = require('./HabitLog')(sequelize, DataTypes);
 const HabitStreak = require('./HabitStreak')(sequelize, DataTypes);
 
+
+
 const StudySquad = require('./StudySquad');
 const SquadMember = require('./SquadMember');
 const SquadChallenge = require('./SquadChallenge');
@@ -71,6 +82,24 @@ const SyllabusTopic = require('./SyllabusTopic');
 const VivaSession = require('./VivaSession');
 const BountyQuestion = require('./BountyQuestion');
 const BountyAnswer = require('./BountyAnswer');
+const ExamIntegrityReport = require('./ExamIntegrityReport');
+const LearningPath = require('./LearningPath');
+const ModeratorAuditLog = require('./ModeratorAuditLog');
+const StudyGoal = require('./StudyGoal');
+const StudyGoalProgress = require('./StudyGoalProgress');
+const WeeklyStudyReport = require('./WeeklyStudyReport');
+const StudyMilestone = require('./StudyMilestone')(sequelize, DataTypes);
+const UserMilestone = require('./UserMilestone')(sequelize, DataTypes);
+
+
+const { Bounty, initBounty } = require('./Bounty');
+const { BountySolution, initBountySolution } = require('./BountySolution');
+const { BountySolutionVote, initBountySolutionVote } = require('./BountySolutionVote');
+
+initBounty(sequelize);
+initBountySolution(sequelize);
+initBountySolutionVote(sequelize);
+
 
 // User associations
 User.hasMany(Exam, { foreignKey: 'user', onDelete: 'CASCADE' });
@@ -349,7 +378,14 @@ BountyAnswer.belongsTo(BountyQuestion, { foreignKey: 'questionId', as: 'question
 User.hasMany(BountyAnswer, { foreignKey: 'userId', as: 'bountyAnswers', onDelete: 'CASCADE' });
 BountyAnswer.belongsTo(User, { foreignKey: 'userId', as: 'author' });
 
-module.exports = {  sequelize,  User,  Exam,
+const { Sequelize } = require('sequelize');
+
+module.exports = {
+  Sequelize,
+  sequelize,
+  User,
+  Exam,
+
   Subject,
   Topic,
   PYQ,
@@ -411,4 +447,24 @@ module.exports = {  sequelize,  User,  Exam,
   VivaSession,
   BountyQuestion,
   BountyAnswer,
+  StudyHabit,
+  HabitLog,
+  HabitStreak,
+  AIUsageLog,
+  ProviderHealthStatus,
+  ExamIntegrityReport,
+  LearningPath,
+  Bounty,
+  BountySolution,
+  BountySolutionVote,
+  SkillDependency,
+  ExamStrategy,
+  StudyTip,
+  StudyReminder,
+  AlumniMentorProfile,
+  ResumeParseSession,
+  MockInterview,
+  SalaryNegotiation,
 };
+
+
