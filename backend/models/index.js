@@ -59,6 +59,7 @@ const HabitLog = require('./HabitLog');
 const HabitStreak = require('./HabitStreak');
 const HandwrittenSubmission = require('./HandwrittenSubmission');
 const LearningPath = require('./LearningPath');
+const MistakeLogEntry = require('./MistakeLogEntry');
 const MockInterview = require('./MockInterview');
 const MockInterviewSession = require('./MockInterviewSession');
 const Note = require('./Note');
@@ -281,6 +282,14 @@ QuizAttempt.hasOne(ExamIntegrityReport, { foreignKey: 'quizAttemptId', as: 'inte
 ExamIntegrityReport.belongsTo(QuizAttempt, { foreignKey: 'quizAttemptId', as: 'attemptRef' });
 ExamIntegrityReport.belongsTo(User, { foreignKey: 'userId', as: 'userRef' });
 
+// MistakeLogEntry associations
+User.hasMany(MistakeLogEntry, { foreignKey: 'user', onDelete: 'CASCADE' });
+MistakeLogEntry.belongsTo(User, { foreignKey: 'user', as: 'userRef' });
+MistakeLogEntry.belongsTo(Subject, { foreignKey: 'subjectId', as: 'subjectRef', onDelete: 'SET NULL' });
+MistakeLogEntry.belongsTo(Topic, { foreignKey: 'topicId', as: 'topicRef', onDelete: 'SET NULL' });
+MistakeLogEntry.belongsTo(QuizAttempt, { foreignKey: 'quizAttemptId', as: 'attemptRef', onDelete: 'SET NULL' });
+MistakeLogEntry.belongsTo(Quiz, { foreignKey: 'quizId', as: 'quizRef', onDelete: 'SET NULL' });
+
 // Note associations
 Note.belongsTo(Subject, { foreignKey: 'subject', as: 'subjectRef', onDelete: 'CASCADE' });
 Note.belongsTo(Topic, { foreignKey: 'topic', as: 'topicRef', onDelete: 'CASCADE' });
@@ -466,6 +475,7 @@ module.exports = {
   JobApplication,
   JobOpportunity,
   LearningPath,
+  MistakeLogEntry,
   MockInterview,
   MockInterviewSession,
   ModeratorAuditLog,
