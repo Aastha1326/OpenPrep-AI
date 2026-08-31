@@ -1,4 +1,5 @@
 require('dotenv').config();
+require('./config/telemetry');
 const { Sentry, requestHandler: sentryRequestHandler, errorHandler: sentryErrorHandler } = require('./utils/sentry');
 const express = require('express');
 const compression = require('compression');
@@ -159,6 +160,16 @@ const redisService = require('./services/redisService');
 redisService.connect();
 const app = express();
 app.use(sentryRequestHandler);
+
+app.get('/metrics', async (req, res) => {
+  try {
+    const { register } = require('./services/metricsService');
+    res.set('Content-Type', register.contentType);
+    res.end(await register.metrics());
+  } catch (err) {
+    res.status(500).end(err.message);
+  }
+});
 
 // Prometheus HTTP request duration tracking middleware
 app.use((req, res, next) => {
@@ -676,11 +687,11 @@ io.use((socket, next) => {
   }
 });
 
-// User notification room listener & WebSocket active connections gauge tracking
-const { activeWebsocketConnections } = require('./services/metricsService');
+const { activeWebsocketConnections, openprepActiveWebsocketConnections } = require('./services/metricsService');
 
 io.on('connection', (socket) => {
   activeWebsocketConnections.inc();
+  if (openprepActiveWebsocketConnections) openprepActiveWebsocketConnections.inc();
   
   if (socket.user && socket.user.id) {
     socket.join(`user:${socket.user.id}`);
@@ -688,6 +699,7 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     activeWebsocketConnections.dec();
+    if (openprepActiveWebsocketConnections) openprepActiveWebsocketConnections.dec();
   });
 });
 
