@@ -7,7 +7,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['tests/chaos/**/*.test.js'],
+    include: ['tests/chaos/**/*.test.js', 'tests/controllers/pdfAnnotationExport.test.js'],
     fileParallelism: false,
     testTimeout: 30000,
     dangerouslyIgnoreUnhandledErrors: true,
