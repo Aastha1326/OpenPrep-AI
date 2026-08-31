@@ -5,6 +5,7 @@ import SquadAudioLounge from './SquadAudioLounge';
 import { Share2, LogOut, Award, Target, Radio } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { io } from 'socket.io-client';
+import AudioLounge from './AudioLounge';
 
 export default function StudySquadDashboard({ squadData, currentUserRole, onLeaveSquad, onRefresh }) {
   const [localChallenge, setLocalChallenge] = useState(null);
@@ -193,6 +194,8 @@ export default function StudySquadDashboard({ squadData, currentUserRole, onLeav
       <div className="mt-6">
         <SquadActivityFeed squadId={squad.id} />
       </div>
+
+      <AudioLounge squadId={squad.id} />
     </div>
   );
 }

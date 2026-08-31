@@ -35,6 +35,9 @@ import {
   Bot,
   Users,
   Swords,
+  Box,
+  Headphones,
+  Network,
 } from 'lucide-react';
 import API from '../services/api';
 import { toDateOnlyString } from '../utils/dateUtils';
@@ -561,6 +564,12 @@ const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
           label="Study Squads"
           delay={0.46}
           onClick={() => navigate('/squads')}
+        />
+        <GoldTabButton
+          icon={Award}
+          label="Bounty Board"
+          delay={0.47}
+          onClick={() => navigate('/bounties')}
         />
         <GoldTabButton
           icon={Globe}

@@ -9,6 +9,7 @@
 
 const {
   computeBalanceScore,
+  toDateString,
   linearRegression,
   generateInsights,
   generateRecommendations,
@@ -18,7 +19,7 @@ const {
   INSIGHT_TYPES,
   PRIORITY,
   INSIGHT_THRESHOLDS,
-} = require('../services/studyAnalyticsService');
+} = require('../../services/studyAnalyticsService');
 
 describe('studyAnalyticsService', () => {
   // ── Balance Score ────────────────────────────────────────────────────
@@ -343,36 +344,123 @@ describe('studyAnalyticsService', () => {
 
   // ── Period Helpers ───────────────────────────────────────────────────
 
+  /**
+   * Dates here are built with `new Date(year, monthIndex, day)`, which is
+   * local midnight. `new Date('2026-08-15')` is *UTC* midnight, which is a
+   * different calendar day west of UTC — passing that in and asserting on a
+   * local date string tests the runner's timezone rather than the helper.
+   */
+  const localDate = (year, month, day) => new Date(year, month - 1, day);
+
   describe('getWeekPeriod', () => {
     it('should return a 7-day period', () => {
-      const { periodStart, periodEnd } = getWeekPeriod(new Date('2026-08-25'));
-      const start = new Date(periodStart);
-      const end = new Date(periodEnd);
+      const { periodStart, periodEnd } = getWeekPeriod(localDate(2026, 8, 25));
+      const start = new Date(`${periodStart}T00:00:00Z`);
+      const end = new Date(`${periodEnd}T00:00:00Z`);
       const diffDays = Math.round((end - start) / (1000 * 60 * 60 * 24));
       expect(diffDays).toBe(6); // 7 days inclusive = 6 day diff
     });
 
+    it('should start the week on the Monday', () => {
+      // 25 August 2026 is a Tuesday.
+      expect(getWeekPeriod(localDate(2026, 8, 25)).periodStart).toBe('2026-08-24');
+    });
+
+    it('should treat Sunday as the end of the week it closes, not the start of the next', () => {
+      // 30 August 2026 is a Sunday; its week began on Monday the 24th.
+      const { periodStart, periodEnd } = getWeekPeriod(localDate(2026, 8, 30));
+      expect(periodStart).toBe('2026-08-24');
+      expect(periodEnd).toBe('2026-08-30');
+    });
+
+    it('should carry the week across a month boundary', () => {
+      // Monday 31 August 2026 runs into September.
+      const { periodStart, periodEnd } = getWeekPeriod(localDate(2026, 8, 31));
+      expect(periodStart).toBe('2026-08-31');
+      expect(periodEnd).toBe('2026-09-06');
+    });
+
     it('should default to current date when no argument', () => {
       const { periodStart, periodEnd } = getWeekPeriod();
-      expect(periodStart).toBeDefined();
-      expect(periodEnd).toBeDefined();
-      expect(new Date(periodStart).getTime()).toBeLessThanOrEqual(new Date().getTime());
+      const today = toDateString(new Date());
+
+      // Compared as YYYY-MM-DD strings, which sort lexicographically and carry
+      // no timezone. Parsing periodStart back with `new Date()` reads it as UTC
+      // midnight, which is *ahead* of local midnight east of UTC — so early on
+      // a Monday in Auckland the week's own start looked like it was in the
+      // future.
+      expect(periodStart <= today).toBe(true);
+      expect(today <= periodEnd).toBe(true);
     });
   });
 
   describe('getMonthPeriod', () => {
     it('should return a period within the same month', () => {
-      const { periodStart, periodEnd } = getMonthPeriod(new Date('2026-08-15'));
-      expect(periodStart).toMatch(/^2026-08-01/);
-      expect(periodEnd).toMatch(/^2026-08-3[01]/);
+      const { periodStart, periodEnd } = getMonthPeriod(localDate(2026, 8, 15));
+      expect(periodStart).toBe('2026-08-01');
+      expect(periodEnd).toBe('2026-08-31');
+    });
+
+    it('should end February on the 28th in a common year', () => {
+      expect(getMonthPeriod(localDate(2026, 2, 10)).periodEnd).toBe('2026-02-28');
+    });
+
+    it('should end February on the 29th in a leap year', () => {
+      expect(getMonthPeriod(localDate(2028, 2, 10)).periodEnd).toBe('2028-02-29');
+    });
+
+    it('should end a 30-day month on the 30th', () => {
+      expect(getMonthPeriod(localDate(2026, 4, 10)).periodEnd).toBe('2026-04-30');
     });
   });
 
   describe('getDayPeriod', () => {
     it('should return same date for start and end', () => {
-      const { periodStart, periodEnd } = getDayPeriod(new Date('2026-08-15'));
+      const { periodStart, periodEnd } = getDayPeriod(localDate(2026, 8, 15));
       expect(periodStart).toBe('2026-08-15');
       expect(periodEnd).toBe('2026-08-15');
+    });
+  });
+
+  /**
+   * All three helpers build their boundary in local time and used to serialise
+   * it with toISOString(), which converts to UTC first. East of UTC that shifts
+   * the label back a day — local midnight on 1 August in IST is
+   * 2026-07-31T18:30:00Z — so every snapshot period was labelled a day early
+   * for the majority of this app's users.
+   */
+  describe('period labels do not shift with the timezone', () => {
+    it('formats a date from its local calendar fields', () => {
+      expect(toDateString(localDate(2026, 8, 1))).toBe('2026-08-01');
+      expect(toDateString(localDate(2026, 1, 1))).toBe('2026-01-01');
+      expect(toDateString(localDate(2026, 12, 31))).toBe('2026-12-31');
+    });
+
+    it('zero-pads single-digit months and days', () => {
+      expect(toDateString(localDate(2026, 3, 7))).toBe('2026-03-07');
+    });
+
+    it('starts August on the 1st, not on 31 July', () => {
+      // The exact regression: toISOString() on a local-midnight Date.
+      expect(getMonthPeriod(localDate(2026, 8, 15)).periodStart).toBe('2026-08-01');
+    });
+
+    it('reports the local day for a time late in the evening', () => {
+      // 23:30 local on 15 August is already 16 August in UTC for IST.
+      const lateEvening = new Date(2026, 7, 15, 23, 30);
+      expect(getDayPeriod(lateEvening).periodStart).toBe('2026-08-15');
+    });
+
+    it('reports the local day for a time early in the morning', () => {
+      // 00:30 local on 15 August is still 14 August in UTC west of it.
+      const earlyMorning = new Date(2026, 7, 15, 0, 30);
+      expect(getDayPeriod(earlyMorning).periodStart).toBe('2026-08-15');
+    });
+
+    it('keeps the week boundaries on their local days', () => {
+      const { periodStart, periodEnd } = getWeekPeriod(new Date(2026, 7, 25, 23, 45));
+      expect(periodStart).toBe('2026-08-24');
+      expect(periodEnd).toBe('2026-08-30');
     });
   });
 

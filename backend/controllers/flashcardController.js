@@ -678,26 +678,6 @@ exports.reviewFlashcard = async (req, res, next) => {
         .status(400)
         .json({ success: false, error: 'Provide a quality score between 0 and 5' });
     }
-const spacedRepetitionScheduler = require('../services/spacedRepetitionScheduler');
-const DuplicateDetectionService = require('../services/duplicateDetectionService');
-
-// In your review endpoint:
-const submissionToken = req.body.submissionToken || DuplicateDetectionService.generateSubmissionToken(flashcardId);
-const timezone = req.body.timezone || 'UTC';
-const quality = req.body.quality; // 0-5
-
-const reviewResult = await spacedRepetitionScheduler.processReview(
-  flashcardId,
-  quality,
-  submissionToken,
-  timezone
-);
-
-if (!reviewResult.success) {
-  return res.status(400).json(reviewResult);
-}
-
-res.json(reviewResult);
     const card = await Flashcard.findOne({ where: { id: req.params.id, user: req.user.id } });
     if (!card) {
       return res.status(404).json({ success: false, error: 'Flashcard not found' });
@@ -1700,3 +1680,10 @@ exports.getPodcastEpisodeById = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Generate AI flashcards from YouTube lecture video transcript
+// @route   POST /api/flashcards/generate-from-youtube, POST /api/flashcards/from-youtube
+// @access  Private
+const { generateFromYoutube: youtubeGen } = require('./youtubeFlashcardController');
+exports.generateFlashcardsFromYouTube = youtubeGen;
+

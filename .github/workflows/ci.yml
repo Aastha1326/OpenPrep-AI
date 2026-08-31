@@ -29,6 +29,14 @@ jobs:
       - name: Test Repo Scripts
         run: npm run test:scripts
 
+      # server.js is the one backend module no test loads, and it reached main
+      # not parsing at all — two duplicate router declarations behind two lines
+      # of stripped merge residue. This reads it as text, so it runs in the
+      # lint job with no database and no boot.
+      - name: Check Server Wiring
+        run: node scripts/check-server-wiring.js
+        working-directory: backend
+
       # These two report but do not block, because the workflow has not been
       # schedulable for weeks and the backlog built up unchecked: ESLint finds
       # 121 errors and 1538 warnings, and 587 files are not Prettier-clean.
@@ -63,6 +71,14 @@ jobs:
       # so this gate needs no PostgreSQL and no Redis and stays green when the
       # database-backed suites cannot run. Four separate boot failures reached
       # main while nothing in CI ever asked whether a backend module loads.
+      # Reads models/index.js as text, so it needs neither a database nor a
+      # loadable registry. It runs before the suite because when the registry
+      # is broken every vitest file collects zero tests and the run below
+      # reports "no tests" rather than naming the model at fault.
+      - name: Check Model Registry
+        run: npm run check:models
+        working-directory: backend
+
       - name: Check Backend Module Integrity
         run: npm run test:integrity
         working-directory: backend
@@ -99,6 +115,13 @@ jobs:
 
       - name: Install Backend Dependencies
         run: npm install --no-audit
+        working-directory: backend
+
+      # A test file matching neither runner's glob is never executed, and the
+      # run below still prints a healthy pass count. 94 files are in that
+      # state; this fails on a 95th.
+      - name: Check Test Discovery
+        run: node scripts/check-test-discovery.js
         working-directory: backend
 
       - name: Run Backend Tests with Coverage

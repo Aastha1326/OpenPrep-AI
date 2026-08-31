@@ -1,4 +1,4 @@
-const { Op } = require('sequelize');
+const { Op, Transaction } = require('sequelize');
 const { v4: uuidv4 } = require('uuid');
 const PDFDocument = require('pdfkit');
 const { sequelize } = require('../config/db');
@@ -171,14 +171,21 @@ exports.generateAIQuiz = async (req, res, next) => {
       };
     });
 
-    const quiz = await Quiz.create({
-      title: aiQuiz.title || `${topicName} AI Practice Quiz`,
-      subject: subjectId,
-      topic: topicId || null,
-      questions: questionsWithIds,
-      type: 'AI_Generated',
-      language: normalizedLanguage,
-      createdBy: req.user.id,
+    const quiz = await sequelize.transaction(async (t) => {
+      const createdQuiz = await Quiz.create({
+        title: aiQuiz.title || `${topicName} AI Practice Quiz`,
+        subject: subjectId,
+        topic: topicId || null,
+        questions: questionsWithIds,
+        type: 'AI_Generated',
+        language: normalizedLanguage,
+        createdBy: req.user.id,
+      }, { transaction: t });
+      
+      // Mocking associated QuizSettings or QuizMetadata creation
+      // await QuizSettings.create({ quizId: createdQuiz.id, timer: 300 }, { transaction: t });
+
+      return createdQuiz;
     });
 
     await createNotification(
@@ -253,13 +260,6 @@ exports.generateCustomQuiz = async (req, res, next) => {
       .join('\n\n');
 
     const difficultyLevel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
-const quizGenerationService = require('../services/quizGenerationService');
-const generatedQuestions = await quizGenerationService.generateQuestionsWithValidation(
-  topic,
-  questionCount,
-  sourceContext,
-  req.body.quizId
-);
     // Call Gemini Service
     const aiQuiz = await geminiService.generateCustomQuiz(
       subject.name,
@@ -309,15 +309,15 @@ const generatedQuestions = await quizGenerationService.generateQuestionsWithVali
   }
 };
 
+const { getPaginationParams, formatPaginatedResponse } = require('../utils/paginationParams');
+
 // @desc    Get quizzes for a subject
 // @route   GET /api/quizzes
 // @access  Private
 exports.getQuizzes = async (req, res, next) => {
   try {
     const { subjectId } = req.query;
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
-    const offset = (page - 1) * limit;
+    const { page, limit, offset } = getPaginationParams(req.query);
 
     const filter = { createdBy: req.user.id };
     if (subjectId) filter.subject = subjectId;
@@ -340,14 +340,7 @@ exports.getQuizzes = async (req, res, next) => {
       return json;
     });
 
-    res.status(200).json({
-      success: true,
-      count: populatedQuizzes.length,
-      total,
-      page,
-      totalPages: Math.ceil(total / limit),
-      data: populatedQuizzes,
-    });
+    res.status(200).json(formatPaginatedResponse(populatedQuizzes, total, page, limit));
   } catch (error) {
     next(error);
   }

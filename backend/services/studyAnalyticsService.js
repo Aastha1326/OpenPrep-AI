@@ -6,7 +6,6 @@ const QuizAttempt = require('../models/QuizAttempt');
 const Quiz = require('../models/Quiz');
 const Flashcard = require('../models/Flashcard');
 const Subject = require('../models/Subject');
-const FocusSession = require('../models/FocusSession');
 const StudyGoal = require('../models/StudyGoal');
 const StudyGoalProgress = require('../models/StudyGoalProgress');
 const Progress = require('../models/Progress');
@@ -825,6 +824,28 @@ function getDaysBetween(startStr, endStr) {
 
 // ── Period Helpers ───────────────────────────────────────────────────────
 
+/**
+ * Formats a Date as YYYY-MM-DD using its local calendar fields.
+ *
+ * The period helpers below build their boundaries in local time —
+ * `new Date(year, month, 1)`, `setHours(0, 0, 0, 0)` — and used to serialise
+ * them with `toISOString()`, which converts to UTC first. For any timezone
+ * ahead of UTC that shifts the label back a day: local midnight on 1 August in
+ * IST (UTC+5:30) is 2026-07-31T18:30:00Z, so `getMonthPeriod` labelled August
+ * as starting on 31 July. Every snapshot period was off by one for the
+ * majority of this app's users.
+ *
+ * Reading the fields back off the same local Date keeps the label and the
+ * boundary in the same calendar.
+ */
+function toDateString(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
 function getWeekPeriod(date = new Date()) {
   const d = new Date(date);
   const day = d.getDay();
@@ -837,8 +858,8 @@ function getWeekPeriod(date = new Date()) {
   weekEnd.setHours(23, 59, 59, 999);
 
   return {
-    periodStart: weekStart.toISOString().split('T')[0],
-    periodEnd: weekEnd.toISOString().split('T')[0],
+    periodStart: toDateString(weekStart),
+    periodEnd: toDateString(weekEnd),
   };
 }
 
@@ -847,17 +868,17 @@ function getMonthPeriod(date = new Date()) {
   const year = d.getFullYear();
   const month = d.getMonth();
   const monthStart = new Date(year, month, 1);
+  // Day 0 of the next month is the last day of this one.
   const monthEnd = new Date(year, month + 1, 0);
 
   return {
-    periodStart: monthStart.toISOString().split('T')[0],
-    periodEnd: monthEnd.toISOString().split('T')[0],
+    periodStart: toDateString(monthStart),
+    periodEnd: toDateString(monthEnd),
   };
 }
 
 function getDayPeriod(date = new Date()) {
-  const d = new Date(date);
-  const dayStr = d.toISOString().split('T')[0];
+  const dayStr = toDateString(new Date(date));
   return { periodStart: dayStr, periodEnd: dayStr };
 }
 
@@ -891,6 +912,7 @@ module.exports = {
   getDayPeriod,
   linearRegression,
   computeBalanceScore,
+  toDateString,
   INSIGHT_TYPES,
   PRIORITY,
   INSIGHT_THRESHOLDS,
